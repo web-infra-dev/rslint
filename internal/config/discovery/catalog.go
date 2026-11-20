@@ -67,7 +67,7 @@ type ConfigDiscoveryRequest struct {
 	// are combined with already-expanded glob candidates.
 	RecursiveDirectories []rslintconfig.DirectoryIdentity
 	ImplicitCWD          bool
-	// AdditionalGitFiles add exact Git chains without participating in config discovery.
+	// AdditionalGitFiles supply frozen file identities for Git source collection only.
 	AdditionalGitFiles []rslintconfig.PathIdentity
 	Fresh              bool
 	SingleThreaded     bool

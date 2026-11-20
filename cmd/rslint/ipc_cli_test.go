@@ -69,6 +69,25 @@ func TestClassifyPaths(t *testing.T) {
 	}
 }
 
+func TestCLIWorkingDirectoryUsesStoredDirectoryName(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	stored := tspath.CombinePaths(root, "project")
+	if err := os.Mkdir(stored, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alternate := tspath.CombinePaths(root, "PROJECT")
+	if _, err := os.Stat(alternate); os.IsNotExist(err) {
+		t.Skip("fixture requires case-insensitive directory lookup")
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(alternate)
+	cwd, err := new(lintArgs).cliWorkingDirectory()
+	if err != nil || cwd != stored {
+		t.Fatalf("working directory = %q, err = %v, want %q", cwd, err, stored)
+	}
+}
+
 func TestCLIDoubleSlashPaths(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		const unc = "//server/share/file.ts"
@@ -81,7 +100,7 @@ func TestCLIDoubleSlashPaths(t *testing.T) {
 	root := osvfs.FS().Realpath(txtarfs.MustParseFile(t, "testdata/cli_globs.txtar").Materialize(t, ""))
 	t.Chdir(root)
 	t.Setenv("PWD", "/"+root)
-	if cwd, err := cliWorkingDirectory(); err != nil || cwd != root {
+	if cwd, err := new(lintArgs).cliWorkingDirectory(); err != nil || cwd != root {
 		t.Fatalf("working directory = %q, %v; want %q", cwd, err, root)
 	}
 	file := tspath.ResolvePath(root, "src/a.ts")

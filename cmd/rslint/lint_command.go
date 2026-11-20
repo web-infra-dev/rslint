@@ -163,7 +163,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		defer pprof.StopCPUProfile()
 	}
 
-	workingDirectory, err := cliWorkingDirectory()
+	workingDirectory, err := args.cliWorkingDirectory()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting current directory: %v\n", err)
 		return 1
@@ -179,7 +179,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 	var baseline *suppressions.File
 	if !typeCheckOnly {
-		baseline, err = suppressions.Open(args.Suppressions)
+		baseline, err = suppressions.Open(args.Suppressions, args.storedWorkingDirectory)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 2
@@ -352,12 +352,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	var configResolver *configLint.Resolver
 	var projectPolicies map[target.File]rslintconfig.ProjectPolicy
 	if !typeCheckOnly || hasProjectOptions {
-		targetDirectories := configCatalog.TargetDirectories
-		if len(args.GlobRoots) > 0 {
-			// Glob roots govern config discovery; only literal directory inputs
-			// authorize recursive lint-target walking.
-			targetDirectories = rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, fs)
-		}
 		request := target.Request{
 			ConfigMap:       targetConfigMap,
 			Config:          targetRslintConfig,
@@ -367,7 +361,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			FS:              fs,
 			Files:           configCatalog.TargetFiles,
 			ScanDirectories: args.ScanDirectories,
-			Directories:     targetDirectories,
+			Directories:     configCatalog.TargetDirectories,
 			GitPolicy:       configCatalog.GitPolicy,
 			PathSpaces:      pathSpaces,
 			SingleThreaded:  singleThreaded,

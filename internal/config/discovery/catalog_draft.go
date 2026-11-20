@@ -152,9 +152,9 @@ func (draft *catalogDraft) validateDirectoryIdentities(physicalDirectory func(st
 	ownersByPhysical := make(map[string][]rslintconfig.DirectoryIdentity, len(directories))
 	for _, directory := range directories {
 		physicalPath := physicalDirectory(directory)
-		key := configSpellingKey(physicalPath)
+		key := rslintconfig.PathSpellingKey(physicalPath)
 		for _, existing := range ownersByPhysical[key] {
-			if samePhysicalPath(fsys, existing.CanonicalPath, physicalPath) {
+			if rslintconfig.SamePhysicalPath(fsys, existing.CanonicalPath, physicalPath) {
 				return fmt.Errorf( //nolint:staticcheck // Preserve the established user-facing JS API error contract.
 					"Config directories %q and %q resolve to the same filesystem location %q",
 					existing.LexicalPath, directory, physicalPath,

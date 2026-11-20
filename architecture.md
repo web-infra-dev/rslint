@@ -1370,12 +1370,11 @@ Its pure cursors keep raw source reachability separate from authored
 config admission. `config.GitPolicy` compiles that snapshot once and retains
 physical repository roots, source-directory groups and precise covered
 containing directories; it owns no VFS, module loader or owner lookup.
-A file's Git coordinate is its frozen canonical parent plus original basename,
-so a leaf symlink cannot switch Git repositories. Directory aliases use their
-frozen physical roots. Requests hand those typed identities from discovery to
-target planning rather than resolving them again. Distinct explicit directory
-roots remain independent even when one contains another; final selected files
-are deduplicated as before.
+Git matches a file using its physical parent and the name stored in that
+directory. A leaf symlink therefore uses its own name and its containing
+repository's ignore rules. Directory aliases use their physical roots.
+Discovery passes these identities to target planning. Each explicit directory
+root is scanned independently, including when one root contains another.
 
 `target.Request` receives the policy and `target.Plan.GitPolicy()` carries it to
 `config/lint` and file config resolvers alongside `PathSpaces()`. Matching uses
@@ -1398,15 +1397,15 @@ when assembling overlay content, so the selected document overrides other open
 aliases of the same target. Before loading config modules,
 discovery chooses one raw owner-directory spelling for drive-equivalent
 candidates, so candidate priority and plugin routing share one owner.
-Ownership lookup never compares depth across lexical and physical path spaces:
-the nearest exact lexical config wins, a native case alias is accepted only
-after filesystem identity verification, and realpath ancestry is consulted only
-when no lexical owner exists. Directory-walk handoff boundaries are likewise
-built only from the lexical config hierarchy. Canonical paths remain file and
-Program identities, not a second config inheritance tree. Before activation,
-two distinct lexical config directories resolving to one physical directory are
-rejected; verified alternate native casing of the same directory is the only
-allowed alias.
+Ownership lookup tries the nearest exact lexical config first, verifies native
+spelling variants against the filesystem, then falls back to realpath ancestry.
+A parent config's walk stops at the directory entries assigned to child configs.
+On a case-sensitive volume this lets `SRC` own a nested config while its sibling
+`src` still uses the parent config. Canonical paths identify files and Programs.
+When the filesystem returns several spellings for one verified config directory,
+the catalog uses one physical spelling for target selection and Git ignore rules.
+Before activation, discovery rejects two independently named config owners
+that resolve to the same physical directory.
 
 Additional current behaviors:
 

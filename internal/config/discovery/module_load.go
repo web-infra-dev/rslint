@@ -5,18 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
-	"slices"
 	"sort"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/unicode/norm"
 )
 
 type configCandidate struct {
@@ -226,25 +220,14 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 	return nil
 }
 
-// Full Unicode folding supplies a lookup bucket, including canonically equivalent
-// spellings. The filesystem decides whether two names in that bucket are one entry.
-func configSpellingKey(path string) string {
-	for i := range len(path) {
-		if path[i] >= utf8.RuneSelf {
-			return cases.Fold().String(norm.NFD.String(path))
-		}
-	}
-	return strings.ToLower(path)
-}
-
 func (coordinator *moduleLoadCoordinator) configOwner(candidate configCandidate) string {
 	directory := rslintconfig.DirectoryIdentity{LexicalPath: candidate.directory, CanonicalPath: candidate.physicalDirectory}
 	if owner, ok := coordinator.ownerByDirectory[directory]; ok {
 		return owner
 	}
-	key := configSpellingKey(directory.CanonicalPath)
+	key := rslintconfig.PathSpellingKey(directory.CanonicalPath)
 	for _, owner := range coordinator.ownersByPhysical[key] {
-		if samePhysicalPath(coordinator.fs, owner.CanonicalPath, directory.CanonicalPath) &&
+		if rslintconfig.SamePhysicalPath(coordinator.fs, owner.CanonicalPath, directory.CanonicalPath) &&
 			sameDirectoryEntries(coordinator.fs, owner.LexicalPath, directory.LexicalPath) {
 			coordinator.ownerByDirectory[directory] = owner.LexicalPath
 			return owner.LexicalPath
@@ -256,13 +239,14 @@ func (coordinator *moduleLoadCoordinator) configOwner(candidate configCandidate)
 }
 
 // Two distinct symlinks can lead to the same directory, including on a volume
-// with different case sensitivity from the host default. Verify the stored name
-// of each differing component, not only the final filesystem object.
+// with different case sensitivity from the host default. Verify that each
+// differing component addresses the same directory entry.
 func sameDirectoryEntries(fsys vfs.FS, left, right string) bool {
 	left, right = rslintconfig.ExactPathID(left), rslintconfig.ExactPathID(right)
-	native, _ := fsys.(interface{ DirectoryEntryName(path string) string })
+	native, _ := fsys.(interface{ SameDirectoryEntry(left, right string) bool })
+
 	for left != right {
-		parent, otherParent := configDiscoveryParent(left), configDiscoveryParent(right)
+		parent, otherParent := rslintconfig.FilesystemParentDirectory(left), rslintconfig.FilesystemParentDirectory(right)
 		if parent == "" || otherParent == "" {
 			// A UNC share is a filesystem root. Its server and share names are
 			// case-insensitive and need no enumeration above the share.
@@ -271,49 +255,23 @@ func sameDirectoryEntries(fsys vfs.FS, left, right string) bool {
 		name, other := tspath.GetBaseFileName(left), tspath.GetBaseFileName(right)
 		if name != other {
 			if native != nil {
-				name, other = native.DirectoryEntryName(left), native.DirectoryEntryName(right)
+				if !native.SameDirectoryEntry(left, right) {
+					return false
+				}
 			} else {
-				directories := fsys.GetAccessibleEntries(parent).Directories
-				name, other = storedDirectoryName(directories, name), storedDirectoryName(directories, other)
-			}
-			if name == "" || name != other {
-				return false
+				directories := rslintconfig.InputEntryNames(fsys, parent, true)
+				if len(directories) == 0 && otherParent != parent {
+					directories = rslintconfig.InputEntryNames(fsys, otherParent, true)
+				}
+				stored := rslintconfig.StoredEntryName(directories, name)
+				if stored == "" || stored != rslintconfig.StoredEntryName(directories, other) {
+					return false
+				}
 			}
 		}
 		left, right = parent, otherParent
 	}
 	return true
-}
-
-func storedDirectoryName(names []string, requested string) string {
-	if slices.Contains(names, requested) {
-		return requested
-	}
-	// A case-sensitive volume may preserve both Café and café while treating
-	// the composed and decomposed spelling of each as the same entry.
-	for _, key := range []func(string) string{norm.NFD.String, configSpellingKey} {
-		want, match := key(requested), ""
-		for _, name := range names {
-			if key(name) == want {
-				if match != "" {
-					return ""
-				}
-				match = name
-			}
-		}
-		if match != "" {
-			return match
-		}
-	}
-	return ""
-}
-
-func samePhysicalPath(fsys vfs.FS, left, right string) bool {
-	if rslintconfig.ExactPathID(left) == rslintconfig.ExactPathID(right) {
-		return true
-	}
-	leftInfo, rightInfo := fsys.Stat(left), fsys.Stat(right)
-	return leftInfo != nil && rightInfo != nil && os.SameFile(leftInfo, rightInfo)
 }
 
 func (coordinator *moduleLoadCoordinator) validateCandidate(left, right configCandidate) error {
@@ -326,7 +284,7 @@ func (coordinator *moduleLoadCoordinator) validateCandidate(left, right configCa
 	if leftPath, rightPath := left.modulePath(), right.modulePath(); leftPath != rightPath {
 		leftPath = cmp.Or(coordinator.fs.Realpath(leftPath), leftPath)
 		rightPath = cmp.Or(coordinator.fs.Realpath(rightPath), rightPath)
-		if !samePhysicalPath(coordinator.fs, leftPath, rightPath) {
+		if !rslintconfig.SamePhysicalPath(coordinator.fs, leftPath, rightPath) {
 			return fmt.Errorf("config candidates %q and %q resolve to distinct filesystem paths", left.path, right.path)
 		}
 	}

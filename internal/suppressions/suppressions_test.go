@@ -46,7 +46,7 @@ func TestScopedUpdate(t *testing.T) {
 	}
 	run := func(options Options, unused bool) *File {
 		t.Helper()
-		file, err := Open(options)
+		file, err := Open(options, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -72,6 +72,23 @@ func TestScopedUpdate(t *testing.T) {
 	}
 	if !reflect.DeepEqual(pruned.entries, want) {
 		t.Fatalf("prune: got %v, want %v", pruned.entries, want)
+	}
+}
+
+func TestWorkingDirectoryLookupRequiresAnActiveBaseline(t *testing.T) {
+	t.Chdir(t.TempDir())
+	directory := ""
+	stored := func(cwd string) string {
+		directory = cwd
+		return "/stored"
+	}
+	empty, err := Open(Options{}, stored)
+	if err != nil || empty != nil || directory != "" {
+		t.Fatalf("empty check: baseline=%v, observed directory=%q, err=%v", empty, directory, err)
+	}
+	active, err := Open(Options{Mode: Record}, stored)
+	if err != nil || directory == "" || active.fileKey("/stored/file.js") != "file.js" {
+		t.Fatalf("active baseline: observed directory=%q, err=%v", directory, err)
 	}
 }
 
@@ -104,7 +121,7 @@ func TestLintedPathsFromSymlinkedDirectory(t *testing.T) {
 	alias := filepath.ToSlash(filepath.Join(link, "src", "File.js"))
 	run := func(mode Mode, display string, found, visibleCount int) *File {
 		t.Helper()
-		baseline, err := Open(Options{Mode: mode, Location: path})
+		baseline, err := Open(Options{Mode: mode, Location: path}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -139,7 +156,7 @@ func TestLintedPathsFromSymlinkedDirectory(t *testing.T) {
 		root:             filepath.Join(root, "rslint-suppressions_"+cwdHash(native)),
 		"../shared.json": filepath.Join(filepath.Dir(native), "shared.json"),
 	} {
-		store, err := Open(Options{Mode: Record, Location: location})
+		store, err := Open(Options{Mode: Record, Location: location}, nil)
 		if err != nil || store.path != expected {
 			t.Fatalf("location %q: got %v, error %v, want %q", location, store, err, expected)
 		}
@@ -188,11 +205,11 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 	makeDirectoryLink(t, cwd, link)
 	t.Chdir(link)
 	options := Options{Mode: Record}
-	first, err := Open(options)
+	first, err := Open(options, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := Open(options)
+	second, err := Open(options, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +244,7 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 	if err := update(ctx, first, "cancelled"); err == nil {
 		t.Fatal("cancelled update succeeded")
 	}
-	reopened, err := Open(Options{})
+	reopened, err := Open(Options{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,14 +257,14 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 		if err := os.Symlink(DefaultFilename, location); err != nil {
 			t.Skipf("file symlink unavailable: %v", err)
 		}
-		linked, err := Open(Options{Mode: Record, Location: location})
+		linked, err := Open(Options{Mode: Record, Location: location}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := update(t.Context(), linked, "linked"); err != nil {
 			t.Fatal(err)
 		}
-		reopened, err := Open(Options{})
+		reopened, err := Open(Options{}, nil)
 		if err != nil || reopened == nil || reopened.entries["test.js"]["linked"].Count != 1 {
 			t.Fatalf("update through file symlink: %v, error %v", reopened, err)
 		}
@@ -274,7 +291,7 @@ func TestUpdateRechecksTargetAliases(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			baseline, err := Open(test.options)
+			baseline, err := Open(test.options, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -180,14 +180,18 @@ func (policy *GitPolicy) directoryCoverage(physicalDir string) (covered, negatio
 	return covered, negationCanReach
 }
 
-// GitPath preserves the original directory entry name even for a leaf symlink
-// whose target belongs to another repository.
+// GitPath uses the containing directory and its entry name, including for
+// a leaf symlink whose target belongs to another repository.
 func GitPath(target PathIdentity) string {
 	parent := target.CanonicalParentPath
 	if parent == "" {
 		parent = tspath.GetDirectoryPath(target.Path)
 	}
-	return tspath.CombinePaths(parent, tspath.GetBaseFileName(target.Path))
+	name := target.EntryName
+	if name == "" {
+		name = tspath.GetBaseFileName(target.Path)
+	}
+	return tspath.CombinePaths(parent, name)
 }
 
 // CollectGitPolicy is the direct-configuration entrypoint. It observes only

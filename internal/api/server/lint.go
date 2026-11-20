@@ -218,11 +218,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	targetDirectories := rslintconfig.ResolveDirectoryIdentities(inputDirectories, fs)
 	discoveryDirectories := append([]rslintconfig.DirectoryIdentity(nil), targetDirectories...)
 	discoveryDirectories = append(discoveryDirectories, rslintconfig.ResolveDirectoryIdentities(globRoots, fs)...)
-	var recursiveDirectories []rslintconfig.DirectoryIdentity
 	limitDirectoryWalk := len(globRoots) > 0
-	if limitDirectoryWalk {
-		recursiveDirectories = targetDirectories
-	}
 	if req.ConfigDiscovery != nil {
 		for _, directory := range req.ConfigDiscovery.Directories {
 			discoveryDirectories = append(discoveryDirectories, rslintconfig.ResolveDirectoryIdentities([]string{resolveRequestPath(directory)}, fs)...)
@@ -246,6 +242,10 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	for path := range explicitFiles {
 		delete(scanDirectories, path)
+	}
+	var recursiveDirectories []rslintconfig.DirectoryIdentity
+	if limitDirectoryWalk {
+		recursiveDirectories = targetDirectories
 	}
 	var discoveryFiles []discovery.DiscoveryFile
 	if targetFiles != nil {
@@ -271,7 +271,8 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		if err != nil {
 			return nil, fmt.Errorf("resolve inline config inputs: %w", err)
 		}
-		gitPolicy, pathSpaces, targetFiles = catalog.GitPolicy, catalog.PathSpaces, catalog.TargetFiles
+		gitPolicy, pathSpaces = catalog.GitPolicy, catalog.PathSpaces
+		targetFiles, targetDirectories = catalog.TargetFiles, catalog.TargetDirectories
 	}
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
@@ -330,10 +331,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 		gitPolicy = configCatalog.GitPolicy
 		pathSpaces = configCatalog.PathSpaces
-		targetFiles = configCatalog.TargetFiles
-		if targetFiles == nil {
-			targetDirectories = configCatalog.TargetDirectories
-		}
+		targetFiles, targetDirectories = configCatalog.TargetFiles, configCatalog.TargetDirectories
 		if len(configCatalog.Failures) > 0 {
 			printConfigDiscoveryFailures(configCatalog.Failures)
 		}
@@ -381,8 +379,15 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 
 	if gitPolicy == nil {
+		names := rslintconfig.NewInputPathNames(fs)
 		if targetFiles == nil {
 			targetDirectories = rslintconfig.ResolveDirectoryIdentities([]string{currentDirectory}, fs)
+		}
+		for i := range targetDirectories {
+			targetDirectories[i].CanonicalPath = names.Directory(targetDirectories[i].CanonicalPath)
+		}
+		for i := range targetFiles {
+			targetFiles[i] = names.File(targetFiles[i], false)
 		}
 		gitPolicy = rslintconfig.CollectGitPolicy(rslintConfig, configDirectory, fs, targetFiles, targetDirectories)
 	}

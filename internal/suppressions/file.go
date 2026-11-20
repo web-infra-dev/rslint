@@ -20,7 +20,7 @@ const DefaultFilename = "rslint-suppressions.json"
 
 // Open reads the CLI baseline from the process working directory.
 // A plain check without a baseline returns nil.
-func Open(options Options) (*File, error) {
+func Open(options Options, storedDirectory func(string) string) (*File, error) {
 	cwd, err := syscall.Getwd()
 	if err != nil {
 		return nil, err
@@ -58,6 +58,11 @@ func Open(options Options) (*File, error) {
 	if runtime.GOOS == "windows" {
 		// GetCurrentDirectory can retain a junction in the working directory.
 		cwd = osvfs.FS().Realpath(cwd)
+	}
+	// A shared mount can retain the spelling used to enter the directory.
+	// File keys use its stored name even when two invocations enter it differently.
+	if storedDirectory != nil {
+		cwd = storedDirectory(cwd)
 	}
 	f.cwd = tspath.EnsureTrailingDirectorySeparator(cwd)
 	f.entries = data

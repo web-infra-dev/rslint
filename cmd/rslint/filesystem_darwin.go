@@ -24,10 +24,17 @@ func newCLIFileSystem() vfs.FS {
 
 type darwinCLIFileSystem struct{ vfs.FS }
 
-// DirectoryEntryName returns the stored name in the input's parent, preserving
-// a directory symlink's own name. An empty result means it could not be verified.
-func (darwinCLIFileSystem) DirectoryEntryName(path string) string {
-	return darwinDirectoryEntryName(path)
+// SameDirectoryEntry compares the final directory entries without merging
+// distinct hard links to a symlink. The caller checks each earlier component.
+func (darwinCLIFileSystem) SameDirectoryEntry(left, right string) bool {
+	if !filepath.IsAbs(left) || !filepath.IsAbs(right) || !darwinSameParent(left, right) {
+		return false
+	}
+	name, other := darwinDirectoryEntryName(left), darwinDirectoryEntryName(right)
+	if name != "" && other != "" {
+		return name == other
+	}
+	return darwinSameCaseLookup(left, right)
 }
 
 func darwinDirectoryEntryName(path string) string {

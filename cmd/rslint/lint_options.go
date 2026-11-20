@@ -74,6 +74,8 @@ type lintArgs struct {
 	// after read-only target/Program preparation and before any lint or fixes.
 	// The command also joins it on early failure. Nil means already activated.
 	CompleteConfigActivation func() error
+
+	workingDirectoryNames *rslintconfig.InputPathNames
 }
 
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).

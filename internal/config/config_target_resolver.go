@@ -312,12 +312,7 @@ func (resolver *configTargetResolver) resolveTarget(
 }
 
 func (resolver *configTargetResolver) resolveTargetWithGitEntryBlock(discovered PathIdentity, gitEntryBlocked bool) configTargetDecision {
-	target, matches := resolver.resolvePathSpacesWithCanonicalParent(
-		discovered.Path,
-		discovered.CanonicalPath,
-		discovered.CanonicalParentPath,
-		false,
-	)
+	target, matches := resolver.resolvePathSpaces(discovered, false)
 
 	decision := configTargetDecision{selected: isDefaultLintFile(target.path)}
 	decision.globallyIgnored = resolver.globallyIgnores(target, matches, gitEntryBlocked)
@@ -358,34 +353,15 @@ func (resolver *configTargetResolver) resolveTargetWithGitEntryBlock(discovered 
 }
 
 func (resolver *configTargetResolver) resolvePathSpaces(
-	path string,
-	canonicalPath string,
+	identity PathIdentity,
 	directory bool,
 ) (configTargetIdentity, []configTargetMatch) {
-	return resolver.resolvePathSpacesWithCanonicalParent(
-		path,
-		canonicalPath,
-		"",
-		directory,
-	)
-}
-
-func (resolver *configTargetResolver) resolvePathSpacesWithCanonicalParent(
-	path string,
-	canonicalPath string,
-	canonicalParentPath string,
-	directory bool,
-) (configTargetIdentity, []configTargetMatch) {
-	path = tspath.NormalizePath(path)
-	if canonicalPath != "" {
-		canonicalPath = tspath.NormalizePath(canonicalPath)
-	} else if resolver.fs != nil && resolver.needsCanonicalPath(path) {
+	identity = identity.normalized()
+	path, canonicalPath, canonicalParentPath := identity.Path, identity.CanonicalPath, identity.CanonicalParentPath
+	if canonicalPath == "" && resolver.fs != nil && resolver.needsCanonicalPath(path) {
 		if realPath := resolver.fs.Realpath(path); realPath != "" {
 			canonicalPath = tspath.NormalizePath(realPath)
 		}
-	}
-	if canonicalParentPath != "" {
-		canonicalParentPath = tspath.NormalizePath(canonicalParentPath)
 	}
 	matches := make([]configTargetMatch, len(resolver.bases))
 	for index, base := range resolver.bases {
@@ -427,7 +403,7 @@ func (resolver *configTargetResolver) resolvePathSpacesWithCanonicalParent(
 	}
 	gitPath := canonicalPath
 	if !directory {
-		gitPath = GitPath(PathIdentity{Path: path, CanonicalParentPath: canonicalParentPath})
+		gitPath = GitPath(identity)
 	} else if gitPath == "" {
 		gitPath = path
 	}
@@ -517,7 +493,7 @@ func (match *configTargetMatch) applyIgnorePatternGroups(
 }
 
 func (resolver *configTargetResolver) blocksDirectory(path string, canonicalPath string) bool {
-	target, matches := resolver.resolvePathSpaces(path, canonicalPath, true)
+	target, matches := resolver.resolvePathSpaces(PathIdentity{Path: path, CanonicalPath: canonicalPath}, true)
 	return resolver.hasAbsoluteDirectoryBlock(target, matches, false)
 }
 
@@ -603,7 +579,7 @@ func (resolver *configTargetResolver) canPruneDirectory(path string, canonicalPa
 }
 
 func (resolver *configTargetResolver) canPruneDirectoryWithEntry(path string, canonicalPath string, entering bool) bool {
-	target, matches := resolver.resolvePathSpaces(path, canonicalPath, true)
+	target, matches := resolver.resolvePathSpaces(PathIdentity{Path: path, CanonicalPath: canonicalPath}, true)
 	fileLevelCovered, negationCanReach := resolver.gitPolicy.directoryCoverage(target.gitPath)
 	if entering && resolver.gitPolicy.blocksDirectoryEntry(target.gitPath) {
 		fileLevelCovered, negationCanReach = true, false
@@ -688,7 +664,7 @@ func targetPathForPatternGroup(
 }
 
 func (resolver *configTargetResolver) reopensDirectory(path string, canonicalPath string) bool {
-	_, matches := resolver.resolvePathSpaces(path, canonicalPath, true)
+	_, matches := resolver.resolvePathSpaces(PathIdentity{Path: path, CanonicalPath: canonicalPath}, true)
 	reopened := false
 	for _, entryIndex := range resolver.globalEntryIndexes {
 		entry := resolver.entries[entryIndex]

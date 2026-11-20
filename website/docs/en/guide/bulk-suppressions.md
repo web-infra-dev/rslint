@@ -40,7 +40,7 @@ Rslint records the filename it checked, relative to the working directory's phys
 
 For example, if `linked.js` points to `src/app.js`, the two names can match different rules. Checking them in separate runs gives each name its own count. Pruning `linked.js` leaves the entry for `src/app.js` intact.
 
-On macOS, Rslint uses the spelling stored on disk for the working directory. If a directory symlink has several hard links and permissions prevent Rslint from identifying the directory entry, the baseline uses the spelling you supplied.
+Rslint uses the spelling stored on disk for the working directory when the filesystem can identify it. If directory permissions hide that spelling, Rslint keeps the spelling you supplied. Checking two names together can then produce a config conflict if Rslint cannot verify that they use the same config directory.
 
 When a project scan or explicit arguments select both names under the same config, Rslint checks the physical file once. If you ask to record counts for both names, or either name already has a count, Rslint exits with code `2` and identifies both paths. Run Rslint on each path separately, or exclude one name in your config so project scans select the intended entry. Repeating the same filename as `app.js` and `./app.js` works normally. If different config files govern the two names, target selection reports a config conflict and exits with code `1` before applying suppressions.
 

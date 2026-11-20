@@ -317,6 +317,30 @@ func TestGitPolicyUsesPhysicalParentAndOriginalLeafName(t *testing.T) {
 	}
 }
 
+func TestGitPolicyUsesFrozenEntryName(t *testing.T) {
+	const root = "/repo"
+	_, patterns := gitignore.NewCursor(root, true).AppendSourcePatterns(root, "/src/alias.ts\n")
+	policy := NewGitPolicy(gitignore.Snapshot{
+		UseCaseSensitive: true,
+		Roots:            []string{root},
+		Sources:          []gitignore.Source{{Directory: root, Patterns: patterns}},
+	})
+	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{root: entries}, nil)
+	resolver, err := NewFileConfigResolverWithPathSpaces(entries, root, nil, spaces, baseRuleCatalog(), policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := PathIdentity{Path: "/repo/src/ALIAS.ts", CanonicalPath: "/elsewhere/source.ts", CanonicalParentPath: "/repo/src"}
+	if resolver.ResolveTarget(file).GloballyIgnored {
+		t.Fatal("the caller's leaf spelling matched a case-sensitive Git pattern")
+	}
+	file.EntryName = "alias.ts"
+	if !resolver.ResolveTarget(file).GloballyIgnored {
+		t.Fatal("the stored symlink name did not match the Git pattern")
+	}
+}
+
 func TestGitPolicySnapshotAndInputConfigurationAreImmutable(t *testing.T) {
 	root := gitPolicyFixture(t, map[string]string{".git": "", ".gitignore": "dist/\n", "dist/file.ts": "", "src/file.ts": ""})
 	reader := gitignore.NewReader(osvfs.FS())
