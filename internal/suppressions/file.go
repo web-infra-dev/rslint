@@ -196,6 +196,9 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	if err != nil {
 		return err
 	}
+	if err := f.checkTargetAliases(data); err != nil {
+		return err
+	}
 	if data == nil {
 		data = make(entries)
 	}

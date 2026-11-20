@@ -3,6 +3,7 @@ package suppressions
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -28,11 +29,39 @@ type entry struct {
 
 type entries map[string]map[string]entry
 
+type targetAlias struct {
+	selected, other string
+}
+
 type File struct {
-	cwd     string // Physical working directory, slash-separated and ending in a slash.
-	path    string
-	options Options
-	entries entries
+	cwd           string // Physical working directory, slash-separated and ending in a slash.
+	path          string
+	options       Options
+	entries       entries
+	targetAliases []targetAlias
+}
+
+// NoteTargetAlias records two selected filenames for which lint will run only once.
+func (f *File) NoteTargetAlias(selected, other string) {
+	alias := targetAlias{selected: f.fileKey(selected), other: f.fileKey(other)}
+	if alias.selected != alias.other {
+		f.targetAliases = append(f.targetAliases, alias)
+	}
+}
+
+// CheckTargetAliases reports when recording or verifying counts requires both filenames.
+func (f *File) CheckTargetAliases() error {
+	return f.checkTargetAliases(f.entries)
+}
+
+func (f *File) checkTargetAliases(data entries) error {
+	recordingRules := f.options.Mode == Record && (f.options.Rules == nil || len(f.options.Rules) > 0)
+	for _, alias := range f.targetAliases {
+		if recordingRules || len(data[alias.selected]) != 0 || len(data[alias.other]) != 0 {
+			return fmt.Errorf("cannot verify suppressions for %q and %q together because they refer to the same file. Run rslint on each path separately or exclude one path", alias.selected, alias.other)
+		}
+	}
+	return nil
 }
 
 // FileResult identifies a linted target. A completed rule with no diagnostics
@@ -69,10 +98,11 @@ func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []ru
 		}
 		file.counts[diagnostic.RuleName]++
 	}
-	if f.options.Mode != Check {
-		if err := f.update(ctx, files); err != nil {
-			return diagnostics, false, err
-		}
+	var aliasErr error
+	if f.options.Mode == Check {
+		aliasErr = f.CheckTargetAliases()
+	} else if err := f.update(ctx, files); err != nil {
+		return diagnostics, false, err
 	}
 
 	unused := false
@@ -91,7 +121,7 @@ func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []ru
 		count := file.counts[diagnostic.RuleName]
 		return count != 0 && count <= f.entries[file.key][diagnostic.RuleName].Count
 	})
-	return visible, unused, nil
+	return visible, unused, aliasErr
 }
 
 func eligible(d rule.RuleDiagnostic) bool {
