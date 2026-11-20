@@ -1,3 +1,4 @@
+// Upstream: typescript-eslint v8.67.0. Locations verified with the upstream rule.
 import { createTestCases } from './createTestCases';
 
 createTestCases([
@@ -16,6 +17,71 @@ createTestCases([
     options: {
       selector: 'classMethod',
     },
+    locations: [
+      {
+        type: 'Class Method',
+        line: 1,
+        column: 25,
+        endLine: 1,
+        endColumn: 26,
+      },
+      {
+        type: 'Class Method',
+        line: 2,
+        column: 25,
+        endLine: 2,
+        endColumn: 28,
+      },
+      {
+        type: 'Class Method',
+        line: 3,
+        column: 31,
+        endLine: 3,
+        endColumn: 32,
+      },
+      {
+        type: 'Class Method',
+        line: 4,
+        column: 32,
+        endLine: 4,
+        endColumn: 33,
+      },
+      {
+        type: 'Class Method',
+        line: 5,
+        column: 38,
+        endLine: 5,
+        endColumn: 39,
+      },
+      {
+        type: 'Class Method',
+        line: 6,
+        column: 25,
+        endLine: 6,
+        endColumn: 26,
+      },
+      {
+        type: 'Class Method',
+        line: 7,
+        column: 26,
+        endLine: 7,
+        endColumn: 27,
+      },
+      {
+        type: 'Class Method',
+        line: 8,
+        column: 17,
+        endLine: 8,
+        endColumn: 19,
+      },
+      {
+        type: 'Class Method',
+        line: 9,
+        column: 24,
+        endLine: 9,
+        endColumn: 26,
+      },
+    ],
   },
   {
     code: [
@@ -26,6 +92,29 @@ createTestCases([
     options: {
       selector: 'objectLiteralMethod',
     },
+    locations: [
+      {
+        type: 'Object Literal Method',
+        line: 1,
+        column: 19,
+        endLine: 1,
+        endColumn: 20,
+      },
+      {
+        type: 'Object Literal Method',
+        line: 2,
+        column: 19,
+        endLine: 2,
+        endColumn: 22,
+      },
+      {
+        type: 'Object Literal Method',
+        line: 3,
+        column: 19,
+        endLine: 3,
+        endColumn: 20,
+      },
+    ],
   },
   {
     code: [
@@ -41,5 +130,63 @@ createTestCases([
     options: {
       selector: 'typeMethod',
     },
+    locations: [
+      {
+        type: 'Type Method',
+        line: 1,
+        column: 21,
+        endLine: 1,
+        endColumn: 22,
+      },
+      {
+        type: 'Type Method',
+        line: 2,
+        column: 21,
+        endLine: 2,
+        endColumn: 24,
+      },
+      {
+        type: 'Type Method',
+        line: 3,
+        column: 21,
+        endLine: 3,
+        endColumn: 22,
+      },
+      {
+        type: 'Type Method',
+        line: 4,
+        column: 21,
+        endLine: 4,
+        endColumn: 24,
+      },
+      {
+        type: 'Type Method',
+        line: 5,
+        column: 18,
+        endLine: 5,
+        endColumn: 19,
+      },
+      {
+        type: 'Type Method',
+        line: 6,
+        column: 18,
+        endLine: 6,
+        endColumn: 21,
+      },
+      {
+        type: 'Type Method',
+        line: 7,
+        column: 18,
+        endLine: 7,
+        endColumn: 19,
+      },
+      {
+        type: 'Type Method',
+        line: 8,
+        column: 18,
+        endLine: 8,
+        endColumn: 21,
+      },
+    ],
   },
 ]);

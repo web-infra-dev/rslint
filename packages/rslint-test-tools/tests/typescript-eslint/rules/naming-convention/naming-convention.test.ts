@@ -1,17 +1,31 @@
+// Upstream: typescript-eslint v8.67.0; full diagnostics verified against the upstream rule.
+/* eslint-disable @typescript-eslint/internal/no-multiple-lines-of-errors */
 /* eslint-disable @typescript-eslint/internal/plugin-test-formatting -- Prettier doesn't yet support TS 5.6 string literal module identifiers */
 /* eslint-disable @typescript-eslint/internal/prefer-ast-types-enum */
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
-
-import { getFixturesRootDir } from '../../RuleTester';
-
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({
+  plugin: '@typescript-eslint',
+  filename: 'file.ts',
+  fixtureFiles: {
+    'tsconfig.json': JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: 'es2015',
+        module: 'commonjs',
+        lib: ['es2015', 'es2017', 'esnext', 'dom'],
+        types: [],
+        experimentalDecorators: true,
+      },
+      include: ['file.ts'],
+    }),
+  },
+});
 
 // only need parserOptions for the `type` option tests
-const rootDir = getFixturesRootDir();
 const parserOptions = {
   project: './tsconfig.json',
-  tsconfigRootDir: rootDir,
+  projectService: false,
 };
 
 ruleTester.run('naming-convention', {
@@ -19,19 +33,49 @@ ruleTester.run('naming-convention', {
     {
       // make sure we handle no options and apply defaults
       code: 'const x_x = 1;',
-      errors: [{ messageId: 'doesNotMatchFormat' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `x_x` must match one of the following formats: camelCase, UPPER_CASE',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
     {
       // make sure we handle empty options and apply defaults
       code: 'const x_x = 1;',
-      errors: [{ messageId: 'doesNotMatchFormat' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `x_x` must match one of the following formats: camelCase, UPPER_CASE',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
       options: [],
     },
     {
       code: `
         const child_process = require('child_process');
       `,
-      errors: [{ messageId: 'doesNotMatchFormat' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `child_process` must match one of the following formats: camelCase',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 28,
+        },
+      ],
       languageOptions: { parserOptions },
       options: [
         {
@@ -66,7 +110,179 @@ ruleTester.run('naming-convention', {
         declare const boolean_camelCase15: false | null | undefined;
         declare const boolean_camelCase16: true | false | null | undefined;
       `,
-      errors: Array(19).fill({ messageId: 'doesNotMatchFormatTrimmed' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `any_camelCase01` trimmed as `camelCase01` must match one of the following formats: UPPER_CASE',
+          line: 2,
+          column: 23,
+          endLine: 2,
+          endColumn: 43,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `any_camelCase02` trimmed as `camelCase02` must match one of the following formats: UPPER_CASE',
+          line: 3,
+          column: 23,
+          endLine: 3,
+          endColumn: 50,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `any_camelCase03` trimmed as `camelCase03` must match one of the following formats: UPPER_CASE',
+          line: 4,
+          column: 23,
+          endLine: 4,
+          endColumn: 62,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `string_camelCase01` trimmed as `camelCase01` must match one of the following formats: snake_case',
+          line: 5,
+          column: 23,
+          endLine: 5,
+          endColumn: 49,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `string_camelCase02` trimmed as `camelCase02` must match one of the following formats: snake_case',
+          line: 6,
+          column: 23,
+          endLine: 6,
+          endColumn: 56,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `string_camelCase03` trimmed as `camelCase03` must match one of the following formats: snake_case',
+          line: 7,
+          column: 23,
+          endLine: 7,
+          endColumn: 68,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `string_camelCase04` trimmed as `camelCase04` must match one of the following formats: snake_case',
+          line: 8,
+          column: 23,
+          endLine: 8,
+          endColumn: 65,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `string_camelCase05` trimmed as `camelCase05` must match one of the following formats: snake_case',
+          line: 9,
+          column: 23,
+          endLine: 9,
+          endColumn: 74,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `number_camelCase06` trimmed as `camelCase06` must match one of the following formats: snake_case',
+          line: 10,
+          column: 23,
+          endLine: 10,
+          endColumn: 49,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `number_camelCase07` trimmed as `camelCase07` must match one of the following formats: snake_case',
+          line: 11,
+          column: 23,
+          endLine: 11,
+          endColumn: 56,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `number_camelCase08` trimmed as `camelCase08` must match one of the following formats: snake_case',
+          line: 12,
+          column: 23,
+          endLine: 12,
+          endColumn: 68,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `number_camelCase09` trimmed as `camelCase09` must match one of the following formats: snake_case',
+          line: 13,
+          column: 23,
+          endLine: 13,
+          endColumn: 63,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `number_camelCase10` trimmed as `camelCase10` must match one of the following formats: snake_case',
+          line: 14,
+          column: 23,
+          endLine: 14,
+          endColumn: 72,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `boolean_camelCase11` trimmed as `camelCase11` must match one of the following formats: snake_case',
+          line: 15,
+          column: 23,
+          endLine: 15,
+          endColumn: 51,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `boolean_camelCase12` trimmed as `camelCase12` must match one of the following formats: snake_case',
+          line: 16,
+          column: 23,
+          endLine: 16,
+          endColumn: 58,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `boolean_camelCase13` trimmed as `camelCase13` must match one of the following formats: snake_case',
+          line: 17,
+          column: 23,
+          endLine: 17,
+          endColumn: 70,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `boolean_camelCase14` trimmed as `camelCase14` must match one of the following formats: snake_case',
+          line: 18,
+          column: 23,
+          endLine: 18,
+          endColumn: 67,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `boolean_camelCase15` trimmed as `camelCase15` must match one of the following formats: snake_case',
+          line: 19,
+          column: 23,
+          endLine: 19,
+          endColumn: 68,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `boolean_camelCase16` trimmed as `camelCase16` must match one of the following formats: snake_case',
+          line: 20,
+          column: 23,
+          endLine: 20,
+          endColumn: 75,
+        },
+      ],
       languageOptions: { parserOptions },
       options: [
         {
@@ -106,7 +322,44 @@ ruleTester.run('naming-convention', {
           | null
           | undefined;
       `,
-      errors: Array(4).fill({ messageId: 'doesNotMatchFormatTrimmed' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `function_camelCase1` trimmed as `camelCase1` must match one of the following formats: snake_case',
+          line: 2,
+          column: 23,
+          endLine: 2,
+          endColumn: 54,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `function_camelCase2` trimmed as `camelCase2` must match one of the following formats: snake_case',
+          line: 3,
+          column: 23,
+          endLine: 3,
+          endColumn: 63,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `function_camelCase3` trimmed as `camelCase3` must match one of the following formats: snake_case',
+          line: 4,
+          column: 23,
+          endLine: 4,
+          endColumn: 75,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `function_camelCase4` trimmed as `camelCase4` must match one of the following formats: snake_case',
+          line: 5,
+          column: 23,
+          endLine: 9,
+          endColumn: 22,
+        },
+      ],
       languageOptions: { parserOptions },
       options: [
         {
@@ -137,7 +390,80 @@ ruleTester.run('naming-convention', {
           | null
           | undefined;
       `,
-      errors: Array(8).fill({ messageId: 'doesNotMatchFormatTrimmed' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `array_camelCase1` trimmed as `camelCase1` must match one of the following formats: snake_case',
+          line: 2,
+          column: 23,
+          endLine: 2,
+          endColumn: 54,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `array_camelCase2` trimmed as `camelCase2` must match one of the following formats: snake_case',
+          line: 3,
+          column: 23,
+          endLine: 3,
+          endColumn: 69,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `array_camelCase3` trimmed as `camelCase3` must match one of the following formats: snake_case',
+          line: 4,
+          column: 23,
+          endLine: 4,
+          endColumn: 68,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `array_camelCase4` trimmed as `camelCase4` must match one of the following formats: snake_case',
+          line: 5,
+          column: 23,
+          endLine: 5,
+          endColumn: 77,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `array_camelCase5` trimmed as `camelCase5` must match one of the following formats: snake_case',
+          line: 6,
+          column: 23,
+          endLine: 10,
+          endColumn: 22,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `array_camelCase6` trimmed as `camelCase6` must match one of the following formats: snake_case',
+          line: 11,
+          column: 23,
+          endLine: 11,
+          endColumn: 62,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `array_camelCase7` trimmed as `camelCase7` must match one of the following formats: snake_case',
+          line: 12,
+          column: 23,
+          endLine: 12,
+          endColumn: 68,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `array_camelCase8` trimmed as `camelCase8` must match one of the following formats: snake_case',
+          line: 13,
+          column: 23,
+          endLine: 18,
+          endColumn: 22,
+        },
+      ],
       languageOptions: { parserOptions },
       options: [
         {
@@ -151,61 +477,16 @@ ruleTester.run('naming-convention', {
     {
       code: `
         let unused_foo = 'a';
-        const _unused_foo = 1;
-        interface IFoo {}
-        class IBar {}
-        function fooBar() {}
       `,
       errors: [
         {
-          data: {
-            name: 'unused_foo',
-            regex: '/^unused_\\w/u',
-            regexMatch: 'not match',
-            type: 'Variable',
-          },
+          messageId: 'satisfyCustom',
+          message:
+            'Variable name `unused_foo` must not match the RegExp: /^unused_\\w/u',
           line: 2,
-          messageId: 'satisfyCustom',
-        },
-        {
-          data: {
-            name: '_unused_foo',
-            regex: '/^unused_\\w/u',
-            regexMatch: 'not match',
-            type: 'Variable',
-          },
-          line: 3,
-          messageId: 'satisfyCustom',
-        },
-        {
-          data: {
-            name: 'IFoo',
-            regex: '/^I[A-Z]/u',
-            regexMatch: 'not match',
-            type: 'Interface',
-          },
-          line: 4,
-          messageId: 'satisfyCustom',
-        },
-        {
-          data: {
-            name: 'IBar',
-            regex: '/^I[A-Z]/u',
-            regexMatch: 'not match',
-            type: 'Class',
-          },
-          line: 5,
-          messageId: 'satisfyCustom',
-        },
-        {
-          data: {
-            name: 'fooBar',
-            regex: '/function/u',
-            regexMatch: 'match',
-            type: 'Function',
-          },
-          line: 6,
-          messageId: 'satisfyCustom',
+          column: 13,
+          endLine: 2,
+          endColumn: 23,
         },
       ],
       options: [
@@ -218,6 +499,51 @@ ruleTester.run('naming-convention', {
           leadingUnderscore: 'allow',
           selector: 'default',
         },
+      ],
+    },
+    {
+      code: `
+        const _unused_foo = 1;
+      `,
+      errors: [
+        {
+          messageId: 'satisfyCustom',
+          message:
+            'Variable name `_unused_foo` must not match the RegExp: /^unused_\\w/u',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 26,
+        },
+      ],
+      options: [
+        {
+          custom: {
+            match: false,
+            regex: /^unused_\w/.source,
+          },
+          format: ['snake_case'],
+          leadingUnderscore: 'allow',
+          selector: 'default',
+        },
+      ],
+    },
+    {
+      code: `
+        interface IFoo {}
+      `,
+      errors: [
+        {
+          messageId: 'satisfyCustom',
+          message:
+            'Interface name `IFoo` must not match the RegExp: /^I[A-Z]/u',
+          line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 23,
+        },
+      ],
+      options: [
         {
           custom: {
             match: false,
@@ -226,6 +552,48 @@ ruleTester.run('naming-convention', {
           format: ['PascalCase'],
           selector: 'typeLike',
         },
+      ],
+    },
+    {
+      code: `
+        class IBar {}
+      `,
+      errors: [
+        {
+          messageId: 'satisfyCustom',
+          message: 'Class name `IBar` must not match the RegExp: /^I[A-Z]/u',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 19,
+        },
+      ],
+      options: [
+        {
+          custom: {
+            match: false,
+            regex: /^I[A-Z]/.source,
+          },
+          format: ['PascalCase'],
+          selector: 'typeLike',
+        },
+      ],
+    },
+    {
+      code: `
+        function fooBar() {}
+      `,
+      errors: [
+        {
+          messageId: 'satisfyCustom',
+          message: 'Function name `fooBar` must match the RegExp: /function/u',
+          line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 24,
+        },
+      ],
+      options: [
         {
           custom: {
             match: true,
@@ -240,59 +608,110 @@ ruleTester.run('naming-convention', {
     {
       code: `
         let unused_foo = 'a';
+      `,
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `unused_foo` must match one of the following formats: camelCase',
+          line: 2,
+          column: 13,
+          endLine: 2,
+          endColumn: 23,
+        },
+      ],
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'allow',
+          selector: ['variable', 'function'],
+        },
+      ],
+    },
+    {
+      code: `
         const _unused_foo = 1;
+      `,
+      errors: [
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `_unused_foo` trimmed as `unused_foo` must match one of the following formats: camelCase',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 26,
+        },
+      ],
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'allow',
+          selector: ['variable', 'function'],
+        },
+      ],
+    },
+    {
+      code: `
         function foo_bar() {}
+      `,
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Function name `foo_bar` must match one of the following formats: camelCase',
+          line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 25,
+        },
+      ],
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'allow',
+          selector: ['variable', 'function'],
+        },
+      ],
+    },
+    {
+      code: `
         interface IFoo {}
+      `,
+      errors: [
+        {
+          messageId: 'satisfyCustom',
+          message:
+            'Interface name `IFoo` must not match the RegExp: /^I[A-Z]/u',
+          line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 23,
+        },
+      ],
+      options: [
+        {
+          custom: {
+            match: false,
+            regex: /^I[A-Z]/.source,
+          },
+          format: ['PascalCase'],
+          selector: ['class', 'interface'],
+        },
+      ],
+    },
+    {
+      code: `
         class IBar {}
       `,
       errors: [
         {
-          data: {
-            formats: 'camelCase',
-            name: 'unused_foo',
-            type: 'Variable',
-          },
+          messageId: 'satisfyCustom',
+          message: 'Class name `IBar` must not match the RegExp: /^I[A-Z]/u',
           line: 2,
-          messageId: 'doesNotMatchFormat',
-        },
-        {
-          data: {
-            formats: 'camelCase',
-            name: '_unused_foo',
-            processedName: 'unused_foo',
-            type: 'Variable',
-          },
-          line: 3,
-          messageId: 'doesNotMatchFormatTrimmed',
-        },
-        {
-          data: {
-            formats: 'camelCase',
-            name: 'foo_bar',
-            type: 'Function',
-          },
-          line: 4,
-          messageId: 'doesNotMatchFormat',
-        },
-        {
-          data: {
-            name: 'IFoo',
-            regex: '/^I[A-Z]/u',
-            regexMatch: 'not match',
-            type: 'Interface',
-          },
-          line: 5,
-          messageId: 'satisfyCustom',
-        },
-        {
-          data: {
-            name: 'IBar',
-            regex: '/^I[A-Z]/u',
-            regexMatch: 'not match',
-            type: 'Class',
-          },
-          line: 6,
-          messageId: 'satisfyCustom',
+          column: 15,
+          endLine: 2,
+          endColumn: 19,
         },
       ],
       options: [
@@ -319,13 +738,13 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'strictCamelCase',
-            name: 'Property Name',
-            type: 'Object Literal Property',
-          },
-          line: 3,
           messageId: 'doesNotMatchFormat',
+          message:
+            'Object Literal Property name `Property Name` must match one of the following formats: strictCamelCase',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 26,
         },
       ],
       options: [
@@ -347,7 +766,35 @@ ruleTester.run('naming-convention', {
           Myfoo: string;
         }
       `,
-      errors: Array(3).fill({ messageId: 'doesNotMatchFormatTrimmed' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Variable name `myfoo_bar` trimmed as `foo_bar` must match one of the following formats: PascalCase',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 24,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Parameter name `myfoo` trimmed as `foo` must match one of the following formats: PascalCase',
+          line: 3,
+          column: 22,
+          endLine: 3,
+          endColumn: 35,
+        },
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Class Property name `Myfoo` trimmed as `foo` must match one of the following formats: PascalCase',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 16,
+        },
+      ],
       languageOptions: { parserOptions },
       options: [
         {
@@ -364,7 +811,17 @@ ruleTester.run('naming-convention', {
           private readonly fooBar: boolean;
         }
       `,
-      errors: [{ messageId: 'doesNotMatchFormat' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Class Property name `fooBar` must match one of the following formats: PascalCase',
+          line: 3,
+          column: 28,
+          endLine: 3,
+          endColumn: 34,
+        },
+      ],
       options: [
         {
           format: ['PascalCase'],
@@ -377,7 +834,17 @@ ruleTester.run('naming-convention', {
       code: `
         function my_foo_bar() {}
       `,
-      errors: [{ messageId: 'doesNotMatchFormatTrimmed' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormatTrimmed',
+          message:
+            'Function name `my_foo_bar` trimmed as `_foo_bar` must match one of the following formats: PascalCase',
+          line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 28,
+        },
+      ],
       languageOptions: { parserOptions },
       options: [
         {
@@ -398,8 +865,13 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          line: 3,
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Property name `otherConstant` must match one of the following formats: PascalCase',
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 31,
         },
       ],
       languageOptions: { parserOptions },
@@ -416,8 +888,13 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          line: 3,
           messageId: 'doesNotMatchFormat',
+          message:
+            'Parameter name `Baz` must match one of the following formats: camelCase',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 26,
         },
       ],
       languageOptions: { parserOptions },
@@ -432,7 +909,62 @@ ruleTester.run('naming-convention', {
         export interface PascalCaseInterface {}
         export type PascalCaseType = {};
       `,
-      errors: Array(6).fill({ messageId: 'doesNotMatchFormat' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `PascalCaseVar` must match one of the following formats: camelCase',
+          line: 2,
+          column: 22,
+          endLine: 2,
+          endColumn: 35,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Enum name `PascalCaseEnum` must match one of the following formats: camelCase',
+          line: 3,
+          column: 21,
+          endLine: 3,
+          endColumn: 35,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Class name `PascalCaseClass` must match one of the following formats: camelCase',
+          line: 4,
+          column: 22,
+          endLine: 4,
+          endColumn: 37,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Function name `PascalCaseFunction` must match one of the following formats: camelCase',
+          line: 5,
+          column: 25,
+          endLine: 5,
+          endColumn: 43,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Interface name `PascalCaseInterface` must match one of the following formats: camelCase',
+          line: 6,
+          column: 26,
+          endLine: 6,
+          endColumn: 45,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Alias name `PascalCaseType` must match one of the following formats: camelCase',
+          line: 7,
+          column: 21,
+          endLine: 7,
+          endColumn: 35,
+        },
+      ],
       options: [
         {
           format: ['snake_case'],
@@ -487,7 +1019,62 @@ ruleTester.run('naming-convention', {
           PascalCaseType,
         };
       `,
-      errors: Array(6).fill({ messageId: 'doesNotMatchFormat' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `PascalCaseVar` must match one of the following formats: camelCase',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 28,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Enum name `PascalCaseEnum` must match one of the following formats: camelCase',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 28,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Class name `PascalCaseClass` must match one of the following formats: camelCase',
+          line: 4,
+          column: 15,
+          endLine: 4,
+          endColumn: 30,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Function name `PascalCaseFunction` must match one of the following formats: camelCase',
+          line: 5,
+          column: 18,
+          endLine: 5,
+          endColumn: 36,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Interface name `PascalCaseInterface` must match one of the following formats: camelCase',
+          line: 6,
+          column: 19,
+          endLine: 6,
+          endColumn: 38,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Alias name `PascalCaseType` must match one of the following formats: camelCase',
+          line: 7,
+          column: 14,
+          endLine: 7,
+          endColumn: 28,
+        },
+      ],
       options: [
         { format: ['snake_case'], selector: 'default' },
         {
@@ -528,7 +1115,35 @@ ruleTester.run('naming-convention', {
         function PascalCaseFunction() {}
         declare function PascalCaseDeclaredFunction();
       `,
-      errors: Array(3).fill({ messageId: 'doesNotMatchFormat' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `PascalCaseVar` must match one of the following formats: camelCase',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 28,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Function name `PascalCaseFunction` must match one of the following formats: camelCase',
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 36,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Function name `PascalCaseDeclaredFunction` must match one of the following formats: camelCase',
+          line: 4,
+          column: 26,
+          endLine: 4,
+          endColumn: 52,
+        },
+      ],
       options: [
         { format: ['snake_case'], selector: 'default' },
         {
@@ -551,7 +1166,26 @@ ruleTester.run('naming-convention', {
         const { ignored: IgnoredDueToModifiers2 = 3 } = {};
         const IgnoredDueToModifiers3 = 1;
       `,
-      errors: Array(2).fill({ messageId: 'doesNotMatchFormat' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `some_name1` must match one of the following formats: UPPER_CASE',
+          line: 2,
+          column: 17,
+          endLine: 2,
+          endColumn: 27,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `some_name2` must match one of the following formats: UPPER_CASE',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 27,
+        },
+      ],
       options: [
         {
           format: ['PascalCase'],
@@ -574,7 +1208,26 @@ ruleTester.run('naming-convention', {
           IgnoredDueToModifiers2,
         ) {}
       `,
-      errors: Array(2).fill({ messageId: 'doesNotMatchFormat' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Parameter name `aName` must match one of the following formats: UPPER_CASE',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 18,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Parameter name `anotherName` must match one of the following formats: UPPER_CASE',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 24,
+        },
+      ],
       options: [
         {
           format: ['PascalCase'],
@@ -594,7 +1247,17 @@ ruleTester.run('naming-convention', {
           IgnoredDueToModifiers = 1;
         }
       `,
-      errors: [{ messageId: 'doesNotMatchFormat' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Class Property name `some_name` must match one of the following formats: UPPER_CASE',
+          line: 3,
+          column: 44,
+          endLine: 3,
+          endColumn: 53,
+        },
+      ],
       options: [
         {
           format: ['PascalCase'],
@@ -616,7 +1279,17 @@ ruleTester.run('naming-convention', {
           ) {}
         }
       `,
-      errors: [{ messageId: 'doesNotMatchFormat' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Parameter Property name `some_name` must match one of the following formats: UPPER_CASE',
+          line: 4,
+          column: 30,
+          endLine: 4,
+          endColumn: 39,
+        },
+      ],
       options: [
         {
           format: ['PascalCase'],
@@ -632,11 +1305,21 @@ ruleTester.run('naming-convention', {
     {
       code: `
         class Ignored {
-          private static abstract some_name() {}
+          private static some_name() {}
           IgnoredDueToModifiers() {}
         }
       `,
-      errors: [{ messageId: 'doesNotMatchFormat' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Class Method name `some_name` must match one of the following formats: UPPER_CASE',
+          line: 3,
+          column: 26,
+          endLine: 3,
+          endColumn: 35,
+        },
+      ],
       options: [
         {
           format: ['PascalCase'],
@@ -644,7 +1327,7 @@ ruleTester.run('naming-convention', {
         },
         {
           format: ['UPPER_CASE'],
-          modifiers: ['abstract', 'static'],
+          modifiers: ['static'],
           selector: 'classMethod',
         },
       ],
@@ -656,7 +1339,17 @@ ruleTester.run('naming-convention', {
           get IgnoredDueToModifiers() {}
         }
       `,
-      errors: [{ messageId: 'doesNotMatchFormat' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Classic Accessor name `some_name` must match one of the following formats: UPPER_CASE',
+          line: 3,
+          column: 30,
+          endLine: 3,
+          endColumn: 39,
+        },
+      ],
       options: [
         {
           format: ['PascalCase'],
@@ -674,7 +1367,17 @@ ruleTester.run('naming-convention', {
         abstract class some_name {}
         class IgnoredDueToModifier {}
       `,
-      errors: [{ messageId: 'doesNotMatchFormat' }],
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Class name `some_name` must match one of the following formats: UPPER_CASE',
+          line: 2,
+          column: 24,
+          endLine: 2,
+          endColumn: 33,
+        },
+      ],
       options: [
         {
           format: ['PascalCase'],
@@ -701,7 +1404,71 @@ ruleTester.run('naming-convention', {
           UnusedTypeParam,
         > = {};
       `,
-      errors: Array(7).fill({ messageId: 'doesNotMatchFormat' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `UnusedVar` must match one of the following formats: snake_case',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 24,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Function name `UnusedFunc` must match one of the following formats: snake_case',
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 28,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Parameter name `UnusedParam` must match one of the following formats: snake_case',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 30,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Class name `UnusedClass` must match one of the following formats: snake_case',
+          line: 7,
+          column: 15,
+          endLine: 7,
+          endColumn: 26,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Interface name `UnusedInterface` must match one of the following formats: snake_case',
+          line: 8,
+          column: 19,
+          endLine: 8,
+          endColumn: 34,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Alias name `UnusedType` must match one of the following formats: snake_case',
+          line: 9,
+          column: 14,
+          endLine: 9,
+          endColumn: 24,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Parameter name `UnusedTypeParam` must match one of the following formats: snake_case',
+          line: 11,
+          column: 11,
+          endLine: 11,
+          endColumn: 26,
+        },
+      ],
       options: [
         {
           format: ['PascalCase'],
@@ -744,7 +1511,125 @@ ruleTester.run('naming-convention', {
           'a a',
         }
       `,
-      errors: Array(13).fill({ messageId: 'doesNotMatchFormat' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Object Literal Property name `a a` must match one of the following formats: PascalCase',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 16,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Object Literal Method name `b b` must match one of the following formats: PascalCase',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 16,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Classic Accessor name `c c` must match one of the following formats: PascalCase',
+          line: 5,
+          column: 15,
+          endLine: 5,
+          endColumn: 20,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Classic Accessor name `d d` must match one of the following formats: PascalCase',
+          line: 8,
+          column: 15,
+          endLine: 8,
+          endColumn: 20,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Class Property name `a a` must match one of the following formats: PascalCase',
+          line: 11,
+          column: 11,
+          endLine: 11,
+          endColumn: 16,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Class Method name `b b` must match one of the following formats: PascalCase',
+          line: 12,
+          column: 11,
+          endLine: 12,
+          endColumn: 16,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Classic Accessor name `c c` must match one of the following formats: PascalCase',
+          line: 13,
+          column: 15,
+          endLine: 13,
+          endColumn: 20,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Classic Accessor name `d d` must match one of the following formats: PascalCase',
+          line: 16,
+          column: 15,
+          endLine: 16,
+          endColumn: 20,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Property name `a a` must match one of the following formats: PascalCase',
+          line: 19,
+          column: 11,
+          endLine: 19,
+          endColumn: 16,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Method name `b b` must match one of the following formats: PascalCase',
+          line: 20,
+          column: 11,
+          endLine: 20,
+          endColumn: 16,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Property name `a a` must match one of the following formats: PascalCase',
+          line: 23,
+          column: 11,
+          endLine: 23,
+          endColumn: 16,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Method name `b b` must match one of the following formats: PascalCase',
+          line: 24,
+          column: 11,
+          endLine: 24,
+          endColumn: 16,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Enum Member name `a a` must match one of the following formats: PascalCase',
+          line: 27,
+          column: 11,
+          endLine: 27,
+          endColumn: 16,
+        },
+      ],
       options: [
         {
           format: ['snake_case'],
@@ -758,7 +1643,7 @@ ruleTester.run('naming-convention', {
       ],
     },
     {
-      code: noFormat`
+      code: `
         type Foo = {
           'foo     Bar': string;
           '': string;
@@ -773,7 +1658,62 @@ ruleTester.run('naming-convention', {
         }
       `,
       // 6, not 7 because 'foo' is valid
-      errors: Array(6).fill({ messageId: 'doesNotMatchFormat' }),
+      errors: [
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Property name `foo     Bar` must match one of the following formats: camelCase',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 24,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Property name `` must match one of the following formats: camelCase',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 13,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Property name `0` must match one of the following formats: camelCase',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 14,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Property name `foo-bar` must match one of the following formats: camelCase',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 20,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Property name `#foo-bar` must match one of the following formats: camelCase',
+          line: 8,
+          column: 11,
+          endLine: 8,
+          endColumn: 21,
+        },
+        {
+          messageId: 'doesNotMatchFormat',
+          message:
+            'Type Property name `boo-----foo` must match one of the following formats: camelCase',
+          line: 12,
+          column: 11,
+          endLine: 12,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: `
@@ -806,36 +1746,40 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'snake_case',
-            name: 'asyncBar',
-            type: 'Class Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Method name `asyncBar` must match one of the following formats: snake_case',
+          line: 10,
+          column: 24,
+          endLine: 10,
+          endColumn: 32,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'AsyncBar2',
-            type: 'Class Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Method name `AsyncBar2` must match one of the following formats: snake_case',
+          line: 14,
+          column: 18,
+          endLine: 14,
+          endColumn: 27,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'AsyncBar3',
-            type: 'Class Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Method name `AsyncBar3` must match one of the following formats: snake_case',
+          line: 18,
+          column: 18,
+          endLine: 18,
+          endColumn: 27,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'ASYNC_BAR',
-            type: 'Class Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Method name `ASYNC_BAR` must match one of the following formats: snake_case',
+          line: 26,
+          column: 33,
+          endLine: 26,
+          endColumn: 42,
         },
       ],
       languageOptions: { parserOptions },
@@ -880,28 +1824,31 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'snake_case',
-            name: 'AsyncBar',
-            type: 'Object Literal Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Object Literal Method name `AsyncBar` must match one of the following formats: snake_case',
+          line: 10,
+          column: 17,
+          endLine: 10,
+          endColumn: 25,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'AsyncBar2',
-            type: 'Object Literal Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Object Literal Method name `AsyncBar2` must match one of the following formats: snake_case',
+          line: 14,
+          column: 11,
+          endLine: 14,
+          endColumn: 20,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'AsyncBar3',
-            type: 'Object Literal Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Object Literal Method name `AsyncBar3` must match one of the following formats: snake_case',
+          line: 18,
+          column: 11,
+          endLine: 18,
+          endColumn: 20,
         },
       ],
       languageOptions: { parserOptions },
@@ -937,20 +1884,22 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'snake_case',
-            name: 'AsyncBar1',
-            type: 'Variable',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `AsyncBar1` must match one of the following formats: snake_case',
+          line: 7,
+          column: 15,
+          endLine: 7,
+          endColumn: 24,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'asyncBar5',
-            type: 'Variable',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Variable name `asyncBar5` must match one of the following formats: snake_case',
+          line: 12,
+          column: 15,
+          endLine: 12,
+          endColumn: 24,
         },
       ],
       languageOptions: { parserOptions },
@@ -982,20 +1931,22 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'snake_case',
-            name: 'asyncBar2',
-            type: 'Function',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Function name `asyncBar2` must match one of the following formats: snake_case',
+          line: 8,
+          column: 24,
+          endLine: 8,
+          endColumn: 33,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'ASYNC_BAR4',
-            type: 'Function',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Function name `ASYNC_BAR4` must match one of the following formats: snake_case',
+          line: 12,
+          column: 43,
+          endLine: 12,
+          endColumn: 53,
         },
       ],
       languageOptions: { parserOptions },
@@ -1022,12 +1973,13 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'snake_case',
-            name: 'someAttributeOverride',
-            type: 'Class Property',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Property name `someAttributeOverride` must match one of the following formats: snake_case',
+          line: 6,
+          column: 27,
+          endLine: 6,
+          endColumn: 48,
         },
       ],
       languageOptions: { parserOptions },
@@ -1057,12 +2009,13 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'snake_case',
-            name: 'someMethodOverride',
-            type: 'Class Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Method name `someMethodOverride` must match one of the following formats: snake_case',
+          line: 7,
+          column: 27,
+          endLine: 7,
+          endColumn: 45,
         },
       ],
       languageOptions: { parserOptions },
@@ -1093,20 +2046,22 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'snake_case',
-            name: 'someGetterOverride',
-            type: 'Classic Accessor',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Classic Accessor name `someGetterOverride` must match one of the following formats: snake_case',
+          line: 6,
+          column: 31,
+          endLine: 6,
+          endColumn: 49,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'someSetterOverride',
-            type: 'Classic Accessor',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Classic Accessor name `someSetterOverride` must match one of the following formats: snake_case',
+          line: 10,
+          column: 31,
+          endLine: 10,
+          endColumn: 49,
         },
       ],
       languageOptions: { parserOptions },
@@ -1135,20 +2090,22 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'camelCase',
-            name: 'first_private_field',
-            type: 'Class Property',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Property name `first_private_field` must match one of the following formats: camelCase',
+          line: 5,
+          column: 19,
+          endLine: 5,
+          endColumn: 38,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'secondPrivateField',
-            type: 'Class Property',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Property name `secondPrivateField` must match one of the following formats: snake_case',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 30,
         },
       ],
       languageOptions: { parserOptions },
@@ -1177,20 +2134,22 @@ ruleTester.run('naming-convention', {
       `,
       errors: [
         {
-          data: {
-            formats: 'camelCase',
-            name: 'first_private_method',
-            type: 'Class Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Method name `first_private_method` must match one of the following formats: camelCase',
+          line: 5,
+          column: 19,
+          endLine: 5,
+          endColumn: 39,
         },
         {
-          data: {
-            formats: 'snake_case',
-            name: 'secondPrivateMethod',
-            type: 'Class Method',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Class Method name `secondPrivateMethod` must match one of the following formats: snake_case',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 31,
         },
       ],
       languageOptions: { parserOptions },
@@ -1210,12 +2169,13 @@ ruleTester.run('naming-convention', {
       code: "import * as fooBar from 'foo_bar';",
       errors: [
         {
-          data: {
-            formats: 'PascalCase',
-            name: 'fooBar',
-            type: 'Import',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Import name `fooBar` must match one of the following formats: PascalCase',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 19,
         },
       ],
       languageOptions: { parserOptions },
@@ -1235,12 +2195,13 @@ ruleTester.run('naming-convention', {
       code: "import FooBar from 'foo_bar';",
       errors: [
         {
-          data: {
-            formats: 'camelCase',
-            name: 'FooBar',
-            type: 'Import',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Import name `FooBar` must match one of the following formats: camelCase',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 14,
         },
       ],
       languageOptions: { parserOptions },
@@ -1260,12 +2221,13 @@ ruleTester.run('naming-convention', {
       code: "import { default as foo_bar } from 'foo_bar';",
       errors: [
         {
-          data: {
-            formats: 'camelCase',
-            name: 'foo_bar',
-            type: 'Import',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Import name `foo_bar` must match one of the following formats: camelCase',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
       languageOptions: { parserOptions },
@@ -1282,16 +2244,16 @@ ruleTester.run('naming-convention', {
       ],
     },
     {
-      skip: true, // TS 5.6 string literal import specifiers not supported by parser
       code: 'import { "🍎" as foo } from \'foo_bar\';',
       errors: [
         {
-          data: {
-            formats: 'PascalCase',
-            name: 'foo',
-            type: 'Import',
-          },
           messageId: 'doesNotMatchFormat',
+          message:
+            'Import name `foo` must match one of the following formats: PascalCase',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 21,
         },
       ],
       languageOptions: { parserOptions },
@@ -1876,7 +2838,7 @@ ruleTester.run('naming-convention', {
     {
       code: `
         class Ignored {
-          private static abstract some_name() {}
+          private static some_name() {}
           IgnoredDueToModifiers() {}
         }
       `,
@@ -1887,7 +2849,7 @@ ruleTester.run('naming-convention', {
         },
         {
           format: ['snake_case'],
-          modifiers: ['abstract', 'static'],
+          modifiers: ['static'],
           selector: 'classMethod',
         },
       ],
@@ -2059,7 +3021,7 @@ ruleTester.run('naming-convention', {
             'enumMember',
           ],
         },
-        // making sure the `requoresQuotes` modifier appropriately overrides this
+        // making sure the `requiresQuotes` modifier appropriately overrides this
         {
           format: ['PascalCase'],
           selector: [
@@ -2119,10 +3081,10 @@ ruleTester.run('naming-convention', {
           }
         }
         abstract class foo {
-          public abstract Bar() {
+          public Bar() {
             return 42;
           }
-          public abstract async async_bar() {
+          public async async_bar() {
             return 42;
           }
         }
@@ -2283,7 +3245,6 @@ ruleTester.run('naming-convention', {
       ],
     },
     {
-      skip: true, // TS 5.6 string literal import specifiers not supported by parser
       code: 'import { "🍎" as Foo } from \'foo_bar\';',
       languageOptions: { parserOptions },
       options: [
@@ -2293,279 +3254,604 @@ ruleTester.run('naming-convention', {
         },
       ],
     },
-
-    // Regression: names that trim to empty string after stripping the leading
-    // underscore must be treated as valid. typescript-eslint short-circuits
-    // the format check when the processed name is empty
-    // (see naming-convention-utils/format.ts — every check accepts length 0).
-    {
-      code: 'const _ = 1;',
-      options: [
-        {
-          format: ['camelCase'],
-          leadingUnderscore: 'allow',
-          selector: 'variable',
-        },
-      ],
-    },
-    {
-      code: 'const [_, setA] = [1, 2];',
-      options: [
-        {
-          format: ['camelCase'],
-          leadingUnderscore: 'allow',
-          selector: 'variable',
-        },
-      ],
-    },
-    {
-      code: 'function f(_: number) {}',
-      options: [
-        {
-          format: ['camelCase'],
-          leadingUnderscore: 'allow',
-          selector: 'parameter',
-        },
-      ],
-    },
-
-    // Regression: non-letter characters such as `$` (or digits when not in the
-    // leading position) should pass camelCase / PascalCase because JS
-    // `c === c.toLowerCase() && c === c.toUpperCase()` is true for them.
-    {
-      code: 'const $cache = 1; const $svg = 1; const x$y = 1;',
-      options: [
-        { format: ['camelCase'], selector: 'variable' },
-      ],
-    },
-    {
-      code: 'const $Root = 1;',
-      options: [
-        { format: ['PascalCase'], selector: 'variable' },
-      ],
-    },
-    {
-      code: 'class C { private $foo = 1; }',
-      options: [
-        { format: ['camelCase'], selector: 'property' },
-      ],
-    },
-
-    // Regression: strictCamelCase / strictPascalCase must accept `$` runs but
-    // still reject two consecutive uppercase *letters*.
-    {
-      code: 'const fooBar$Baz = 1;',
-      options: [
-        { format: ['strictCamelCase'], selector: 'variable' },
-      ],
-    },
-
-    // Regression: the real-world portal config (filter with match:false over a
-    // snake-camel mix regex) should not fire on `$`-prefixed variables, since
-    // the format check itself now accepts them.
-    {
-      code: 'const $cache = 1;',
-      options: [
-        {
-          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
-          leadingUnderscore: 'allow',
-          filter: {
-            regex:
-              '(^_?[a-z][a-z0-9]*([A-Z][a-z]?[a-z0-9]*)*_[a-z][a-z0-9]*([A-Z][a-z]?[a-z0-9]*)*$)',
-            match: false,
-          },
-          selector: 'variable',
-        },
-      ],
-    },
-
-    // Regression: parameter names inside type-only signatures create no
-    // binding, so the `parameter` selector must not validate them — matches
-    // the real-world false positive where `System` in
-    // `as (System: any, ...globalArgs: any[]) => void` (a cast, not a real
-    // function declaration) was incorrectly flagged.
-    {
-      code: 'const evaluateThunk = (0, eval)("") as (System: any, ...globalArgs: any[]) => void;',
-      options: [{ format: ['camelCase'], selector: 'parameter' }],
-    },
-    {
-      code: 'type Cast = (System: any) => void;',
-      options: [{ format: ['camelCase'], selector: 'parameter' }],
-    },
-    {
-      code: 'interface Foo { method(System: any): void; }',
-      options: [{ format: ['camelCase'], selector: 'parameter' }],
-    },
-    {
-      code: 'interface Foo { (System: any): void; }',
-      options: [{ format: ['camelCase'], selector: 'parameter' }],
-    },
-    {
-      code: 'interface Foo { new (System: any): void; }',
-      options: [{ format: ['camelCase'], selector: 'parameter' }],
-    },
-    {
-      code: 'interface Foo { [System: string]: any; }',
-      options: [{ format: ['camelCase'], selector: 'parameter' }],
-    },
   ],
 });
 
-// Additional edge-case suite for empty-name short-circuit and `$`-neutral
-// character handling. Kept in a sibling describe via the `description` option
-// so the rule name passed to the rslint backend stays correct.
-ruleTester.run('naming-convention', {
-  invalid: [
-    // Underscore-only name with leadingUnderscore: 'require' cannot trim to
-    // empty *and* satisfy the underscore requirement at the same time.
-    // The require branch strips one `_`, leaving "", which counts as empty →
-    // format passes. But there is only one `_` to begin with so `require`
-    // sees it, strips it, and passes. That's the symmetric edge case: it's
-    // actually valid. Instead, verify `requireDouble` on a single `_` fails.
-    {
-      code: 'const _ = 1;',
-      errors: [{ messageId: 'missingUnderscore' }],
-      options: [
-        {
-          format: ['camelCase'],
-          leadingUnderscore: 'requireDouble',
-          selector: 'variable',
+// Preserve the existing Rslint regression cases, with their original expectations
+// independently verified and completed using the same upstream version.
+// Three historical cases contain abstract method bodies; their upstream
+// verification uses allowInvalidAST, while Rslint already parses these inputs.
+describe('existing Rslint regressions', () => {
+  ruleTester.run('naming-convention', {
+    valid: [
+      {
+        code: '\n        class Ignored {\n          private static abstract some_name() {}\n          IgnoredDueToModifiers() {}\n        }\n      ',
+        options: [
+          {
+            format: ['PascalCase'],
+            selector: 'default',
+          },
+          {
+            format: ['snake_case'],
+            modifiers: ['abstract', 'static'],
+            selector: 'classMethod',
+          },
+        ],
+      },
+      {
+        code: '\n        const obj = {\n          Bar() {\n            return 42;\n          },\n          async async_bar() {\n            return 42;\n          },\n        };\n        class foo {\n          public Bar() {\n            return 42;\n          }\n          public async async_bar() {\n            return 42;\n          }\n        }\n        abstract class foo {\n          public abstract Bar() {\n            return 42;\n          }\n          public abstract async async_bar() {\n            return 42;\n          }\n        }\n      ',
+        languageOptions: {
+          parserOptions: {
+            project: './tsconfig.json',
+          },
         },
-      ],
-    },
-    // `_` with leadingUnderscore: 'forbid' must still report the underscore
-    // even though trimming would produce an empty name.
-    {
-      code: 'const _x = 1;',
-      errors: [{ messageId: 'unexpectedUnderscore' }],
-      options: [
-        {
-          format: ['camelCase'],
-          leadingUnderscore: 'forbid',
-          selector: 'variable',
-        },
-      ],
-    },
-    // `$` in the middle of a name must still fail strictPascalCase's
-    // consecutive-uppercase rule — only *letter* runs matter.
-    {
-      code: 'const FOOBar = 1;',
-      errors: [{ messageId: 'doesNotMatchFormat' }],
-      options: [
-        { format: ['StrictPascalCase'], selector: 'variable' },
-      ],
-    },
-    // snake_case rejects leading, trailing, and adjacent underscores.
-    {
-      code: 'const foo__bar = 1;',
-      errors: [{ messageId: 'doesNotMatchFormat' }],
-      options: [
-        { format: ['snake_case'], selector: 'variable' },
-      ],
-    },
-    {
-      code: 'const foo_ = 1;',
-      errors: [{ messageId: 'doesNotMatchFormat' }],
-      options: [
-        { format: ['snake_case'], selector: 'variable' },
-      ],
-    },
-    // UPPER_CASE: adjacent underscores rejected, but `$` is accepted.
-    {
-      code: 'const FOO__BAR = 1;',
-      errors: [{ messageId: 'doesNotMatchFormat' }],
-      options: [
-        { format: ['UPPER_CASE'], selector: 'variable' },
-      ],
-    },
-    // camelCase: `_` in the middle is still rejected even though `$` is fine.
-    {
-      code: 'const foo_bar = 1;',
-      errors: [{ messageId: 'doesNotMatchFormat' }],
-      options: [
-        { format: ['camelCase'], selector: 'variable' },
-      ],
-    },
-    // PascalCase: leading-lowercase is still rejected even though `$` leading
-    // would pass. Nested class method inherits the method rule.
-    {
-      code: 'class C { method foo() {} }'.replace('method ', ''),
-      errors: [{ messageId: 'doesNotMatchFormat' }],
-      options: [
-        { format: ['PascalCase'], selector: 'method' },
-      ],
-    },
-  ],
-  valid: [
-    // Empty trimmed name after a leadingUnderscore strip — camelCase.
-    {
-      code: 'const _ = 1;',
-      options: [
-        {
-          format: ['camelCase'],
-          leadingUnderscore: 'allow',
-          selector: 'variable',
-        },
-      ],
-    },
-    // Double underscore that trims to empty via allowDouble.
-    {
-      code: 'const __ = 1;',
-      options: [
-        {
-          format: ['camelCase'],
-          leadingUnderscore: 'allowDouble',
-          selector: 'variable',
-        },
-      ],
-    },
-    // Empty trimmed name after prefix strip also passes.
-    {
-      code: 'const IS = 1;',
-      options: [
-        {
-          format: ['camelCase'],
-          prefix: ['IS'],
-          selector: 'variable',
-        },
-      ],
-    },
-    // `$` is accepted as a neutral character at any position for camelCase
-    // and PascalCase.
-    {
-      code: 'const $a = 1; const a$ = 1; const a$b = 1;',
-      options: [{ format: ['camelCase'], selector: 'variable' }],
-    },
-    {
-      code: 'const $A = 1; const A$ = 1; const A$B = 1;',
-      options: [{ format: ['PascalCase'], selector: 'variable' }],
-    },
-    // `$` in UPPER_CASE: uppercased equals itself, no `_` adjacency.
-    {
-      code: 'const FOO$BAR = 1;',
-      options: [{ format: ['UPPER_CASE'], selector: 'variable' }],
-    },
-    // Nested: object method whose filter excludes `$`-prefixed names, and the
-    // variable rule accepts `$`-prefixed.
-    {
-      code: `
-        const obj = { $fn() { return 1; } };
-        const $flag = true;
-      `,
-      options: [
-        { format: ['camelCase'], selector: 'variable' },
-        { format: ['camelCase'], selector: 'objectLiteralMethod' },
-      ],
-    },
-    // strictCamelCase with a `$` run between camel humps.
-    {
-      code: 'const foo$$Bar = 1;',
-      options: [{ format: ['strictCamelCase'], selector: 'variable' }],
-    },
-    // strictPascalCase with `$` after the first uppercase letter.
-    {
-      code: 'const F$ooBar = 1;',
-      options: [{ format: ['StrictPascalCase'], selector: 'variable' }],
-    },
-  ],
-}, { description: 'rslint edge cases' });
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'memberLike',
+          },
+          {
+            format: ['snake_case'],
+            modifiers: ['async'],
+            selector: ['method', 'objectLiteralMethod'],
+          },
+          {
+            format: ['PascalCase'],
+            selector: 'method',
+          },
+        ],
+      },
+      {
+        code: 'const _ = 1;',
+        options: [
+          {
+            format: ['camelCase'],
+            leadingUnderscore: 'allow',
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const [_, setA] = [1, 2];',
+        options: [
+          {
+            format: ['camelCase'],
+            leadingUnderscore: 'allow',
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'function f(_: number) {}',
+        options: [
+          {
+            format: ['camelCase'],
+            leadingUnderscore: 'allow',
+            selector: 'parameter',
+          },
+        ],
+      },
+      {
+        code: 'const $cache = 1; const $svg = 1; const x$y = 1;',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const $Root = 1;',
+        options: [
+          {
+            format: ['PascalCase'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'class C { private $foo = 1; }',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'property',
+          },
+        ],
+      },
+      {
+        code: 'const fooBar$Baz = 1;',
+        options: [
+          {
+            format: ['strictCamelCase'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const $cache = 1;',
+        options: [
+          {
+            format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+            leadingUnderscore: 'allow',
+            filter: {
+              regex:
+                '(^_?[a-z][a-z0-9]*([A-Z][a-z]?[a-z0-9]*)*_[a-z][a-z0-9]*([A-Z][a-z]?[a-z0-9]*)*$)',
+              match: false,
+            },
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const evaluateThunk = (0, eval)("") as (System: any, ...globalArgs: any[]) => void;',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'parameter',
+          },
+        ],
+      },
+      {
+        code: 'type Cast = (System: any) => void;',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'parameter',
+          },
+        ],
+      },
+      {
+        code: 'interface Foo { method(System: any): void; }',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'parameter',
+          },
+        ],
+      },
+      {
+        code: 'interface Foo { (System: any): void; }',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'parameter',
+          },
+        ],
+      },
+      {
+        code: 'interface Foo { new (System: any): void; }',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'parameter',
+          },
+        ],
+      },
+      {
+        code: 'interface Foo { [System: string]: any; }',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'parameter',
+          },
+        ],
+      },
+      {
+        code: 'const _ = 1;',
+        options: [
+          {
+            format: ['camelCase'],
+            leadingUnderscore: 'allow',
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const __ = 1;',
+        options: [
+          {
+            format: ['camelCase'],
+            leadingUnderscore: 'allowDouble',
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const IS = 1;',
+        options: [
+          {
+            format: ['camelCase'],
+            prefix: ['IS'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const $a = 1; const a$ = 1; const a$b = 1;',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const $A = 1; const A$ = 1; const A$B = 1;',
+        options: [
+          {
+            format: ['PascalCase'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const FOO$BAR = 1;',
+        options: [
+          {
+            format: ['UPPER_CASE'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: '\n        const obj = { $fn() { return 1; } };\n        const $flag = true;\n      ',
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'variable',
+          },
+          {
+            format: ['camelCase'],
+            selector: 'objectLiteralMethod',
+          },
+        ],
+      },
+      {
+        code: 'const foo$$Bar = 1;',
+        options: [
+          {
+            format: ['strictCamelCase'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const F$ooBar = 1;',
+        options: [
+          {
+            format: ['StrictPascalCase'],
+            selector: 'variable',
+          },
+        ],
+      },
+    ],
+    invalid: [
+      {
+        code: "\n        let unused_foo = 'a';\n        const _unused_foo = 1;\n        interface IFoo {}\n        class IBar {}\n        function fooBar() {}\n      ",
+        errors: [
+          {
+            messageId: 'satisfyCustom',
+            message:
+              'Variable name `unused_foo` must not match the RegExp: /^unused_\\w/u',
+            line: 2,
+            column: 13,
+            endLine: 2,
+            endColumn: 23,
+          },
+          {
+            messageId: 'satisfyCustom',
+            message:
+              'Variable name `_unused_foo` must not match the RegExp: /^unused_\\w/u',
+            line: 3,
+            column: 15,
+            endLine: 3,
+            endColumn: 26,
+          },
+          {
+            messageId: 'satisfyCustom',
+            message:
+              'Interface name `IFoo` must not match the RegExp: /^I[A-Z]/u',
+            line: 4,
+            column: 19,
+            endLine: 4,
+            endColumn: 23,
+          },
+          {
+            messageId: 'satisfyCustom',
+            message: 'Class name `IBar` must not match the RegExp: /^I[A-Z]/u',
+            line: 5,
+            column: 15,
+            endLine: 5,
+            endColumn: 19,
+          },
+          {
+            messageId: 'satisfyCustom',
+            message:
+              'Function name `fooBar` must match the RegExp: /function/u',
+            line: 6,
+            column: 18,
+            endLine: 6,
+            endColumn: 24,
+          },
+        ],
+        options: [
+          {
+            custom: {
+              match: false,
+              regex: '^unused_\\w',
+            },
+            format: ['snake_case'],
+            leadingUnderscore: 'allow',
+            selector: 'default',
+          },
+          {
+            custom: {
+              match: false,
+              regex: '^I[A-Z]',
+            },
+            format: ['PascalCase'],
+            selector: 'typeLike',
+          },
+          {
+            custom: {
+              match: true,
+              regex: 'function',
+            },
+            format: ['camelCase'],
+            leadingUnderscore: 'allow',
+            selector: 'function',
+          },
+        ],
+      },
+      {
+        code: "\n        let unused_foo = 'a';\n        const _unused_foo = 1;\n        function foo_bar() {}\n        interface IFoo {}\n        class IBar {}\n      ",
+        errors: [
+          {
+            messageId: 'doesNotMatchFormat',
+            message:
+              'Variable name `unused_foo` must match one of the following formats: camelCase',
+            line: 2,
+            column: 13,
+            endLine: 2,
+            endColumn: 23,
+          },
+          {
+            messageId: 'doesNotMatchFormatTrimmed',
+            message:
+              'Variable name `_unused_foo` trimmed as `unused_foo` must match one of the following formats: camelCase',
+            line: 3,
+            column: 15,
+            endLine: 3,
+            endColumn: 26,
+          },
+          {
+            messageId: 'doesNotMatchFormat',
+            message:
+              'Function name `foo_bar` must match one of the following formats: camelCase',
+            line: 4,
+            column: 18,
+            endLine: 4,
+            endColumn: 25,
+          },
+          {
+            messageId: 'satisfyCustom',
+            message:
+              'Interface name `IFoo` must not match the RegExp: /^I[A-Z]/u',
+            line: 5,
+            column: 19,
+            endLine: 5,
+            endColumn: 23,
+          },
+          {
+            messageId: 'satisfyCustom',
+            message: 'Class name `IBar` must not match the RegExp: /^I[A-Z]/u',
+            line: 6,
+            column: 15,
+            endLine: 6,
+            endColumn: 19,
+          },
+        ],
+        options: [
+          {
+            format: ['camelCase'],
+            leadingUnderscore: 'allow',
+            selector: ['variable', 'function'],
+          },
+          {
+            custom: {
+              match: false,
+              regex: '^I[A-Z]',
+            },
+            format: ['PascalCase'],
+            selector: ['class', 'interface'],
+          },
+        ],
+      },
+      {
+        code: '\n        class Ignored {\n          private static abstract some_name() {}\n          IgnoredDueToModifiers() {}\n        }\n      ',
+        errors: [
+          {
+            messageId: 'doesNotMatchFormat',
+            message:
+              'Class Method name `some_name` must match one of the following formats: UPPER_CASE',
+            line: 3,
+            column: 35,
+            endLine: 3,
+            endColumn: 44,
+          },
+        ],
+        options: [
+          {
+            format: ['PascalCase'],
+            selector: 'default',
+          },
+          {
+            format: ['UPPER_CASE'],
+            modifiers: ['abstract', 'static'],
+            selector: 'classMethod',
+          },
+        ],
+      },
+      {
+        code: 'const _ = 1;',
+        errors: [
+          {
+            messageId: 'missingUnderscore',
+            message: 'Variable name `_` must have two leading underscore(s).',
+            line: 1,
+            column: 7,
+            endLine: 1,
+            endColumn: 8,
+          },
+        ],
+        options: [
+          {
+            format: ['camelCase'],
+            leadingUnderscore: 'requireDouble',
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const _x = 1;',
+        errors: [
+          {
+            messageId: 'unexpectedUnderscore',
+            message: 'Variable name `_x` must not have a leading underscore.',
+            line: 1,
+            column: 7,
+            endLine: 1,
+            endColumn: 9,
+          },
+        ],
+        options: [
+          {
+            format: ['camelCase'],
+            leadingUnderscore: 'forbid',
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const FOOBar = 1;',
+        errors: [
+          {
+            messageId: 'doesNotMatchFormat',
+            message:
+              'Variable name `FOOBar` must match one of the following formats: StrictPascalCase',
+            line: 1,
+            column: 7,
+            endLine: 1,
+            endColumn: 13,
+          },
+        ],
+        options: [
+          {
+            format: ['StrictPascalCase'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const foo__bar = 1;',
+        errors: [
+          {
+            messageId: 'doesNotMatchFormat',
+            message:
+              'Variable name `foo__bar` must match one of the following formats: snake_case',
+            line: 1,
+            column: 7,
+            endLine: 1,
+            endColumn: 15,
+          },
+        ],
+        options: [
+          {
+            format: ['snake_case'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const foo_ = 1;',
+        errors: [
+          {
+            messageId: 'doesNotMatchFormat',
+            message:
+              'Variable name `foo_` must match one of the following formats: snake_case',
+            line: 1,
+            column: 7,
+            endLine: 1,
+            endColumn: 11,
+          },
+        ],
+        options: [
+          {
+            format: ['snake_case'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const FOO__BAR = 1;',
+        errors: [
+          {
+            messageId: 'doesNotMatchFormat',
+            message:
+              'Variable name `FOO__BAR` must match one of the following formats: UPPER_CASE',
+            line: 1,
+            column: 7,
+            endLine: 1,
+            endColumn: 15,
+          },
+        ],
+        options: [
+          {
+            format: ['UPPER_CASE'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'const foo_bar = 1;',
+        errors: [
+          {
+            messageId: 'doesNotMatchFormat',
+            message:
+              'Variable name `foo_bar` must match one of the following formats: camelCase',
+            line: 1,
+            column: 7,
+            endLine: 1,
+            endColumn: 14,
+          },
+        ],
+        options: [
+          {
+            format: ['camelCase'],
+            selector: 'variable',
+          },
+        ],
+      },
+      {
+        code: 'class C { foo() {} }',
+        errors: [
+          {
+            messageId: 'doesNotMatchFormat',
+            message:
+              'Class Method name `foo` must match one of the following formats: PascalCase',
+            line: 1,
+            column: 11,
+            endLine: 1,
+            endColumn: 14,
+          },
+        ],
+        options: [
+          {
+            format: ['PascalCase'],
+            selector: 'method',
+          },
+        ],
+      },
+    ],
+  });
+});

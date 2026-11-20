@@ -1,20 +1,31 @@
-import type {
-  InvalidTestCase,
-  ValidTestCase,
-} from '@typescript-eslint/rule-tester';
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase as RslintValidTestCase,
+} from '@rslint/rule-tester';
 
-import { RuleTester } from '@typescript-eslint/rule-tester';
-
-import type {
-  MessageIds,
-  Options,
-} from '../../../../src/rules/naming-convention';
+import type { Options } from '../../../../src/rules/naming-convention';
 import type {
   PredefinedFormatsString,
   Selector,
 } from '../../../../src/rules/naming-convention-utils';
 
-import { selectorTypeToMessageString } from '../../../../src/rules/naming-convention-utils';
+const messages = {
+  doesNotMatchFormat:
+    '{{type}} name `{{name}}` must match one of the following formats: {{formats}}',
+  doesNotMatchFormatTrimmed:
+    '{{type}} name `{{name}}` trimmed as `{{processedName}}` must match one of the following formats: {{formats}}',
+  missingAffix:
+    '{{type}} name `{{name}}` must have one of the following {{position}}es: {{affixes}}',
+  missingUnderscore:
+    '{{type}} name `{{name}}` must have {{count}} {{position}} underscore(s).',
+  satisfyCustom:
+    '{{type}} name `{{name}}` must {{regexMatch}} the RegExp: {{regex}}',
+  unexpectedUnderscore:
+    '{{type}} name `{{name}}` must not have a {{position}} underscore.',
+};
+
+type MessageIds = keyof typeof messages;
 
 export const formatTestNames: Readonly<
   Record<PredefinedFormatsString, Record<'invalid' | 'valid', string[]>>
@@ -75,26 +86,39 @@ export const formatTestNames: Readonly<
 };
 
 const REPLACE_REGEX = /%/g;
+
+// cSpell:ignore gnored
 // filter to not match `[iI]gnored`
 const IGNORED_FILTER = {
   match: false,
   regex: /.gnored/.source,
 };
 
-type Cases = { code: string[]; options: Omit<Options[0], 'format'> }[];
+type Location = {
+  type: string;
+  line: number;
+  column: number;
+  endLine: number;
+  endColumn: number;
+};
+type Cases = {
+  code: string[];
+  options: Omit<Options[0], 'format'>;
+  locations: Location[];
+}[];
 
 export function createTestCases(cases: Cases): void {
-  const createValidTestCases = (): ValidTestCase<Options>[] =>
-    cases.flatMap(test =>
+  const createValidTestCases = (): RslintValidTestCase[] =>
+    cases.flatMap((test) =>
       Object.entries(formatTestNames).flatMap(([formatLoose, names]) =>
-        names.valid.flatMap(name => {
+        names.valid.flatMap((name) => {
           const format = [formatLoose as PredefinedFormatsString];
           const createCase = (
             preparedName: string,
             options: Selector,
-          ): ValidTestCase<Options> => ({
+          ): RslintValidTestCase => ({
             code: `// ${JSON.stringify(options)}\n${test.code
-              .map(code => code.replaceAll(REPLACE_REGEX, preparedName))
+              .map((code) => code.replaceAll(REPLACE_REGEX, preparedName))
               .join('\n')}`,
             options: [{ ...options, filter: IGNORED_FILTER }],
           });
@@ -234,8 +258,8 @@ export function createTestCases(cases: Cases): void {
       ),
     );
 
-  function createInvalidTestCases(): InvalidTestCase<MessageIds, Options>[] {
-    const newCases: InvalidTestCase<MessageIds, Options>[] = [];
+  function createInvalidTestCases(): TestCase[] {
+    const newCases: TestCase[] = [];
 
     for (const test of cases) {
       for (const [formatLoose, names] of Object.entries(formatTestNames)) {
@@ -246,39 +270,33 @@ export function createTestCases(cases: Cases): void {
             options: Selector,
             messageId: MessageIds,
             data: Record<string, unknown> = {},
-          ): InvalidTestCase<MessageIds, Options> => {
-            const selectors = Array.isArray(test.options.selector)
-              ? test.options.selector
-              : [test.options.selector];
-            const errorsTemplate = selectors.map(selector => ({
-              messageId,
-              ...(selector !== 'default' &&
-              selector !== 'variableLike' &&
-              selector !== 'memberLike' &&
-              selector !== 'typeLike' &&
-              selector !== 'property' &&
-              selector !== 'method' &&
-              selector !== 'accessor'
-                ? {
-                    data: {
-                      name: preparedName,
-                      type: selectorTypeToMessageString(selector),
-                      ...data,
-                    },
-                  }
-                : // meta-types will use the correct selector, so don't assert on data shape
-                  {}),
-            }));
-
-            const errors: {
-              data?: { name: string; type: string };
-              messageId: MessageIds;
-            }[] = [];
-            test.code.forEach(() => errors.push(...errorsTemplate));
+          ): TestCase => {
+            const lines = test.code.join('\n').split('\n');
+            const column = (line: number, col: number) =>
+              col +
+              (lines[line - 1].slice(0, col - 1).match(/%/g)?.length ?? 0) *
+                (preparedName.length - 1);
+            const errors = test.locations.map((location) => {
+              const values = {
+                name: preparedName,
+                type: location.type,
+                ...data,
+              };
+              return {
+                messageId,
+                message: messages[messageId].replace(/{{(\w+)}}/g, (_, key) =>
+                  String(values[key as keyof typeof values]),
+                ),
+                line: location.line + 1,
+                column: column(location.line, location.column),
+                endLine: location.endLine + 1,
+                endColumn: column(location.endLine, location.endColumn),
+              };
+            });
 
             return {
               code: `// ${JSON.stringify(options)}\n${test.code
-                .map(code => code.replaceAll(REPLACE_REGEX, preparedName))
+                .map((code) => code.replaceAll(REPLACE_REGEX, preparedName))
                 .join('\n')}`,
               errors,
               options: [
@@ -447,7 +465,10 @@ export function createTestCases(cases: Cases): void {
     return newCases;
   }
 
-  const ruleTester = new RuleTester();
+  const ruleTester = new RuleTester({
+    plugin: '@typescript-eslint',
+    filename: 'file.ts',
+  });
 
   ruleTester.run('naming-convention', {
     invalid: createInvalidTestCases(),

@@ -1,3 +1,4 @@
+// Upstream: typescript-eslint v8.67.0. Locations verified with the upstream rule.
 import { createTestCases } from './createTestCases';
 
 createTestCases([
@@ -18,5 +19,84 @@ createTestCases([
     options: {
       selector: 'autoAccessor',
     },
+    locations: [
+      {
+        type: 'Auto Accessor',
+        line: 1,
+        column: 26,
+        endLine: 1,
+        endColumn: 27,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 2,
+        column: 26,
+        endLine: 2,
+        endColumn: 28,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 3,
+        column: 33,
+        endLine: 3,
+        endColumn: 34,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 4,
+        column: 33,
+        endLine: 4,
+        endColumn: 35,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 5,
+        column: 34,
+        endLine: 5,
+        endColumn: 35,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 6,
+        column: 41,
+        endLine: 6,
+        endColumn: 42,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 7,
+        column: 35,
+        endLine: 7,
+        endColumn: 36,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 8,
+        column: 26,
+        endLine: 8,
+        endColumn: 29,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 9,
+        column: 36,
+        endLine: 9,
+        endColumn: 37,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 10,
+        column: 33,
+        endLine: 10,
+        endColumn: 34,
+      },
+      {
+        type: 'Auto Accessor',
+        line: 11,
+        column: 35,
+        endLine: 11,
+        endColumn: 36,
+      },
+    ],
   },
 ]);
