@@ -137,6 +137,85 @@ Default: `false`. By default the rule emits a file-level `noStrictNullCheck` dia
 
 If your codebase does not rely on JavaScript truthiness coercion in boolean positions, or you prefer the conciseness of `if (x)` over the strictness of `if (x != null)`, you can disable this rule.
 
+## Differences from upstream
+
+For a generic predicate whose constraint contains a function signature, the
+`explicitBooleanReturnType` suggestion annotates the predicate's own parameter
+list. typescript-eslint v8.67.0 instead finds the first closing parenthesis and
+can insert the annotation into the constraint, producing invalid syntax:
+
+```typescript
+// Input, with allowNumber: false
+[true].some(<T extends () => boolean>() => 1);
+
+// Rslint suggestion
+[true].some(<T extends () => boolean>(): boolean => 1);
+```
+
+The suggestion also preserves an existing parameter list with a trailing comma,
+including comments containing parentheses. For `(x, /* ) */) => 1`, Rslint
+produces `(x, /* ) */): boolean => 1`. Upstream v8.67.0 misidentifies this
+as a parameter without parentheses and produces an invalid annotation.
+
+The string-length and empty-string suggestions default an optional chain's short-circuit result
+or a potentially nullish value hidden by a type assertion to an empty string
+before accessing `.length` or comparing with `""`. For example, `user?.name!` becomes
+`((user?.name!) ?? "").length > 0`; the original expression is evaluated once.
+Upstream v8.67.0 can suggest `(user?.name!).length > 0`, which throws when
+`user` is nullish. Negated conditions use the corresponding `=== 0` check. This protection is
+consistent for all authored optional chains, including receivers whose static
+types are non-nullish. For `value: string | undefined`, the suggestion for
+`value!` is `(value! ?? "").length > 0`. The same protection applies when an
+assertion wraps a conditional expression, or occurs inside `await`. For an
+optional `Promise<string>`, the suggestion for `await value!` handles the awaited
+nullish result before reading its length or comparing with an empty string.
+Transparent `satisfies` wrappers receive the same protection. Local result branches
+are also checked: `flag ? value! : "ok"` receives a nullish default when
+`value` can be undefined. This check does not evaluate calls or resolve aliases,
+and a nullable receiver alone does not imply a nullable expression result.
+
+Suggestions that begin with a parenthesis insert a leading semicolon when needed
+inside `case` and `default` clauses, namespace bodies and ordinary blocks. This prevents a
+suggestion from joining a preceding expression statement through automatic
+semicolon insertion, including when `as` or `satisfies` wraps the expression.
+Upstream v8.67.0 misses these boundaries.
+
+Array-predicate checks use the callback element of a spread tuple and exclude
+its `thisArg`. Empty tuples allow selection of the next argument. A possibly
+empty spread admits both its element type and the following argument as possible
+callbacks. No inline callback edits are offered for a spread argument.
+Upstream v8.67.0 can report `conditionErrorOther` on a valid tuple containing a
+boolean callback and its `thisArg`. For array-like intersection types, an
+explicit required `0` property retains the first callback and nonempty status
+when the type has the standard iterator signature. Matching type-only iterator
+signatures retain the static tuple model; they do not prove runtime iterator identity. Iterators with
+yield type `never` contribute no arguments, allowing inspection of the following
+callback. User-declared iterator implementations use the
+compiler's yield type independently of numeric metadata and do not imply a
+nonempty argument list. `Set` and `Iterable` spreads also use the yield type. Opaque
+collections and unresolved mixed collection unions remain conservative.
+Spread analysis uses declared types. It does not reconstruct `Object.assign`
+results, track iterator replacement through aliases or mutations, or execute
+generators. For example, replacing a tuple's iterator can make its actual first
+callback differ from the statically checked tuple element. Intersection types
+can retain overwritten iterator signatures. These situations can produce false
+positives or false negatives; the rule does not infer the runtime callback.
+
+Computed array-method names are treated as unknown when their backing objects
+may have been modified by a function call. Primitive strings copied from those objects
+before a later-created callback remain stable; defining that callback does not
+execute its body. Function-local captures of outer mutable objects remain
+unknown when repeated calls could observe earlier mutations. Fresh local objects
+and primitive literals retain the existing local analysis. The rule does not
+interpret IIFEs or recover names by analyzing execution across function boundaries.
+Outer mutable object captures remain unknown even in a direct synchronous IIFE.
+Calls before the copy still invalidate the backing object. This avoids classifying a runtime `forEach` call
+as a predicate method based on an object's initial property value.
+
+The `noStrictNullCheck` diagnostic uses an empty range at the start of the file
+(line 1, column 1). Upstream uses line 0 for this file-level diagnostic; Rslint's
+API reports 1-based source locations.
+
 ## Original Documentation
 
 - [typescript-eslint: strict-boolean-expressions](https://typescript-eslint.io/rules/strict-boolean-expressions)

@@ -202,7 +202,7 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 
 			callback := arguments[0]
 
-			if utils.IsArrayMethodCallWithPredicate(ctx.TypeChecker, expr) && returnsThenable(callback) {
+			if utils.IsArrayMethodCallWithPredicate(ctx.TypeChecker, expr, nil) && returnsThenable(callback) {
 				ctx.ReportNode(callback, buildPredicateMessage())
 			}
 		}

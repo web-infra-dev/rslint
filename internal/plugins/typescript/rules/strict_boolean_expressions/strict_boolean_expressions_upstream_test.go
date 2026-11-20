@@ -83,11 +83,11 @@ func TestStrictBooleanExpressionsUpstream(t *testing.T) {
 
 		// nullable enum — allowed when opted in
 		{
-			Code: "\n        enum ExampleEnum {\n          This = 0,\n          That = 1,\n        }\n        const rand = Math.random();\n        let theEnum: ExampleEnum | null = null;\n        if (rand < 0.3) {\n          theEnum = ExampleEnum.This;\n        }\n        if (theEnum) {\n        }\n      ",
+			Code:    "\n        enum ExampleEnum {\n          This = 0,\n          That = 1,\n        }\n        const rand = Math.random();\n        let theEnum: ExampleEnum | null = null;\n        if (rand < 0.3) {\n          theEnum = ExampleEnum.This;\n        }\n        if (theEnum) {\n        }\n      ",
 			Options: map[string]interface{}{"allowNullableEnum": true},
 		},
 		{
-			Code: "\n        enum ExampleEnum {\n          This = 'one',\n          That = 'two',\n        }\n        const rand = Math.random();\n        let theEnum: ExampleEnum | null = null;\n        if (rand < 0.3) {\n          theEnum = ExampleEnum.This;\n        }\n        if (!theEnum) {\n        }\n      ",
+			Code:    "\n        enum ExampleEnum {\n          This = 'one',\n          That = 'two',\n        }\n        const rand = Math.random();\n        let theEnum: ExampleEnum | null = null;\n        if (rand < 0.3) {\n          theEnum = ExampleEnum.This;\n        }\n        if (!theEnum) {\n        }\n      ",
 			Options: map[string]interface{}{"allowNullableEnum": true},
 		},
 
@@ -1299,19 +1299,6 @@ func TestStrictBooleanExpressionsUpstream(t *testing.T) {
 			}},
 		},
 
-		// ---- assertion function: skipped TS#59707 (upstream invalid #84) ----
-		// SKIP: tsgo, like the TS API the upstream test references, does not
-		// report `someAssert(maybeString)` as a type predicate call when
-		// `someAssert` is a union of assertion overloads. Carried as Skip
-		// to preserve the upstream order.
-		{
-			Skip: true,
-			Code: "\nfunction asserts1(x: string | number | undefined): asserts x {}\nfunction asserts2(x: string | number | undefined): asserts x {}\n\nconst maybeString = Math.random() ? 'string'.slice() : undefined;\n\nconst someAssert: typeof asserts1 | typeof asserts2 =\n  Math.random() > 0.5 ? asserts1 : asserts2;\n\nsomeAssert(maybeString);\n      ",
-			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "conditionErrorNullableString",
-			}},
-		},
-
 		// ---- implementation overload, no rest match (upstream invalid #85) ----
 		{
 			Code: "\nfunction assert(this: object, a: number, b: unknown): asserts b;\nfunction assert(a: bigint, b: unknown): asserts b;\nfunction assert(this: object, a: string, two: string): asserts two;\nfunction assert(\n  this: object,\n  a: string,\n  assertee: string,\n  c: bigint,\n  d: object,\n): asserts assertee;\n\nfunction assert(...args: any[]) {\n  throw new Error('lol');\n}\n\ndeclare const nullableString: string | null;\nassert(3 as any, nullableString);\n      ",
@@ -1596,6 +1583,19 @@ func TestStrictBooleanExpressionsUpstream(t *testing.T) {
 					{MessageId: "conditionFixCastBoolean", Output: "\nconst stringValue: string = 'hoge';\n['hoge', 'foo'].filter(x => Boolean(stringValue));\n      "},
 					{MessageId: "explicitBooleanReturnType", Output: "\nconst stringValue: string = 'hoge';\n['hoge', 'foo'].filter((x): boolean => stringValue);\n      "},
 				},
+			}},
+		},
+	})
+}
+
+// Preserve the upstream assertion-union regression and explain its skip.
+func TestStrictBooleanExpressionsUpstreamAssertionUnion(t *testing.T) {
+	t.Skip("TypeScript does not expose the truthiness predicate of a union of assertion signatures (microsoft/TypeScript#59707); also skipped by typescript-eslint v8.67.0.")
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, []rule_tester.InvalidTestCase{
+		{
+			Code: "\nfunction asserts1(x: string | number | undefined): asserts x {}\nfunction asserts2(x: string | number | undefined): asserts x {}\n\nconst maybeString = Math.random() ? 'string'.slice() : undefined;\n\nconst someAssert: typeof asserts1 | typeof asserts2 =\n  Math.random() > 0.5 ? asserts1 : asserts2;\n\nsomeAssert(maybeString);\n      ",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "conditionErrorNullableString",
 			}},
 		},
 	})

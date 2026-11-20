@@ -239,7 +239,7 @@ func sugCompareZero() rule.RuleMessage {
 	return rule.RuleMessage{Id: "conditionFixCompareZero", Description: "Change condition to check for 0 (`value !== 0`)"}
 }
 func sugDefaultEmptyString() rule.RuleMessage {
-	return rule.RuleMessage{Id: "conditionFixDefaultEmptyString", Description: "Explicitly treat nullish value the same as an empty string (`value ?? \"\")`"}
+	return rule.RuleMessage{Id: "conditionFixDefaultEmptyString", Description: "Explicitly treat nullish value the same as an empty string (`value ?? \"\"`)"}
 }
 func sugDefaultFalse() rule.RuleMessage {
 	return rule.RuleMessage{Id: "conditionFixDefaultFalse", Description: "Explicitly treat nullish value the same as false (`value ?? false`)"}
@@ -258,6 +258,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 		tc := ctx.TypeChecker
 		sf := ctx.SourceFile
+		staticEvaluator := utils.NewStaticStringEvaluatorWithCallEscapes(tc, sf, ctx.Refs)
 
 		// strictNullChecks gate. Matches upstream: when strictNullChecks is
 		// off and the user has not opted in via the long-named "I know what
@@ -299,6 +300,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 			if node == nil {
 				return
 			}
+			node = ast.SkipParentheses(node)
 			if _, seen := traversed[node]; seen {
 				return
 			}
@@ -392,8 +394,11 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 				}
 				// (2) array predicate: inspect the predicate function's return
 				// type against the same VariantType matrix.
-				if utils.IsArrayMethodCallWithPredicate(tc, callExpr) && len(callExpr.Arguments.Nodes) > 0 {
-					checkArrayMethodPredicate(ctx, sf, tc, callExpr.Arguments.Nodes[0], opts)
+				if utils.IsArrayMethodCallWithPredicate(tc, callExpr, staticEvaluator) && len(callExpr.Arguments.Nodes) > 0 {
+					predicate, predicateType := firstArrayPredicateArgument(ctx, callExpr.Arguments.Nodes)
+					if predicate != nil {
+						checkArrayMethodPredicate(ctx, sf, tc, predicate, predicateType, opts)
+					}
 				}
 			},
 		}
@@ -852,13 +857,23 @@ func getSuggestionsForConditionError(
 		}
 
 	case "conditionErrorString":
+		// Assertions can hide nullish values from the final expression type.
+		// Default their result before accessing length,
+		// preserving short-circuiting and evaluating the original expression once.
+		guardNullish := hasOptionalChain(node) || assertionCanBeNullish(tc, node)
+		valueCode := func(code string) string {
+			if guardNullish {
+				return "(" + code + ` ?? "")`
+			}
+			return code
+		}
 		if neg != nil {
 			return []rule.RuleSuggestion{
 				wrappingFix(sf, sugCompareStringLength(), neg, node, func(code string) string {
-					return code + ".length === 0"
+					return valueCode(code) + ".length === 0"
 				}),
 				wrappingFix(sf, sugCompareEmptyString(), neg, node, func(code string) string {
-					return code + ` === ""`
+					return valueCode(code) + ` === ""`
 				}),
 				wrappingFix(sf, sugCastBoolean(), neg, node, func(code string) string {
 					return "!Boolean(" + code + ")"
@@ -867,10 +882,10 @@ func getSuggestionsForConditionError(
 		}
 		return []rule.RuleSuggestion{
 			wrappingFix(sf, sugCompareStringLength(), node, node, func(code string) string {
-				return code + ".length > 0"
+				return valueCode(code) + ".length > 0"
 			}),
 			wrappingFix(sf, sugCompareEmptyString(), node, node, func(code string) string {
-				return code + ` !== ""`
+				return valueCode(code) + ` !== ""`
 			}),
 			wrappingFix(sf, sugCastBoolean(), node, node, func(code string) string {
 				return "Boolean(" + code + ")"
@@ -886,13 +901,283 @@ func getSuggestionsForConditionError(
 
 // ----- Array predicate checking ----------------------------------------
 
+// Inspect local result-producing expressions for erased nullish values.
+// Follow conditional branches and logical results, without evaluating calls,
+// resolving aliases or treating a nullable receiver as a nullable result.
+func assertionCanBeNullish(tc *checker.Checker, node *ast.Node) bool {
+	for node = ast.SkipParentheses(node); node != nil; node = ast.SkipParentheses(node.Expression()) {
+		awaited := false
+		switch node.Kind {
+		case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression:
+		case ast.KindAwaitExpression:
+			awaited = true
+		case ast.KindConditionalExpression:
+			conditional := node.AsConditionalExpression()
+			return assertionCanBeNullish(tc, conditional.WhenTrue) || hasOptionalChain(conditional.WhenTrue) ||
+				assertionCanBeNullish(tc, conditional.WhenFalse) || hasOptionalChain(conditional.WhenFalse)
+		case ast.KindBinaryExpression:
+			binary := node.AsBinaryExpression()
+			switch binary.OperatorToken.Kind {
+			case ast.KindAmpersandAmpersandToken:
+				return assertionCanBeNullish(tc, binary.Left) || hasOptionalChain(binary.Left) ||
+					assertionCanBeNullish(tc, binary.Right) || hasOptionalChain(binary.Right)
+			case ast.KindBarBarToken, ast.KindQuestionQuestionToken, ast.KindCommaToken:
+				// A nullish left operand cannot be the result of || or ??.
+				return assertionCanBeNullish(tc, binary.Right) || hasOptionalChain(binary.Right)
+			}
+			return false
+		default:
+			return false
+		}
+		operand := ast.SkipOuterExpressions(node.Expression(), ast.OEKParentheses|ast.OEKAssertions|ast.OEKNonNullAssertions)
+		operandType := utils.GetConstrainedTypeAtLocation(tc, operand)
+		if awaited {
+			operandType = checker.Checker_getAwaitedType(tc, operandType)
+			if operandType == nil {
+				return true
+			}
+		}
+		for _, part := range utils.UnionTypeParts(operandType) {
+			if utils.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoidLike|checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsTypeParameter) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Protect every authored optional chain consistently, including assertions
+// and await wrappers. Non-nullish static receiver types do not remove the
+// runtime optional syntax or change how the length suggestion is constructed.
+func hasOptionalChain(node *ast.Node) bool {
+	const wrappers = ast.OEKNonNullAssertions | ast.OEKAssertions | ast.OEKParentheses
+	for node = ast.SkipOuterExpressions(node, wrappers); node != nil; node = ast.SkipOuterExpressions(node.Expression(), wrappers) {
+		optional := false
+		switch node.Kind {
+		case ast.KindPropertyAccessExpression:
+			optional = node.AsPropertyAccessExpression().QuestionDotToken != nil
+		case ast.KindElementAccessExpression:
+			optional = node.AsElementAccessExpression().QuestionDotToken != nil
+		case ast.KindCallExpression:
+			optional = node.AsCallExpression().QuestionDotToken != nil
+		case ast.KindAwaitExpression:
+			// Await preserves the nullish result of a short-circuited call.
+		default:
+			return false
+		}
+		if optional {
+			return true
+		}
+	}
+	return false
+}
+
+// firstArrayPredicateArgument selects possible first arguments from static spread types.
+// A possibly empty spread also admits the next argument. Keep the authored
+// spread as the diagnostic node: its element types do not identify a safe
+// inline function to edit.
+func firstArrayPredicateArgument(ctx rule.RuleContext, arguments []*ast.Node) (*ast.Node, *checker.Type) {
+	tc := ctx.TypeChecker
+	var firstTypes []*checker.Type
+	var reportNode *ast.Node
+	for _, argument := range arguments {
+		if !ast.IsSpreadElement(argument) {
+			if reportNode == nil {
+				reportNode = ast.SkipParentheses(argument)
+			}
+			firstTypes = append(firstTypes, utils.GetConstrainedTypeAtLocation(tc, argument))
+			break
+		}
+		spreadType := utils.GetConstrainedTypeAtLocation(tc, argument.Expression())
+		types, mayBeEmpty, known := firstSpreadElementTypes(ctx, spreadType, map[*checker.Type]bool{})
+		if !known {
+			// Keep unresolved mixed collection unions conservative instead of
+			// losing tuple argument positions in an iterated-type union.
+			if spreadType.IsUnion() {
+				return nil, nil
+			}
+			// A spread node exposes the compiler's iterated element type for
+			// Set/Iterable even when the collection has no numeric index.
+			// Error/any/unknown types do not establish a callback type.
+			element := utils.GetConstrainedTypeAtLocation(tc, argument)
+			if element == nil || utils.IsTypeFlagSet(element, checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsNever) {
+				return nil, nil
+			}
+			types, mayBeEmpty = []*checker.Type{element}, true
+		}
+		if len(types) != 0 && reportNode == nil {
+			reportNode = argument
+		}
+		firstTypes = append(firstTypes, types...)
+		if !mayBeEmpty {
+			break
+		}
+	}
+	if len(firstTypes) == 0 {
+		return nil, nil
+	}
+	return reportNode, tc.GetUnionType(firstTypes)
+}
+
+// Read tuple elements in order and stop at the first guaranteed argument. For
+// [...Callback[], Callback, object], the object can never be the callback, even
+// though it appears in the tuple's numeric index type. Variadic elements recurse
+// through their constraints, with a cycle guard for recursive generic types.
+func firstSpreadElementTypes(ctx rule.RuleContext, t *checker.Type, visiting map[*checker.Type]bool) ([]*checker.Type, bool, bool) {
+	tc := ctx.TypeChecker
+	if t == nil || visiting[t] {
+		return nil, false, false
+	}
+	visiting[t] = true
+	defer delete(visiting, t)
+	if utils.IsTypeParameter(t) {
+		return firstSpreadElementTypes(ctx, checker.Checker_getBaseConstraintOfType(tc, t), visiting)
+	}
+	if t.IsUnion() {
+		var types []*checker.Type
+		mayBeEmpty := false
+		for _, part := range t.Types() {
+			first, empty, known := firstSpreadElementTypes(ctx, part, visiting)
+			if !known {
+				return nil, false, false
+			}
+			types = append(types, first...)
+			mayBeEmpty = mayBeEmpty || empty
+		}
+		return types, mayBeEmpty, true
+	}
+	iterator := utils.GetWellKnownSymbolPropertyOfType(t, "iterator", tc)
+	standardIterator := iterator == nil || hasStandardIteratorSignature(ctx, iterator)
+	// User iterator declarations define the spread values independently of
+	// numeric properties or tuple-like metadata. Their length is not inferred.
+	if !standardIterator {
+		return iterableElementTypes(tc, t)
+	}
+	if !checker.IsTupleType(t) {
+		// A required zero property on an array-like type preserves its
+		// callback and nonempty information through branding/intersections.
+		// Do not infer iterator order for an arbitrary indexed object.
+		arrayLike := tc.IsArrayLikeType(t)
+		if zero := tc.GetPropertyOfType(t, "0"); arrayLike && zero != nil && zero.Flags&ast.SymbolFlagsOptional == 0 {
+			if first := tc.GetTypeOfPropertyOfType(t, "0"); first != nil {
+				return []*checker.Type{first}, false, true
+			}
+		}
+		if first, empty, known := iterableElementTypes(tc, t); known {
+			return first, empty, true
+		}
+		// Downlevel arrays can lack the iterator library declaration.
+		if iterator == nil && arrayLike {
+			if first := tc.GetNumberIndexType(t); first != nil {
+				return []*checker.Type{first}, true, true
+			}
+		}
+		return nil, false, false
+	}
+	infos := t.TargetTupleType().ElementInfos()
+	elements := tc.GetTypeArguments(t)
+	if len(infos) != len(elements) {
+		return nil, false, false
+	}
+	var types []*checker.Type
+	for i, info := range infos {
+		flags := info.TupleElementFlags()
+		element := elements[i]
+		if flags&checker.ElementFlagsVariadic != 0 {
+			first, empty, known := firstSpreadElementTypes(ctx, element, visiting)
+			if !known {
+				return nil, false, false
+			}
+			types = append(types, first...)
+			if !empty {
+				return types, false, true
+			}
+			continue
+		}
+		if flags&checker.ElementFlagsOptional != 0 {
+			element = tc.GetUnionType([]*checker.Type{element, tc.GetUndefinedType()})
+		}
+		types = append(types, element)
+		if flags&checker.ElementFlagsRequired != 0 {
+			return types, false, true
+		}
+	}
+	return types, true, true
+}
+
+// Matching ambient signatures preserve the standard static tuple model.
+// This does not prove that the runtime iterator has not been replaced.
+// Different signatures use the declared yield type instead.
+func hasStandardIteratorSignature(ctx rule.RuleContext, iterator *ast.Symbol) bool {
+	tc := ctx.TypeChecker
+	if len(iterator.Declarations) == 0 {
+		return false
+	}
+	allLibrary := true
+	for _, declaration := range iterator.Declarations {
+		if !ctx.Program().IsSourceFileDefaultLibrary(ast.GetSourceFileOfNode(declaration)) {
+			allLibrary = false
+			if declaration.Kind != ast.KindMethodSignature {
+				return false
+			}
+		}
+	}
+	if allLibrary {
+		return true
+	}
+	signatures := utils.GetCallSignatures(tc, tc.GetTypeOfSymbolAtLocation(iterator, ctx.SourceFile.AsNode()))
+	var library []*checker.Signature
+	for _, signature := range signatures {
+		if declaration := signature.Declaration(); declaration != nil && ctx.Program().IsSourceFileDefaultLibrary(ast.GetSourceFileOfNode(declaration)) {
+			library = append(library, signature)
+		}
+	}
+	if len(library) == 0 {
+		return false
+	}
+	for _, signature := range signatures {
+		declaration := signature.Declaration()
+		if declaration == nil {
+			return false
+		}
+		if ctx.Program().IsSourceFileDefaultLibrary(ast.GetSourceFileOfNode(declaration)) {
+			continue
+		}
+		matched := false
+		for _, standard := range library {
+			if len(signature.Parameters()) == len(standard.Parameters()) && len(signature.TypeParameters()) == 0 && len(standard.TypeParameters()) == 0 &&
+				checker.Checker_isTypeIdenticalTo(tc, tc.GetReturnTypeOfSignature(signature), tc.GetReturnTypeOfSignature(standard)) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
+}
+
+func iterableElementTypes(tc *checker.Checker, t *checker.Type) ([]*checker.Type, bool, bool) {
+	first := checker.Checker_getIterationTypeOfIterable(tc, checker.IterationUseSpread, checker.IterationTypeKindYield, t, nil)
+	if first == nil || utils.IsTypeFlagSet(first, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
+		return nil, false, false
+	}
+	if utils.IsTypeFlagSet(first, checker.TypeFlagsNever) {
+		return nil, true, true
+	}
+	return []*checker.Type{first}, true, true
+}
+
 func checkArrayMethodPredicate(
 	ctx rule.RuleContext,
 	sf *ast.SourceFile,
 	tc *checker.Checker,
 	predicateNode *ast.Node,
+	predicateType *checker.Type,
 	opts resolvedOptions,
 ) {
+	predicateNode = ast.SkipParentheses(predicateNode)
 	isFunctionExpression := ast.IsArrowFunction(predicateNode) || ast.IsFunctionExpression(predicateNode)
 
 	// Async arrow / function expression → Promise<…>, never a boolean.
@@ -901,12 +1186,7 @@ func checkArrayMethodPredicate(
 		return
 	}
 
-	predicateType := utils.GetConstrainedTypeAtLocation(tc, predicateNode)
 	sigs := utils.GetCallSignatures(tc, predicateType)
-	if len(sigs) == 0 {
-		return
-	}
-
 	var collected []*checker.Type
 	for _, sig := range sigs {
 		rt := checker.Checker_getReturnTypeOfSignature(tc, sig)
@@ -959,7 +1239,7 @@ func checkArrayMethodPredicate(
 		// Expression-bodied function: emit the same suggestion fixes as a
 		// conditional, anchored at the body expression.
 		if body != nil && !ast.IsBlock(body) {
-			suggestions = append(suggestions, getSuggestionsForConditionError(sf, tc, body, reportID, opts)...)
+			suggestions = append(suggestions, getSuggestionsForConditionError(sf, tc, ast.SkipParentheses(body), reportID, opts)...)
 		}
 
 		// Add explicit boolean return-type annotation suggestion when the
@@ -991,7 +1271,6 @@ func hasReturnTypeAnnotation(fn *ast.Node) bool {
 // insertion point depends on whether the predicate is a parenless arrow, a
 // no-arg arrow / function expression, or a normal parameter-listed function.
 func explicitBooleanReturnTypeSuggestion(sf *ast.SourceFile, fn *ast.Node) rule.RuleSuggestion {
-	src := sf.Text()
 	var fixes []rule.RuleFix
 
 	if ast.IsArrowFunction(fn) && utils.IsParenlessArrowFunction(fn) {
@@ -1012,28 +1291,16 @@ func explicitBooleanReturnTypeSuggestion(sf *ast.SourceFile, fn *ast.Node) rule.
 		return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType()}
 	}
 
-	if len(params.Nodes) == 0 {
-		// `() => …` / `function () {}` — scan from the function start for the
-		// first `)` and insert `: boolean` after it.
-		closeParen := findFirstCharAt(src, fn.Pos(), ')')
-		if closeParen < 0 {
-			return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType()}
-		}
-		fixes = append(fixes, rule.RuleFix{
-			Text:  ": boolean",
-			Range: core.NewTextRange(closeParen+1, closeParen+1),
-		})
-		return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType(), FixesArr: fixes}
-	}
-
-	lastParam := params.Nodes[len(params.Nodes)-1]
-	closeParen := findFirstCharAt(src, lastParam.End(), ')')
-	if closeParen < 0 {
+	// The parser records the parameter-list end immediately before its closing
+	// token. Start there so comments and parentheses in generic constraints or
+	// default values cannot redirect the annotation into unrelated source.
+	closeParen, ok := utils.TokenAtOrAfter(sf, params.End())
+	if !ok || closeParen.Kind != ast.KindCloseParenToken {
 		return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType()}
 	}
 	fixes = append(fixes, rule.RuleFix{
 		Text:  ": boolean",
-		Range: core.NewTextRange(closeParen+1, closeParen+1),
+		Range: core.NewTextRange(closeParen.End, closeParen.End),
 	})
 	return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType(), FixesArr: fixes}
 }
@@ -1046,20 +1313,6 @@ func getFunctionParameters(fn *ast.Node) *ast.NodeList {
 		return fn.AsFunctionExpression().Parameters
 	}
 	return nil
-}
-
-// findFirstCharAt scans `src` forward from `from`, returning the index of the
-// first occurrence of `ch`. Returns -1 when not found. Sufficient for the
-// narrow `(`/`)` scans the predicate-return-type fixer performs because
-// neither character can appear inside a parameter name or default value
-// without an enclosing paren the AST already tracks.
-func findFirstCharAt(src string, from int, ch byte) int {
-	for i := from; i < len(src); i++ {
-		if src[i] == ch {
-			return i
-		}
-	}
-	return -1
 }
 
 // ----- Wrapping fixer ---------------------------------------------------
@@ -1121,6 +1374,12 @@ func isStrongInnerNode(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
+	// ESTree exposes an optional chain as ChainExpression and even a template
+	// without substitutions as TemplateLiteral. Neither is a strong node in
+	// the upstream wrapping fixer.
+	if ast.IsOptionalChain(ast.SkipOuterExpressions(node, ast.OEKNonNullAssertions)) || node.Kind == ast.KindNoSubstitutionTemplateLiteral {
+		return false
+	}
 	if utils.IsStrongPrecedenceNode(node) {
 		return true
 	}
@@ -1160,10 +1419,9 @@ func isObjectExpressionInOneLineReturn(node, innerNode *ast.Node) bool {
 var leadingSemiTrigger = regexp.MustCompile("^[`(\\[]")
 
 func needsLeadingSemicolon(sf *ast.SourceFile, node *ast.Node, code string) bool {
-	if !leadingSemiTrigger.MatchString(code) {
+	if !leadingSemiTrigger.MatchString(code) || !utils.IsStartOfExpressionStatement(sf, node) {
 		return false
 	}
-	src := sf.Text()
 	// Walk up: while the node is in a left-hand position relative to its
 	// parent, keep going. Then check whether the previous statement (if any)
 	// in the surrounding block / program terminated with `;`.
@@ -1175,20 +1433,17 @@ func needsLeadingSemicolon(sf *ast.SourceFile, node *ast.Node, code string) bool
 		}
 		if ast.IsExpressionStatement(parent) {
 			block := parent.Parent
-			if block != nil && (block.Kind == ast.KindSourceFile || block.Kind == ast.KindBlock) {
+			if block != nil {
 				statements := getBlockStatements(block)
 				idx := indexOfNode(statements, parent)
 				if idx > 0 {
 					prev := statements[idx-1]
-					last := lastSignificantChar(src, prev.End())
-					if last != ';' {
+					last, ok := utils.TokenBeforePosition(sf, prev.End())
+					if ok && last.Kind != ast.KindSemicolonToken {
 						return true
 					}
 				}
 			}
-			return false
-		}
-		if !isLeftHandSide(current) {
 			return false
 		}
 		current = parent
@@ -1201,6 +1456,10 @@ func getBlockStatements(block *ast.Node) []*ast.Node {
 		return block.AsSourceFile().Statements.Nodes
 	case ast.KindBlock:
 		return block.AsBlock().Statements.Nodes
+	case ast.KindModuleBlock:
+		return block.AsModuleBlock().Statements.Nodes
+	case ast.KindCaseClause, ast.KindDefaultClause:
+		return block.AsCaseOrDefaultClause().Statements.Nodes
 	}
 	return nil
 }
@@ -1214,62 +1473,13 @@ func indexOfNode(nodes []*ast.Node, target *ast.Node) int {
 	return -1
 }
 
-// lastSignificantChar returns the last non-whitespace character at or before
-// `endExclusive`, skipping common trivia. Used by the ASI hazard check.
-func lastSignificantChar(src string, endExclusive int) byte {
-	for i := endExclusive - 1; i >= 0; i-- {
-		ch := src[i]
-		if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
-			continue
-		}
-		return ch
-	}
-	return 0
-}
-
-// isLeftHandSide mirrors upstream's `isLeftHandSide` (the private helper used
-// by the wrapping fixer's ASI check). Upstream only treats `UpdateExpression`
-// (`a++` / `++a`) as a left-hand parent on the unary side, not the broader
-// `UnaryExpression` (`!a`, `~a`, `typeof a`, ...). tsgo collapses both shapes
-// into PrefixUnary / PostfixUnary, so we differentiate by operator: only the
-// update operators `++` and `--` should return true.
-func isLeftHandSide(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-	if parent.Kind == ast.KindPostfixUnaryExpression {
-		// `a++` / `a--` — operand is the leftmost token. Upstream UpdateExpression.
-		return true
-	}
-	if parent.Kind == ast.KindPrefixUnaryExpression {
-		op := parent.AsPrefixUnaryExpression().Operator
-		// Only `++a` / `--a` count as UpdateExpression upstream-side; `!a`,
-		// `~a`, `+a`, `-a` are UnaryExpression and upstream returns false.
-		return op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken
-	}
-	if ast.IsBinaryExpression(parent) {
-		return parent.AsBinaryExpression().Left == node
-	}
-	if ast.IsConditionalExpression(parent) {
-		return parent.AsConditionalExpression().Condition == node
-	}
-	if ast.IsCallExpression(parent) {
-		return parent.AsCallExpression().Expression == node
-	}
-	if ast.IsTaggedTemplateExpression(parent) {
-		return parent.AsTaggedTemplateExpression().Tag == node
-	}
-	return false
-}
-
 // ----- Array length detection -------------------------------------------
 
 // isArrayLengthExpression mirrors upstream's `isArrayLengthExpression`: a
 // non-computed `.length` access on a value whose constrained type is an array
 // or a union of arrays.
 func isArrayLengthExpression(tc *checker.Checker, node *ast.Node) bool {
-	if node == nil || !ast.IsPropertyAccessExpression(node) {
+	if node == nil || !ast.IsPropertyAccessExpression(node) || ast.IsOptionalChain(node) {
 		return false
 	}
 	access := node.AsPropertyAccessExpression()
