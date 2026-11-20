@@ -2,6 +2,7 @@ package suppressions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -50,9 +51,12 @@ func TestScopedUpdate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		visible, stale, err := file.Apply(t.Context(), []FileResult{{Path: checked}}, append([]rule.RuleDiagnostic(nil), diagnostics...))
+		visible, stale, err := file.Prepare(t.Context(), []FileResult{{Path: checked}}, append([]rule.RuleDiagnostic(nil), diagnostics...))
 		if err != nil || stale != unused || len(visible) != 1 || visible[0].RuleName != "z" {
 			t.Fatalf("apply: %v, stale %v, error %v", visible, stale, err)
+		}
+		if err := file.CommitUpdate(); err != nil {
+			t.Fatal(err)
 		}
 		return file
 	}
@@ -129,9 +133,12 @@ func TestLintedPathsFromSymlinkedDirectory(t *testing.T) {
 		for range found {
 			diagnostics = append(diagnostics, rule.RuleDiagnostic{FilePath: display, RuleName: "x", Severity: rule.SeverityError})
 		}
-		visible, unused, err := baseline.Apply(t.Context(), []FileResult{{Path: display}}, diagnostics)
+		visible, unused, err := baseline.Prepare(t.Context(), []FileResult{{Path: display}}, diagnostics)
 		if err != nil || unused || len(visible) != visibleCount {
 			t.Fatalf("mode %d: visible %v, unused %v, error %v", mode, visible, unused, err)
+		}
+		if err := baseline.CommitUpdate(); err != nil {
+			t.Fatal(err)
 		}
 		return baseline
 	}
@@ -215,10 +222,14 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 	}
 	file := filepath.ToSlash(filepath.Join(cwd, "test.js"))
 	update := func(ctx context.Context, baseline *File, id string) error {
-		_, _, err := baseline.Apply(ctx, []FileResult{{Path: file}}, []rule.RuleDiagnostic{
+		defer baseline.DiscardUpdate()
+		_, _, err := baseline.Prepare(ctx, []FileResult{{Path: file}}, []rule.RuleDiagnostic{
 			{FilePath: file, RuleName: id, Severity: rule.SeverityError},
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		return baseline.CommitUpdate()
 	}
 	if err := first.BeginUpdate(); err != nil {
 		t.Fatal(err)
@@ -306,13 +317,39 @@ func TestUpdateRechecksTargetAliases(t *testing.T) {
 			if err := os.WriteFile(DefaultFilename, []byte(latest), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if _, _, err := baseline.Apply(t.Context(), []FileResult{{Path: selected}}, nil); err == nil {
+			if _, _, err := baseline.Prepare(t.Context(), []FileResult{{Path: selected}}, nil); err == nil {
 				t.Fatal("updated a baseline with counts for aliased targets")
 			}
 			if got, err := os.ReadFile(DefaultFilename); err != nil || string(got) != latest {
 				t.Fatalf("baseline after rejected update = %q, error %v, want %q", got, err, latest)
 			}
 		})
+	}
+}
+
+func TestPreparePreservesProtectedCountsFromAnotherWriter(t *testing.T) {
+	cwd := filepath.FromSlash(osvfs.FS().Realpath(filepath.ToSlash(t.TempDir())))
+	t.Chdir(cwd)
+	target := filepath.ToSlash(filepath.Join(cwd, "file.js"))
+	if err := os.WriteFile(target, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	baseline, err := Open(Options{Mode: Prune}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reason := errors.New("unverified Git entry")
+	baseline.PreserveCounts(target, reason)
+	const latest = `{"file.js":{"no-var":{"count":1}}}`
+	if err := os.WriteFile(DefaultFilename, []byte(latest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = baseline.Prepare(t.Context(), []FileResult{{Path: target}}, nil)
+	if !errors.Is(err, reason) {
+		t.Fatalf("prune error = %v, want %v", err, reason)
+	}
+	if got, err := os.ReadFile(DefaultFilename); err != nil || string(got) != latest {
+		t.Fatalf("baseline = %q, error %v, want %q", got, err, latest)
 	}
 }
 

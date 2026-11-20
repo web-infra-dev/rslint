@@ -308,6 +308,7 @@ type preparedLSPConfigSnapshot struct {
 	transactionID            string
 	usableLastGood           bool
 	gitPolicy                *config.GitPolicy
+	inputNames               *config.InputPathNames
 	gitWatchDirectories      []string
 }
 
@@ -488,6 +489,7 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 		)
 	}
 	preparedSnapshot.gitWatchDirectories = gitWatchDirectories
+	preparedSnapshot.inputNames = names
 	// The candidate already contains an immutable Git policy. A later
 	// filesystem mutation belongs to the next transaction and cannot alter this
 	// catalog while Node activation and commit complete.
@@ -829,6 +831,7 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.ruleCatalog = snapshot.ruleCatalog
 	s.configDiscoveryHasLastGood = snapshot.usableLastGood
 	s.gitPolicy = snapshot.gitPolicy
+	s.documentPathNames = snapshot.inputNames
 	s.failedGitPolicyDirectories = nil
 	s.committedGitWatchDirectories = snapshot.gitWatchDirectories
 	for _, ruleName := range snapshot.shadowedPluginRules {

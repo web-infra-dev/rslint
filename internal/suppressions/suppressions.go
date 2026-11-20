@@ -39,6 +39,7 @@ type File struct {
 	options       Options
 	entries       entries
 	targetAliases []targetAlias
+	protected     map[string]error
 	pending       *stagedUpdate
 }
 
@@ -55,10 +56,13 @@ func (f *File) CheckTargetAliases() error {
 	return f.checkTargetAliases(f.entries)
 }
 
-// NeedsUpdateBeforeFixes reports whether another writer could add an alias
-// count between this run's source changes and its baseline update.
-func (f *File) NeedsUpdateBeforeFixes() bool {
-	return f.options.Mode != Check && len(f.targetAliases) > 0
+// PreserveCounts reserves the current counts for a target whose eligibility
+// could not be verified. A read or an update leaving those counts intact is valid.
+func (f *File) PreserveCounts(path string, reason error) {
+	if f.protected == nil {
+		f.protected = make(map[string]error)
+	}
+	f.protected[f.fileKey(path)] = reason
 }
 
 func (f *File) checkTargetAliases(data entries) error {
@@ -84,9 +88,9 @@ type checkedFile struct {
 	skippedRules []string
 }
 
-// Apply compares diagnostics with the baseline for the given files, including
-// those that were checked and produced no diagnostics.
-func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []rule.RuleDiagnostic) ([]rule.RuleDiagnostic, bool, error) {
+// Prepare compares diagnostics with the latest counts and stages any changes.
+// The caller releases an update with CommitUpdate or DiscardUpdate.
+func (f *File) Prepare(ctx context.Context, checked []FileResult, diagnostics []rule.RuleDiagnostic) ([]rule.RuleDiagnostic, bool, error) {
 	files := make(map[string]*checkedFile)
 	for _, result := range checked {
 		key := f.fileKey(result.Path)
@@ -105,16 +109,21 @@ func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []ru
 		}
 		file.counts[diagnostic.RuleName]++
 	}
+	counts := f.entries
 	var aliasErr error
 	if f.options.Mode == Check {
 		aliasErr = f.CheckTargetAliases()
-	} else if err := f.update(ctx, files); err != nil {
-		return diagnostics, false, err
+	} else {
+		if err := f.prepareUpdate(ctx, files); err != nil {
+			f.DiscardUpdate()
+			return diagnostics, false, err
+		}
+		counts = f.pending.entries
 	}
 
 	unused := false
 	for _, file := range files {
-		for id, recorded := range f.entries[file.key] {
+		for id, recorded := range counts[file.key] {
 			if file.counts[id] < recorded.Count && !slices.Contains(file.skippedRules, id) {
 				unused = true
 			}
@@ -126,7 +135,7 @@ func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []ru
 			return false
 		}
 		count := file.counts[diagnostic.RuleName]
-		return count != 0 && count <= f.entries[file.key][diagnostic.RuleName].Count
+		return count != 0 && count <= counts[file.key][diagnostic.RuleName].Count
 	})
 	return visible, unused, aliasErr
 }
@@ -135,46 +144,68 @@ func eligible(d rule.RuleDiagnostic) bool {
 	return d.Origin == rule.DiagnosticOriginLint && d.Severity == rule.SeverityError && d.RuleName != ""
 }
 
-func (f *File) record(data entries, files map[string]*checkedFile) {
+func (f *File) record(data entries, files map[string]*checkedFile) (bool, error) {
+	changed := false
 	for _, file := range files {
 		for id, count := range file.counts {
 			if f.options.Rules != nil && !slices.Contains(f.options.Rules, id) {
 				continue
 			}
+			if data[file.key][id].Count == count {
+				continue
+			}
+			if err := f.protected[file.key]; err != nil {
+				return false, err
+			}
 			if data[file.key] == nil {
 				data[file.key] = make(map[string]entry)
 			}
 			data[file.key][id] = entry{Count: count}
+			changed = true
 		}
 	}
+	return changed, nil
 }
 
-func (f *File) prune(data entries, files map[string]*checkedFile) error {
+func (f *File) prune(data entries, files map[string]*checkedFile) (bool, error) {
+	changed := false
 	for _, file := range files {
 		rules := data[file.key]
 		for id, recorded := range rules {
 			if slices.Contains(file.skippedRules, id) {
 				continue
 			}
-			switch count := file.counts[id]; {
-			case count == 0:
+			count := file.counts[id]
+			if count >= recorded.Count {
+				continue
+			}
+			if err := f.protected[file.key]; err != nil {
+				return false, err
+			}
+			changed = true
+			if count == 0 {
 				delete(rules, id)
-			case count < recorded.Count:
+			} else {
 				rules[id] = entry{Count: count}
 			}
 		}
-		if len(rules) == 0 {
+		if rules != nil && len(rules) == 0 && f.protected[file.key] == nil {
 			delete(data, file.key)
+			changed = true
 		}
 	}
 	for key := range data {
 		missing, err := f.fileMissing(key)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if missing {
+			if err := f.protected[key]; err != nil {
+				return false, err
+			}
 			delete(data, key)
+			changed = true
 		}
 	}
-	return nil
+	return changed, nil
 }

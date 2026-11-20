@@ -20,6 +20,7 @@ import (
 // All fix rounds happen in linter-owned memory before this adapter is called.
 type cliFinalChangeCommitter struct {
 	canonicalByPath map[string]string
+	protected       map[string]error
 }
 
 func newCLIFinalChangeCommitter(files []target.File) cliFinalChangeCommitter {
@@ -49,7 +50,12 @@ func (committer cliFinalChangeCommitter) CommitFinalChanges(
 			preflightErrors = append(preflightErrors, err)
 			break
 		}
-		physical, selected := committer.canonicalByPath[rslintconfig.ExactPathID(change.Path)]
+		id := rslintconfig.ExactPathID(change.Path)
+		if err := committer.protected[id]; err != nil {
+			preflightErrors = append(preflightErrors, err)
+			continue
+		}
+		physical, selected := committer.canonicalByPath[id]
 		if !selected {
 			preflightErrors = append(preflightErrors, fmt.Errorf("fix target %q is not a selected lint target", change.Path))
 			continue

@@ -9,22 +9,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/suppressions"
 )
 
-// Reserve the baseline only when the pipeline is ready to persist its final
-// changes. The command releases the reservation on every exit.
-type suppressionFixCommitter struct {
-	baseline  *suppressions.File
-	committer linter.FinalChangeCommitter
-}
-
-type suppressionUpdateError struct{ error }
-
-func (c suppressionFixCommitter) CommitFinalChanges(ctx context.Context, changes []linter.FileChange) (linter.CommitResult, error) {
-	if err := c.baseline.BeginUpdate(); err != nil {
-		return linter.CommitResult{}, &suppressionUpdateError{err}
-	}
-	return c.committer.CommitFinalChanges(ctx, changes)
-}
-
 func applyLintSuppressions(
 	ctx context.Context,
 	baseline *suppressions.File,
@@ -32,7 +16,9 @@ func applyLintSuppressions(
 	diagnostics []rule.RuleDiagnostic,
 	records []linter.PluginDispatchRecord,
 	args lintArgs,
+	commitSources func() error,
 ) ([]rule.RuleDiagnostic, string) {
+	defer baseline.DiscardUpdate()
 	failedRules := make(map[string][]string)
 	var dispatchFailed, missingFile bool
 	for _, record := range records {
@@ -56,6 +42,16 @@ func applyLintSuppressions(
 		return d.Origin == rule.DiagnosticOriginPluginFailure
 	})
 	if incomplete && args.Suppressions.Mode != suppressions.Check {
+		// Independent native fixes can still be published after checking the
+		// current alias counts. Incomplete plugin counts must stay on disk.
+		if commitSources != nil {
+			if err := baseline.BeginUpdate(); err != nil {
+				return diagnostics, err.Error()
+			}
+			if err := commitSources(); err != nil {
+				return diagnostics, err.Error()
+			}
+		}
 		return diagnostics, "Cannot update suppressions because plugin lint results are incomplete."
 	}
 	files := observation.Native.Files
@@ -73,7 +69,13 @@ func applyLintSuppressions(
 			SkippedRules: skipped,
 		})
 	}
-	visible, unused, err := baseline.Apply(ctx, checked, diagnostics)
+	visible, unused, err := baseline.Prepare(ctx, checked, diagnostics)
+	if err == nil && commitSources != nil {
+		err = commitSources()
+	}
+	if err == nil {
+		err = baseline.CommitUpdate()
+	}
 	if err != nil {
 		return visible, err.Error()
 	}

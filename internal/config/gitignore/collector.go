@@ -41,7 +41,8 @@ func patternGlobs(patterns []Pattern) []string {
 }
 
 type gitignorePruneRule struct {
-	patterns []Pattern
+	patterns        []Pattern
+	caseInsensitive bool
 }
 
 // Cursor is an immutable, filesystem-independent view of the .gitignore
@@ -136,15 +137,15 @@ func (cursor Cursor) AppendSourcePatterns(directory string, content string) (Cur
 	}
 
 	patterns := convertGitignoreToPatterns(content, relative)
-	return cursor.appendPatterns(patterns), patterns
+	return cursor.appendPatterns(patterns, !cursor.useCaseSensitive), patterns
 }
 
-func (cursor Cursor) appendPatterns(patterns []Pattern) Cursor {
+func (cursor Cursor) appendPatterns(patterns []Pattern, caseInsensitive bool) Cursor {
 	next := cursor
 	if len(patterns) > 0 {
 		next.rules = append(
 			append([]gitignorePruneRule(nil), cursor.rules...),
-			gitignorePruneRule{patterns: patterns},
+			gitignorePruneRule{patterns: patterns, caseInsensitive: caseInsensitive},
 		)
 	}
 	return next
@@ -161,7 +162,7 @@ func (cursor Cursor) blocksDirectoryNode(directory string) bool {
 	ignored := false
 	for _, rule := range cursor.rules {
 		for _, pattern := range rule.patterns {
-			if gitignorePrunePatternMatchesDirectoryNode(pattern, relative, cursor.useCaseSensitive) {
+			if gitignorePrunePatternMatchesDirectoryNode(pattern, relative, !rule.caseInsensitive) {
 				ignored = !pattern.Negated
 			}
 		}

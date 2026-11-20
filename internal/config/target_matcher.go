@@ -25,6 +25,10 @@ func (match TargetMatch) Selected() bool { return match.decision.selected }
 // GloballyIgnored reports whether the target must be skipped entirely.
 func (match TargetMatch) GloballyIgnored() bool { return match.decision.globallyIgnored }
 
+// GitEntryUnverified reports a hard link whose unknown stored name could
+// change its effective ignore decision.
+func (match TargetMatch) GitEntryUnverified() bool { return match.decision.gitEntryUnverified }
+
 // TargetMatcher evaluates target selection and directory pruning for one
 // immutable config and path-space generation.
 type TargetMatcher struct {
@@ -116,11 +120,11 @@ func (matcher TargetMatcher) GitEntryBlocked(directory, scanRoot DirectoryIdenti
 		return false
 	}
 	for physical, lexical := directory.CanonicalPath, directory.LexicalPath; physical != ""; physical, lexical = gitignore.ParentDirectory(physical), tspath.GetDirectoryPath(lexical) {
-		_, repositoryRoot := policy.roots[policy.pathID(physical)]
+		_, repositoryRoot := policy.roots[gitignore.DirectoryPathID(physical)]
 		if repositoryRoot && matcher.resolver.reopensDirectory(lexical, physical) {
 			return false
 		}
-		if policy.pathID(physical) == policy.pathID(blocked) {
+		if gitignore.DirectoryPathID(physical) == gitignore.DirectoryPathID(blocked) {
 			return true
 		}
 	}

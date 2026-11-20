@@ -1373,6 +1373,9 @@ containing directories; it owns no VFS, module loader or owner lookup.
 Git matches a file using its physical parent and the name stored in that
 directory. A leaf symlink therefore uses its own name and its containing
 repository's ignore rules. Directory aliases use their physical roots.
+Git patterns use the case behavior observed at the repository's `.git` entry.
+Outside a repository, each `.gitignore` uses its containing directory's behavior.
+Physical source and coverage keys retain their exact directory names.
 Discovery passes these identities to target planning. Each explicit directory
 root is scanned independently, including when one root contains another.
 
@@ -1422,6 +1425,9 @@ Additional current behaviors:
   unavailable for diagnostics, quick fixes and fix-all. Content edits do not
   repeat a failed refresh for the same physical directory. Config/watch events
   can retry it, and a successful commit clears the failed-directory set.
+  Open documents share directory-name lookups from the current config snapshot.
+  Each request resolves the document's physical target again so it sees changes
+  to a symlink's destination. File notifications, saves and reopens refresh the names.
 - Dynamic Git watches cover workspace lexical/physical trees and open-document
   ancestor chains for `.gitignore` and `.git` marker creation/deletion, never
   `.git` contents. Watch ranges are registered before source observation and
@@ -1502,9 +1508,10 @@ names through config discovery, including at nested configs. At physical file
 deduplication, target selection can report two distinct names that would
 share one lint result. The file CLI uses this fact to reject recording or
 verifying counts for those names together. Updates repeat this check against
-the latest baseline under the write lock. If an autofix run selects such a
-pair and also updates the baseline, it acquires the lock after the in-memory
-fix rounds and holds it from the final source write through baseline publication.
+the latest baseline under the write lock. When one command fixes source and
+updates the baseline, the CLI computes both changes in memory. Under the lock
+it validates the counts, stages the JSON, applies the source edits and then
+publishes the baseline.
 
 Files with syntax errors and rules skipped for lack of type information keep
 their entries. The plugin dispatcher identifies incomplete rule results.

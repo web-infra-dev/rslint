@@ -1740,6 +1740,75 @@ func TestDocumentGitPolicyCoverageRejectsRetargetedAliasesAndCodeActions(t *test
 	}
 }
 
+type documentListingFS struct {
+	vfs.FS
+	listings int
+}
+
+func (fs *documentListingFS) GetAccessibleEntries(path string) vfs.Entries {
+	fs.listings++
+	return fs.FS.GetAccessibleEntries(path)
+}
+
+func TestDocumentPathNamesShareListingsUntilFileChangeOrConfigRefresh(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	fsys := &documentListingFS{FS: s.fs}
+	s.fs = fsys
+	directory := tspath.ResolvePath(root, "src")
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	open := func(name string) lsproto.DocumentUri {
+		path := tspath.ResolvePath(directory, name)
+		if err := os.WriteFile(path, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		uri := documentURIFromPath(path)
+		if err := s.handleDidOpen(t.Context(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{Uri: uri}}); err != nil {
+			t.Fatal(err)
+		}
+		return uri
+	}
+	first, second := open("first.ts"), open("second.ts")
+	original := s.documentTargetIdentity(first)
+	reads := fsys.listings
+	if reads == 0 {
+		t.Fatal("first document did not observe its directory")
+	}
+	if again := s.documentTargetIdentity(first); again != original {
+		t.Fatalf("repeated observation changed from %+v to %+v", original, again)
+	}
+	s.documentTargetIdentity(second)
+	if fsys.listings != reads {
+		t.Fatalf("opening a sibling or repeating a request listed %d additional directories", fsys.listings-reads)
+	}
+	renamed := tspath.ResolvePath(directory, "FIRST.ts")
+	if err := os.Rename(uriToPath(first), renamed); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.handleDidChangeWatchedFiles(t.Context(), &lsproto.DidChangeWatchedFilesParams{
+		Changes: []*lsproto.FileEvent{{Uri: documentURIFromPath(renamed), Type: lsproto.FileChangeTypeCreated}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	updated := s.documentTargetIdentity(first)
+	if fsys.listings == reads || fsys.FileExists(uriToPath(first)) && tspath.GetBaseFileName(updated.CanonicalPath) != "FIRST.ts" {
+		t.Fatalf("file notification retained an old observation: %+v, %d -> %d directory reads", updated, reads, fsys.listings)
+	}
+	if err := os.Rename(renamed, uriToPath(first)); err != nil {
+		t.Fatal(err)
+	}
+	refresh := startConfigRefreshForTest(s, "initial")
+	completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{}})
+	if result := awaitConfigRefreshResult(t, refresh); result.err != nil {
+		t.Fatal(result.err)
+	}
+	if again := s.documentTargetIdentity(first); again != original {
+		t.Fatalf("config refresh retained obsolete names: %+v, want %+v", again, original)
+	}
+}
+
 func TestHandleDidOpenCollectsGitChainWithoutRetryingEveryEdit(t *testing.T) {
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)

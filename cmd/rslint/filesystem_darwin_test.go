@@ -1,4 +1,4 @@
-// cspell:ignore APFS FSOPT FULLPATH Linkat STRASSE Straße
+// cspell:ignore APFS FSOPT FULLPATH Linkat STRASSE Straße Straß
 
 package main
 
@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/suppressions"
 	"golang.org/x/sys/unix"
 )
 
@@ -98,13 +100,19 @@ func TestWorkingDirectoryWithHardLinksToSymlink(t *testing.T) {
 	}
 }
 
-func TestCLIDarwinDirectoryEntryName(t *testing.T) {
+func TestCLIDarwinStoredEntryName(t *testing.T) {
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeLintTargetContractFiles(t, root, map[string]string{"Straße/file": "", "Café/file": "", "Other/file": ""})
+	writeLintTargetContractFiles(t, root, map[string]string{"Straße/file": "", "Café/file": "", "Other/Straße.js": ""})
 	path := func(name string) string { return filepath.Join(root, name) }
+	if err := os.Symlink("Straße.js", path("Other/Café.js")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(path("Straße/file"), path("Other/linked.js")); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Symlink("Café", path("Shortcut")); err != nil {
 		t.Fatal(err)
 	}
@@ -118,12 +126,12 @@ func TestCLIDarwinDirectoryEntryName(t *testing.T) {
 	}
 	check := func(input, want string) {
 		t.Helper()
-		if got := darwinDirectoryEntryName(input); got != want {
-			t.Errorf("DirectoryEntryName(%q) = %q, want %q", input, got, want)
+		if got, _ := darwinStoredEntryName(input); got != want {
+			t.Errorf("StoredEntryName(%q) = %q, want %q", input, got, want)
 		}
 	}
 	check("Café", "")
-	check(path("Café/file"), "")
+	check(path("Café/file"), "file")
 	check(path("missing"), "")
 	check(path("Shortcut"), "Shortcut")
 	check(path("Shortcut")+"/", "Shortcut")
@@ -155,7 +163,20 @@ func TestCLIDarwinDirectoryEntryName(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, input := range []string{path("Straße/WORK"), path("Other/work")} {
+	fs := newCLIFileSystem()
+	names := rslintconfig.NewInputPathNames(fs)
+	for input, entry := range map[string]string{"Other/STRASSE.js": "Other/Straße.js", "Other/Cafe\u0301.js": "Other/Café.js"} {
+		if _, err := os.Stat(path(input)); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		file := names.File(rslintconfig.FreezeFileIdentity(path(input), fs), false)
+		if got := rslintconfig.GitPath(file); got != path(entry) || file.CanonicalPath != path("Other/Straße.js") {
+			t.Errorf("observed %q as Git entry %q and physical target %q", input, got, file.CanonicalPath)
+		}
+	}
+	for _, input := range []string{path("Straße/WORK"), path("Other/work"), path("Straße/file"), path("Other/linked.js")} {
 		parent := filepath.Dir(input)
 		if _, err := os.ReadDir(parent); !errors.Is(err, os.ErrPermission) {
 			continue
@@ -163,6 +184,64 @@ func TestCLIDarwinDirectoryEntryName(t *testing.T) {
 		reported, _ := darwinPathAttribute(input, unix.ATTR_CMN_FULLPATH, unix.FSOPT_NOFOLLOW)
 		if reported != "" && filepath.Dir(reported) != parent {
 			check(input, "")
+		}
+	}
+}
+
+func TestFixAndPrunePreserveUnlistedGitEntry(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const source = "var value = 1;\n"
+	const ledger = `{"locked/STRASSE.js":{"no-var":{"count":1}}}`
+	writeLintTargetContractFiles(t, root, map[string]string{
+		".git": "", ".gitignore": "/locked/Straß[e/].js", "locked/placeholder": "",
+		"else/file.js": source, "safe.js": source, suppressions.DefaultFilename: ledger,
+	})
+	path := func(name string) string { return tspath.ResolvePath(root, name) }
+	if err := os.Symlink("../else/file.js", path("else/first.js")); err != nil {
+		t.Fatal(err)
+	}
+	if err := unix.Linkat(unix.AT_FDCWD, path("else/first.js"), unix.AT_FDCWD, path("locked/Straße.js"), 0); err != nil {
+		if errors.Is(err, unix.ENOTSUP) {
+			t.Skip("filesystem does not support hard links to a symlink")
+		}
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path("locked"), 0o111); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chmod(path("locked"), 0o755); err != nil {
+			t.Error(err)
+		}
+	})
+	fsys := newCLIFileSystem()
+	names := rslintconfig.NewInputPathNames(fsys)
+	paths := []string{path("safe.js"), path("locked/STRASSE.js")}
+	entries := rslintconfig.RslintConfig{{Files: []string{"**/*.js"}, Rules: rslintconfig.Rules{"no-var": "error"}}}
+	catalog := explicitConfigCatalogForTest(root, entries)
+	for _, p := range paths {
+		catalog.TargetFiles = append(catalog.TargetFiles, names.File(rslintconfig.FreezeFileIdentity(p, fsys), false))
+	}
+	if _, err := darwinStoredEntryName(paths[1]); !errors.Is(err, os.ErrPermission) {
+		t.Skip("this lookup does not produce an unlisted hard link")
+	}
+	if again := names.File(rslintconfig.FreezeFileIdentity(paths[1], fsys), false); again != catalog.TargetFiles[1] {
+		t.Fatalf("repeated lookup changed file identity: %+v, then %+v", catalog.TargetFiles[1], again)
+	}
+	catalog.GitPolicy = rslintconfig.CollectGitPolicy(entries, root, fsys, catalog.TargetFiles, nil)
+	code, _, stderr := runLintCommandForTest(t, root, lintArgs{
+		FS: fsys, ConfigCatalog: catalog, Fix: true, Format: "jsonline", AllowFiles: paths,
+		Suppressions: suppressions.Options{Mode: suppressions.Prune},
+	})
+	if code != 2 || !strings.Contains(stderr, "cannot be verified against .gitignore") {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	for name, want := range map[string]string{"safe.js": source, "else/file.js": source, suppressions.DefaultFilename: ledger} {
+		if got, err := os.ReadFile(path(name)); err != nil || string(got) != want {
+			t.Errorf("after --fix --prune-suppressions, %s = %q, %v, want %q", name, got, err, want)
 		}
 	}
 }

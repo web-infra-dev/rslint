@@ -178,10 +178,10 @@ type stagedUpdate struct {
 	destination string
 	file        *os.File
 	entries     entries
+	publish     bool
 }
 
-// BeginUpdate reserves the baseline and validates its latest counts before
-// changing sources. Apply publishes the update. DiscardUpdate releases it on failure.
+// BeginUpdate reserves the baseline and validates its latest counts.
 func (f *File) BeginUpdate() error {
 	if f.pending != nil {
 		return nil
@@ -207,6 +207,7 @@ func (f *File) BeginUpdate() error {
 		f.DiscardUpdate()
 		return err
 	}
+	f.pending.publish = data == nil
 	if data == nil {
 		data = make(entries)
 	}
@@ -223,44 +224,62 @@ func (f *File) DiscardUpdate() {
 	}
 }
 
-func (f *File) update(ctx context.Context, files map[string]*checkedFile) error {
+func (f *File) prepareUpdate(ctx context.Context, files map[string]*checkedFile) error {
 	if err := f.BeginUpdate(); err != nil {
 		return err
 	}
-	defer f.DiscardUpdate()
 	pending := f.pending
-	data, stage, path := pending.entries, pending.file, pending.destination
-	switch f.options.Mode {
-	case Record:
-		f.record(data, files)
-	case Prune:
-		if err := f.prune(data, files); err != nil {
+	var changed bool
+	var err error
+	if f.options.Mode == Record {
+		changed, err = f.record(pending.entries, files)
+	} else {
+		changed, err = f.prune(pending.entries, files)
+	}
+	if err != nil {
+		return err
+	}
+	pending.publish = pending.publish || changed
+	if pending.publish {
+		if err := pending.write(); err != nil {
 			return err
 		}
 	}
-	if info, err := os.Stat(path); err == nil {
-		if err := stage.Chmod(info.Mode().Perm()); err != nil {
+	return ctx.Err()
+}
+
+// CommitUpdate publishes the prepared counts and releases their writer lock.
+// A check has no pending update.
+func (f *File) CommitUpdate() error {
+	pending := f.pending
+	if pending == nil {
+		return nil
+	}
+	if pending.publish {
+		if err := os.Rename(pending.file.Name(), pending.destination); err != nil {
+			return err
+		}
+		f.pending = nil // After rename, a new writer may already own the temporary name.
+	} else {
+		f.DiscardUpdate()
+	}
+	f.entries = pending.entries
+	return nil
+}
+
+func (pending *stagedUpdate) write() error {
+	if info, err := os.Stat(pending.destination); err == nil {
+		if err := pending.file.Chmod(info.Mode().Perm()); err != nil {
 			return err
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	encoder := json.NewEncoder(stage)
+	encoder := json.NewEncoder(pending.file)
 	encoder.SetIndent("", "  ")
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(data); err != nil {
+	if err := encoder.Encode(pending.entries); err != nil {
 		return err
 	}
-	if err := stage.Close(); err != nil {
-		return err
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := os.Rename(stage.Name(), path); err != nil {
-		return err
-	}
-	f.pending = nil // After rename, a new writer may already own the temporary name.
-	f.entries = data
-	return nil
+	return pending.file.Close()
 }
