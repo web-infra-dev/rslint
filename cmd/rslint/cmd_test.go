@@ -2512,31 +2512,42 @@ func TestCLIFinalChangeCommitterValidatesCompleteDeltaBeforeWriting(t *testing.T
 }
 
 func TestCLIFinalChangeCommitterCommitsCompleteFinalDelta(t *testing.T) {
-	directoryPath := t.TempDir()
-	paths := []string{filepath.Join(directoryPath, "first.ts"), filepath.Join(directoryPath, "second.ts")}
+	root := tspath.NormalizePath(t.TempDir())
+	paths := []string{tspath.ResolvePath(root, "first.ts"), tspath.ResolvePath(root, "second.ts"), tspath.ResolvePath(root, "unchanged.ts")}
+	stamp := time.Unix(1700000000, 0)
 	for _, path := range paths {
 		if err := os.WriteFile(path, []byte("before"), 0o644); err != nil {
 			t.Fatal(err)
 		}
+		if err := os.Chtimes(path, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
 	}
+	// The preflight can identify a file with the same size and time even
+	// when its contents are no longer readable.
+	if err := os.Chmod(paths[2], 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(paths[2], 0o600) })
 	// Low-level targets without a realpath retain their lexical disk paths.
 	files := make([]target.File, len(paths))
 	for index, path := range paths {
 		files[index] = target.File{PathIdentity: rslintconfig.FreezeFileIdentity(path, nil)}
 	}
 	committer := newCLIFinalChangeCommitter(files)
-	changes := make([]linter.FileChange, len(paths))
-	for index, path := range paths {
+	fixedPaths := paths[:2]
+	changes := make([]linter.FileChange, len(fixedPaths))
+	for index, path := range fixedPaths {
 		changes[index] = linter.FileChange{Path: path, Before: "before", After: fmt.Sprintf("after-%d", index)}
 	}
 	result, err := committer.CommitFinalChanges(context.Background(), changes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(result.ConfirmedPaths, paths) {
-		t.Fatalf("confirmed paths = %+v, want %+v", result.ConfirmedPaths, paths)
+	if !slices.Equal(result.ConfirmedPaths, fixedPaths) {
+		t.Fatalf("confirmed paths = %+v, want %+v", result.ConfirmedPaths, fixedPaths)
 	}
-	for index, path := range paths {
+	for index, path := range fixedPaths {
 		content, readErr := os.ReadFile(path)
 		if readErr != nil || string(content) != fmt.Sprintf("after-%d", index) {
 			t.Fatalf("committed file %q: content=%q error=%v", path, content, readErr)
@@ -2583,6 +2594,9 @@ func TestCLIFinalChangeCommitterChecksSelectedHardLinks(t *testing.T) {
 			changes := []linter.FileChange{{Path: first, Before: "before", After: "fixed"}}
 			if test.secondAfter != "" {
 				changes = append(changes, linter.FileChange{Path: second, Before: "before", After: test.secondAfter})
+				if test.conflict {
+					slices.Reverse(changes)
+				}
 			}
 			result, err := newCLIFinalChangeCommitter(files).CommitFinalChanges(t.Context(), changes)
 			want := "fixed"
@@ -2604,6 +2618,32 @@ func TestCLIFinalChangeCommitterChecksSelectedHardLinks(t *testing.T) {
 				t.Fatalf("linked file = %q, %v; want %q", text, err, want)
 			}
 		})
+	}
+}
+
+func TestCLIFinalChangeCommitterChecksUnchangedNameForSingleLink(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	path, alias := tspath.ResolvePath(root, "file.js"), tspath.ResolvePath(root, "alias.js")
+	if err := os.WriteFile(path, []byte("before"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A second filesystem path can reach the same single-link file, as with
+	// a bind mount. Keep both names in this committer's input.
+	if err := os.Symlink(path, alias); err != nil {
+		t.Skipf("creating a symlink: %v", err)
+	}
+	files := []target.File{
+		{PathIdentity: rslintconfig.FreezeFileIdentity(path, nil)},
+		{PathIdentity: rslintconfig.FreezeFileIdentity(alias, nil)},
+	}
+	result, err := newCLIFinalChangeCommitter(files).CommitFinalChanges(t.Context(), []linter.FileChange{
+		{Path: path, Before: "before", After: "fixed"},
+	})
+	if err == nil || !strings.Contains(err.Error(), alias) || !strings.Contains(err.Error(), path) || len(result.ConfirmedPaths) != 0 {
+		t.Fatalf("single-link alias conflict: result=%+v error=%v", result, err)
+	}
+	if content, err := os.ReadFile(alias); err != nil || string(content) != "before" {
+		t.Fatalf("unchanged selection contains %q, %v", content, err)
 	}
 }
 

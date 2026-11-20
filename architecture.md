@@ -1046,11 +1046,12 @@ Automatic discovery uses these rules:
    directory; the lexical directory remains the owner and selector coordinate.
    The catalog passes its frozen authored path spaces to target planning and
    LSP activation, so neither reconstructs them through a moved directory alias.
-   Before sending a batch, Go coalesces verified native case aliases to one
-   stable candidate ID and representative directory across all frontiers. The
-   check requires both lexical case equivalence and matching resolved file and
-   directory paths; arbitrary symlink owners are not deduplicated by physical
-   target.
+   Before sending a batch, discovery assigns one owner directory and candidate
+   ID to native spellings of the same config, including Unicode variants.
+   It verifies the directory entries along the path and the config file itself
+   before reusing that ID across discovery frontiers. If two distinct symlinks
+   lead to the same directory and both become effective config owners, the
+   catalog reports the ambiguity before activation.
    After ownership is resolved, `activateConfigs` names only effective IDs;
    Node rechecks fingerprints, prepares plugin state only for that set, then
    rechecks the same effective sources before publishing the activation. This

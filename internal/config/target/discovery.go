@@ -222,7 +222,7 @@ func discoverLintTargetsWithinRoot(
 			return []string{fullPath}
 		}
 		return projectPathThroughRequestedDirectories(
-			fullPath, physicalPath, resolvedAllowDirs, useCaseSensitive,
+			fullPath, physicalPath, resolvedAllowDirs,
 		)
 	}
 	allProjectedDirectoriesMatch := func(

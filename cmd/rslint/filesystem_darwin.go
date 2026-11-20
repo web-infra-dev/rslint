@@ -1,4 +1,4 @@
-// cspell:ignore Attrlist Bitmapcount Commonattr Dirattr Fileattr FSOPT FULLPATH LINKCOUNT Nlink attrreference getattrlist
+// cspell:ignore Attrlist Bitmapcount Commonattr Dirattr Fileattr FSOPT FULLPATH LINKCOUNT attrreference getattrlist
 
 package main
 
@@ -19,16 +19,45 @@ import (
 )
 
 func newCLIFileSystem() vfs.FS {
-	return bundled.WrapFS(cachedvfs.From(darwinCLIFileSystem{osvfs.FS()}))
+	return darwinCLIFileSystem{bundled.WrapFS(cachedvfs.From(darwinRealpathFS{osvfs.FS()}))}
 }
 
 type darwinCLIFileSystem struct{ vfs.FS }
 
-func (fs darwinCLIFileSystem) Realpath(path string) string {
+// DirectoryEntryName returns the stored name in the input's parent, preserving
+// a directory symlink's own name. An empty result means it could not be verified.
+func (darwinCLIFileSystem) DirectoryEntryName(path string) string {
+	return darwinDirectoryEntryName(path)
+}
+
+func darwinDirectoryEntryName(path string) string {
+	path = strings.TrimRight(path, "/")
+	if !filepath.IsAbs(path) {
+		return ""
+	}
+	if info, err := os.Stat(path); err != nil || !info.IsDir() {
+		return ""
+	}
+	stored, links := darwinPathAttribute(path, unix.ATTR_CMN_NAME, unix.FSOPT_NOFOLLOW)
+	if links == 1 {
+		return stored
+	}
+	if links > 1 {
+		if info, err := os.Lstat(path); err == nil {
+			reported, _ := darwinPathAttribute(path, unix.ATTR_CMN_FULLPATH, unix.FSOPT_NOFOLLOW)
+			return darwinHardLinkEntryName(filepath.Dir(path), filepath.Base(path), reported, info)
+		}
+	}
+	return ""
+}
+
+type darwinRealpathFS struct{ vfs.FS }
+
+func (fs darwinRealpathFS) Realpath(path string) string {
 	if !filepath.IsAbs(path) {
 		return path
 	}
-	physical, links := darwinPathAttribute(path, unix.ATTR_CMN_FULLPATH)
+	physical, links := darwinPathAttribute(path, unix.ATTR_CMN_FULLPATH, 0)
 	// An exact path also identifies the requested entry among its hard links.
 	if links == 1 || physical == path {
 		return tspath.NormalizeSlashes(physical)
@@ -39,10 +68,13 @@ func (fs darwinCLIFileSystem) Realpath(path string) string {
 		// path's symlinks and confirm the stored entry in that parent.
 		if info, err := os.Lstat(resolved); err == nil {
 			parent := filepath.Dir(resolved)
-			if stored, parentLinks := darwinPathAttribute(parent, unix.ATTR_CMN_FULLPATH); parentLinks == 1 {
+			if stored, parentLinks := darwinPathAttribute(parent, unix.ATTR_CMN_FULLPATH, 0); parentLinks == 1 {
 				parent = stored
 			}
-			name := darwinHardLinkEntryName(parent, filepath.Base(resolved), filepath.Base(physical), info)
+			name := filepath.Base(resolved)
+			if stored := darwinHardLinkEntryName(parent, name, physical, info); stored != "" {
+				name = stored
+			}
 			return tspath.NormalizeSlashes(filepath.Join(parent, name))
 		}
 	}
@@ -63,44 +95,26 @@ func getCLIWorkingDirectory() (string, error) {
 	// component without following its final link.
 	parent := "/"
 	for part := range strings.SplitSeq(strings.TrimPrefix(cwd, "/"), "/") {
-		path := filepath.Join(parent, part)
-		name := darwinEntryName(path)
-		if name != "" && name != part {
-			onDisk := filepath.Join(parent, name)
-			original, err := os.Lstat(path)
-			if err == nil {
-				stat, ok := original.Sys().(*syscall.Stat_t)
-				if ok && original.Mode()&os.ModeSymlink != 0 && stat.Nlink > 1 {
-					path = filepath.Join(parent, darwinHardLinkEntryName(parent, part, name, original))
-				} else if candidate, err := os.Lstat(onDisk); err == nil && os.SameFile(original, candidate) {
-					path = onDisk
-				}
-			}
+		if stored := darwinDirectoryEntryName(filepath.Join(parent, part)); stored != "" {
+			part = stored
 		}
-		parent = path
+		parent = filepath.Join(parent, part)
 	}
 	return parent, nil
 }
 
-func darwinEntryName(path string) string {
-	name, _ := darwinPathAttribute(path, unix.ATTR_CMN_NAME)
-	return name
-}
-
-func darwinPathAttribute(path string, attribute uint32) (string, uint32) {
+// darwinPathAttribute asks the kernel for a stored name and the hard link count
+// in the same lookup. FSOPT_NOFOLLOW preserves the final symlink entry.
+func darwinPathAttribute(path string, attribute uint32, flags uintptr) (string, uint32) {
 	p, err := unix.BytePtrFromString(path)
 	if err != nil {
 		return "", 0
 	}
-	attrs := unix.Attrlist{Bitmapcount: unix.ATTR_BIT_MAP_COUNT, Commonattr: attribute}
-	flags := uintptr(unix.FSOPT_NOFOLLOW)
-	if attribute == unix.ATTR_CMN_FULLPATH {
-		// Only the link count applicable to the object is packed. Request it
-		// with the full path so hard-linked names can be verified separately.
-		const directoryLinkCount = 1 // ATTR_DIR_LINKCOUNT from sys/attr.h.
-		attrs.Dirattr = directoryLinkCount
-		attrs.Fileattr = unix.ATTR_FILE_LINKCOUNT
-		flags = 0
+	// Only the link count applicable to the object is packed.
+	const directoryLinkCount = 1 // ATTR_DIR_LINKCOUNT from sys/attr.h.
+	attrs := unix.Attrlist{
+		Bitmapcount: unix.ATTR_BIT_MAP_COUNT, Commonattr: attribute,
+		Dirattr: directoryLinkCount, Fileattr: unix.ATTR_FILE_LINKCOUNT,
 	}
 	var buf [unix.PathMax + 16]byte
 	//nolint:staticcheck // Pure-Go builds lack a getattrlist wrapper.
@@ -114,14 +128,11 @@ func darwinPathAttribute(path string, attribute uint32) (string, uint32) {
 	size := int(binary.NativeEndian.Uint32(buf[:]))
 	start := 4 + int(binary.NativeEndian.Uint32(buf[4:]))
 	end := start + int(binary.NativeEndian.Uint32(buf[8:]))
-	if start < 12 || end <= start || end > size || size > len(buf) || buf[end-1] != 0 {
+	if start != 16 || end <= start || end > size || size > len(buf) || buf[end-1] != 0 {
 		return "", 0
 	}
-	if attribute == unix.ATTR_CMN_FULLPATH {
-		if start != 16 || buf[start] != '/' {
-			return "", 0
-		}
-		return string(buf[start : end-1]), binary.NativeEndian.Uint32(buf[12:])
+	if attribute == unix.ATTR_CMN_FULLPATH && buf[start] != '/' {
+		return "", 0
 	}
-	return string(buf[start : end-1]), 0
+	return string(buf[start : end-1]), binary.NativeEndian.Uint32(buf[12:])
 }

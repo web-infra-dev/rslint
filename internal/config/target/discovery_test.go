@@ -1,6 +1,6 @@
 package target
 
-// cspell:ignore cmpopts gitdir
+// cspell:ignore cmpopts gitdir Straße STRASSE
 
 import (
 	"os"
@@ -2041,7 +2041,6 @@ func TestProjectPathThroughRequestedDirectoriesPreservesCallerCasing(t *testing.
 			LexicalPath:   "c:/repo/src",
 			CanonicalPath: "C:/Repo/src",
 		}},
-		false,
 	)
 	if len(projections) != 1 ||
 		projections[0] != "c:/repo/src/a.TS" {
@@ -2055,12 +2054,21 @@ func TestProjectPathThroughRequestedDirectoriesPreservesCallerCasing(t *testing.
 			{LexicalPath: "C:/Repo/src", CanonicalPath: "C:/Repo/src"},
 			{LexicalPath: "c:/repo/src", CanonicalPath: "c:/repo/src"},
 		},
-		false,
 	)
 	if len(projections) != 1 ||
 		projections[0] != "C:/Repo/src/a.TS" {
 		t.Fatalf("distinct case-only roots produced projections %+v", projections)
 	}
+
+	const owner, physical = "/repo/STRASSE/pkg", "/repo/Straße/pkg"
+	projections = projectPathThroughRequestedDirectories(
+		owner+"/app.js", physical+"/app.js",
+		[]resolvedAllowedDirectory{
+			{LexicalPath: owner, CanonicalPath: physical},
+			{LexicalPath: physical, CanonicalPath: physical},
+		},
+	)
+	assert.DeepEqual(t, projections, []string{owner + "/app.js", physical + "/app.js"})
 }
 
 func TestDiscoverFilesOutsideProgramsMultiConfig_UsesNearestConfigOwner(t *testing.T) {

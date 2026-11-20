@@ -291,7 +291,7 @@ func (coordinator *discoveryCoordinator) adoptCandidate(state *configLoadState, 
 }
 
 func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
-	configs, scopes, effectiveIDs, err := coordinator.draft.finalize(coordinator.physicalDirectory, coordinator.fs.UseCaseSensitiveFileNames())
+	configs, scopes, effectiveIDs, err := coordinator.draft.finalize(coordinator.physicalDirectory, coordinator.fs)
 	if err != nil {
 		return nil, err
 	}

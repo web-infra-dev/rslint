@@ -1,17 +1,22 @@
 package discovery
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/unicode/norm"
 )
 
 type configCandidate struct {
@@ -39,11 +44,6 @@ type configLoadState struct {
 	failure       *ConfigModuleError
 }
 
-type configOwnerIdentity struct {
-	lexicalDirectory  tspath.Path
-	physicalDirectory string
-}
-
 // moduleLoadCoordinator owns the Node-facing half of one discovery
 // transaction: candidate identity, ordered batch IDs, immutable load results,
 // failures, and final effective-config activation.
@@ -57,8 +57,8 @@ type moduleLoadCoordinator struct {
 	pathSpaces     *rslintconfig.PathSpaceSnapshot
 
 	statesByPath     map[string]*configLoadState
-	stateByIdentity  map[tspath.Path]*configLoadState
-	ownerByIdentity  map[configOwnerIdentity]string
+	ownerByDirectory map[rslintconfig.DirectoryIdentity]string
+	ownersByPhysical map[string][]rslintconfig.DirectoryIdentity
 	failureByPath    map[string]ConfigFailure
 	nextCandidateID  int
 	configsRequested int
@@ -74,16 +74,16 @@ func newModuleLoadCoordinator(
 	singleThreaded bool,
 ) moduleLoadCoordinator {
 	return moduleLoadCoordinator{
-		ctx:             ctx,
-		fs:              fsys,
-		loader:          loader,
-		transactionID:   transactionID,
-		fresh:           fresh,
-		singleThreaded:  singleThreaded,
-		statesByPath:    make(map[string]*configLoadState),
-		stateByIdentity: make(map[tspath.Path]*configLoadState),
-		ownerByIdentity: make(map[configOwnerIdentity]string),
-		failureByPath:   make(map[string]ConfigFailure),
+		ctx:              ctx,
+		fs:               fsys,
+		loader:           loader,
+		transactionID:    transactionID,
+		fresh:            fresh,
+		singleThreaded:   singleThreaded,
+		statesByPath:     make(map[string]*configLoadState),
+		ownerByDirectory: make(map[rslintconfig.DirectoryIdentity]string),
+		ownersByPhysical: make(map[string][]rslintconfig.DirectoryIdentity),
+		failureByPath:    make(map[string]ConfigFailure),
 	}
 }
 
@@ -94,9 +94,13 @@ func (coordinator *moduleLoadCoordinator) state(candidatePath string) *configLoa
 func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configCandidate) error {
 	type candidateGroup struct {
 		candidate configCandidate
-		aliases   map[string]configCandidate
+		identity  string
+		aliases   map[string]struct{}
 	}
-	groups := make(map[tspath.Path]*candidateGroup, len(rawCandidates))
+	// The first spelling in a frontier supplies the representative owner and module.
+	sort.Slice(rawCandidates, func(i, j int) bool { return rawCandidates[i].path < rawCandidates[j].path })
+	var groups []*candidateGroup
+	pending := make(map[string]*candidateGroup, len(rawCandidates))
 	for _, candidate := range rawCandidates {
 		candidate.path = tspath.NormalizePath(candidate.path)
 		candidate.directory = tspath.NormalizePath(candidate.directory)
@@ -106,30 +110,24 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 				candidate.physicalDirectory = tspath.NormalizePath(physical)
 			}
 		}
-		identity := tspath.ToPath(candidate.path, "", coordinator.fs.UseCaseSensitiveFileNames())
-		if state := coordinator.stateByIdentity[identity]; state != nil {
-			if err := coordinator.validateNativeCaseAlias(state.candidate, candidate); err != nil {
+		candidate.directory = coordinator.configOwner(candidate)
+		identity := rslintconfig.ExactPathID(tspath.CombinePaths(candidate.directory, tspath.GetBaseFileName(candidate.path)))
+		if state := coordinator.statesByPath[identity]; state != nil {
+			if err := coordinator.validateCandidate(state.candidate, candidate); err != nil {
 				return err
 			}
 			coordinator.statesByPath[candidate.path] = state
 			continue
 		}
-		group := groups[identity]
+		group := pending[identity]
 		if group == nil {
-			group = &candidateGroup{
-				candidate: candidate,
-				aliases:   make(map[string]configCandidate),
-			}
-			groups[identity] = group
-		} else {
-			if err := coordinator.validateNativeCaseAlias(group.candidate, candidate); err != nil {
-				return err
-			}
-			if candidate.path < group.candidate.path {
-				group.candidate = candidate
-			}
+			group = &candidateGroup{candidate: candidate, identity: identity, aliases: make(map[string]struct{})}
+			pending[identity] = group
+			groups = append(groups, group)
+		} else if err := coordinator.validateCandidate(group.candidate, candidate); err != nil {
+			return err
 		}
-		group.aliases[candidate.path] = candidate
+		group.aliases[candidate.path] = struct{}{}
 	}
 	if len(groups) == 0 {
 		return nil
@@ -138,13 +136,6 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 		return errors.New("javascript config candidates require a module loader")
 	}
 
-	paths := make([]string, 0, len(groups))
-	groupByPath := make(map[string]*candidateGroup, len(groups))
-	for _, group := range groups {
-		paths = append(paths, group.candidate.path)
-		groupByPath[group.candidate.path] = group
-	}
-	sort.Strings(paths)
 	loadMode := ConfigModuleLoadCached
 	if coordinator.fresh {
 		loadMode = ConfigModuleLoadFresh
@@ -155,22 +146,9 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 		LoadMode:        loadMode,
 		SingleThreaded:  coordinator.singleThreaded,
 	}
-	request.Candidates = make([]ConfigLoadCandidate, 0, len(paths))
-	for _, path := range paths {
-		candidate := groupByPath[path].candidate
-		// Competing filenames in one native-case directory share an original
-		// owner spelling. Distinct lexical aliases may fail independently;
-		// the catalog validates only the final effective owners for ambiguity.
-		ownerID := configOwnerIdentity{
-			lexicalDirectory:  tspath.ToPath(candidate.directory, "", coordinator.fs.UseCaseSensitiveFileNames()),
-			physicalDirectory: rslintconfig.ExactPathID(candidate.physicalDirectory),
-		}
-		if owner, exists := coordinator.ownerByIdentity[ownerID]; exists {
-			candidate.directory = owner
-		} else {
-			coordinator.ownerByIdentity[ownerID] = candidate.directory
-		}
-		groupByPath[path].candidate = candidate
+	request.Candidates = make([]ConfigLoadCandidate, 0, len(groups))
+	for _, group := range groups {
+		candidate := group.candidate
 		coordinator.nextCandidateID++
 		id := fmt.Sprintf("config-%06d", coordinator.nextCandidateID)
 		request.Candidates = append(request.Candidates, ConfigLoadCandidate{
@@ -193,7 +171,7 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 	directoryIdentities := make([]rslintconfig.DirectoryIdentity, 0, len(request.Candidates))
 	loadedStates := make([]*configLoadState, 0, len(request.Candidates))
 	for index, wireCandidate := range request.Candidates {
-		group := groupByPath[paths[index]]
+		group := groups[index]
 		candidate := group.candidate
 		result := results[wireCandidate.ID]
 		state := &configLoadState{
@@ -224,8 +202,7 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 			loadedStates = append(loadedStates, state)
 			coordinator.configsLoaded++
 		}
-		identity := tspath.ToPath(candidate.path, "", coordinator.fs.UseCaseSensitiveFileNames())
-		coordinator.stateByIdentity[identity] = state
+		coordinator.statesByPath[group.identity] = state
 		for aliasPath := range group.aliases {
 			coordinator.statesByPath[aliasPath] = state
 		}
@@ -249,45 +226,109 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 	return nil
 }
 
-// validateNativeCaseAlias protects candidate coalescing with the same
-// physical-directory invariant used by the final catalog.
-func (coordinator *moduleLoadCoordinator) validateNativeCaseAlias(left configCandidate, right configCandidate) error {
+// Full Unicode folding supplies a lookup bucket, including canonically equivalent
+// spellings. The filesystem decides whether two names in that bucket are one entry.
+func configSpellingKey(path string) string {
+	for i := range len(path) {
+		if path[i] >= utf8.RuneSelf {
+			return cases.Fold().String(norm.NFD.String(path))
+		}
+	}
+	return strings.ToLower(path)
+}
+
+func (coordinator *moduleLoadCoordinator) configOwner(candidate configCandidate) string {
+	directory := rslintconfig.DirectoryIdentity{LexicalPath: candidate.directory, CanonicalPath: candidate.physicalDirectory}
+	if owner, ok := coordinator.ownerByDirectory[directory]; ok {
+		return owner
+	}
+	key := configSpellingKey(directory.CanonicalPath)
+	for _, owner := range coordinator.ownersByPhysical[key] {
+		if samePhysicalPath(coordinator.fs, owner.CanonicalPath, directory.CanonicalPath) &&
+			sameDirectoryEntries(coordinator.fs, owner.LexicalPath, directory.LexicalPath) {
+			coordinator.ownerByDirectory[directory] = owner.LexicalPath
+			return owner.LexicalPath
+		}
+	}
+	coordinator.ownersByPhysical[key] = append(coordinator.ownersByPhysical[key], directory)
+	coordinator.ownerByDirectory[directory] = directory.LexicalPath
+	return directory.LexicalPath
+}
+
+// Two distinct symlinks can lead to the same directory, including on a volume
+// with different case sensitivity from the host default. Verify the stored name
+// of each differing component, not only the final filesystem object.
+func sameDirectoryEntries(fsys vfs.FS, left, right string) bool {
+	left, right = rslintconfig.ExactPathID(left), rslintconfig.ExactPathID(right)
+	native, _ := fsys.(interface{ DirectoryEntryName(path string) string })
+	for left != right {
+		parent, otherParent := configDiscoveryParent(left), configDiscoveryParent(right)
+		if parent == "" || otherParent == "" {
+			// A UNC share is a filesystem root. Its server and share names are
+			// case-insensitive and need no enumeration above the share.
+			return parent == otherParent && rslintconfig.PathsEqual(left, right, false)
+		}
+		name, other := tspath.GetBaseFileName(left), tspath.GetBaseFileName(right)
+		if name != other {
+			if native != nil {
+				name, other = native.DirectoryEntryName(left), native.DirectoryEntryName(right)
+			} else {
+				directories := fsys.GetAccessibleEntries(parent).Directories
+				name, other = storedDirectoryName(directories, name), storedDirectoryName(directories, other)
+			}
+			if name == "" || name != other {
+				return false
+			}
+		}
+		left, right = parent, otherParent
+	}
+	return true
+}
+
+func storedDirectoryName(names []string, requested string) string {
+	if slices.Contains(names, requested) {
+		return requested
+	}
+	// A case-sensitive volume may preserve both Café and café while treating
+	// the composed and decomposed spelling of each as the same entry.
+	for _, key := range []func(string) string{norm.NFD.String, configSpellingKey} {
+		want, match := key(requested), ""
+		for _, name := range names {
+			if key(name) == want {
+				if match != "" {
+					return ""
+				}
+				match = name
+			}
+		}
+		if match != "" {
+			return match
+		}
+	}
+	return ""
+}
+
+func samePhysicalPath(fsys vfs.FS, left, right string) bool {
+	if rslintconfig.ExactPathID(left) == rslintconfig.ExactPathID(right) {
+		return true
+	}
+	leftInfo, rightInfo := fsys.Stat(left), fsys.Stat(right)
+	return leftInfo != nil && rightInfo != nil && os.SameFile(leftInfo, rightInfo)
+}
+
+func (coordinator *moduleLoadCoordinator) validateCandidate(left, right configCandidate) error {
 	if left.path == right.path {
 		if rslintconfig.ExactPathID(left.physicalDirectory) != rslintconfig.ExactPathID(right.physicalDirectory) {
 			return fmt.Errorf("config candidate %q changed physical directory from %q to %q", left.path, left.physicalDirectory, right.physicalDirectory)
 		}
 		return nil
 	}
-	if coordinator.fs.UseCaseSensitiveFileNames() || !strings.EqualFold(left.path, right.path) {
-		return fmt.Errorf("config candidate identity collision between %q and %q", left.path, right.path)
-	}
-	physicalPath := func(path string) string {
-		if realPath := coordinator.fs.Realpath(path); realPath != "" {
-			return tspath.NormalizePath(realPath)
+	if leftPath, rightPath := left.modulePath(), right.modulePath(); leftPath != rightPath {
+		leftPath = cmp.Or(coordinator.fs.Realpath(leftPath), leftPath)
+		rightPath = cmp.Or(coordinator.fs.Realpath(rightPath), rightPath)
+		if !samePhysicalPath(coordinator.fs, leftPath, rightPath) {
+			return fmt.Errorf("config candidates %q and %q resolve to distinct filesystem paths", left.path, right.path)
 		}
-		return tspath.NormalizePath(path)
-	}
-	samePhysicalPath := func(leftPath string, rightPath string) bool {
-		if tspath.ToPath(leftPath, "", true) == tspath.ToPath(rightPath, "", true) {
-			return true
-		}
-		// Realpath may preserve native case aliases (notably EvalSymlinks on
-		// macOS). Verify both directory and file identities without assuming
-		// that distinct spellings mean distinct filesystem objects.
-		leftInfo, rightInfo := coordinator.fs.Stat(leftPath), coordinator.fs.Stat(rightPath)
-		return leftInfo != nil && rightInfo != nil && os.SameFile(leftInfo, rightInfo)
-	}
-	leftPhysicalDirectory := left.physicalDirectory
-	rightPhysicalDirectory := right.physicalDirectory
-	leftPhysicalPath := physicalPath(left.modulePath())
-	rightPhysicalPath := physicalPath(right.modulePath())
-	if !samePhysicalPath(leftPhysicalDirectory, rightPhysicalDirectory) ||
-		!samePhysicalPath(leftPhysicalPath, rightPhysicalPath) {
-		return fmt.Errorf(
-			"config candidates %q and %q differ only by case but resolve to distinct filesystem paths",
-			left.path,
-			right.path,
-		)
 	}
 	return nil
 }

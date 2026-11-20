@@ -98,7 +98,6 @@ func projectPathThroughRequestedDirectories(
 	filePath string,
 	physicalPath string,
 	allowDirs []resolvedAllowedDirectory,
-	useCaseSensitive bool,
 ) []string {
 	projections := make([]string, 0, len(allowDirs))
 	seen := make(map[string]struct{}, len(allowDirs))
@@ -112,37 +111,10 @@ func projectPathThroughRequestedDirectories(
 		projections = append(projections, path)
 	}
 	for _, dir := range allowDirs {
-		if _, within := rslintconfig.RelativePathWithinConfigRoot(filePath, dir.LexicalPath, useCaseSensitive); within {
-			relative, exactWithin := rslintconfig.RelativePathWithinConfigRoot(
-				filePath,
-				dir.LexicalPath,
-				true,
-			)
-			if !exactWithin {
-				// A case-insensitive lexical resemblance is authoritative only
-				// when the frozen physical spelling verifies the same root. This
-				// keeps native casing aliases while rejecting a distinct tree that
-				// differs only by case on a case-sensitive filesystem facade.
-				physicalRelative, verified := rslintconfig.RelativePathWithinConfigRoot(
-					filePath,
-					dir.CanonicalPath,
-					true,
-				)
-				if !verified && physicalPath != filePath {
-					physicalRelative, verified = rslintconfig.RelativePathWithinConfigRoot(
-						physicalPath,
-						dir.CanonicalPath,
-						true,
-					)
-				}
-				if !verified {
-					continue
-				}
-				relative = physicalRelative
-			}
+		if relative, within := rslintconfig.RelativePathWithinConfigRoot(filePath, dir.LexicalPath, true); within {
 			appendProjection(tspath.ResolvePath(dir.LexicalPath, relative))
 		}
-		if dir.LexicalPath == dir.CanonicalPath {
+		if dir.LexicalPath == dir.CanonicalPath && filePath == physicalPath {
 			continue
 		}
 		relative, within := rslintconfig.RelativePathWithinConfigRoot(filePath, dir.CanonicalPath, true)

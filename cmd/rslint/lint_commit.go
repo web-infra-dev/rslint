@@ -86,35 +86,36 @@ func (committer cliFinalChangeCommitter) CommitFinalChanges(
 	return result, errors.Join(writeErrors...)
 }
 
-// An in-place write must agree with the final text verified for every
-// selected hard link to that file, including names with no net edit.
+// An in-place write must agree with the final text verified for every selected
+// name for the file. Bind mounts can share a file even when its link count is one.
 func (committer cliFinalChangeCommitter) checkHardLinkConflicts(ctx context.Context, changes []linter.FileChange, destinations []string) error {
 	if len(committer.canonicalByPath) < 2 {
 		return nil
 	}
 	type changedFile struct {
 		change *linter.FileChange
-		info   os.FileInfo
+		id     fixFileID
 	}
-	// Size and modification time only narrow comparisons. SameFile decides
-	// identity without assuming a platform-specific layout for FileInfo.Sys.
-	type stamp struct{ size, modified int64 }
-	stampOf := func(info os.FileInfo) stamp { return stamp{info.Size(), info.ModTime().UnixNano()} }
-	byStamp := make(map[stamp][]changedFile, len(changes))
+	// The first changed name in lexical order is enough to witness any
+	// disagreement, whether another name has a different edit or no edit.
+	firstByID := make(map[fixFileID]*linter.FileChange, len(changes))
 	byPath := make(map[string]changedFile, len(changes))
 	for index := range changes {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		change := &changes[index]
-		info, err := statFixFile(destinations[index])
+		if change.Before == change.After {
+			continue
+		}
+		id, err := statFixFile(destinations[index])
 		if err != nil {
 			return fmt.Errorf("stat fix target %q: %w", change.Path, err)
 		}
-		file := changedFile{change, info}
-		byPath[rslintconfig.ExactPathID(change.Path)] = file
-		key := stampOf(info)
-		byStamp[key] = append(byStamp[key], file)
+		byPath[rslintconfig.ExactPathID(change.Path)] = changedFile{change, id}
+		if first := firstByID[id]; first == nil || change.Path < first.Path {
+			firstByID[id] = change
+		}
 	}
 	var conflict [2]string
 	for path, physical := range committer.canonicalByPath {
@@ -122,10 +123,9 @@ func (committer cliFinalChangeCommitter) checkHardLinkConflicts(ctx context.Cont
 			return err
 		}
 		current := byPath[path]
-		info := current.info
-		if info == nil {
+		if current.change == nil {
 			var err error
-			info, err = statFixFile(physical)
+			current.id, err = statFixFile(physical)
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
@@ -133,37 +133,19 @@ func (committer cliFinalChangeCommitter) checkHardLinkConflicts(ctx context.Cont
 				return fmt.Errorf("stat selected lint target %q: %w", path, err)
 			}
 		}
-		for _, fixed := range byStamp[stampOf(info)] {
-			if current.change == fixed.change || !os.SameFile(info, fixed.info) {
-				continue
-			}
-			expected := fixed.change.Before
-			if current.change != nil {
-				expected = current.change.After
-			}
-			if expected != fixed.change.After {
-				pair := [2]string{min(fixed.change.Path, path), max(fixed.change.Path, path)}
-				if conflict[0] == "" || slices.Compare(pair[:], conflict[:]) < 0 {
-					conflict = pair
-				}
-			}
+		first := firstByID[current.id]
+		if first == nil || (current.change != nil && current.change.After == first.After) {
+			continue
+		}
+		pair := [2]string{min(first.Path, path), max(first.Path, path)}
+		if conflict[0] == "" || slices.Compare(pair[:], conflict[:]) < 0 {
+			conflict = pair
 		}
 	}
 	if conflict[0] != "" {
 		return fmt.Errorf("hard-linked lint targets %q and %q require different final contents", conflict[0], conflict[1])
 	}
 	return nil
-}
-
-// On Windows a hard link's directory entry can have stale size and
-// timestamps. A handle supplies the metadata for the underlying file.
-func statFixFile(path string) (os.FileInfo, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	info, err := file.Stat()
-	return info, errors.Join(err, file.Close())
 }
 
 func readPhysicalFileText(path string) (string, bool) {
