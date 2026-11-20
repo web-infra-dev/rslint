@@ -259,9 +259,10 @@ describe('CLI Configuration Tests', () => {
       'other.js': 'debugger;',
     });
     try {
+      const alternate = existsSync(path.join(cwd, 'SRC')) ? 'SRC' : 'src';
       try {
         await fs.symlink(
-          path.join('src', 'app.js'),
+          path.join(alternate, 'app.js'),
           path.join(cwd, 'entry.js'),
           'file',
         );
@@ -290,6 +291,17 @@ describe('CLI Configuration Tests', () => {
       expect((await check('--suppress-all', 'entry.js')).exitCode).toBe(0);
       expect((await check('src/app.js')).exitCode).toBe(1);
       expect((await check('entry.js')).exitCode).toBe(0);
+      if (alternate !== 'src') {
+        for (const args of [
+          ['SRC', 'src'],
+          ['src/*.js', 'SRC/*.js'],
+        ]) {
+          const result = await check(...args);
+          expect(result.exitCode, result.stderr).toBe(2);
+          expect(result.stderr).toContain('SRC/app.js');
+          expect(result.stderr).toContain('src/app.js');
+        }
+      }
       const scan = await check('--pass-on-unpruned-suppressions');
       expect(scan.exitCode, scan.stderr).toBe(2);
       expect(scan.stderr).toContain('entry.js');

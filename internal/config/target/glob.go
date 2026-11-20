@@ -57,7 +57,7 @@ type globExpansion struct {
 // expandGlobs returns one expansion per input, in the same order. Patterns with
 // the same lexical root share a walk; other roots retain independent entry points.
 // Config ownership and ignores are evaluated later using each result's root.
-func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string) ([]globExpansion, error) {
+func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string, normalize func(string) string) ([]globExpansion, error) {
 	type compiledGlob struct {
 		inputs    []int
 		files     *minimatch3.Matcher
@@ -82,7 +82,7 @@ func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 		options := inputPatternOptions
 		options.NoNegate = !strings.HasPrefix(pattern, "!")
 		directory, prefix, relative := globDirectory(pattern)
-		root, err := resolveInputPath(cwd, directory)
+		root, err := resolveInputPath(cwd, directory, normalize)
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +93,7 @@ func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 		// Normalize both sides in authored syntax, so escapes in a returning
 		// suffix cannot be confused with the decoded filesystem root.
 		if runtime.GOOS == "windows" {
-			prefix, err = resolveInputPath(cwd, prefix)
+			prefix, err = resolveInputPath(cwd, prefix, normalize)
 			if err != nil {
 				return nil, err
 			}
@@ -134,7 +134,7 @@ func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 			if walkErr != nil {
 				return vfs.SkipDir
 			}
-			path = tspath.NormalizePath(path)
+			path = normalize(path)
 			relative := tspath.GetRelativePathFromDirectory(group.root, path, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
 			if entry.IsDir() {
 				if rslintconfig.IsDefaultExcludedPath(path, group.root, fsys.UseCaseSensitiveFileNames()) {

@@ -12,11 +12,8 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -203,7 +200,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 
 	fs := args.FS
 	if fs == nil {
-		fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		fs = newCLIFileSystem()
 	}
 	eslintPlugins := configCatalog.EslintPlugins
 	ruleCatalog, shadowedPluginRules := rules.All().ForESLintPlugins(eslintPlugins)
@@ -563,9 +560,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 	var pipelineRequest linter.PipelineRequest
 	if fix {
+		var committer linter.FinalChangeCommitter = newCLIFinalChangeCommitter(targetPlan.Files)
+		if baseline != nil && baseline.NeedsUpdateBeforeFixes() {
+			committer = suppressionFixCommitter{baseline: baseline, committer: committer}
+			defer baseline.DiscardUpdate()
+		}
 		pipelineRequest = linter.NewAutofixRequestWithCommitter(
 			provider,
-			newCLIFinalChangeCommitter(targetPlan.Files),
+			committer,
 			observationPolicy,
 			linter.AutofixPolicy{
 				VerifyAfterLastRound: true,
@@ -595,6 +597,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		})
 	}
 	if err != nil {
+		var updateErr *suppressionUpdateError
+		if errors.As(err, &updateErr) {
+			return abortRun(2, updateErr.Error(), fmt.Sprintf("error: %v", updateErr))
+		}
 		operation := "running linter"
 		reason := err.Error()
 		if _, autofixStarted := pipelineResult.AppliedFixes(); autofixStarted {

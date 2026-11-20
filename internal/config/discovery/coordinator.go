@@ -295,17 +295,27 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 	if err != nil {
 		return nil, err
 	}
+	pathSpaces := coordinator.modules.pathSpaces
+	var directoryAliases []rslintconfig.DirectoryIdentity
+	for owner, scope := range scopes {
+		// A shared config module can govern multiple spellings of its directory.
+		// Preserve each admitted entry for the target owner's frozen index.
+		for _, directory := range scope.Directories {
+			if _, frozen := pathSpaces.PhysicalDirectory(directory.LexicalPath); !frozen {
+				directoryAliases = append(directoryAliases, directory)
+			}
+		}
+		if len(coordinator.request.RecursiveDirectories) > 0 && scope.RecursiveDirectories == nil {
+			scope.RecursiveDirectories = []rslintconfig.DirectoryIdentity{}
+			scopes[owner] = scope
+		}
+	}
+	if len(directoryAliases) > 0 {
+		pathSpaces = pathSpaces.WithConfigBases(nil, coordinator.fs, directoryAliases...)
+	}
 	eslintPlugins, err := coordinator.modules.activateEffectiveConfigs(effectiveIDs)
 	if err != nil {
 		return nil, err
-	}
-	if len(coordinator.request.RecursiveDirectories) > 0 {
-		for owner, scope := range scopes {
-			if scope.RecursiveDirectories == nil {
-				scope.RecursiveDirectories = []rslintconfig.DirectoryIdentity{}
-				scopes[owner] = scope
-			}
-		}
 	}
 	targetFiles := coordinator.targetFiles
 	if coordinator.reachableFiles != nil {
@@ -319,7 +329,7 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 	return &ConfigCatalog{
 		TransactionID:      coordinator.transactionID,
 		GitPolicy:          rslintconfig.NewGitPolicy(coordinator.git.Snapshot()),
-		PathSpaces:         coordinator.modules.pathSpaces,
+		PathSpaces:         pathSpaces,
 		TargetFiles:        targetFiles,
 		TargetDirectories:  coordinator.targetDirectories,
 		Configs:            configs,

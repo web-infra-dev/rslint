@@ -9,6 +9,22 @@ import (
 	"github.com/web-infra-dev/rslint/internal/suppressions"
 )
 
+// Reserve the baseline only when the pipeline is ready to persist its final
+// changes. The command releases the reservation on every exit.
+type suppressionFixCommitter struct {
+	baseline  *suppressions.File
+	committer linter.FinalChangeCommitter
+}
+
+type suppressionUpdateError struct{ error }
+
+func (c suppressionFixCommitter) CommitFinalChanges(ctx context.Context, changes []linter.FileChange) (linter.CommitResult, error) {
+	if err := c.baseline.BeginUpdate(); err != nil {
+		return linter.CommitResult{}, &suppressionUpdateError{err}
+	}
+	return c.committer.CommitFinalChanges(ctx, changes)
+}
+
 func applyLintSuppressions(
 	ctx context.Context,
 	baseline *suppressions.File,

@@ -54,8 +54,7 @@ func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconf
 	if len(raw) == 0 && len(coordinator.request.Files) == 0 && coordinator.request.ImplicitCWD {
 		raw = rslintconfig.ResolveDirectoryIdentities([]string{coordinator.request.CWD}, coordinator.fs)
 	}
-	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
-	byIdentity := make(map[tspath.Path]rslintconfig.DirectoryIdentity, len(raw))
+	byIdentity := make(map[string]rslintconfig.DirectoryIdentity, len(raw))
 	for _, directory := range raw {
 		directory.LexicalPath = normalizeDiscoveryPath(directory.LexicalPath, coordinator.request.CWD)
 		if directory.CanonicalPath == "" {
@@ -63,7 +62,7 @@ func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconf
 		} else {
 			directory.CanonicalPath = normalizeDiscoveryPath(directory.CanonicalPath, coordinator.request.CWD)
 		}
-		identity := tspath.ToPath(directory.LexicalPath, "", useCaseSensitive)
+		identity := rslintconfig.ExactPathID(directory.LexicalPath)
 		if current, exists := byIdentity[identity]; !exists || directory.LexicalPath < current.LexicalPath {
 			byIdentity[identity] = directory
 		}
@@ -77,8 +76,9 @@ func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconf
 }
 
 func (coordinator *discoveryCoordinator) recursiveDirectory(path string) bool {
+	root := rslintconfig.ExactPathID(path)
 	return slices.ContainsFunc(coordinator.request.RecursiveDirectories, func(directory rslintconfig.DirectoryIdentity) bool {
-		return discoveryPathsEqual(path, directory.LexicalPath, coordinator.fs.UseCaseSensitiveFileNames())
+		return rslintconfig.ExactPathID(normalizeDiscoveryPath(directory.LexicalPath, coordinator.request.CWD)) == root
 	})
 }
 
@@ -135,18 +135,16 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 ) map[string]*discoveryTargetTrie {
 	tries := make(map[string]*discoveryTargetTrie, len(roots))
 	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
-	for index := range files {
-		file := &files[index]
-		for _, directory := range roots {
-			root := directory.LexicalPath
+	for _, directory := range roots {
+		root := directory.LexicalPath
+		rootID := rslintconfig.ExactPathID(root)
+		trie := &discoveryTargetTrie{}
+		for index := range files {
+			file := &files[index]
 			if !file.Explicit && file.ScanDirectories != nil && !slices.ContainsFunc(file.ScanDirectories, func(directory string) bool {
-				return discoveryPathsEqual(directory, root, useCaseSensitive)
+				return rslintconfig.ExactPathID(directory) == rootID
 			}) {
 				continue
-			}
-			trie := tries[root]
-			if trie == nil {
-				trie = &discoveryTargetTrie{}
 			}
 			if addDiscoveryTarget(trie, root, &file.PathIdentity, useCaseSensitive) {
 				tries[root] = trie

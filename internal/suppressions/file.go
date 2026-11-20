@@ -169,9 +169,18 @@ func resolveUpdatePath(path string) (string, error) {
 	return physical, nil
 }
 
-// Stage in the destination directory so a reader always sees complete JSON.
-// Exclusive creation serializes the read/modify/replace operation for writers.
-func (f *File) update(ctx context.Context, files map[string]*checkedFile) error {
+type stagedUpdate struct {
+	destination string
+	file        *os.File
+	entries     entries
+}
+
+// BeginUpdate reserves the baseline and validates its latest counts before
+// changing sources. Apply publishes the update. DiscardUpdate releases it on failure.
+func (f *File) BeginUpdate() error {
+	if f.pending != nil {
+		return nil
+	}
 	path, err := resolveUpdatePath(f.path)
 	if err != nil {
 		return err
@@ -184,24 +193,38 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	if err != nil {
 		return fmt.Errorf("stage suppressions update: %w", err)
 	}
-	// Once renamed the temporary name may immediately belong to another writer.
-	removeStage := true
-	defer func() {
-		if removeStage {
-			_ = stage.Close()
-			_ = os.Remove(stagePath)
-		}
-	}()
+	f.pending = &stagedUpdate{destination: path, file: stage}
 	data, err := f.read(path)
-	if err != nil {
-		return err
+	if err == nil {
+		err = f.checkTargetAliases(data)
 	}
-	if err := f.checkTargetAliases(data); err != nil {
+	if err != nil {
+		f.DiscardUpdate()
 		return err
 	}
 	if data == nil {
 		data = make(entries)
 	}
+	f.pending.entries = data
+	return nil
+}
+
+// DiscardUpdate releases an unpublished update, including its writer lock.
+func (f *File) DiscardUpdate() {
+	if pending := f.pending; pending != nil {
+		f.pending = nil
+		_ = pending.file.Close()
+		_ = os.Remove(pending.file.Name())
+	}
+}
+
+func (f *File) update(ctx context.Context, files map[string]*checkedFile) error {
+	if err := f.BeginUpdate(); err != nil {
+		return err
+	}
+	defer f.DiscardUpdate()
+	pending := f.pending
+	data, stage, path := pending.entries, pending.file, pending.destination
 	switch f.options.Mode {
 	case Record:
 		f.record(data, files)
@@ -229,10 +252,10 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := os.Rename(stagePath, path); err != nil {
+	if err := os.Rename(stage.Name(), path); err != nil {
 		return err
 	}
-	removeStage = false
+	f.pending = nil // After rename, a new writer may already own the temporary name.
 	f.entries = data
 	return nil
 }

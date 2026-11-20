@@ -5,10 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 )
@@ -18,16 +15,7 @@ func cliWorkingDirectory() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return tspath.NormalizePath(normalizeCLIRoot(cwd)), nil
-}
-
-// The native POSIX CLI treats repeated leading slashes as one root. Keep
-// glob escapes and Windows UNC roots intact before entering tsgo's path space.
-func normalizeCLIRoot(path string) string {
-	if runtime.GOOS != "windows" && strings.HasPrefix(path, "//") {
-		return "/" + strings.TrimLeft(path, "/")
-	}
-	return path
+	return target.NormalizeNativePath(cwd), nil
 }
 
 // IPC-supplied files are exact names. Only raw CLI arguments expand as globs.
@@ -44,10 +32,7 @@ func prepareCLIInputs(ctx context.Context, args *lintArgs, exactPaths []string) 
 		args.Positional = nil
 		return nil
 	}
-	for i, input := range args.Positional {
-		args.Positional[i] = normalizeCLIRoot(input)
-	}
-	selection, err := target.SelectInputs(ctx, args.FS, cwd, args.Positional)
+	selection, err := target.SelectNativeInputs(ctx, args.FS, cwd, args.Positional)
 	if err != nil {
 		return err
 	}
@@ -69,8 +54,8 @@ func classifyPaths(cwd string, paths []string) (files []string, dirs []string) {
 			fmt.Fprintf(os.Stderr, "rslint: filepath.Abs(%q) failed: %v\n", p, err)
 			continue
 		}
-		normalized := tspath.NormalizePath(absPath)
-		info, statErr := os.Stat(absPath)
+		normalized := target.NormalizeNativePath(absPath)
+		info, statErr := os.Stat(normalized)
 		if statErr == nil && info.IsDir() {
 			dirs = append(dirs, normalized)
 		} else {
