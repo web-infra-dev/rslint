@@ -882,6 +882,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/no-await-expression-member.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-await-in-promise-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-boolean-sort-comparator.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-canvas-to-image.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-chained-comparison.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-console-spaces.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-constant-zero-expression.test.ts',
