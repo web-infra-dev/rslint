@@ -88,7 +88,6 @@ export interface DeclaredMembersFact {
 export interface TypeDetailFact {
   pattern?: NodeRef;
   node?: NodeRef;
-  fresh: number;
   regular: number;
   base: number;
   constraint: number;
@@ -166,6 +165,7 @@ type PrintArgs = IDArgs & {
 export interface QueryArguments {
   conditionalInstantiations: IDArgs;
   freshLiteral: IDArgs;
+  regularType: IDArgs;
   evolvingElement: IDArgs;
   finalArray: IDArgs;
   simplifiedForReading: IDArgs;
@@ -291,10 +291,7 @@ export interface QueryArguments {
   indexInfo: IDArgs & { kind: number };
   indexInfos: IDArgs;
   typeRecord: IDArgs;
-  mappedTypeParameter: IDArgs;
-  mappedConstraintType: IDArgs;
-  mappedTemplateType: IDArgs;
-  mappedModifiersType: IDArgs;
+  mappedFields: IDArgs;
   classThisType: IDArgs;
   fullyQualifiedName: IDArgs;
   symbolMembers: IDArgs;
@@ -331,6 +328,7 @@ export interface QueryArguments {
 export interface QueryResults {
   conditionalInstantiations: readonly NamedSymbolFact[];
   freshLiteral: number;
+  regularType: number;
   evolvingElement: number;
   finalArray: number;
   simplifiedForReading: number;
@@ -439,10 +437,7 @@ export interface QueryResults {
   indexInfo: readonly IndexInfoFact[];
   indexInfos: readonly IndexInfoFact[];
   typeRecord: TypeFact;
-  mappedTypeParameter: number;
-  mappedConstraintType: number;
-  mappedTemplateType: number;
-  mappedModifiersType: number;
+  mappedFields: readonly number[];
   classThisType: number;
   fullyQualifiedName: string;
   symbolMembers: readonly NamedSymbolFact[];
@@ -500,16 +495,14 @@ export function isCacheableTypeQuery(query: TypeServiceQuery): boolean {
     case 'declaredMembers':
     case 'conditionalInstantiations':
     case 'freshLiteral':
+    case 'regularType':
     case 'typeParameterConstraint':
     case 'finalArray':
     case 'simplifiedForReading':
     case 'simplifiedForWriting':
     case 'resolvedTrueType':
     case 'resolvedFalseType':
-    case 'mappedModifiersType':
-    case 'mappedTypeParameter':
-    case 'mappedConstraintType':
-    case 'mappedTemplateType':
+    case 'mappedFields':
       return false;
     default:
       // A node can depend on a re-resolved call elsewhere in the expression.
@@ -567,9 +560,7 @@ const operations = [
   'parameterType',
   'propertyType',
   'resolvedSignatureWithOptions',
-  'mappedTypeParameter',
-  'mappedConstraintType',
-  'mappedTemplateType',
+  'mappedFields',
   'symbolDocumentation',
   'symbolJSDocTags',
   'signatureDocumentation',
@@ -577,7 +568,6 @@ const operations = [
   'contextualArgument',
   'suggestionDiagnostics',
   'typeNode',
-  'mappedModifiersType',
   'classThisType',
   'fullyQualifiedName',
   'symbolMembers',
@@ -652,6 +642,7 @@ const operations = [
   'symbolGlobalExports',
   'conditionalInstantiations',
   'freshLiteral',
+  'regularType',
   'evolvingElement',
   'finalArray',
   'simplifiedForReading',
@@ -779,6 +770,7 @@ export type ScalarOperation = Exclude<
 export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   conditionalInstantiations: 11,
   freshLiteral: 1,
+  regularType: 1,
   evolvingElement: 1,
   finalArray: 1,
   simplifiedForReading: 1,
@@ -878,10 +870,7 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   properties: 4,
   apparentProperties: 4,
   typeArguments: 4,
-  mappedTypeParameter: 1,
-  mappedConstraintType: 1,
-  mappedTemplateType: 1,
-  mappedModifiersType: 1,
+  mappedFields: 4,
   classThisType: 1,
   fullyQualifiedName: 3,
   symbolMembers: 11,

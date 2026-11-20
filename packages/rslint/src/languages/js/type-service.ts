@@ -447,6 +447,13 @@ function diagnosticMessage(fact: DiagnosticFact): ts.DiagnosticMessageChain {
 function unsupported(surface: string): never {
   throw new Error(`unsupported TypeScript operation: ${surface}`);
 }
+// Field order in the mappedFields reply.
+const mappedFieldIndex = {
+  typeParameter: 0,
+  constraintType: 1,
+  templateType: 2,
+  modifiersType: 3,
+} as const;
 const declaredMemberKeys = new Set<PropertyKey>([
   'declaredProperties',
   'declaredCallSignatures',
@@ -454,20 +461,16 @@ const declaredMemberKeys = new Set<PropertyKey>([
   'declaredIndexInfos',
 ]);
 
-type ViewReflection<T extends object> = Pick<
-  ProxyHandler<T>,
-  'has' | 'ownKeys' | 'getOwnPropertyDescriptor'
->;
+const serviceView = Symbol();
+function canonicalView<T extends object>(view: T & { [serviceView]?: T }): T {
+  return view[serviceView] ?? view;
+}
 
-export function guarded<T extends object>(
-  object: T,
-  ensure: () => void,
-  reflection?: ViewReflection<T>,
-): T {
-  return new Proxy(object, {
-    ...reflection,
+export function guarded<T extends object>(object: T, ensure: () => void): T {
+  const proxy: T = new Proxy(object, {
     get(target, key, receiver) {
       ensure();
+      if (key === serviceView) return proxy;
       const value: unknown = Reflect.get(target, key, receiver);
       return typeof value === 'function'
         ? (...args: unknown[]) => {
@@ -477,6 +480,7 @@ export function guarded<T extends object>(
         : value;
     },
   });
+  return proxy;
 }
 // The wrapper caches decoded values only. This closure never captures a packet
 // reader, shared byte view, request lease, or syntax transport reply.
@@ -511,8 +515,9 @@ function makeTypePrototype(checker: CheckerView, typescript: TypeScriptEnums) {
   function cached<T>(read: (type: TypeView) => T) {
     const values = new WeakMap<TypeView, T>();
     return function (this: TypeView) {
-      if (!values.has(this)) values.set(this, read(this));
-      return values.get(this)!;
+      const type = canonicalView(this);
+      if (!values.has(type)) values.set(type, read(type));
+      return values.get(type)!;
     };
   }
   const typeArguments = cached((t) =>
@@ -1539,13 +1544,11 @@ export class TypeServiceClient {
       ...request,
     };
     const key = typeQueryKey(query);
-    // At a simple variable declaration's name the checker returns the symbol's
-    // fixed type. A use of the same identifier can have a different flow type.
     if (
       !isCacheableTypeQuery(query) &&
       !(
-        query.op === 'type' &&
-        this.syntax.isVariableDeclarationName(query.args.node)
+        (query.op === 'type' || query.op === 'constantValue') &&
+        this.syntax.isStableNodeQuery(query.op, query.args.node)
       )
     ) {
       const reader = this.ingest(
@@ -1673,7 +1676,8 @@ export class TypeServiceClient {
   }
   private id(object: object, kind: ObjectKind): number {
     this.ensure();
-    const brand = this.brands.get(object);
+    const brand =
+      this.brands.get(object) ?? this.brands.get(canonicalView(object));
     if (brand?.kind !== kind) throw new Error(`foreign ${kind} handle`);
     return brand.id;
   }
@@ -1682,20 +1686,19 @@ export class TypeServiceClient {
     kind: ObjectKind,
     id: number,
     create: (client: this, brand: ObjectBrand) => T,
-    reflection?: ViewReflection<T>,
+    wrap?: (fields: T) => T,
   ): T | undefined {
     this.ensure();
     if (!id) return undefined;
     const old = map.get(id);
     if (old) return old;
     const brand = { kind, id };
-    const object = guarded(
-      create(this, brand),
-      () => {
-        this.ensure();
-      },
-      reflection,
-    );
+    const fields = create(this, brand);
+    const object = wrap
+      ? wrap(fields)
+      : guarded(fields, () => {
+          this.ensure();
+        });
     this.brands.set(object, brand);
     map.set(id, object);
     return object;
@@ -1725,9 +1728,21 @@ export class TypeServiceClient {
     if (fact.id) this.indexInfos.set(fact.id, info);
     return info;
   }
-  // TypeScript assigns some fields even when their initial value is undefined.
-  // All other optional getters represent a member only when it has a value.
-  private hasTypeField(view: TypeView, key: PropertyKey): boolean {
+  private readonly mappedValues = new WeakMap<object, readonly number[]>();
+  private mappedFields(view: object, id: number, index?: number) {
+    const known = this.mappedValues.get(view);
+    if (known && (index === undefined ? known.every(Boolean) : known[index]))
+      return known;
+    const current = this.query({ op: 'mappedFields', args: { id } });
+    this.mappedValues.set(view, current);
+    return current;
+  }
+  // Some compiler fields are present even when their value is undefined.
+  private hasTypeField(
+    view: TypeView,
+    key: PropertyKey,
+    mapped?: readonly number[],
+  ): boolean {
     const tf = this.typescript.TypeFlags;
     const of = this.typescript.ObjectFlags;
     switch (key) {
@@ -1786,6 +1801,14 @@ export class TypeServiceClient {
       case 'hasRestElement':
       case 'labeledElementDeclarations':
         return view.combinedFlags !== undefined;
+      case 'typeParameter':
+      case 'constraintType':
+      case 'templateType':
+      case 'modifiersType':
+        return (
+          !!((view.objectFlags ?? 0) & of.Mapped) &&
+          (mapped ? !!mapped[mappedFieldIndex[key]] : view[key] !== undefined)
+        );
       case 'objectFlags':
         return view.objectFlags !== undefined;
       case 'freshType':
@@ -1823,31 +1846,104 @@ export class TypeServiceClient {
       }
     }
   }
-  private readonly typeReflection: ViewReflection<TypeView> = {
-    has: (view, key) => {
-      this.ensure();
-      return this.hasTypeField(view, key);
-    },
-    ownKeys: (view) => {
-      this.ensure();
-      const declared = view.declaredProperties !== undefined;
-      return Reflect.ownKeys(view).filter((key) =>
-        declaredMemberKeys.has(key) ? declared : this.hasTypeField(view, key),
+  private readonly wrapType = (fields: TypeView): TypeView => {
+    // Plugins own the ordinary JS object. Compiler getters are private and
+    // supply its fields lazily, so reflection never calls a plugin getter.
+    const target: TypeView = Object.create(this.typePrototype);
+    let deleted: Set<PropertyKey> | undefined;
+    const available = (key: PropertyKey) =>
+      Object.hasOwn(fields, key) &&
+      !deleted?.has(key) &&
+      Object.isExtensible(target);
+    const descriptor = (key: PropertyKey): PropertyDescriptor => ({
+      value: Reflect.get(fields, key),
+      configurable: true,
+      enumerable: true,
+      writable: true,
+    });
+    const fieldKeys = () => {
+      const declared = fields.declaredProperties !== undefined;
+      const mapped =
+        (fields.objectFlags ?? 0) & this.typescript.ObjectFlags.Mapped
+          ? this.mappedFields(fields, fields.id)
+          : undefined;
+      return Reflect.ownKeys(fields).filter(
+        (key) =>
+          !deleted?.has(key) &&
+          (declaredMemberKeys.has(key)
+            ? declared
+            : this.hasTypeField(fields, key, mapped)),
       );
-    },
-    getOwnPropertyDescriptor: (view, key) => {
-      this.ensure();
-      if (declaredMemberKeys.has(key)) {
-        const value: unknown = Reflect.get(view, key);
-        return value === undefined
-          ? undefined
-          : { value, writable: true, configurable: true, enumerable: true };
-      }
-      const descriptor = Reflect.getOwnPropertyDescriptor(view, key);
-      return descriptor && this.hasTypeField(view, key)
-        ? descriptor
-        : undefined;
-    },
+    };
+    const proxy: TypeView = new Proxy(target, {
+      get: (object, key, receiver) => {
+        this.ensure();
+        if (key === serviceView) return proxy;
+        if (Object.hasOwn(object, key) || !available(key))
+          return Reflect.get(object, key, receiver);
+        const value: unknown = Reflect.get(fields, key);
+        return value === undefined &&
+          Reflect.has(object, key) &&
+          !this.hasTypeField(fields, key)
+          ? Reflect.get(object, key, receiver)
+          : value;
+      },
+      has: (object, key) => {
+        this.ensure();
+        return (
+          Reflect.has(object, key) ||
+          (available(key) && this.hasTypeField(fields, key))
+        );
+      },
+      ownKeys: (object) => {
+        this.ensure();
+        const own = Reflect.ownKeys(object);
+        if (!Object.isExtensible(object)) return own;
+        const keys = fieldKeys();
+        if (!own.length) return keys;
+        // Let JS order integer, string and symbol keys, including overridden fields.
+        return Reflect.ownKeys(
+          Object.fromEntries([...keys, ...own].map((key) => [key, true])),
+        );
+      },
+      getOwnPropertyDescriptor: (object, key) => {
+        this.ensure();
+        return (
+          Reflect.getOwnPropertyDescriptor(object, key) ??
+          (available(key) && this.hasTypeField(fields, key)
+            ? descriptor(key)
+            : undefined)
+        );
+      },
+      defineProperty: (object, key, attributes) => {
+        this.ensure();
+        if (
+          !Object.hasOwn(object, key) &&
+          available(key) &&
+          this.hasTypeField(fields, key)
+        )
+          Object.defineProperty(object, key, descriptor(key));
+        return Reflect.defineProperty(object, key, attributes);
+      },
+      deleteProperty: (object, key) => {
+        this.ensure();
+        if (!Reflect.deleteProperty(object, key)) return false;
+        if (available(key) && this.hasTypeField(fields, key))
+          (deleted ??= new Set()).add(key);
+        return true;
+      },
+      preventExtensions: (object) => {
+        this.ensure();
+        if (Object.isExtensible(object)) {
+          for (const key of fieldKeys()) {
+            if (!Object.hasOwn(object, key))
+              Object.defineProperty(object, key, descriptor(key));
+          }
+        }
+        return Reflect.preventExtensions(object);
+      },
+    });
+    return proxy;
   };
   private type(id: number): TypeView | undefined {
     const create = (client: this): TypeView => {
@@ -1931,12 +2027,13 @@ export class TypeServiceClient {
         tf = this.typescript.TypeFlags,
         of = this.typescript.ObjectFlags;
       const mapped = (
-        op:
-          'mappedTypeParameter' | 'mappedConstraintType' | 'mappedTemplateType',
-      ) =>
-        objectFlag(of.Mapped)
-          ? this.type(this.query({ op, args: { id } }))
-          : undefined;
+        key: keyof typeof mappedFieldIndex,
+      ): TypeView | undefined => {
+        if (!objectFlag(of.Mapped)) return undefined;
+        const index = mappedFieldIndex[key];
+        return this.type(this.mappedFields(fields, id, index)[index]);
+      };
+      let regular: TypeView | undefined;
       let resolvedMembers: DeclaredMemberViews | undefined;
       const declaredMembers = () => {
         if (!resolvedMembers && objectFlag(of.ClassOrInterface | of.Tuple)) {
@@ -2044,8 +2141,12 @@ export class TypeServiceClient {
           );
         },
         get regularType() {
-          const d = details();
-          return client.type(d.regular);
+          if (flag(tf.Literal | tf.Enum)) return client.type(details().regular);
+          if (flag(tf.Union) || objectFlag(of.FreshLiteral))
+            return (regular ??= client.type(
+              client.query({ op: 'regularType', args: { id } }),
+            ));
+          return undefined;
         },
         get baseType() {
           const d = details();
@@ -2113,20 +2214,16 @@ export class TypeServiceClient {
           return typeParameters();
         },
         get typeParameter() {
-          return mapped('mappedTypeParameter');
+          return mapped('typeParameter');
         },
         get constraintType() {
-          return mapped('mappedConstraintType');
+          return mapped('constraintType');
         },
         get templateType() {
-          return mapped('mappedTemplateType');
+          return mapped('templateType');
         },
         get modifiersType() {
-          return objectFlag(of.Mapped)
-            ? client.type(
-                client.query({ op: 'mappedModifiersType', args: { id } }),
-              )
-            : undefined;
+          return mapped('modifiersType');
         },
         get thisType() {
           return objectFlag(of.ClassOrInterface | of.Tuple) &&
@@ -2144,7 +2241,7 @@ export class TypeServiceClient {
       inheritTypePrototype(fields, client.typePrototype);
       return fields;
     };
-    return this.intern(this.types, 'type', id, create, this.typeReflection);
+    return this.intern(this.types, 'type', id, create, this.wrapType);
   }
   private symbol(id: number, knownName?: string): SymbolView | undefined {
     const view = this.intern(this.symbols, 'symbol', id, (client, brand) => {

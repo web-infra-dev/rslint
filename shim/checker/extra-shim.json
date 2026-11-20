@@ -76,6 +76,7 @@
     ],
     "TupleType": ["combinedFlags", "minLength"],
     "LiteralType": ["freshType", "regularType"],
+    "UnionType": ["regularType"],
     "Relation": ["results"],
     "IndexInfo": ["components"],
     "TypeReference": ["node"],

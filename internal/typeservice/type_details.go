@@ -13,7 +13,7 @@ type TypeDetails struct {
 	labels                            []*ast.Node
 	patternRef, nodeRef, rootRef      *NodeRef
 	labelRefs                         []*NodeRef
-	fresh, regular, base, constraint  uint32
+	regular, base, constraint         uint32
 	outer, local, elements            Handles
 	minPlusOne, fixedPlusOne          uint32
 	texts                             []string
@@ -48,9 +48,9 @@ func (s *Session) typeDetails(c *checker.Checker, t *checker.Type) *TypeDetails 
 		}
 	}
 	switch {
-	case flags&(checker.TypeFlagsStringLiteral|checker.TypeFlagsBooleanLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral|checker.TypeFlagsEnumLiteral) != 0 && flags&checker.TypeFlagsUnion == 0:
+	case flags&(checker.TypeFlagsLiteral|checker.TypeFlagsEnum) != 0:
 		literal := t.AsLiteralType()
-		d.fresh, d.regular = s.typeID(literal.FreshType()), s.typeID(literal.RegularType())
+		d.regular = s.typeID(literal.RegularType())
 	case flags&checker.TypeFlagsTemplateLiteral != 0:
 		d.texts = t.AsTemplateLiteralType().Texts()
 	case flags&checker.TypeFlagsSubstitution != 0:
@@ -146,11 +146,7 @@ func cachedSymbolType(c *checker.Checker, symbol *ast.Symbol) *checker.Type {
 	return checker.ValueSymbolLinks_resolvedType(*links)
 }
 
-func cachedIndexedAccess(c *checker.Checker, t *checker.Type, writing bool) *checker.Type {
-	kind := checker.CachedTypeKindIndexedAccessForReading
-	if writing {
-		kind = checker.CachedTypeKindIndexedAccessForWriting
-	}
+func cachedType(c *checker.Checker, t *checker.Type, kind checker.CachedTypeKind) *checker.Type {
 	var key checker.CachedTypeKey
 	*checker.CachedTypeKey_kindPtr(&key) = kind
 	*checker.CachedTypeKey_typeIdPtr(&key) = t.Id()

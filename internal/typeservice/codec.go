@@ -107,7 +107,6 @@ func EncodePacket(result Result) ([]byte, error) {
 	case *TypeDetails:
 		w.put(8, w.node(fact.patternRef))
 		w.put(12, w.node(fact.nodeRef))
-		w.put(16, fact.fresh)
 		w.put(20, fact.regular)
 		w.put(24, fact.base)
 		w.put(28, fact.constraint)

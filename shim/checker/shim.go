@@ -1499,6 +1499,17 @@ const UnionReductionLiteral = checker.UnionReductionLiteral
 const UnionReductionNone = checker.UnionReductionNone
 const UnionReductionSubtype = checker.UnionReductionSubtype
 type UnionType = checker.UnionType
+type extra_UnionType struct {
+  checker.UnionOrIntersectionType
+  resolvedReducedType *checker.Type
+  regularType *checker.Type
+  origin *checker.Type
+  keyPropertyName string
+  constituentMap map[*checker.Type]*checker.Type
+}
+func UnionType_regularType(v *checker.UnionType) *checker.Type {
+  return ((*extra_UnionType)(unsafe.Pointer(v))).regularType
+}
 type UniqueESSymbolType = checker.UniqueESSymbolType
 type UnusedKind = checker.UnusedKind
 const UnusedKindLocal = checker.UnusedKindLocal

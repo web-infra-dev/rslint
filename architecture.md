@@ -1881,12 +1881,16 @@ kinds for JS rules. Generated nodes have no source-node handle.
 Symbol member tables materialize on demand. Reads of transient symbol links
 and mapped-type fields observe the checker's current values without triggering
 resolution. Type methods and the `typeArguments` accessor are inherited.
-Field presence follows the TypeScript type kind and its current state. Explicit signature queries pass the apparent
+Field presence follows the TypeScript type kind and its current state. A mapped
+type exposes the slots the checker has already filled in one read. Plugin
+properties use their own JavaScript descriptors, and wrapping a type in a
+transparent proxy preserves its checker handle. Explicit signature queries pass the apparent
 argument count and candidate output through normal overload resolution. They
 can change the checker's cached answers for every client. Node-dependent
-semantic reads therefore go directly to the checker, except for
-`getTypeAtLocation` on a variable declaration's own identifier. Its symbol has
-a fixed type, and the worker can reuse it when it already has the syntax tree. Type and signature
+semantic reads therefore go directly to the checker. A variable declaration's
+own identifier has a fixed symbol type, and an enum member declaration has a
+fixed constant value. The worker can reuse these reads when it already has the
+syntax tree. Type and signature
 formatting use the checker printer with the writer layout used by each
 TypeScript method. Syntax navigation uses the reader's synthesized tokens and
 lists. Their identities survive decoded source eviction, and semantic queries
