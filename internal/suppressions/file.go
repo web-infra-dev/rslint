@@ -18,8 +18,8 @@ import (
 
 const DefaultFilename = "rslint-suppressions.json"
 
-// Open uses the file CLI's current working directory, including its logical
-// spelling. A plain check without a baseline returns nil.
+// Open reads the CLI baseline and freezes the canonical working directory
+// for its file keys. A plain check without a baseline returns nil.
 func Open(cwd string, options Options) (*File, error) {
 	cwd = filepath.FromSlash(cwd)
 	f := &File{options: options}
@@ -29,7 +29,6 @@ func Open(cwd string, options Options) (*File, error) {
 		if err != nil {
 			return nil, err
 		}
-		f.baseDir = baseDir
 		path = location
 		if filepath.VolumeName(path) != "" || os.IsPathSeparator(path[0]) {
 			// Let Windows resolve drive-relative and current-drive-rooted paths.
@@ -56,15 +55,32 @@ func Open(cwd string, options Options) (*File, error) {
 	if len(data) == 0 && options.Mode == Check {
 		return nil, nil //nolint:nilnil // No active baseline means the CLI can skip collecting linted files.
 	}
-	if err := f.resolveWorkingDirectory(cwd); err != nil {
-		return nil, err
-	}
+	physical := osvfs.FS().Realpath(filepath.ToSlash(cwd))
+	f.cwd = tspath.EnsureTrailingDirectorySeparator(physical)
 	f.entries = data
 	return f, nil
 }
 
-// NativeCWD is the process working directory used to resolve CLI operands.
-func (f *File) NativeCWD() string { return f.baseDir }
+// Canonical paths under cwd already contain their slash-separated JSON key.
+func (f *File) fileKey(path string) string {
+	dir := f.cwd
+	if relative, ok := strings.CutPrefix(path, dir); ok {
+		return relative
+	}
+	if runtime.GOOS == "windows" {
+		baseVolume, fileVolume := filepath.VolumeName(dir), filepath.VolumeName(path)
+		// Target identity preserves UNC server and share spelling.
+		if strings.HasPrefix(path, "//") && baseVolume != fileVolume {
+			return path
+		}
+		if !strings.EqualFold(baseVolume, fileVolume) {
+			return strings.ToUpper(fileVolume) + path[len(fileVolume):]
+		}
+		return tspath.GetRelativePathFromDirectory(dir, path, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+	}
+	relative, _ := filepath.Rel(dir, path) // Both canonical paths have the same Unix root.
+	return relative
+}
 
 func (f *File) fileMissing(key string) (bool, error) {
 	if strings.HasPrefix(key, "//") {
@@ -76,7 +92,7 @@ func (f *File) fileMissing(key string) (bool, error) {
 		return false, nil // A Unix host cannot check a Windows drive.
 	}
 	if !filepath.IsAbs(path) {
-		path = filepath.Join(f.baseDir, path)
+		path = filepath.Join(f.cwd, path)
 	}
 	_, err := os.Stat(path)
 	if err != nil && volume != "" {
@@ -180,8 +196,6 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	if data == nil {
 		data = make(entries)
 	}
-	// A different writer may have recorded the observed spelling since Open.
-	selectExistingKeys(data, files)
 	switch f.options.Mode {
 	case Record:
 		f.record(data, files)

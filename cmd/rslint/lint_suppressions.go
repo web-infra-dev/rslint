@@ -1,9 +1,11 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"slices"
 
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/suppressions"
@@ -16,7 +18,7 @@ func applyLintSuppressions(
 	diagnostics []rule.RuleDiagnostic,
 	records []linter.PluginDispatchRecord,
 	args lintArgs,
-	inputPaths map[string]suppressions.FileResult,
+	targets []target.File,
 ) ([]rule.RuleDiagnostic, string) {
 	failedRules := make(map[string][]string)
 	var dispatchFailed, missingFile bool
@@ -43,24 +45,28 @@ func applyLintSuppressions(
 	if incomplete && args.Suppressions.Mode != suppressions.Check {
 		return diagnostics, "Cannot update suppressions because plugin lint results are incomplete."
 	}
+	// Use the identities that target selection used for deduplication.
+	canonicalPaths := make(map[string]string)
+	for _, target := range targets {
+		if target.Path != target.CanonicalPath {
+			canonicalPaths[target.Path] = target.CanonicalPath
+		}
+	}
 	files := observation.Native.Files
 	checked := make([]suppressions.FileResult, 0, len(files))
 	for _, file := range files {
+		if file.SyntaxError {
+			continue
+		}
 		skipped := file.SkippedErrorRules
 		if failed := failedRules[file.Path]; len(failed) > 0 {
 			skipped = append(failed, skipped...)
 		}
-		result := inputPaths[file.Path]
-		result.Path = file.Path
-		result.SkippedRules = skipped
-		result.Unchecked = file.SyntaxError
-		checked = append(checked, result)
-		delete(inputPaths, file.Path)
-	}
-	// The remaining selected spellings were coalesced before lint ran.
-	for _, result := range inputPaths {
-		result.Unchecked = true
-		checked = append(checked, result)
+		checked = append(checked, suppressions.FileResult{
+			Path:          file.Path,
+			CanonicalPath: cmp.Or(canonicalPaths[file.Path], file.Path),
+			SkippedRules:  skipped,
+		})
 	}
 	visible, unused, err := baseline.Apply(ctx, checked, diagnostics)
 	if err != nil {

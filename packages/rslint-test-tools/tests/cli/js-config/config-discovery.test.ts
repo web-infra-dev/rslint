@@ -10,6 +10,32 @@ import {
 } from './helpers.js';
 
 describe('CLI config discovery (upward traversal)', () => {
+  test('checks suppression counts written during config evaluation', async () => {
+    const tempDir = await createTempDir({
+      'rslint-suppressions.json': '{"app.js":{"no-debugger":{"count":2}}}',
+      'app.js': 'debugger; debugger;',
+      'rslint.config.mjs': `import { writeFileSync } from 'node:fs';
+        writeFileSync('rslint-suppressions.json',
+          '{"app.js":{"no-debugger":{"count":1}}}');
+        export default [{ rules: { 'no-debugger': 'error' } }];`,
+    });
+    try {
+      const result = await runRslint(
+        ['--format', 'jsonline', 'app.js'],
+        tempDir,
+      );
+      expect(result.exitCode).toBe(1);
+      expect(
+        result.stdout
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line).ruleName),
+      ).toEqual(['no-debugger', 'no-debugger']);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('invalid empty files array should fail before linting', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': `export default [

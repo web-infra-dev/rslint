@@ -52,7 +52,6 @@ type lintArgs struct {
 	Positional      []string
 	GlobRoots       []rslintconfig.DirectoryIdentity
 	ScanDirectories map[string][]string
-	inputOrigins    cliInputOrigins
 	// FS is an optional run-scoped filesystem shared with Go config discovery.
 	// Native CLI supplies one cached instance so the later target/program phases
 	// reuse directory entries already read by the staged frontier.

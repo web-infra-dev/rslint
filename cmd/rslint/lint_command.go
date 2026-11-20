@@ -62,42 +62,10 @@ func resolveStartTime(startTimeMs int64) time.Time {
 	return time.Now()
 }
 
-// Discovery needs to know whether to retain operand spellings before it walks.
-// Keep the same baseline for the run and report a read failure after discovery
-// and profiler setup, like other lint-only preflight failures.
-type lintPreflight struct {
-	cwd         string
-	format      output.Format
-	baseline    *suppressions.File
-	baselineErr error
-}
-
-func prepareLintCommand(args lintArgs) (lintPreflight, int) {
-	preflight := lintPreflight{format: output.FormatDefault}
-	var err error
-	if !args.Init {
-		preflight.format, err = output.ParseFormat(args.Format)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return preflight, 2
-		}
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting current directory: %v\n", err)
-		return preflight, 1
-	}
-	preflight.cwd = tspath.NormalizePath(cwd)
-	if !args.Init && !args.TypeCheckOnly {
-		preflight.baseline, preflight.baselineErr = suppressions.Open(preflight.cwd, args.Suppressions)
-	}
-	return preflight, 0
-}
-
 // handleLintCommand handles one CLI invocation: it prepares command-owned
 // config/targets/Programs, delegates lint execution to linter.RunPipeline, and
 // projects the result to the selected output format.
-func handleLintCommand(args lintArgs, preflight lintPreflight, ctx context.Context, dispatch linter.EslintPluginDispatcher) (exitCode int) {
+func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) (exitCode int) {
 	completeActivation := args.CompleteConfigActivation
 	// Even a preflight/Program error must observe preparation failure and join
 	// the pending transaction. Cancellation is still owned by the IPC adapter.
@@ -135,7 +103,15 @@ func handleLintCommand(args lintArgs, preflight lintPreflight, ctx context.Conte
 	if args.Timing && !typeCheckOnly {
 		timingCollector = linter.NewTimingCollector()
 	}
-	format := preflight.format
+	format := output.FormatDefault
+	if !init {
+		var formatErr error
+		format, formatErr = output.ParseFormat(args.Format)
+		if formatErr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", formatErr)
+			return 2
+		}
+	}
 	mode := output.ModeLint
 	if typeCheckOnly {
 		mode = output.ModeTypeCheckOnly
@@ -190,7 +166,12 @@ func handleLintCommand(args lintArgs, preflight lintPreflight, ctx context.Conte
 		defer pprof.StopCPUProfile()
 	}
 
-	currentDirectory := preflight.cwd
+	currentDirectory, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error getting current directory: %v\n", err)
+		return 1
+	}
+	currentDirectory = tspath.NormalizePath(currentDirectory)
 	workingDirectory := currentDirectory
 
 	if init {
@@ -200,11 +181,14 @@ func handleLintCommand(args lintArgs, preflight lintPreflight, ctx context.Conte
 		}
 		return 0
 	}
-	if preflight.baselineErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", preflight.baselineErr)
-		return 2
+	var baseline *suppressions.File
+	if !typeCheckOnly {
+		baseline, err = suppressions.Open(workingDirectory, args.Suppressions)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 2
+		}
 	}
-	baseline := preflight.baseline
 	if configCatalog == nil {
 		fmt.Fprintln(os.Stderr, "error: config discovery did not produce a catalog")
 		return 1
@@ -371,13 +355,8 @@ func handleLintCommand(args lintArgs, preflight lintPreflight, ctx context.Conte
 	// target discovery. Per-file service/root options require selected targets
 	// before their effective values can contribute project candidates.
 	var targetPlan target.Plan
-	var directoryInputRoots target.InputRoots
-	if args.inputOrigins.configRoots != nil {
-		directoryInputRoots = make(target.InputRoots)
-	}
 	var configResolver *configLint.Resolver
 	var projectPolicies map[target.File]rslintconfig.ProjectPolicy
-	var err error
 	if !typeCheckOnly || hasProjectOptions {
 		targetDirectories := configCatalog.TargetDirectories
 		if len(args.GlobRoots) > 0 {
@@ -386,20 +365,18 @@ func handleLintCommand(args lintArgs, preflight lintPreflight, ctx context.Conte
 			targetDirectories = rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, fs)
 		}
 		targetPlan, err = target.Resolve(target.Request{
-			ConfigMap:             targetConfigMap,
-			Config:                targetRslintConfig,
-			ConfigDirectory:       currentDirectory,
-			ScanRoot:              workingDirectory,
-			OwnerScopes:           configTargetScopes,
-			FS:                    fs,
-			Files:                 configCatalog.TargetFiles,
-			ScanDirectories:       args.ScanDirectories,
-			Directories:           targetDirectories,
-			GitPolicy:             configCatalog.GitPolicy,
-			PathSpaces:            pathSpaces,
-			SingleThreaded:        singleThreaded,
-			DirectoryInputRoots:   directoryInputRoots,
-			CollectSkippedAliases: baseline != nil,
+			ConfigMap:       targetConfigMap,
+			Config:          targetRslintConfig,
+			ConfigDirectory: currentDirectory,
+			ScanRoot:        workingDirectory,
+			OwnerScopes:     configTargetScopes,
+			FS:              fs,
+			Files:           configCatalog.TargetFiles,
+			ScanDirectories: args.ScanDirectories,
+			Directories:     targetDirectories,
+			GitPolicy:       configCatalog.GitPolicy,
+			PathSpaces:      pathSpaces,
+			SingleThreaded:  singleThreaded,
 		})
 		if err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
@@ -654,8 +631,7 @@ func handleLintCommand(args lintArgs, preflight lintPreflight, ctx context.Conte
 		if err := ctx.Err(); err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
-		inputPaths := args.inputOrigins.paths(targetPlan, directoryInputRoots, configCatalog.Explicit, fs.UseCaseSensitiveFileNames())
-		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args, inputPaths)
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args, targetPlan.Files)
 	}
 	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0

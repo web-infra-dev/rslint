@@ -36,13 +36,9 @@ This baseline records two `no-debugger` errors in `src/app.js`.
 
 If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
 
-File paths in the baseline use `/` and are relative to the working directory, including when you pass `--config`. On Windows, a file on another drive or network share uses its absolute path. To reuse an existing ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. The rule IDs must match exactly.
+Rslint records the file's real path relative to the working directory, using `/` as the separator. For example, if `linked.js` points to `src/app.js`, passing either path or both uses the `src/app.js` entry. This also applies when you pass `--config`. On Windows, a file on another drive or network share uses its absolute path.
 
-ESLint can record separate counts for a relative path and an absolute path through a symlink. When you pass one path, Rslint looks for that exact entry first, then for the path it normally records from the working directory.
-
-If a relative path and an absolute path resolve to the same baseline key, passing both uses the same entry as passing either one alone. If two inputs select the same linted filename under different keys, each key must cover the error count. A missing entry allows zero errors. For example, if the entries allow one and two errors for a rule, Rslint reports the two errors once. Recording or pruning updates both entries.
-
-When two different filenames resolve to the same file, a plugin can report different errors for each name. Rslint updates counts only for filenames it linted. An existing entry for a skipped alias keeps its counts.
+To reuse an ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. Entries apply when the file path and rule ID match. ESLint can store separate counts under symlink names. To generate a fresh baseline with Rslint's paths, run `rslint --suppress-all` and use the resulting `rslint-suppressions.json`.
 
 Pass `--suppressions-location` on every run that uses a custom location. An existing directory or a path ending in a directory separator selects `rslint-suppressions_<hash>` inside that directory. Create the directory first. The hash comes from the absolute working directory.
 

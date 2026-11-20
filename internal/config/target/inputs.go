@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -23,46 +22,11 @@ type InputSelection struct {
 	ScanDirectories map[string][]string
 }
 
-// InputMatch connects an operand's filesystem spelling to the paths selected
-// from it. For a glob, Operand and Path name the static root, and Files is the
-// existing expansion. A literal directory is expanded later by target planning.
-type InputMatch struct {
-	Operand   string
-	Path      string
-	Directory bool
-	Files     []string
-}
-
-type ownedInput struct{ owner, path string }
-
-// InputRoots optionally records which independent scans reached an exact path
-// under its config owner. Callers that only need the target set leave it nil.
-type InputRoots map[ownedInput][]string
-
-func (roots InputRoots) Add(owner, path, root string) {
-	if roots == nil {
-		return
-	}
-	key := ownedInput{owner, path}
-	if !slices.Contains(roots[key], root) {
-		roots[key] = append(roots[key], root)
-	}
-}
-
-func (roots InputRoots) For(owner, path string) []string {
-	return roots[ownedInput{owner, path}]
-}
-
 // SelectInputs interprets raw file, directory, and glob inputs against fsys.
 // Exact-file APIs bypass this operation. Unmatched inputs remain separate so
 // each entrypoint keeps its existing reporting policy without admitting overlay
 // dependencies as fallback targets.
 func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string) (*InputSelection, error) {
-	return SelectInputsWithMatches(ctx, fsys, cwd, inputs, nil)
-}
-
-// SelectInputsWithMatches also reports how each successful operand matched.
-func SelectInputsWithMatches(ctx context.Context, fsys vfs.FS, cwd string, inputs []string, onMatch func(InputMatch)) (*InputSelection, error) {
 	selection := &InputSelection{Files: []string{}, ScanDirectories: make(map[string][]string)}
 	type input struct {
 		path      string
@@ -125,9 +89,6 @@ func SelectInputsWithMatches(ctx context.Context, fsys vfs.FS, cwd string, input
 			continue
 		}
 		if input.directory {
-			if onMatch != nil {
-				onMatch(InputMatch{Operand: inputs[index], Path: input.path, Directory: true})
-			}
 			if !directories[input.path] {
 				directories[input.path] = true
 				selection.Directories = append(selection.Directories, input.path)
@@ -136,9 +97,6 @@ func SelectInputsWithMatches(ctx context.Context, fsys vfs.FS, cwd string, input
 		}
 		if !input.glob {
 			if input.file {
-				if onMatch != nil {
-					onMatch(InputMatch{Operand: inputs[index], Path: input.path})
-				}
 				addFile(input.path)
 				literals[input.path] = true
 			} else if !unmatched[input.path] {
@@ -155,10 +113,6 @@ func SelectInputsWithMatches(ctx context.Context, fsys vfs.FS, cwd string, input
 				selection.Unmatched = append(selection.Unmatched, input.path)
 			}
 			continue
-		}
-		if onMatch != nil {
-			operand, _, _ := globDirectory(patterns[globIndex-1])
-			onMatch(InputMatch{Operand: operand, Path: expansion.Root, Files: expansion.Files})
 		}
 		if !roots[expansion.Root] {
 			roots[expansion.Root] = true

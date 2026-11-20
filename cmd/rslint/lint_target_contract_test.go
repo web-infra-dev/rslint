@@ -7,7 +7,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -22,7 +21,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
-	"github.com/web-infra-dev/rslint/internal/suppressions"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
@@ -174,57 +172,6 @@ func TestCLINoArgsUsesDefaultScriptExtensions(t *testing.T) {
 	}
 }
 
-func TestCLIGlobOriginsRequireActiveSuppressions(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows uses the process working directory for CLI operands")
-	}
-	root := t.TempDir()
-	realDir := filepath.Join(root, "project")
-	link := filepath.Join(root, "link")
-	writeLintTargetContractFiles(t, realDir, map[string]string{
-		"one.ts": "", "two.js": "",
-	})
-	if err := os.Symlink(realDir, link); err != nil {
-		t.Fatal(err)
-	}
-	t.Chdir(link)
-	check := func(t *testing.T, args lintArgs, wantOrigins bool) {
-		t.Helper()
-		args.Positional = []string{"*.ts", "*.js"}
-		args.Format = "jsonline"
-		args.FS = osvfs.FS()
-		preflight, code := prepareLintCommand(args)
-		if code != 0 || preflight.baselineErr != nil {
-			t.Fatalf("preflight exit code = %d, baseline error = %v", code, preflight.baselineErr)
-		}
-		if err := prepareCLIInputs(t.Context(), &args, preflight); err != nil {
-			t.Fatal(err)
-		}
-		if len(args.AllowFiles) != 2 {
-			t.Fatalf("glob selection = %v", args.AllowFiles)
-		}
-		origins := args.inputOrigins
-		if wantOrigins {
-			if len(origins.matches) != 2 || origins.configRoots == nil {
-				t.Fatalf("active baseline lost input origins: %+v", origins)
-			}
-		} else if origins.cwd != "" || origins.matches != nil || origins.configRoots != nil {
-			t.Fatalf("retained input origins without an active baseline: %+v", origins)
-		}
-	}
-	t.Run("missing baseline", func(t *testing.T) { check(t, lintArgs{}, false) })
-	writeLintTargetContractFiles(t, realDir, map[string]string{suppressions.DefaultFilename: "{}"})
-	t.Run("empty baseline", func(t *testing.T) { check(t, lintArgs{}, false) })
-	t.Run("record", func(t *testing.T) {
-		check(t, lintArgs{Suppressions: suppressions.Options{Mode: suppressions.Record}}, true)
-	})
-	writeLintTargetContractFiles(t, realDir, map[string]string{suppressions.DefaultFilename: `{"one.ts":{"no-debugger":{"count":1}}}`})
-	t.Run("check", func(t *testing.T) { check(t, lintArgs{}, true) })
-	writeLintTargetContractFiles(t, realDir, map[string]string{suppressions.DefaultFilename: "invalid"})
-	t.Run("type check only", func(t *testing.T) { check(t, lintArgs{TypeCheckOnly: true}, false) })
-	t.Run("init", func(t *testing.T) { check(t, lintArgs{Init: true}, false) })
-}
-
 func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 	dir := t.TempDir()
 	writeLintTargetContractFiles(t, dir, map[string]string{
@@ -256,7 +203,11 @@ func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 			SingleThreaded: true,
 			TypeCheck:      typeCheck,
 		}
+		t.Chdir(dir)
 		args.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		if err := prepareCLIInputs(context.Background(), &args); err != nil {
+			t.Fatal(err)
+		}
 		code, stdout, stderr := runLintCommandForTest(t, dir, args)
 		if code != 1 {
 			t.Fatalf("typeCheck=%v exit code = %d, want 1; stdout=%q stderr=%q", typeCheck, code, stdout, stderr)
@@ -318,7 +269,11 @@ func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 		NoColor:        true,
 		SingleThreaded: true,
 	}
+	t.Chdir(dir)
 	args.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	if err := prepareCLIInputs(context.Background(), &args); err != nil {
+		t.Fatal(err)
+	}
 	code, stdout, stderr := runLintCommandForTest(t, dir, args)
 	if code != 0 || stdout != "" {
 		t.Fatalf("targeted fix failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)

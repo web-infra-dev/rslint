@@ -17,7 +17,6 @@ func (coordinator *discoveryCoordinator) collectExplicitGitSources(ownerDirector
 		}
 		roots = append(roots, discoveryWalkNode{
 			directory:          directory.LexicalPath,
-			inputRoot:          directory.LexicalPath,
 			canonicalDirectory: directory.CanonicalPath,
 			ownerDir:           ownerDirectory,
 			ownerPath:          ownerPath,

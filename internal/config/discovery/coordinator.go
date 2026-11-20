@@ -223,7 +223,6 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			return nil, err
 		}
 		if !seed.explicitFile {
-			coordinator.request.InputRoots.Add(seed.ownerDir, seed.path, seed.path)
 			coordinator.draft.addDirectory(seed.ownerDir, rslintconfig.DirectoryIdentity{
 				LexicalPath: seed.path, CanonicalPath: seed.physicalDirectory,
 			}, coordinator.recursiveDirectory(seed.path))
@@ -247,7 +246,6 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		ignoreMatcher, _ := coordinator.modules.globalIgnoreMatcher(seed.ownerPath)
 		walkRoots = append(walkRoots, discoveryWalkNode{
 			directory:          directory,
-			inputRoot:          directory,
 			canonicalDirectory: seed.physicalDirectory,
 			ownerDir:           seed.ownerDir,
 			ownerPath:          seed.ownerPath,
