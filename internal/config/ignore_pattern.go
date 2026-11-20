@@ -368,6 +368,7 @@ func applyFileIgnorePatternsNormalized(path string, unixPath string, patterns []
 // Authored config patterns are evaluated after the complete Git group and may
 // still intentionally override its final decision as a separate config layer.
 type gitIgnorePathState struct {
+	unlisted               *unlistedGitMatch
 	path                   string
 	lowerPath              string
 	fileDepth              int
@@ -431,6 +432,13 @@ func (state *gitIgnorePathState) apply(pattern *IgnorePattern) bool {
 			state.lowerPath = strings.ToLower(path)
 		}
 		path = state.lowerPath
+	}
+
+	if state.unlisted != nil {
+		// The parent nodes have already admitted this path. Only the unknown
+		// leaf can change that decision. Keep the normal node precedence.
+		return !pattern.GitDirectoryOnly && !state.depthResolved(state.fileDepth) &&
+			state.unlisted.matches(pattern, path) && state.applyDepth(state.fileDepth, pattern.Negated)
 	}
 
 	if basenameGlob, ok := gitIgnoreRootBasenameGlob(pattern); ok {

@@ -349,6 +349,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// target discovery. Per-file service/root options require selected targets
 	// before their effective values can contribute project candidates.
 	var targetPlan target.Plan
+	var protectedWrites map[string]error
 	var configResolver *configLint.Resolver
 	var projectPolicies map[target.File]rslintconfig.ProjectPolicy
 	if !typeCheckOnly || hasProjectOptions {
@@ -372,6 +373,20 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		targetPlan, err = target.Resolve(request)
 		if err != nil {
 			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
+		}
+		if fix || args.Suppressions.Mode != suppressions.Check {
+			for _, file := range targetPlan.Files {
+				if match := file.Match(); match != nil && match.GitEntryUnverified() {
+					reason := fmt.Errorf("cannot update %q because its directory entry cannot be verified against .gitignore without read access to its parent", file.Path)
+					if protectedWrites == nil {
+						protectedWrites = make(map[string]error)
+					}
+					protectedWrites[rslintconfig.ExactPathID(file.Path)] = reason
+					if baseline != nil && args.Suppressions.Mode != suppressions.Check {
+						baseline.PreserveCounts(file.Path, reason)
+					}
+				}
+			}
 		}
 		if baseline != nil && (fix || args.Suppressions.Mode != suppressions.Check) {
 			if err := baseline.CheckTargetAliases(); err != nil {
@@ -553,26 +568,24 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		PluginFailure: linter.PluginKeepPartialWithSynthetic,
 	}
 	var pipelineRequest linter.PipelineRequest
+	var stagedSourceCommitter *cliFinalChangeCommitter
 	if fix {
-		var committer linter.FinalChangeCommitter = newCLIFinalChangeCommitter(targetPlan.Files)
-		if baseline != nil && baseline.NeedsUpdateBeforeFixes() {
-			committer = suppressionFixCommitter{baseline: baseline, committer: committer}
-			defer baseline.DiscardUpdate()
-		}
-		pipelineRequest = linter.NewAutofixRequestWithCommitter(
-			provider,
-			committer,
-			observationPolicy,
-			linter.AutofixPolicy{
-				VerifyAfterLastRound: true,
-				VerificationDemand: linter.ArtifactDemand{
-					SkippedErrorRules: baseline != nil,
-					Native:            rule.EditDemandNone,
-					Plugin:            rule.EditDemandAll,
-				},
+		committer := newCLIFinalChangeCommitter(targetPlan.Files)
+		committer.protected = protectedWrites
+		autofix := linter.AutofixPolicy{
+			VerifyAfterLastRound: true,
+			VerificationDemand: linter.ArtifactDemand{
+				SkippedErrorRules: baseline != nil,
+				Native:            rule.EditDemandNone,
+				Plugin:            rule.EditDemandAll,
 			},
-			dispatch,
-		)
+		}
+		if baseline != nil && args.Suppressions.Mode != suppressions.Check {
+			stagedSourceCommitter = &committer
+			pipelineRequest = linter.NewAutofixRequest(provider, observationPolicy, autofix, dispatch)
+		} else {
+			pipelineRequest = linter.NewAutofixRequestWithCommitter(provider, committer, observationPolicy, autofix, dispatch)
+		}
 	} else {
 		observationPolicy.ProgramExecution = linter.ProgramComplete
 		pipelineRequest = linter.NewLintRequest(provider, observationPolicy, dispatch)
@@ -591,10 +604,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		})
 	}
 	if err != nil {
-		var updateErr *suppressionUpdateError
-		if errors.As(err, &updateErr) {
-			return abortRun(2, updateErr.Error(), fmt.Sprintf("error: %v", updateErr))
-		}
 		operation := "running linter"
 		reason := err.Error()
 		if _, autofixStarted := pipelineResult.AppliedFixes(); autofixStarted {
@@ -611,10 +620,20 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	lintResult := pipelineResult.Observation.Native.Lint
 	initialObservation := pipelineResult.Observation
 	fixedCount := 0
+	var commitSources func() error
+	var sourceWriteErr error
+	var sourceCommitAttempted bool
 	if applied, ok := pipelineResult.AppliedFixes(); ok {
 		initialObservation = applied.Initial
 		for _, round := range applied.Rounds {
 			fixedCount += round.AppliedDiagnostics
+		}
+		if stagedSourceCommitter != nil && len(applied.FinalChanges) != 0 {
+			commitSources = func() error {
+				sourceCommitAttempted = true
+				_, sourceWriteErr = stagedSourceCommitter.CommitFinalChanges(ctx, applied.FinalChanges)
+				return sourceWriteErr
+			}
 		}
 	}
 	lintedfileCount := initialObservation.Native.Lint.LintedFileCount
@@ -637,7 +656,13 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if err := ctx.Err(); err != nil {
 			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
 		}
-		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args)
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args, commitSources)
+		if sourceWriteErr != nil {
+			return abortRun(1, "applying fixes: "+sourceWriteErr.Error(), fmt.Sprintf("error applying fixes: %v", sourceWriteErr))
+		}
+		if commitSources != nil && !sourceCommitAttempted && suppressionError != "" {
+			return abortRun(2, suppressionError, "error: "+suppressionError)
+		}
 	}
 	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0

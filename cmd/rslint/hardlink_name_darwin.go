@@ -66,23 +66,23 @@ func darwinEqualLookupNames(parent, left, right string) bool {
 // The kernel can report the name of another hard link. Only consider directory
 // entries in the requested parent that identify the same object. An empty name
 // means that the underlying lookup could not be attributed to one entry.
-func darwinHardLinkEntryName(parent, requested, reportedPath string, original os.FileInfo) string {
+func darwinHardLinkEntryName(parent, requested, reportedPath string, original os.FileInfo) (string, error) {
 	path := filepath.Join(parent, requested)
 	if path == reportedPath {
-		return requested
+		return requested, nil
 	}
 	entries, err := os.ReadDir(parent)
 	if err != nil {
 		// A reported link in another parent says nothing about this entry's
 		// spelling, even when both names open the same inode.
 		if reportedPath != "" && darwinSameParent(path, reportedPath) && darwinSameCaseLookup(path, reportedPath) {
-			return filepath.Base(reportedPath)
+			return filepath.Base(reportedPath), nil
 		}
-		return ""
+		return "", err
 	}
 	for _, entry := range entries {
 		if entry.Name() == requested {
-			return requested
+			return requested, nil
 		}
 	}
 	var names []string
@@ -92,14 +92,14 @@ func darwinHardLinkEntryName(parent, requested, reportedPath string, original os
 		}
 		info, err := entry.Info()
 		if err != nil {
-			return ""
+			return "", err
 		}
 		if os.SameFile(original, info) {
 			names = append(names, entry.Name())
 		}
 	}
 	if len(names) == 1 {
-		return names[0]
+		return names[0], nil
 	}
 	spelling := norm.NFD.String
 	if sensitive, err := unix.Pathconf(parent, pcCaseSensitive); err == nil && sensitive == 0 {
@@ -111,10 +111,10 @@ func darwinHardLinkEntryName(parent, requested, reportedPath string, original os
 	for _, name := range names {
 		if spelling(name) == want {
 			if match != "" {
-				return ""
+				return "", nil
 			}
 			match = name
 		}
 	}
-	return match
+	return match, nil
 }

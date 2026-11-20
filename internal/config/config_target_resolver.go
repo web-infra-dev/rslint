@@ -193,10 +193,11 @@ type configTargetIdentity struct {
 }
 
 type configTargetDecision struct {
-	key             configMatchKey
-	matched         bool
-	selected        bool
-	globallyIgnored bool
+	key                configMatchKey
+	matched            bool
+	selected           bool
+	globallyIgnored    bool
+	gitEntryUnverified bool
 }
 
 func newConfigTargetResolver(config RslintConfig, defaultDirectory string, fsys vfs.FS) *configTargetResolver {
@@ -319,6 +320,9 @@ func (resolver *configTargetResolver) resolveTargetWithGitEntryBlock(discovered 
 	if decision.globallyIgnored {
 		return decision
 	}
+	decision.gitEntryUnverified = discovered.entryNameStatus != entryNameUsable &&
+		resolver.globallyIgnores(target, matches, true) &&
+		resolver.gitPolicy.mayIgnoreUnlistedFile(target.gitPath, discovered.entryNameStatus == entryNameUnlistedWithASCIIAnchors)
 
 	var tail []byte
 	if tailEntryCount := len(resolver.config) - 64; tailEntryCount > 0 {

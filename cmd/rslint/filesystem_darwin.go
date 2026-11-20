@@ -1,4 +1,4 @@
-// cspell:ignore Attrlist Bitmapcount Commonattr Dirattr Fileattr FSOPT FULLPATH LINKCOUNT attrreference getattrlist
+// cspell:ignore APFS Fstypename Attrlist Bitmapcount Commonattr Dirattr Fileattr FSOPT FULLPATH LINKCOUNT attrreference getattrlist
 
 package main
 
@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"golang.org/x/sys/unix"
 )
 
@@ -24,30 +25,43 @@ func newCLIFileSystem() vfs.FS {
 
 type darwinCLIFileSystem struct{ vfs.FS }
 
+var _ utils.StoredEntryNamer = darwinCLIFileSystem{}
+
 // SameDirectoryEntry compares the final directory entries without merging
 // distinct hard links to a symlink. The caller checks each earlier component.
 func (darwinCLIFileSystem) SameDirectoryEntry(left, right string) bool {
 	if !filepath.IsAbs(left) || !filepath.IsAbs(right) || !darwinSameParent(left, right) {
 		return false
 	}
-	name, other := darwinDirectoryEntryName(left), darwinDirectoryEntryName(right)
+	name, _ := darwinStoredEntryName(left)
+	other, _ := darwinStoredEntryName(right)
 	if name != "" && other != "" {
 		return name == other
 	}
 	return darwinSameCaseLookup(left, right)
 }
 
-func darwinDirectoryEntryName(path string) string {
+// APFS preserves distinct ASCII letters and punctuation in literal name
+// prefixes and suffixes, including on its case-insensitive variant.
+func (darwinCLIFileSystem) PreservesASCIILookupAnchors(path string) bool {
+	var volume unix.Statfs_t
+	return unix.Statfs(filepath.Dir(path), &volume) == nil && unix.ByteSliceToString(volume.Fstypename[:]) == "apfs"
+}
+
+// StoredEntryName returns the actual leaf name without following its symlink.
+// A search-only parent suffices when the kernel can identify one entry.
+func (darwinCLIFileSystem) StoredEntryName(path string) (string, error) {
+	return darwinStoredEntryName(path)
+}
+
+func darwinStoredEntryName(path string) (string, error) {
 	path = strings.TrimRight(path, "/")
 	if !filepath.IsAbs(path) {
-		return ""
-	}
-	if info, err := os.Stat(path); err != nil || !info.IsDir() {
-		return ""
+		return "", nil
 	}
 	stored, links := darwinPathAttribute(path, unix.ATTR_CMN_NAME, unix.FSOPT_NOFOLLOW)
 	if links == 1 {
-		return stored
+		return stored, nil
 	}
 	if links > 1 {
 		if info, err := os.Lstat(path); err == nil {
@@ -55,7 +69,7 @@ func darwinDirectoryEntryName(path string) string {
 			return darwinHardLinkEntryName(filepath.Dir(path), filepath.Base(path), reported, info)
 		}
 	}
-	return ""
+	return "", nil
 }
 
 type darwinRealpathFS struct{ vfs.FS }
@@ -79,7 +93,7 @@ func (fs darwinRealpathFS) Realpath(path string) string {
 				parent = stored
 			}
 			name := filepath.Base(resolved)
-			if stored := darwinHardLinkEntryName(parent, name, physical, info); stored != "" {
+			if stored, _ := darwinHardLinkEntryName(parent, name, physical, info); stored != "" {
 				name = stored
 			}
 			return tspath.NormalizeSlashes(filepath.Join(parent, name))
@@ -102,7 +116,7 @@ func getCLIWorkingDirectory() (string, error) {
 	// component without following its final link.
 	parent := "/"
 	for part := range strings.SplitSeq(strings.TrimPrefix(cwd, "/"), "/") {
-		if stored := darwinDirectoryEntryName(filepath.Join(parent, part)); stored != "" {
+		if stored, _ := darwinStoredEntryName(filepath.Join(parent, part)); stored != "" {
 			part = stored
 		}
 		parent = filepath.Join(parent, part)

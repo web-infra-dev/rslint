@@ -19,7 +19,18 @@ type PathIdentity struct {
 	// EntryName is the stored leaf name when it differs from the caller's spelling.
 	// For a symlink it names the link in its parent directory.
 	EntryName string
+	// An unlisted hard link can be read, but its stored name may affect Git
+	// exclusions. Capture any provable spelling constraints during discovery.
+	entryNameStatus entryNameStatus
 }
+
+type entryNameStatus uint8
+
+const (
+	entryNameUsable entryNameStatus = iota
+	entryNameUnlisted
+	entryNameUnlistedWithASCIIAnchors
+)
 
 func (identity PathIdentity) normalized() PathIdentity {
 	identity.Path = tspath.NormalizePath(identity.Path)

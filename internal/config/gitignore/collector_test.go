@@ -449,6 +449,27 @@ func newReaderTestFS(files map[string]string, directories ...string) *readerTest
 	return fsys
 }
 
+type namedMarkerFS struct {
+	*readerTestFS
+	lookups []string
+}
+
+func (fsys *namedMarkerFS) StoredEntryName(path string) (string, error) {
+	fsys.lookups = append(fsys.lookups, path)
+	return ".git", nil
+}
+
+func TestReaderUsesStoredMarkerNameWithoutListing(t *testing.T) {
+	fsys := &namedMarkerFS{readerTestFS: newReaderTestFS(map[string]string{
+		"/repo/.git": "", "/repo/.GIT": "", "/repo/.gitignore": "/SRC/\n",
+	})}
+	reader := NewReader(fsys)
+	cursor := reader.Observe(reader.Ancestors("/repo"), "/repo")
+	_, blocked := cursor.Enter("/repo/src")
+	assert.Assert(t, blocked)
+	assert.DeepEqual(t, fsys.lookups, []string{"/repo/.git", "/repo/.GIT"})
+}
+
 func TestReaderNearestGitBoundaryIncludesDirectoryAndFileMarkers(t *testing.T) {
 	for _, markerIsDirectory := range []bool{false, true} {
 		fsys := newReaderTestFS(map[string]string{"/.gitignore": "outside/\n", "/work/.gitignore": "dist/\n"})

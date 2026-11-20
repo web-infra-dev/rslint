@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -24,6 +25,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"gotest.tools/v3/assert"
 )
+
+var compareDiscoveredFiles = cmp.Options{
+	cmpopts.IgnoreFields(File{}, "match"),
+	cmpopts.EquateComparable(rslintconfig.PathIdentity{}),
+}
 
 func strconvI(i int) string { return strconv.Itoa(i) }
 
@@ -780,7 +786,7 @@ func TestDiscoverLintTargetsFromRoot_WalksEveryRequestedDirectory(t *testing.T) 
 	assert.DeepEqual(t, targets, []File{
 		{PathIdentity: rslintconfig.PathIdentity{Path: firstFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(firstFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(firstDir))}, ConfigDirectory: configDir},
 		{PathIdentity: rslintconfig.PathIdentity{Path: secondFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(secondFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(secondDir))}, ConfigDirectory: configDir},
-	}, cmpopts.IgnoreFields(File{}, "match"))
+	}, compareDiscoveredFiles)
 }
 
 func TestDiscoverLintTargetsFromRoot_PreservesDistinctLexicalDirectorySelectors(t *testing.T) {
@@ -969,7 +975,7 @@ func TestDiscoverLintTargetsFromRoot_UnionsFilesAndDirectories(t *testing.T) {
 	assert.DeepEqual(t, targets, []File{
 		{PathIdentity: rslintconfig.PathIdentity{Path: directoryFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryRoot))}, ConfigDirectory: configDir},
 		{PathIdentity: rslintconfig.PathIdentity{Path: exactFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(exactFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(filepath.Dir(exactFile)))}, ConfigDirectory: configDir},
-	}, cmpopts.IgnoreFields(File{}, "match"))
+	}, compareDiscoveredFiles)
 }
 
 func TestDiscoverLintTargetsFromRoot_RequestedAncestorWidensOnlyScanScope(t *testing.T) {
@@ -1192,7 +1198,7 @@ func TestDiscoverLintTargets_MissingSymlinkMetadataResolvesFileIdentity(t *testi
 			CanonicalParentPath: "/repo/src",
 		},
 		ConfigDirectory: configDir,
-	}}, cmpopts.IgnoreFields(File{}, "match"))
+	}}, compareDiscoveredFiles)
 }
 
 func TestDiscoverWalkRootsMapsCanonicalDirectoryAlias(t *testing.T) {
@@ -1545,7 +1551,7 @@ func TestDiscoverLintTargetsMultiConfig_MatchesIgnoresInPhysicalConfigSpace(t *t
 			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["src/keep.ts"]))),
 		},
 		ConfigDirectory: linkDir,
-	}}, cmpopts.IgnoreFields(File{}, "match"))
+	}}, compareDiscoveredFiles)
 }
 
 func TestDiscoverLintTargetsMultiConfig_AssignsExplicitFilesBeforeConfigProcessing(t *testing.T) {
@@ -1649,7 +1655,7 @@ func TestDiscoverLintTargetsMultiConfig_MergesAutomaticAndHostAssignedFilesForSa
 			},
 			ConfigDirectory: childDir,
 		},
-	}, cmpopts.IgnoreFields(File{}, "match"))
+	}, compareDiscoveredFiles)
 }
 
 func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFiles(t *testing.T) {
@@ -1688,7 +1694,7 @@ func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFil
 			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["ignored/explicit.ts"]))),
 		},
 		ConfigDirectory: ignoredDir,
-	}}, cmpopts.IgnoreFields(File{}, "match"))
+	}}, compareDiscoveredFiles)
 }
 
 func TestDiscoverLintTargetsMultiConfig_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {

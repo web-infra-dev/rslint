@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"slices"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
 )
@@ -31,18 +33,30 @@ func NewInputPathNames(fsys vfs.FS) *InputPathNames {
 	return &InputPathNames{fs: fsys, directories: make(map[string]string), listings: make(map[inputListing][]string)}
 }
 
-func (names *InputPathNames) storedName(parent, actualParent, base string, directory bool) string {
+func (names *InputPathNames) storedName(parent, actualParent, base string, directory bool) (name string, hardLinkNameUnknown bool) {
 	key := inputListing{actualParent, directory}
 	entries, ok := names.listings[key]
 	if !ok {
 		entries = InputEntryNames(names.fs, actualParent, directory)
 		names.listings[key] = entries
 	}
-	if stored := StoredEntryName(entries, base); stored != "" && stored != base &&
-		SamePhysicalPath(names.fs, tspath.CombinePaths(parent, base), tspath.CombinePaths(actualParent, stored)) {
-		return stored
+	stored := StoredEntryName(entries, base)
+	if stored == base {
+		return base, false
 	}
-	return base
+	path := tspath.CombinePaths(parent, base)
+	if native, ok := names.fs.(utils.StoredEntryNamer); ok {
+		// A searchable directory may hide its listing. Query the entry itself
+		// without substituting another symlink or hard link to the same file.
+		if name, err := native.StoredEntryName(path); name != "" {
+			return name, false
+		} else if errors.Is(err, fs.ErrPermission) {
+			return base, true
+		}
+	} else if stored != "" && SamePhysicalPath(names.fs, path, tspath.CombinePaths(actualParent, stored)) {
+		return stored, false
+	}
+	return base, false
 }
 
 // Directory returns the stored spelling of a frozen physical directory.
@@ -57,7 +71,7 @@ func (names *InputPathNames) Directory(path string) string {
 	if parent := FilesystemParentDirectory(path); parent != "" {
 		actualParent := names.Directory(parent)
 		base := tspath.GetBaseFileName(path)
-		stored := names.storedName(parent, actualParent, base, true)
+		stored, _ := names.storedName(parent, actualParent, base, true)
 		if actualParent != parent || stored != base {
 			actual = tspath.CombinePaths(actualParent, stored)
 		}
@@ -82,7 +96,14 @@ func (names *InputPathNames) File(file PathIdentity, enumerated bool) PathIdenti
 	base := tspath.GetBaseFileName(file.Path)
 	actual := base
 	if !enumerated {
-		actual = names.storedName(parent, actualParent, base, false)
+		var unknown bool
+		actual, unknown = names.storedName(parent, actualParent, base, false)
+		if unknown {
+			file.entryNameStatus = entryNameUnlisted
+			if native, ok := names.fs.(interface{ PreservesASCIILookupAnchors(path string) bool }); ok && native.PreservesASCIILookupAnchors(file.Path) {
+				file.entryNameStatus = entryNameUnlistedWithASCIIAnchors
+			}
+		}
 		if actual != base {
 			file.EntryName = actual
 		}
@@ -97,7 +118,7 @@ func (names *InputPathNames) File(file PathIdentity, enumerated bool) PathIdenti
 		// A leaf symlink has a separate physical target and Git entry.
 		original := tspath.GetDirectoryPath(file.CanonicalPath)
 		targetParent := names.Directory(original)
-		targetName := names.storedName(original, targetParent, tspath.GetBaseFileName(file.CanonicalPath), false)
+		targetName, _ := names.storedName(original, targetParent, tspath.GetBaseFileName(file.CanonicalPath), false)
 		file.CanonicalPath = tspath.CombinePaths(targetParent, targetName)
 	}
 	return file

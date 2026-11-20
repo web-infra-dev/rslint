@@ -7,6 +7,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
+// StoredEntryNamer can report the name of an entry in its parent without
+// following the final symlink. An empty name means it could not be identified.
+type StoredEntryNamer interface {
+	StoredEntryName(path string) (string, error)
+}
+
 // DirectoryIdentity keeps one directory's caller-visible and physical paths.
 // CanonicalPath can be omitted when the caller has not frozen a physical path.
 type DirectoryIdentity struct {
