@@ -1,17 +1,55 @@
 package no_canvas_to_image_test
 
 import (
+	"strconv"
+	"strings"
+	"testing"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/linter"
-	lintprogram "github.com/web-infra-dev/rslint/internal/program"
-	"github.com/web-infra-dev/rslint/internal/rule"
-	"testing"
-
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_canvas_to_image"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+// Parsing is outside the timer so this measures repeated reference checks.
+func BenchmarkNoCanvasToImageRepeatedReferences(b *testing.B) {
+	for _, count := range []int{4000, 8000} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			code := "const image = loadImage(canvas.toDataURL()); /** @type {typeof image} */ (other);" +
+				strings.Repeat("\ncontext.drawImage(image, 0, 0);", count)
+			raw, source, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(code, "repeated.js", "tsconfig.json")
+			if err != nil {
+				b.Fatal(err)
+			}
+			program, err := lintprogram.NewFromBoundSources(raw, []*ast.SourceFile{source})
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				linter.LintSingleFile(linter.LintSingleFileOptions{
+					Program: program, File: source.FileName(),
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{
+							Name: no_canvas_to_image.NoCanvasToImageRule.Name, Severity: rule.SeverityError,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								return no_canvas_to_image.NoCanvasToImageRule.Run(ctx, nil)
+							},
+						}}
+					},
+					Consumer: rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) {
+						b.Fatalf("unexpected diagnostic: %+v", d.Message)
+					}},
+				})
+			}
+		})
+	}
+}
 
 func TestNoCanvasToImageExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_canvas_to_image.NoCanvasToImageRule,

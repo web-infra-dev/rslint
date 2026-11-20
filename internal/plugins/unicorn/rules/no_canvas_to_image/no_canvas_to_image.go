@@ -2,7 +2,6 @@
 package no_canvas_to_image
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -17,6 +16,7 @@ var NoCanvasToImageRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		oneArgument := 1
+		singleReferences := make(map[*ast.Symbol]*ast.Node)
 		return rule.RuleListeners{ast.KindCallExpression: func(node *ast.Node) {
 			call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
 				Methods: []string{"drawImage", "putImageData"}, MinimumArguments: &oneArgument,
@@ -25,7 +25,7 @@ var NoCanvasToImageRule = rule.Rule{
 				return
 			}
 			argument := node.Arguments()[0]
-			expression := directExpressionOrOneUseConst(ctx, argument)
+			expression := directExpressionOrOneUseConst(ctx, argument, singleReferences)
 			if expression == nil {
 				return
 			}
@@ -57,7 +57,7 @@ func withoutAwait(node *ast.Node) *ast.Node {
 	return node
 }
 
-func directExpressionOrOneUseConst(ctx rule.RuleContext, node *ast.Node) *ast.Node {
+func directExpressionOrOneUseConst(ctx rule.RuleContext, node *ast.Node, singleReferences map[*ast.Symbol]*ast.Node) *ast.Node {
 	node = withoutAwait(node)
 	if node == nil {
 		return nil
@@ -76,10 +76,23 @@ func directExpressionOrOneUseConst(ctx rule.RuleContext, node *ast.Node) *ast.No
 	}
 	// RefStore excludes the declaration's initializing write. Upstream counts
 	// that write and the single use as two references.
-	// JSDoc casts add synthesized type references that ESLint does not visit.
-	// Keep RefStore's cached slice intact and retain authored TypeScript uses.
-	references := slices.DeleteFunc(slices.Clone(ctx.Refs.References(symbol)), isJSDocReference)
-	if len(references) != 1 || references[0] != node {
+	// Cache the sole non-JSDoc reference, or nil for a multi-use binding.
+	// RefStore owns the slice; stop scanning as soon as a second use is found.
+	singleReference, cached := singleReferences[symbol]
+	if !cached {
+		for _, reference := range ctx.Refs.References(symbol) {
+			if isJSDocReference(reference) {
+				continue
+			}
+			if singleReference != nil {
+				singleReference = nil
+				break
+			}
+			singleReference = reference
+		}
+		singleReferences[symbol] = singleReference
+	}
+	if singleReference != node {
 		return nil
 	}
 	return withoutAwait(declaration.AsVariableDeclaration().Initializer)
