@@ -15,7 +15,7 @@ import (
 )
 
 func TestScopedUpdate(t *testing.T) {
-	cwd := t.TempDir()
+	cwd := filepath.FromSlash(osvfs.FS().Realpath(filepath.ToSlash(t.TempDir())))
 	t.Chdir(cwd)
 	checked := filepath.ToSlash(filepath.Join(cwd, "a.ts"))
 	for _, name := range []string{"a.ts", "untouched.ts", "former-dir"} {
@@ -46,11 +46,11 @@ func TestScopedUpdate(t *testing.T) {
 	}
 	run := func(options Options, unused bool) *File {
 		t.Helper()
-		file, err := Open(cwd, options)
+		file, err := Open(options)
 		if err != nil {
 			t.Fatal(err)
 		}
-		visible, stale, err := file.Apply(t.Context(), []FileResult{{Path: checked, CanonicalPath: osvfs.FS().Realpath(checked)}}, append([]rule.RuleDiagnostic(nil), diagnostics...))
+		visible, stale, err := file.Apply(t.Context(), []FileResult{{Path: checked}}, append([]rule.RuleDiagnostic(nil), diagnostics...))
 		if err != nil || stale != unused || len(visible) != 1 || visible[0].RuleName != "z" {
 			t.Fatalf("apply: %v, stale %v, error %v", visible, stale, err)
 		}
@@ -75,7 +75,7 @@ func TestScopedUpdate(t *testing.T) {
 	}
 }
 
-func TestCanonicalFileResult(t *testing.T) {
+func TestLintedPathsFromSymlinkedDirectory(t *testing.T) {
 	root := filepath.FromSlash(osvfs.FS().Realpath(filepath.ToSlash(t.TempDir())))
 	repo, link := filepath.Join(root, "repo"), filepath.Join(root, "deep", "link")
 	for _, dir := range []string{filepath.Join(repo, "app"), filepath.Join(repo, "src"), filepath.Dir(link)} {
@@ -92,12 +92,11 @@ func TestCanonicalFileResult(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// An older baseline can contain a caller-visible spelling and an entry
-	// for an unselected file outside the canonical cwd.
+	const realKey = "../src/File.js"
 	const aliasKey = "../../deep/link/src/File.js"
 	const siblingKey = "../../shared.js"
 	path := filepath.Join(root, "baseline.json")
-	raw := fmt.Sprintf(`{%q:{"x":{"count":2}},%q:{"x":{"count":1}}}`, aliasKey, siblingKey)
+	raw := fmt.Sprintf(`{%q:{"x":{"count":2}},%q:{"x":{"count":1}}}`, realKey, siblingKey)
 	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +104,7 @@ func TestCanonicalFileResult(t *testing.T) {
 	alias := filepath.ToSlash(filepath.Join(link, "src", "File.js"))
 	run := func(mode Mode, display string, found, visibleCount int) *File {
 		t.Helper()
-		baseline, err := Open(cwd, Options{Mode: mode, Location: path})
+		baseline, err := Open(Options{Mode: mode, Location: path})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -113,7 +112,7 @@ func TestCanonicalFileResult(t *testing.T) {
 		for range found {
 			diagnostics = append(diagnostics, rule.RuleDiagnostic{FilePath: display, RuleName: "x", Severity: rule.SeverityError})
 		}
-		visible, unused, err := baseline.Apply(t.Context(), []FileResult{{Path: display, CanonicalPath: canonical}}, diagnostics)
+		visible, unused, err := baseline.Apply(t.Context(), []FileResult{{Path: display}}, diagnostics)
 		if err != nil || unused || len(visible) != visibleCount {
 			t.Fatalf("mode %d: visible %v, unused %v, error %v", mode, visible, unused, err)
 		}
@@ -121,12 +120,12 @@ func TestCanonicalFileResult(t *testing.T) {
 	}
 	run(Check, alias, 1, 1)
 	recorded := run(Record, alias, 1, 0)
-	if got := recorded.entries["../src/File.js"]["x"].Count; got != 1 {
-		t.Fatalf("canonical count = %d, want 1", got)
+	if got := recorded.entries[aliasKey]["x"].Count; got != 1 {
+		t.Fatalf("symlink count = %d, want 1", got)
 	}
-	run(Check, canonical, 1, 0)
+	run(Check, canonical, 2, 0)
 	pruned := run(Prune, alias, 0, 0)
-	want := entries{aliasKey: {"x": {Count: 2}}, siblingKey: {"x": {Count: 1}}}
+	want := entries{realKey: {"x": {Count: 2}}, siblingKey: {"x": {Count: 1}}}
 	if !reflect.DeepEqual(pruned.entries, want) {
 		t.Fatalf("pruned entries = %v, want %v", pruned.entries, want)
 	}
@@ -140,7 +139,7 @@ func TestCanonicalFileResult(t *testing.T) {
 		root:             filepath.Join(root, "rslint-suppressions_"+cwdHash(native)),
 		"../shared.json": filepath.Join(filepath.Dir(native), "shared.json"),
 	} {
-		store, err := Open(cwd, Options{Mode: Record, Location: location})
+		store, err := Open(Options{Mode: Record, Location: location})
 		if err != nil || store.path != expected {
 			t.Fatalf("location %q: got %v, error %v, want %q", location, store, err, expected)
 		}
@@ -189,17 +188,17 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 	makeDirectoryLink(t, cwd, link)
 	t.Chdir(link)
 	options := Options{Mode: Record}
-	first, err := Open(link, options)
+	first, err := Open(options)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := Open(link, options)
+	second, err := Open(options)
 	if err != nil {
 		t.Fatal(err)
 	}
 	file := filepath.ToSlash(filepath.Join(cwd, "test.js"))
 	update := func(ctx context.Context, baseline *File, id string) error {
-		_, _, err := baseline.Apply(ctx, []FileResult{{Path: file, CanonicalPath: file}}, []rule.RuleDiagnostic{
+		_, _, err := baseline.Apply(ctx, []FileResult{{Path: file}}, []rule.RuleDiagnostic{
 			{FilePath: file, RuleName: id, Severity: rule.SeverityError},
 		})
 		return err
@@ -215,7 +214,7 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 	if err := update(ctx, first, "cancelled"); err == nil {
 		t.Fatal("cancelled update succeeded")
 	}
-	reopened, err := Open(cwd, Options{})
+	reopened, err := Open(Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,14 +227,14 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 		if err := os.Symlink(DefaultFilename, location); err != nil {
 			t.Skipf("file symlink unavailable: %v", err)
 		}
-		linked, err := Open(link, Options{Mode: Record, Location: location})
+		linked, err := Open(Options{Mode: Record, Location: location})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := update(t.Context(), linked, "linked"); err != nil {
 			t.Fatal(err)
 		}
-		reopened, err := Open(cwd, Options{})
+		reopened, err := Open(Options{})
 		if err != nil || reopened == nil || reopened.entries["test.js"]["linked"].Count != 1 {
 			t.Fatalf("update through file symlink: %v, error %v", reopened, err)
 		}

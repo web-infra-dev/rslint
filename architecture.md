@@ -1491,10 +1491,12 @@ the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 
 The file CLI opens the optional suppressions file after config evaluation and
 before lint or autofix. After the final observation, it passes completed
-files, skipped rules and diagnostics to `internal/suppressions`. The reported
-filename identifies its diagnostics. The canonical path frozen during target
-selection identifies its baseline entry. Recording, checking and pruning use
-that same key relative to the physical working directory.
+files, skipped rules and diagnostics to `internal/suppressions`. The final
+lint result's filename identifies its diagnostics and its baseline entry.
+Recording, checking and pruning use that filename relative to the physical
+working directory. This keeps the base directory for the JSON keys stable
+when a shell enters the same project through a symlink. Target selection
+handles duplicate inputs before lint runs.
 
 Files with syntax errors and rules skipped for lack of type information keep
 their entries. The plugin dispatcher identifies incomplete rule results.

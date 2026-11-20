@@ -29,7 +29,7 @@ type entry struct {
 type entries map[string]map[string]entry
 
 type File struct {
-	cwd     string // Canonical cwd, slash-separated and ending in a slash.
+	cwd     string // Physical working directory, slash-separated and ending in a slash.
 	path    string
 	options Options
 	entries entries
@@ -38,9 +38,8 @@ type File struct {
 // FileResult identifies a linted target. A completed rule with no diagnostics
 // has a count of zero.
 type FileResult struct {
-	Path          string // Caller-visible path used by diagnostics.
-	CanonicalPath string // Absolute, slash-separated identity frozen by target selection.
-	SkippedRules  []string
+	Path         string // Absolute, slash-separated filename of the lint result.
+	SkippedRules []string
 }
 
 type checkedFile struct {
@@ -54,7 +53,7 @@ type checkedFile struct {
 func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []rule.RuleDiagnostic) ([]rule.RuleDiagnostic, bool, error) {
 	files := make(map[string]*checkedFile)
 	for _, result := range checked {
-		key := f.fileKey(result.CanonicalPath)
+		key := f.fileKey(result.Path)
 		if f.options.Mode == Check && f.entries[key] == nil {
 			continue
 		}

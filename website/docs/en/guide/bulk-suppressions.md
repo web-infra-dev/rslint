@@ -36,9 +36,11 @@ This baseline records two `no-debugger` errors in `src/app.js`.
 
 If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
 
-Rslint records the file's real path relative to the working directory, using `/` as the separator. For example, if `linked.js` points to `src/app.js`, passing either path or both uses the `src/app.js` entry. This also applies when you pass `--config`. On Windows, a file on another drive or network share uses its absolute path.
+Rslint records the filename it checked, relative to the working directory's physical path, using `/` as the separator. Entering the same directory through a symlink keeps the base for relative paths stable. This also applies when you pass `--config`. On Windows, a file on another drive or network share uses its absolute path.
 
-To reuse an ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. Entries apply when the file path and rule ID match. ESLint can store separate counts under symlink names. To generate a fresh baseline with Rslint's paths, run `rslint --suppress-all` and use the resulting `rslint-suppressions.json`.
+For example, if `linked.js` points to `src/app.js`, the two names can match different rule settings. Checking them in separate runs gives each name its own count. Pruning `linked.js` leaves the entry for `src/app.js` intact. When Rslint selects one target from multiple arguments, it uses the entry for the name it checked.
+
+To reuse an ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. Entries apply when the file path and rule ID match.
 
 Pass `--suppressions-location` on every run that uses a custom location. An existing directory or a path ending in a directory separator selects `rslint-suppressions_<hash>` inside that directory. Create the directory first. The hash comes from the absolute working directory.
 

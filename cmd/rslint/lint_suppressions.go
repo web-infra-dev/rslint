@@ -1,11 +1,9 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"slices"
 
-	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/suppressions"
@@ -18,7 +16,6 @@ func applyLintSuppressions(
 	diagnostics []rule.RuleDiagnostic,
 	records []linter.PluginDispatchRecord,
 	args lintArgs,
-	targets []target.File,
 ) ([]rule.RuleDiagnostic, string) {
 	failedRules := make(map[string][]string)
 	var dispatchFailed, missingFile bool
@@ -45,13 +42,6 @@ func applyLintSuppressions(
 	if incomplete && args.Suppressions.Mode != suppressions.Check {
 		return diagnostics, "Cannot update suppressions because plugin lint results are incomplete."
 	}
-	// Use the identities that target selection used for deduplication.
-	canonicalPaths := make(map[string]string)
-	for _, target := range targets {
-		if target.Path != target.CanonicalPath {
-			canonicalPaths[target.Path] = target.CanonicalPath
-		}
-	}
 	files := observation.Native.Files
 	checked := make([]suppressions.FileResult, 0, len(files))
 	for _, file := range files {
@@ -63,9 +53,8 @@ func applyLintSuppressions(
 			skipped = append(failed, skipped...)
 		}
 		checked = append(checked, suppressions.FileResult{
-			Path:          file.Path,
-			CanonicalPath: cmp.Or(canonicalPaths[file.Path], file.Path),
-			SkippedRules:  skipped,
+			Path:         file.Path,
+			SkippedRules: skipped,
 		})
 	}
 	visible, unused, err := baseline.Apply(ctx, checked, diagnostics)

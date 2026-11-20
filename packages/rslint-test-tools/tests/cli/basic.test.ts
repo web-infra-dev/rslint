@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
@@ -111,7 +112,44 @@ describe('CLI Configuration Tests', () => {
     }
   });
 
-  test('uses one suppression entry for paths to the same file', async () => {
+  test.skipIf(process.platform !== 'darwin')(
+    'uses the on-disk working directory spelling for relative files',
+    async ({ skip }) => {
+      const temp = await createTempDir({
+        'Project/rslint.config.mjs':
+          "export default [{rules:{'no-debugger':'error'}}];",
+        'Project/src/f.js': 'debugger; debugger;',
+      });
+      try {
+        const project = await fs.realpath(path.join(temp, 'Project'));
+        const cwd = path.join(path.dirname(project), 'PROJECT');
+        if (!existsSync(cwd)) skip();
+        const check = (...args: string[]) =>
+          runCliProcess(process.execPath, [RSLINT_BIN, ...args], {
+            cwd,
+            env: { ...process.env, PWD: cwd },
+          });
+        const recorded = await check(
+          '--suppress-all',
+          path.join(project, 'src/f.js'),
+        );
+        expect(recorded.exitCode, recorded.stderr).toBe(0);
+        const json = await fs.readFile(
+          path.join(cwd, 'rslint-suppressions.json'),
+          'utf8',
+        );
+        expect(JSON.parse(json)).toEqual({
+          'src/f.js': { 'no-debugger': { count: 2 } },
+        });
+        const checked = await check('src/f.js');
+        expect(checked.exitCode, checked.stderr).toBe(0);
+      } finally {
+        await cleanupTempDir(temp);
+      }
+    },
+  );
+
+  test('uses the linted path for duplicate file arguments', async () => {
     const temp = await createTempDir({
       'rslint.config.mjs':
         "export default [{files:['**/*.js'],rules:{'no-debugger':'error'}}];",
@@ -137,11 +175,12 @@ describe('CLI Configuration Tests', () => {
           { cwd, env: { ...process.env, PWD: cwd } },
         );
 
+      const selected = '../../link/b/file.js';
       const two = { 'no-debugger': { count: 2 } };
-      const alias = { '../../link/b/file.js': two };
+      const other = { [relative]: two };
       const seeded = JSON.stringify({
-        [relative]: { 'no-debugger': { count: 1 } },
-        ...alias,
+        [selected]: { 'no-debugger': { count: 1 } },
+        ...other,
       });
       await fs.writeFile(baseline, seeded);
       for (const args of [[logical], [relative, logical], paths, reversed]) {
@@ -160,14 +199,89 @@ describe('CLI Configuration Tests', () => {
       const recorded = await check('--suppress-all', ...paths);
       expect(recorded.exitCode, recorded.stderr).toBe(0);
       expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
-        [relative]: two,
+        [selected]: two,
       });
 
       await fs.writeFile(baseline, seeded);
       await fs.writeFile(physical, '');
       const pruned = await check('--prune-suppressions', ...reversed);
       expect(pruned.exitCode, pruned.stderr).toBe(0);
-      expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual(alias);
+      expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual(other);
+    } finally {
+      await cleanupTempDir(temp);
+    }
+  });
+
+  test('keeps distinct counts for separately linted aliases', async () => {
+    const cwd = await createTempDir({
+      'rslint.config.mjs': `export default [
+        {files:['link/*.js'],rules:{'no-console':['error',{allow:['warn']}]}},
+        {files:['real/*.js'],rules:{'no-console':['error',{allow:['log']}]}}
+      ];`,
+      'real/file.js': 'console.log(1);\nconsole.warn(2);',
+    });
+    try {
+      await fs.symlink(
+        path.join(cwd, 'real'),
+        path.join(cwd, 'link'),
+        'junction',
+      );
+      const check = (...args: string[]) =>
+        runRslint(['--format', 'jsonline', ...args], cwd);
+      const baseline = path.join(cwd, 'rslint-suppressions.json');
+      const recorded = await check('--suppress-all', 'link/file.js');
+      expect(recorded.exitCode, recorded.stderr).toBe(0);
+      const saved = await fs.readFile(baseline, 'utf8');
+      expect(JSON.parse(saved)).toEqual({
+        'link/file.js': { 'no-console': { count: 1 } },
+      });
+
+      const checked = await check('real/file.js');
+      expect(checked.exitCode, checked.stderr).toBe(1);
+      expect(JSON.parse(checked.stdout)).toMatchObject({
+        ruleName: 'no-console',
+        range: { start: { line: 2 } },
+      });
+      await fs.writeFile(path.join(cwd, 'real/file.js'), 'console.log(1);');
+      const pruned = await check('--prune-suppressions', 'real/file.js');
+      expect(pruned.exitCode, pruned.stderr).toBe(0);
+      expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
+    } finally {
+      await cleanupTempDir(cwd);
+    }
+  });
+
+  test('keeps external entries across working directory aliases', async () => {
+    const temp = await createTempDir({
+      'rslint.config.mjs': "export default [{rules:{'no-debugger':'error'}}];",
+      'shared.js': 'debugger;',
+      'work/clean.js': '',
+    });
+    try {
+      const root = await fs.realpath(temp);
+      const work = path.join(root, 'work');
+      const nested = path.join(root, 'nested');
+      await fs.mkdir(nested);
+      const cwd = path.join(nested, 'link');
+      await fs.symlink(work, cwd, 'junction');
+      const shared = path.join(root, 'shared.js');
+      const baseline = path.join(work, 'rslint-suppressions.json');
+      const recorded = await runRslint(['--suppress-all', shared], work);
+      expect(recorded.exitCode, recorded.stderr).toBe(0);
+      const saved = await fs.readFile(baseline, 'utf8');
+      expect(JSON.parse(saved)).toEqual({
+        '../shared.js': { 'no-debugger': { count: 1 } },
+      });
+
+      for (const args of [[shared], ['--prune-suppressions', 'clean.js']]) {
+        const result = await runCliProcess(
+          process.execPath,
+          [RSLINT_BIN, ...args],
+          { cwd, env: { ...process.env, PWD: cwd } },
+        );
+        expect(result.exitCode, result.stderr).toBe(0);
+      }
+      expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
     } finally {
       await cleanupTempDir(temp);
     }
