@@ -14,13 +14,22 @@ import (
 // IsKnownNonArray reports whether node is definitely not an Array or
 // ReadonlyArray. Typed arrays and keyed collections are non-arrays. Unknown
 // receivers return false so syntactic array rules can still report them.
+//
+// It follows Unicorn v80's isKnownNonArray defaults: JSDoc annotations, plain
+// assignment and logical operands, and array producers are read, and a call
+// has a static value only through Object.freeze/preventExtensions/seal.
 func IsKnownNonArray(ctx rule.RuleContext, node *ast.Node) bool {
-	if isSourceOnlyFile(ctx) {
-		return classifySourceOnlyArrayReceiver(
-			ctx, node, arrayTargets, knownNonArrayNames,
-		) == arrayClassNonTarget
-	}
-	return classifyArrayReceiver(ctx, node, arrayTargets, knownNonArrayNames) == arrayClassNonTarget
+	return IsKnownNonArrayWithOptions(ctx, node, ArrayReceiverOptions{})
+}
+
+// IsKnownNonArrayWithOptions adds rule-specific receiver policies to the
+// Unicorn defaults that IsKnownNonArray applies. For example,
+// CheckClassHeritage and CheckClassSyntax make an Array subclass an array.
+func IsKnownNonArrayWithOptions(ctx rule.RuleContext, node *ast.Node, options ArrayReceiverOptions) bool {
+	options.CheckArrayProducers = true
+	options.ReadJSDoc = true
+	options.sideEffectFreeStaticCall = true
+	return classifyArrayReceiverWithOptions(ctx, node, arrayTargets, knownNonArrayNames, options) == arrayClassNonTarget
 }
 
 // IsKnownNonIndexedCollection reports whether node is definitely outside the
@@ -52,6 +61,10 @@ type ArrayReceiverOptions struct {
 	TreatMixedUnionAsNonTarget bool
 	preferKnownAnnotationNames bool
 	treatMixedUnionAsTarget    bool
+	// sideEffectFreeStaticCall mirrors getStaticValueForControlFlow (Unicorn
+	// v77+), which rejects every call flagged by eslint-utils' hasSideEffect.
+	// Older ports read built-in call results such as Number(1).
+	sideEffectFreeStaticCall bool
 }
 
 // IsKnownNonIndexedCollectionWithOptions applies rule-specific receiver
@@ -216,7 +229,9 @@ func classifyArrayReceiverInner(
 		)
 	}
 	if node.Kind == ast.KindAsExpression || node.Kind == ast.KindTypeAssertionExpression {
-		if state.useTypeInformation || state.options.ReadJSDoc && utils.IsJSDocTypeCastWrapper(node) {
+		// ESTree has no node for a JSDoc cast, so Unicorn classifies the
+		// parenthesized expression without reading its @type.
+		if state.useTypeInformation && !utils.IsJSDocTypeCastWrapper(node) {
 			if class := ClassifyTypeAnnotation(ctx, node.Type(), arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
 				return class
 			}
@@ -288,7 +303,7 @@ func classifyArrayReceiverInner(
 	// return types cannot classify arbitrary user calls.
 	classifyArrays := targetNames.Has("Array")
 	if classifyArrays && !state.useTypeInformation && ast.IsCallExpression(node) {
-		if class := classifySourceOnlyStaticCall(ctx, node); class != arrayClassUnknown {
+		if class := classifySourceOnlyStaticCall(ctx, node, state.options.sideEffectFreeStaticCall); class != arrayClassUnknown {
 			return class
 		}
 	} else if classifyArrays && !ast.IsIdentifier(node) && !ast.IsAccessExpression(node) {
@@ -369,6 +384,7 @@ const maxSourceStaticNodeCount = 256
 func classifySourceOnlyStaticCall(
 	ctx rule.RuleContext,
 	node *ast.Node,
+	sideEffectFree bool,
 ) arrayClass {
 	call := node.AsCallExpression()
 	if call == nil {
@@ -377,10 +393,19 @@ func classifySourceOnlyStaticCall(
 	evaluator := arrayReceiverStaticEvaluator(ctx)
 	bounded := isBoundedSourceStaticExpression(ctx, node)
 	root, method, builtin := staticBuiltinCall(ctx, call.Expression)
+	arguments := node.Arguments()
+	if sideEffectFree {
+		// Only Unicorn's isSafeStaticPassThroughCall escapes hasSideEffect.
+		if !builtin || root != "Object" || !isStaticPassThroughMethod(method) || len(arguments) != 1 ||
+			!ast.IsPropertyAccessExpression(ast.SkipOuterExpressions(call.Expression, ast.OEKParentheses|ast.OEKAssertions)) ||
+			ast.IsOptionalChain(node) {
+			return arrayClassUnknown
+		}
+		builtin = false
+	}
 	if !bounded && !builtin {
 		return arrayClassUnknown
 	}
-	arguments := node.Arguments()
 	if !staticCallArgumentsKnown(ctx, evaluator, arguments) {
 		return arrayClassUnknown
 	}
@@ -560,6 +585,10 @@ func isUnshadowedGlobal(ctx rule.RuleContext, identifier *ast.Node) bool {
 		ctx.Refs.IsGlobalNameReference(identifier, name, staticCallGlobalMeaning)
 }
 
+func isStaticPassThroughMethod(name string) bool {
+	return name == "freeze" || name == "preventExtensions" || name == "seal"
+}
+
 func isStaticMathMethod(name string) bool {
 	switch name {
 	case "abs", "acos", "acosh", "asin", "asinh", "atan", "atan2", "atanh",
@@ -690,7 +719,7 @@ func classifyArrayFactoryReturn(ctx rule.RuleContext, callee *ast.Node, targetNa
 			if !ok || state.options.ReadJSDoc && hasContextDependentFactoryReturn(utils.SkipAssertionsAndParens(initializer)) {
 				return arrayClassUnknown
 			}
-			if class := ClassifyTypeAnnotation(ctx, CallableReturnTypeAnnotation(ctx, declaration), arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
+			if class := ClassifyTypeAnnotation(ctx, callableReturnTypeAnnotation(ctx, declaration, state.options.ReadJSDoc), arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
 				return class
 			}
 			return classifyArrayFactoryReturn(ctx, initializer, targetNames, nonTargetNames, state)
@@ -704,7 +733,7 @@ func classifyArrayFactoryReturn(ctx rule.RuleContext, callee *ast.Node, targetNa
 		if state.options.ReadJSDoc && hasContextDependentFactoryReturn(callee) {
 			return arrayClassUnknown
 		}
-		return ClassifyTypeAnnotation(ctx, CallableReturnTypeAnnotation(ctx, callee), arrayTypeOptions(targetNames, nonTargetNames, state.options))
+		return ClassifyTypeAnnotation(ctx, callableReturnTypeAnnotation(ctx, callee, state.options.ReadJSDoc), arrayTypeOptions(targetNames, nonTargetNames, state.options))
 	}
 	return arrayClassUnknown
 }

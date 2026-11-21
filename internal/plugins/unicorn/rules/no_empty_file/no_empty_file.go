@@ -7,9 +7,9 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_empty_file.schema.json
@@ -49,7 +49,7 @@ var NoEmptyFileRule = rule.Rule{
 				strings.HasPrefix(value, "/") {
 				return nil
 			}
-			if isDisableOrEnableComment(comment, value) {
+			if unicornutil.IsDisableOrEnableDirective(comment, value) {
 				if firstDirective == nil {
 					firstDirective = comment
 				}
@@ -74,25 +74,6 @@ var NoEmptyFileRule = rule.Rule{
 		})
 		return nil
 	},
-}
-
-// Only classify the comment here; RuleContext handles suppression. General
-// directive helpers also include config/global comments, which this rule allows.
-func isDisableOrEnableComment(comment *ast.CommentRange, value string) bool {
-	label := ecmascript.StringTrim(value)
-	if end := strings.IndexFunc(label, ecmascript.IsWhiteSpaceOrLineTerminator); end >= 0 {
-		label = label[:end]
-	}
-	switch label {
-	case "eslint-disable", "eslint-enable", "rslint-disable", "rslint-enable":
-		return comment.Kind == ast.KindMultiLineCommentTrivia
-	case "eslint-disable-next-line", "rslint-disable-next-line":
-		return true
-	case "eslint-disable-line", "rslint-disable-line":
-		return !strings.ContainsAny(value, ecmascript.LineTerminators)
-	default:
-		return false
-	}
 }
 
 func isEmptyStatement(node *ast.Node) bool {

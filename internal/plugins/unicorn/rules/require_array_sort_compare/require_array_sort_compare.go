@@ -1,0 +1,122 @@
+package require_array_sort_compare
+
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
+
+const (
+	messageID           = "require-array-sort-compare"
+	numericSuggestionID = "require-array-sort-compare/numeric"
+	stringSuggestionID  = "require-array-sort-compare/string"
+	numericCompare      = "(a, b) => a - b"
+	stringCompare       = "(a, b) => a.localeCompare(b)"
+)
+
+var arraySubclassReceivers = unicornutil.ArrayReceiverOptions{
+	CheckClassHeritage: true,
+	CheckClassSyntax:   true,
+}
+
+var missingCompareMessage = rule.RuleMessage{
+	Id:          messageID,
+	Description: "Pass a compare function to avoid sorting elements as strings.",
+}
+
+// wouldRemoveComments reports whether replacing the authored argument,
+// parentheses included, would drop a comment (upstream wouldRemoveComments
+// over getParenthesizedRange).
+func wouldRemoveComments(ctx rule.RuleContext, argument *ast.Node) bool {
+	textRange := utils.TrimNodeTextRange(ctx.SourceFile, argument)
+	return utils.HasCommentInSpan(ctx.Comments.All(), textRange.Pos(), textRange.End())
+}
+
+func compareSuggestion(
+	ctx rule.RuleContext,
+	call *ast.Node,
+	argument *ast.Node,
+	messageID string,
+	message string,
+	compare string,
+) rule.RuleSuggestion {
+	var fix rule.RuleFix
+	if argument != nil {
+		fix = rule.RuleFixReplace(ctx.SourceFile, argument, compare)
+	} else {
+		closingParenthesis := call.End() - 1
+		fix = rule.RuleFixReplaceRange(
+			core.NewTextRange(closingParenthesis, closingParenthesis),
+			compare,
+		)
+	}
+	return rule.RuleSuggestion{
+		Message:  rule.RuleMessage{Id: messageID, Description: message},
+		FixesArr: []rule.RuleFix{fix},
+	}
+}
+
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/rules/require-array-sort-compare.js
+var RequireArraySortCompareRule = rule.Rule{
+	Name:   "unicorn/require-array-sort-compare",
+	Schema: rule.EmptyArraySchema,
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		maximumArguments := 1
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
+					Methods:             []string{"sort", "toSorted"},
+					MaximumArguments:    &maximumArguments,
+					RejectSpreadElement: true,
+					AllowOptionalMember: true,
+				})
+				if !ok {
+					return
+				}
+
+				// compareArgument keeps the authored argument, parentheses included,
+				// because upstream replaceArgument replaces the parenthesized range.
+				var compareArgument *ast.Node
+				arguments := node.Arguments()
+				if len(arguments) == 1 {
+					compareArgument = arguments[0]
+					if !utils.IsUndefinedIdentifier(utils.ESTreeRuntimeExpression(compareArgument)) {
+						return
+					}
+				}
+
+				// Upstream treats every custom constructor as a non-array. An instance
+				// of a class that extends Array still sorts its elements as strings.
+				if unicornutil.IsKnownNonArrayWithOptions(ctx, call.Object, arraySubclassReceivers) {
+					return
+				}
+
+				ctx.ReportNodeWithDeferredSuggestions(call.Property, missingCompareMessage, func() []rule.RuleSuggestion {
+					if compareArgument != nil && wouldRemoveComments(ctx, compareArgument) {
+						return nil
+					}
+					return []rule.RuleSuggestion{
+						compareSuggestion(
+							ctx,
+							node,
+							compareArgument,
+							numericSuggestionID,
+							"Sort numerically.",
+							numericCompare,
+						),
+						compareSuggestion(
+							ctx,
+							node,
+							compareArgument,
+							stringSuggestionID,
+							"Sort strings with `String#localeCompare()`.",
+							stringCompare,
+						),
+					}
+				})
+			},
+		}
+	},
+}
