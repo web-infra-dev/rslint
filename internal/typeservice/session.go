@@ -385,10 +385,16 @@ func materializeReferences(p *program.Program, result Result) {
 		if fact.nodes != nil {
 			fact.Declarations = make([]NodeRef, 0, len(fact.nodes))
 			for _, node := range fact.nodes {
-				fact.Declarations = append(fact.Declarations, *nodeReference(p, node))
+				ref := nodeReference(p, node)
+				fact.Declarations = append(fact.Declarations, *ref)
+				if node == fact.valueNode {
+					fact.ValueDeclaration = ref
+				}
 			}
 		}
-		fact.ValueDeclaration = nodeReference(p, fact.valueNode)
+		if fact.ValueDeclaration == nil {
+			fact.ValueDeclaration = nodeReference(p, fact.valueNode)
+		}
 		fact.nodes = nil
 		fact.valueNode = nil
 	case *SignatureFact:
@@ -1119,7 +1125,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return Handle(s.typeID(c.GetTypeOfSymbol(s.symbolByID(r.ID)))), nil
 		case "symbolRecord":
 			sym := s.symbolByID(r.ID)
-			declarations, value := symbolDeclarations(sym)
+			declarations, value := copySymbolDeclarations(sym)
 			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: declarations, valueNode: value}, nil
 		}
 	case *SymbolDocsRequest:
@@ -1128,13 +1134,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 		symbol := s.symbolByID(r.ID)
 		active := map[*ast.Symbol]bool{symbol: true}
-		declarations := symbol.Declarations
-		if slices.ContainsFunc(declarations, func(decl *ast.Node) bool { return decl.Flags&ast.NodeFlagsReparsed != 0 }) {
-			declarations, _ = symbolDeclarations(symbol)
-			for i, decl := range declarations {
-				declarations[i] = s.documentationDeclaration(decl)
-			}
-		}
+		declarations, _ := symbolDeclarations(symbol)
 		if r.Op == "symbolDocumentation" {
 			return documentation(c, declarations, active), nil
 		}
@@ -1146,7 +1146,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "returnType":
 			return Handle(s.typeID(c.GetReturnTypeOfSignature(s.signatureByID(r.ID)))), nil
 		case "signatureDocumentation", "signatureJSDocTags":
-			declarations := []*ast.Node{s.documentationDeclaration(s.signatureByID(r.ID).Declaration())}
+			declarations := []*ast.Node{s.signatureByID(r.ID).Declaration()}
 			active := make(map[*ast.Symbol]bool)
 			if r.Op == "signatureDocumentation" {
 				return documentation(c, declarations, active), nil
@@ -1409,14 +1409,19 @@ func diagnosticFacts(diagnostics []*ast.Diagnostic) SuggestionDiagnostics {
 	return result
 }
 
-func (s *Session) documentationDeclaration(decl *ast.Node) *ast.Node {
-	if decl != nil && decl.Flags&ast.NodeFlagsReparsed != 0 {
-		_, decl = syntaxReference(s.program, decl)
-	}
-	return decl
+func isJSDocOverloadDeclaration(decl *ast.Node) bool {
+	return decl.Flags&ast.NodeFlagsReparsed != 0 && (ast.IsFunctionDeclaration(decl) || ast.IsMethodDeclaration(decl) || ast.IsConstructorDeclaration(decl))
 }
 
 func symbolDeclarations(symbol *ast.Symbol) ([]*ast.Node, *ast.Node) {
+	if !slices.ContainsFunc(symbol.Declarations, isJSDocOverloadDeclaration) {
+		return symbol.Declarations, symbol.ValueDeclaration
+	}
+	return copySymbolDeclarations(symbol)
+}
+
+// Symbol records keep their own slice after releasing the checker.
+func copySymbolDeclarations(symbol *ast.Symbol) ([]*ast.Node, *ast.Node) {
 	value := symbol.ValueDeclaration
 	if symbol.Declarations == nil {
 		return nil, value
@@ -1427,7 +1432,7 @@ func symbolDeclarations(symbol *ast.Symbol) ([]*ast.Node, *ast.Node) {
 		// The JS parser inserts @overload signatures immediately before their
 		// implementation. The symbol exposes the implementation, even when
 		// the checker picked one of its overloads as the value declaration.
-		if decl.Flags&ast.NodeFlagsReparsed != 0 && (ast.IsFunctionDeclaration(decl) || ast.IsMethodDeclaration(decl) || ast.IsConstructorDeclaration(decl)) {
+		if isJSDocOverloadDeclaration(decl) {
 			useImplementation = useImplementation || decl == value
 			continue
 		}

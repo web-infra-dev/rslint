@@ -11,7 +11,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
 
@@ -20,6 +19,7 @@ func documentation(c *checker.Checker, declarations []*ast.Node, active map[*ast
 	var parts DisplayParts
 	var comments []DisplayParts
 	for _, decl := range declarations {
+		decl = sourceJSDocDeclaration(decl)
 		nodes := jsDocCommentNodes(decl)
 		if decl.Kind == ast.KindJSDocParameterTag || decl.Kind == ast.KindJSDocPropertyTag {
 			nodes = []*ast.Node{decl}
@@ -78,7 +78,7 @@ func jsDocTags(c *checker.Checker, declarations []*ast.Node, active map[*ast.Sym
 	declarations = uniqueDeclarations(declarations)
 	var tags JSDocTags
 	for _, decl := range declarations {
-		nodes := declarationTags(decl)
+		nodes := declarationTags(sourceJSDocDeclaration(decl))
 		if !belongsToTypeAlias(nodes) {
 			tags = appendTags(c, tags, nodes)
 		}
@@ -303,16 +303,33 @@ func boundJSDocDeclaration(source *ast.Node) *ast.Node {
 	return nil
 }
 
+func sourceJSDocDeclaration(node *ast.Node) *ast.Node {
+	if node.Flags&ast.NodeFlagsReparsed != 0 {
+		file := ast.GetSourceFileOfNode(node)
+		table := encoder.GetNodeIndexTable(file)
+		if index := jsDocNodeIndex(node, file, table); index != 0 {
+			return table.Nodes[index]
+		}
+	}
+	return node
+}
+
 // tsgo binds JSDoc parameters on generated declarations. The authored nodes
 // retain the enclosing JS scope, including locals of the documented function.
 func jsDocLocalScopes(location *ast.Node) iter.Seq2[*ast.Node, ast.SymbolTable] {
 	return func(yield func(*ast.Node, ast.SymbolTable) bool) {
 		for n := location; n != nil && n.Flags&ast.NodeFlagsJSDoc != 0; n = n.Parent {
+			var bound *ast.Node
 			switch n.Kind {
 			case ast.KindJSDocSignature, ast.KindJSDocCallbackTag, ast.KindJSDocTypedefTag:
-				if bound := boundJSDocDeclaration(n); bound != nil && !yield(n, bound.Locals()) {
-					return
+				bound = boundJSDocDeclaration(n)
+			default:
+				if n.LocalsContainerData() != nil {
+					bound = ast.GetReparsedNodeForNode(n)
 				}
+			}
+			if bound != nil && bound != n && len(bound.Locals()) > 0 && !yield(n, bound.Locals()) {
+				return
 			}
 		}
 	}
@@ -320,10 +337,16 @@ func jsDocLocalScopes(location *ast.Node) iter.Seq2[*ast.Node, ast.SymbolTable] 
 
 func resolveName(c *checker.Checker, name string, location *ast.Node, meaning ast.SymbolFlags, excludeGlobals bool) *ast.Symbol {
 	for source, locals := range jsDocLocalScopes(location) {
-		if local := locals[name]; local != nil && local.CombinedLocalAndExportSymbolFlags()&meaning != 0 {
+		if local := locals[name]; visibleJSDocLocal(local, meaning) {
 			// Name resolution inside a parameter or return annotation sees
 			// type parameters. Value parameters are visible on the signature itself.
 			if source.Kind == ast.KindJSDocSignature && source != location && local.Flags&ast.SymbolFlagsVariable != 0 {
+				continue
+			}
+			// Inside a written function, mapped or conditional type, let the
+			// checker decide whether this local is visible at the exact location.
+			if source.Kind != ast.KindJSDocSignature && !ast.IsJSDocTag(source) &&
+				c.ResolveName(name, ast.GetReparsedNodeForNode(location), meaning, excludeGlobals) != local {
 				continue
 			}
 			return local
@@ -337,7 +360,7 @@ func symbolsInScope(c *checker.Checker, location *ast.Node, meaning ast.SymbolFl
 	var inner ast.SymbolTable
 	for _, locals := range jsDocLocalScopes(location) {
 		for name, sym := range locals {
-			if name != ast.InternalSymbolNameThis && sym.CombinedLocalAndExportSymbolFlags()&meaning != 0 && inner[name] == nil {
+			if visibleJSDocLocal(sym, meaning) && inner[name] == nil {
 				if inner == nil {
 					inner = make(ast.SymbolTable)
 				}
@@ -350,6 +373,10 @@ func symbolsInScope(c *checker.Checker, location *ast.Node, meaning ast.SymbolFl
 		symbols = slices.AppendSeq(symbols, maps.Values(inner))
 	}
 	return symbols
+}
+
+func visibleJSDocLocal(symbol *ast.Symbol, meaning ast.SymbolFlags) bool {
+	return symbol != nil && symbol.Name != ast.InternalSymbolNameThis && symbol.CombinedLocalAndExportSymbolFlags()&meaning != 0
 }
 
 func isSourceJSDocNode(source, node *ast.Node) bool {
@@ -432,7 +459,8 @@ func inheritedDeclarations[T ~[]E, E any](c *checker.Checker, declarations []*as
 				continue
 			}
 			seen[symbol] = true
-			if !accessor && tags && len(symbol.Declarations) != 1 {
+			baseDeclarations, _ := symbolDeclarations(symbol)
+			if !accessor && tags && len(baseDeclarations) != 1 {
 				continue
 			}
 			if active[symbol] {
@@ -441,13 +469,13 @@ func inheritedDeclarations[T ~[]E, E any](c *checker.Checker, declarations []*as
 			active[symbol] = true
 			var parts T
 			if accessor {
-				matching := slices.DeleteFunc(slices.Clone(symbol.Declarations), func(decl *ast.Node) bool {
+				matching := slices.DeleteFunc(slices.Clone(baseDeclarations), func(decl *ast.Node) bool {
 					return decl.Kind != declaration.Kind
 				})
 				parts = read(c, matching, active)
 			}
 			if len(parts) == 0 {
-				parts = read(c, symbol.Declarations, active)
+				parts = read(c, baseDeclarations, active)
 			}
 			result = append(result, parts)
 			delete(active, symbol)
@@ -611,18 +639,20 @@ func linkTarget(c *checker.Checker, name *ast.Node) *DisplayPartTarget {
 		return nil
 	}
 	symbol = c.SkipAlias(symbol)
-	declaration := symbol.ValueDeclaration
-	if declaration == nil && len(symbol.Declarations) != 0 {
-		declaration = symbol.Declarations[0]
+	declarations, declaration := symbolDeclarations(symbol)
+	if declaration == nil && len(declarations) != 0 {
+		declaration = declarations[0]
 	}
 	if declaration == nil {
 		return nil
 	}
+	declaration = sourceJSDocDeclaration(declaration)
 	file := ast.GetSourceFileOfNode(declaration)
 	if file == nil {
 		return nil
 	}
-	start, end := scanner.GetTokenPosOfNode(declaration, file, false), declaration.End()
-	text := file.Text()
-	return &DisplayPartTarget{File: file.FileName(), Start: uint32(core.UTF16Len(text[:start])), Length: uint32(core.UTF16Len(text[start:end]))}
+	positions := file.GetPositionMap()
+	start := positions.UTF8ToUTF16(scanner.GetTokenPosOfNode(declaration, file, false))
+	end := positions.UTF8ToUTF16(declaration.End())
+	return &DisplayPartTarget{File: file.FileName(), Start: uint32(start), Length: uint32(end - start)}
 }
