@@ -12,14 +12,18 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-// The encoder stores nodes and NodeLists in fixed-size records after a nil
-// sentinel. Fully synthetic trees have no source positions to translate.
-func convertGeneratedPositions(tree []byte, file *ast.SourceFile) {
-	first := int(binary.LittleEndian.Uint32(tree[encoder.HeaderOffsetNodes:])) + encoder.NodeSize
+func prepareGeneratedSyntax(tree []byte, nodes, origins []*ast.Node, file *ast.SourceFile) {
+	records := tree[binary.LittleEndian.Uint32(tree[encoder.HeaderOffsetNodes:]):]
+	if origins != nil {
+		restoreGeneratedLists(records, nodes, origins)
+	}
+	if file == nil {
+		return
+	}
 	var positions *ast.PositionMap
-	for offset := first; offset < len(tree); offset += encoder.NodeSize {
+	for offset := encoder.NodeSize; offset < len(records); offset += encoder.NodeSize {
 		for _, field := range [...]int{encoder.NodeOffsetPos, encoder.NodeOffsetEnd} {
-			data := tree[offset+field:]
+			data := records[offset+field:]
 			pos := int32(binary.LittleEndian.Uint32(data))
 			if pos < 0 {
 				continue
@@ -31,6 +35,73 @@ func convertGeneratedPositions(tree []byte, file *ast.SourceFile) {
 				}
 			}
 			binary.LittleEndian.PutUint32(data, uint32(positions.UTF8ToUTF16(int(pos))))
+		}
+	}
+}
+
+// A copied node keeps its parse origin. Restore its lists' comma flags and,
+// when the builder kept the original span, their bounds before UTF-16 conversion.
+func restoreGeneratedLists(records []byte, nodes, origins []*ast.Node) {
+	var fields, generated, source []*ast.NodeList
+	visitor := ast.NodeVisitor{Hooks: ast.NodeVisitorHooks{
+		VisitNodes: func(list *ast.NodeList, _ *ast.NodeVisitor) *ast.NodeList {
+			fields = append(fields, list)
+			return list
+		},
+		VisitModifiers: func(modifiers *ast.ModifierList, _ *ast.NodeVisitor) *ast.ModifierList {
+			var list *ast.NodeList
+			if modifiers != nil && len(modifiers.Nodes) != 0 {
+				list = &modifiers.NodeList
+			}
+			fields = append(fields, list)
+			return modifiers
+		},
+	}}
+	listFields := func(node *ast.Node, reuse []*ast.NodeList) []*ast.NodeList {
+		fields = reuse[:0]
+		node.VisitEachChild(&visitor)
+		return fields
+	}
+	for index, origin := range origins {
+		if origin == nil || index+1 == len(nodes) {
+			continue
+		}
+		owner := nodes[index]
+		if owner.Kind != origin.Kind || (owner.Pos() >= 0 && owner.Loc != origin.Loc) {
+			continue
+		}
+		first := index + 1
+		if int(binary.LittleEndian.Uint32(records[first*encoder.NodeSize+encoder.NodeOffsetParent:])) != index {
+			continue
+		}
+		// NodeLists occupy nil slots in the encoder's index, in visitor order.
+		slot := 0
+		for child := first; child != 0; {
+			record := records[child*encoder.NodeSize:]
+			isList := nodes[child] == nil
+			child = int(binary.LittleEndian.Uint32(record[encoder.NodeOffsetNext:]))
+			if !isList {
+				continue
+			}
+			if slot == 0 {
+				generated = listFields(owner, generated)
+				source = listFields(origin, source)
+			}
+			for generated[slot] == nil {
+				slot++
+			}
+			original := source[slot]
+			slot++
+			if original == nil || int32(binary.LittleEndian.Uint32(record[encoder.NodeOffsetPos:])) >= 0 {
+				continue
+			}
+			if owner.Pos() >= 0 {
+				binary.LittleEndian.PutUint32(record[encoder.NodeOffsetPos:], uint32(original.Pos()))
+				binary.LittleEndian.PutUint32(record[encoder.NodeOffsetEnd:], uint32(original.End()))
+			}
+			if original.HasTrailingComma() {
+				binary.LittleEndian.PutUint32(record[encoder.NodeOffsetFlags:], 1)
+			}
 		}
 	}
 }

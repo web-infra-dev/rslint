@@ -19,6 +19,7 @@ export { childProperties } from '../../../typescript-go/packages/typescript/src/
 export {
   SyntaxKind,
   NodeFlags,
+  TokenFlags,
 } from '../../../typescript-go/packages/typescript/src/ast/index.ts';
 export type { Node } from '../../../typescript-go/packages/typescript/src/ast/index.ts';
 export { Wtf8Decoder } from '../../../typescript-go/packages/typescript/src/api/node/wtf8.ts';

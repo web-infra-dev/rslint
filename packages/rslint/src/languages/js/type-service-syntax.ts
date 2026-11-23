@@ -5,6 +5,7 @@ import {
   RemoteNode,
   SyntaxKind,
   NodeFlags,
+  TokenFlags,
   Wtf8Decoder,
   type Node,
 } from '@rslint/api';
@@ -29,6 +30,13 @@ interface SyntheticRef {
   readonly listChild?: number;
 }
 type SyntaxRef = NodeRef | SyntheticRef;
+const tokenNavigation = new Set<PropertyKey>([
+  'getChildren',
+  'getChildAt',
+  'getChildCount',
+  'getFirstToken',
+  'getLastToken',
+]);
 function unsupported(name: string): never {
   throw new Error(`unsupported TypeScript operation: ${name}`);
 }
@@ -111,6 +119,7 @@ function publicSyntaxKind(node: Node): SyntaxKind {
 // The compiler's child table excludes scalar fields exposed by the JS AST.
 const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
   [SyntaxKind.Identifier]: ['escapedText'],
+  [SyntaxKind.StringLiteral]: ['hasExtendedUnicodeEscape'],
   [SyntaxKind.PrivateIdentifier]: ['escapedText'],
   [SyntaxKind.Block]: ['multiLine'],
   [SyntaxKind.ArrayLiteralExpression]: ['multiLine'],
@@ -137,18 +146,36 @@ const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
 
 type JsDocKinds = TypeServiceCompilerData['jsDocKinds'];
 
-// The Go parser reserves these child slots. The JS factory omits them.
-const nativeOnlyFields: Partial<Record<SyntaxKind, readonly string[]>> = {
-  [SyntaxKind.BinaryExpression]: ['type', 'modifiers'],
-  [SyntaxKind.PropertyAssignment]: ['type'],
-  [SyntaxKind.ShorthandPropertyAssignment]: ['type'],
-  [SyntaxKind.ExportAssignment]: ['type'],
-  [SyntaxKind.ModuleDeclaration]: ['attributes'],
-  [SyntaxKind.DefaultClause]: ['expression'],
+// Only differences from the reader's child table belong here. A string names
+// the native slot, and false omits a slot reserved by the Go parser.
+const fieldAliases: Partial<
+  Record<SyntaxKind, Readonly<Record<string, string | false>>>
+> = {
+  [SyntaxKind.TypeParameter]: { default: 'defaultType', defaultType: false },
+  [SyntaxKind.BinaryExpression]: { type: false, modifiers: false },
+  [SyntaxKind.PropertyAssignment]: { type: false },
+  [SyntaxKind.ShorthandPropertyAssignment]: { type: false },
+  [SyntaxKind.ForInStatement]: { awaitModifier: false },
+  [SyntaxKind.ExportAssignment]: { type: false },
+  [SyntaxKind.ModuleDeclaration]: { attributes: false },
+  [SyntaxKind.DefaultClause]: { expression: false },
+  [SyntaxKind.ImportAttributes]: { elements: 'attributes', attributes: false },
+  [SyntaxKind.ImportDeclaration]: { assertClause: 'attributes' },
+  [SyntaxKind.ExportDeclaration]: { assertClause: 'attributes' },
+  [SyntaxKind.JSDocSeeTag]: { name: 'nameExpression', nameExpression: false },
+  [SyntaxKind.JSDocAugmentsTag]: { class: 'className', className: false },
+  [SyntaxKind.JSDocImplementsTag]: { class: 'className', className: false },
+  [SyntaxKind.JSDocTypedefTag]: { fullName: 'name' },
+  [SyntaxKind.JSDocCallbackTag]: { fullName: 'name' },
+  [SyntaxKind.JSDocTypeLiteral]: {
+    jsDocPropertyTags: 'jsdocPropertyTags',
+    jsdocPropertyTags: false,
+  },
 };
 
 function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
   const kind = publicSyntaxKind(raw);
+  const aliases = fieldAliases[kind];
   const fields = [
     'pos',
     'end',
@@ -159,7 +186,7 @@ function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
     ...(scalarFields[kind] ?? []),
   ];
   for (const key of childProperties[kind] ?? []) {
-    if (key === undefined || nativeOnlyFields[kind]?.includes(key)) continue;
+    if (key === undefined || aliases?.[key] === false) continue;
     if (key === 'postfixToken') {
       fields.push('questionToken');
       if (
@@ -169,12 +196,11 @@ function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
         fields.push('exclamationToken');
       continue;
     }
-    fields.push(
-      kind === SyntaxKind.TypeParameter && key === 'defaultType'
-        ? 'default'
-        : key,
-    );
+    fields.push(key);
   }
+  if (aliases)
+    for (const key of Object.keys(aliases))
+      if (aliases[key] !== false) fields.push(key);
   if (
     kind >= SyntaxKind.FirstLiteralToken &&
     kind <= SyntaxKind.LastTemplateToken
@@ -251,8 +277,13 @@ function syntaxView(
 function wrapList(
   value: unknown[],
   wrap: (item: unknown) => unknown,
+  skipReparsed = false,
 ): unknown[] {
-  const list = value.map(wrap);
+  const list: unknown[] = [];
+  for (const item of value) {
+    if (!skipReparsed || !((item as Node).flags & NodeFlags.Reparsed))
+      list.push(wrap(item));
+  }
   for (const key of ['pos', 'end', 'hasTrailingComma'])
     if (key in value) {
       const field = Reflect.get(value, key);
@@ -611,12 +642,26 @@ export class GenerationSyntaxViews {
         });
         const found = this.wrapped.get(key);
         if (found) return found;
-        const list = wrapList(value, (item) => this.wrapNode(item as Node));
+        const list = wrapList(
+          value,
+          (item) => this.wrapNode(item as Node),
+          !!(value.parent.flags & NodeFlags.JavaScriptFile),
+        );
+        if (
+          value.length &&
+          !list.length &&
+          (Reflect.get(value.parent, 'typeParameters') === value ||
+            Reflect.get(value.parent, 'heritageClauses') === value ||
+            Reflect.get(value.parent, 'modifiers') === value)
+        )
+          return undefined;
         this.wrapped.set(key, list);
         return list;
       }
       return wrapList(value, (item) => this.wrap(item));
     }
+    if (value instanceof RemoteNode && value.flags & NodeFlags.Reparsed)
+      return undefined;
     if (
       value instanceof RemoteNode ||
       (typeof value === 'object' &&
@@ -738,8 +783,14 @@ export class GenerationSyntaxViews {
       ) => {
         this.ensure();
         return this.rawSyntax(ref).forEachChild(
-          (n) => cb(this.wrapNode(n)),
-          cbNodes ? (nodes) => cbNodes(this.wrap(nodes)) : undefined,
+          (n) =>
+            n.flags & NodeFlags.Reparsed ? undefined : cb(this.wrapNode(n)),
+          cbNodes
+            ? (nodes) => {
+                const visible = this.wrap(nodes);
+                return visible === undefined ? undefined : cbNodes(visible);
+              }
+            : undefined,
         );
       };
     if (key === 'getChildren')
@@ -825,8 +876,44 @@ export class GenerationSyntaxViews {
   private syntaxMember(raw: Node, key: string | symbol): unknown {
     if (key === 'postfixToken') return undefined;
     const kind = publicSyntaxKind(raw);
-    if (typeof key === 'string' && nativeOnlyFields[kind]?.includes(key))
-      return undefined;
+    if (key === 'jsDocPropertyTags' && kind === SyntaxKind.JSDocTypeLiteral) {
+      // This native field is an unwrapped slice of child nodes.
+      const tags: Node[] = [];
+      raw.forEachChild((tag) => {
+        tags.push(tag);
+      });
+      return tags.length ? tags : undefined;
+    }
+    if (
+      key === 'name' &&
+      (kind === SyntaxKind.JSDocTypedefTag ||
+        kind === SyntaxKind.JSDocCallbackTag)
+    ) {
+      let name = Reflect.get(raw, 'name') as Node | undefined;
+      while (name?.kind === SyntaxKind.ModuleDeclaration)
+        name = (Reflect.get(name, 'body') ?? Reflect.get(name, 'name')) as Node;
+      return name;
+    }
+    if (
+      key === 'comment' &&
+      kind >= SyntaxKind.FirstJSDocNode &&
+      kind <= SyntaxKind.LastJSDocNode
+    ) {
+      const parts = Reflect.get(raw, 'comment') as readonly Node[] | undefined;
+      if (!parts?.length) return undefined;
+      return parts.length === 1 && parts[0].kind === SyntaxKind.JSDocText
+        ? Reflect.get(parts[0], 'text')
+        : parts;
+    }
+    if (key === 'hasExtendedUnicodeEscape' && kind === SyntaxKind.StringLiteral)
+      return !!(
+        (Reflect.get(raw, 'tokenFlags') as number) &
+        TokenFlags.ExtendedUnicodeEscape
+      );
+    const alias =
+      typeof key === 'string' ? fieldAliases[kind]?.[key] : undefined;
+    if (alias === false) return undefined;
+    if (typeof alias === 'string') return Reflect.get(raw, alias);
     if (kind !== raw.kind) {
       if (key === 'expression')
         return Reflect.get(
@@ -879,12 +966,7 @@ export class GenerationSyntaxViews {
       const text = Reflect.get(raw, 'text') as string;
       return text.startsWith('__') ? `_${text}` : text;
     }
-    return Reflect.get(
-      raw,
-      key === 'default' && raw.kind === SyntaxKind.TypeParameter
-        ? 'defaultType'
-        : key,
-    );
+    return Reflect.get(raw, key);
   }
 
   // Generated nodes keep their own syntax identity. Checker queries can follow
@@ -908,32 +990,6 @@ export class GenerationSyntaxViews {
       this.ensure();
       return undefined;
     };
-    const restoreListMetadata = (list: readonly unknown[]) => {
-      if (!('parent' in list) || !(list.parent instanceof RemoteNode)) return;
-      const owner = list.parent;
-      if (((Reflect.get(list, 'pos') as number) | 0) >= 0) return;
-      const ref = origins?.[(owner as unknown as { index: number }).index];
-      if (!ref) return;
-      const field = childProperties[owner.kind]?.find(
-        (key) => key !== undefined && Reflect.get(owner, key) === list,
-      );
-      if (!field) return;
-      const source = this.rawNode(ref);
-      if (
-        source.kind !== owner.kind ||
-        (owner.pos >= 0 &&
-          (source.pos !== owner.pos || source.end !== owner.end))
-      )
-        return;
-      const original = Reflect.get(source, field);
-      if (!Array.isArray(original)) return;
-      const fields =
-        owner.pos < 0
-          ? ['hasTrailingComma']
-          : ['pos', 'end', 'hasTrailingComma'];
-      for (const key of fields)
-        Object.defineProperty(list, key, { value: Reflect.get(original, key) });
-    };
     // The reader uses these caches for recursive navigation. Generated tokens
     // need their own parents even when their spans match tokens in the file.
     const scanSource = (arg: unknown) => {
@@ -942,21 +998,7 @@ export class GenerationSyntaxViews {
       if (!source) {
         source = Object.create(arg, {
           tokenCache: { writable: true },
-          childrenCache: {
-            value: new (class extends Map<Node, readonly Node[]> {
-              override get(owner: Node) {
-                const children = super.get(owner);
-                if (
-                  children === undefined &&
-                  owner instanceof RemoteNode &&
-                  owner.pos >= 0
-                ) {
-                  owner.forEachChild(() => undefined, restoreListMetadata);
-                }
-                return children;
-              }
-            })(),
-          },
+          childrenCache: { writable: true },
         }) as object;
         views.set(arg, source);
       }
@@ -967,7 +1009,6 @@ export class GenerationSyntaxViews {
       const old = views.get(value);
       if (old) return old;
       if (Array.isArray(value)) {
-        restoreListMetadata(value);
         const list = wrapList(value, wrap);
         views.set(value, list);
         return list;
@@ -984,6 +1025,13 @@ export class GenerationSyntaxViews {
         () => node,
         (key) => {
           if (key === 'original') return this.nodeRef(original);
+          if (
+            key === 'hasExtendedUnicodeEscape' &&
+            encoded &&
+            !original &&
+            node.kind === SyntaxKind.StringLiteral
+          )
+            return undefined;
           if (key === 'parent') return encoded ? undefined : wrap(node.parent);
           if (key === 'flags') {
             const flags = this.syntaxMember(node, key) as number;
@@ -1014,7 +1062,12 @@ export class GenerationSyntaxViews {
                 throw new Error(
                   'Node must have a real position for this operation',
                 );
-              return wrap(Reflect.apply(member, node, args.map(scanSource)));
+              if (tokenNavigation.has(key)) {
+                const index = key === 'getChildAt' ? 1 : 0;
+                if (args[index] !== undefined)
+                  args[index] = scanSource(args[index]);
+              }
+              return wrap(Reflect.apply(member, node, args));
             };
           return wrap(member);
         },

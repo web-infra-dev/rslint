@@ -1598,7 +1598,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
       'export class Box { #value = 0; constructor(public label: string) {} read() { return this.#value; } [computedKey]() { return 1; } }',
       'export { id as alias };',
       'export const record = { n: 1 }; export const {n} = record;',
-      "import type { External } from './external'; export type Used = External;",
+      "import type { External } from './external' with { 'resolution-mode': 'import' }; export type Used = External;",
       'export const grow = () => 1; grow.item = 1;',
       'declare const computedKey: string;',
       'declare const condition: boolean; condition;',
@@ -1793,6 +1793,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
               c.isOptionalParameter(generatedParameter),
             ],
             modes: [
+              imp.attributes?.elements[0].value.getText(src),
               p.getModeForUsageLocation(
                 src,
                 imp.moduleSpecifier as ts.StringLiteral,

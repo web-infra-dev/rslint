@@ -19,6 +19,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/nodebuilder"
+	"github.com/microsoft/TypeScript/tsc/shim/printer"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 )
@@ -555,19 +556,32 @@ func nodeFacts(p *program.Program, node *ast.Node) NodeFacts {
 			text := n.Text()
 			fact.Text = &text
 		}
-		if n.Name() != nil {
-			fact.Name = nodeReference(p, n.Name())
-		}
+		fact.Name = nodeReference(p, syntaxName(n))
 		facts = append(facts, fact)
 	}
 	for current := node; current != nil; current = current.Parent {
 		add(current)
-		if current.Name() != nil {
-			add(current.Name())
-		}
+		add(syntaxName(current))
 	}
 	return facts
 }
+
+func syntaxName(node *ast.Node) *ast.Node {
+	if node.Kind == ast.KindJSDocSeeTag {
+		return node.AsJSDocSeeTag().NameExpression
+	}
+	name := node.Name()
+	if node.Kind == ast.KindJSDocTypedefTag || node.Kind == ast.KindJSDocCallbackTag {
+		for name != nil && ast.IsModuleDeclaration(name) {
+			if name.AsModuleDeclaration().Body == nil {
+				return name.Name()
+			}
+			name = name.AsModuleDeclaration().Body
+		}
+	}
+	return name
+}
+
 func nodeReference(p *program.Program, n *ast.Node) *NodeRef {
 	if n == nil {
 		return nil
@@ -792,8 +806,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		*checker.IndexInfo_valueTypePtr(&info) = s.typeByID(r.Value)
 		*checker.IndexInfo_isReadonlyPtr(&info) = r.Readonly
 		*checker.IndexInfo_declarationPtr(&info) = nodes.declaration
-		builder, release := checker.Checker_getNodeBuilder(c)
-		defer release()
+		builder := checker.NewNodeBuilder(c, printer.NewEmitContext())
 		return encodeGeneratedNode(builder.IndexInfoToIndexSignatureDeclaration(&info, native, nodebuilder.Flags(r.Flags), nodebuilder.InternalFlagsNone, nil), builder, native)
 	case *ContextualArgumentRequest:
 		return Handle(s.typeID(c.GetContextualTypeForArgumentAtIndex(native, r.Index))), nil
@@ -1190,8 +1203,9 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			}
 			return Text(c.SymbolToStringEx(s.symbolByID(r.ID), native, ast.SymbolFlags(r.Kind), flags)), nil
 		case "typeNode", "signatureDeclaration", "parameterDeclaration", "typeParameterDeclarations", "typeParameterDeclaration", "entityName", "symbolExpression":
-			builder, release := checker.Checker_getNodeBuilder(c)
-			defer release()
+			// The shared string printer's builder can return a cached tree with
+			// detached ranges. A returned syntax tree needs its own emit context.
+			builder := checker.NewNodeBuilder(c, printer.NewEmitContext())
 			var node *ast.Node
 			switch r.Op {
 			case "typeNode":
@@ -1287,9 +1301,6 @@ func encodeGeneratedNode(node *ast.Node, builder *checker.NodeBuilder, enclosing
 	if err != nil {
 		return nil, err
 	}
-	if file := ast.GetSourceFileOfNode(enclosing); file != nil {
-		convertGeneratedPositions(tree, file)
-	}
 	result := &EncodedTypeNode{tree: tree}
 	for index, generated := range table.Nodes {
 		origin := builder.EmitContext().ParseNode(generated)
@@ -1300,6 +1311,7 @@ func encodeGeneratedNode(node *ast.Node, builder *checker.NodeBuilder, enclosing
 			result.parseNodes[index] = origin
 		}
 	}
+	prepareGeneratedSyntax(tree, table.Nodes, result.parseNodes, ast.GetSourceFileOfNode(enclosing))
 	return result, nil
 }
 
