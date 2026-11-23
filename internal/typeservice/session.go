@@ -1125,9 +1125,9 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return Handle(s.typeID(c.GetTypeOfSymbol(s.symbolByID(r.ID)))), nil
 		case "symbolRecord":
 			sym := s.symbolByID(r.ID)
-			declarations, value := symbolDeclarations(sym)
 			// The record outlives the checker lease.
-			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: slices.Clone(declarations), valueNode: value}, nil
+			declarations, value := symbolDeclarations(sym, true)
+			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: declarations, valueNode: value}, nil
 		}
 	case *SymbolDocsRequest:
 		if !r.WithChecker {
@@ -1135,7 +1135,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 		symbol := s.symbolByID(r.ID)
 		active := map[*ast.Symbol]bool{symbol: true}
-		declarations, _ := symbolDeclarations(symbol)
+		declarations, _ := symbolDeclarations(symbol, false)
 		if r.Op == "symbolDocumentation" {
 			return documentation(c, declarations, active), nil
 		}
@@ -1414,7 +1414,7 @@ func isJSDocOverloadDeclaration(decl *ast.Node) bool {
 	return decl.Flags&ast.NodeFlagsReparsed != 0 && (ast.IsFunctionDeclaration(decl) || ast.IsMethodDeclaration(decl) || ast.IsConstructorDeclaration(decl))
 }
 
-func symbolDeclarations(symbol *ast.Symbol) ([]*ast.Node, *ast.Node) {
+func symbolDeclarations(symbol *ast.Symbol, snapshot bool) ([]*ast.Node, *ast.Node) {
 	nodes := symbol.Declarations
 	value := symbol.ValueDeclaration
 	var kept []*ast.Node
@@ -1434,8 +1434,12 @@ func symbolDeclarations(symbol *ast.Symbol) ([]*ast.Node, *ast.Node) {
 			useImplementation = false
 		}
 	}
-	if kept == nil {
-		return nodes[start:], value
+	if kept != nil {
+		return append(kept, nodes[start:]...), value
 	}
-	return append(kept, nodes[start:]...), value
+	declarations := nodes[start:]
+	if snapshot {
+		declarations = slices.Clone(declarations)
+	}
+	return declarations, value
 }

@@ -24,7 +24,7 @@ func documentation(c *checker.Checker, declarations []*ast.Node, active map[*ast
 		if decl.Kind == ast.KindJSDocParameterTag || decl.Kind == ast.KindJSDocPropertyTag {
 			nodes = []*ast.Node{decl}
 		}
-		if decl.Kind == ast.KindJSDocTypedefTag || decl.Kind == ast.KindJSDocCallbackTag {
+		if isJSDocTypeAlias(decl) {
 			nodes = []*ast.Node{decl, decl.Parent}
 		}
 		if decl.Kind == ast.KindJSDocSignature && decl.Parent.Kind == ast.KindJSDocOverloadTag {
@@ -34,7 +34,7 @@ func documentation(c *checker.Checker, declarations []*ast.Node, active map[*ast
 			var inheritDoc *ast.Node
 			if node.Kind == ast.KindJSDoc {
 				tags := docTags(node)
-				if decl.Kind != ast.KindJSDocCallbackTag && decl.Kind != ast.KindJSDocTypedefTag && belongsToTypeAlias(tags) {
+				if !isJSDocTypeAlias(decl) && belongsToTypeAlias(tags) {
 					continue
 				}
 				if index := slices.IndexFunc(tags, isInheritDoc); index >= 0 {
@@ -335,12 +335,12 @@ func jsDocLocalScopes(location *ast.Node, resolveTemplateNames bool) iter.Seq2[*
 			case ast.KindJSDocSignature, ast.KindJSDocCallbackTag, ast.KindJSDocTypedefTag:
 				bound = boundJSDocDeclaration(n)
 			case ast.KindJSDocTemplateTag:
-				// resolveName sees the type alias that owns these parameters.
+				// resolveName uses the first alias in the enclosing comment.
 				// getSymbolsInScope only walks the template's syntactic parents.
-				if parameters := n.TypeParameters(); resolveTemplateNames && len(parameters) != 0 {
-					name := parameters[0].Name()
-					if clone := ast.GetReparsedNodeForNode(name); clone != name && clone.Parent.Parent.Kind == ast.KindJSTypeAliasDeclaration {
-						bound = clone.Parent.Parent
+				if resolveTemplateNames && n.Parent.Kind == ast.KindJSDoc {
+					tags := docTags(n.Parent)
+					if i := slices.IndexFunc(tags, isJSDocTypeAlias); i >= 0 {
+						bound = boundJSDocDeclaration(tags[i])
 					}
 				}
 			default:
@@ -427,10 +427,12 @@ func isSourceJSDocNode(source, node *ast.Node) bool {
 	return false
 }
 
+func isJSDocTypeAlias(tag *ast.Node) bool {
+	return tag.Kind == ast.KindJSDocTypedefTag || tag.Kind == ast.KindJSDocCallbackTag
+}
+
 func belongsToTypeAlias(tags []*ast.Node) bool {
-	return slices.ContainsFunc(tags, func(tag *ast.Node) bool {
-		return tag.Kind == ast.KindJSDocTypedefTag || tag.Kind == ast.KindJSDocCallbackTag
-	}) && !slices.ContainsFunc(tags, func(tag *ast.Node) bool {
+	return slices.ContainsFunc(tags, isJSDocTypeAlias) && !slices.ContainsFunc(tags, func(tag *ast.Node) bool {
 		return tag.Kind == ast.KindJSDocParameterTag || tag.Kind == ast.KindJSDocReturnTag
 	})
 }
@@ -463,7 +465,7 @@ func inheritedDeclarations[T ~[]E, E any](c *checker.Checker, declarations []*as
 		}
 		bases := ast.GetExtendsHeritageClauseElements(owner)
 		if ast.IsClassLike(owner) {
-			bases = append(slices.Clone(bases), ast.GetImplementsHeritageClauseElements(owner)...)
+			bases = append(slices.Clip(bases), ast.GetImplementsHeritageClauseElements(owner)...)
 		}
 		accessor := declaration.Kind == ast.KindGetAccessor || declaration.Kind == ast.KindSetAccessor
 		for _, base := range bases {
@@ -479,7 +481,7 @@ func inheritedDeclarations[T ~[]E, E any](c *checker.Checker, declarations []*as
 				continue
 			}
 			seen[symbol] = true
-			baseDeclarations, _ := symbolDeclarations(symbol)
+			baseDeclarations, _ := symbolDeclarations(symbol, false)
 			if !accessor && tags && len(baseDeclarations) != 1 {
 				continue
 			}
@@ -659,7 +661,7 @@ func linkTarget(c *checker.Checker, name *ast.Node) *DisplayPartTarget {
 		return nil
 	}
 	symbol = c.SkipAlias(symbol)
-	declarations, declaration := symbolDeclarations(symbol)
+	declarations, declaration := symbolDeclarations(symbol, false)
 	if declaration == nil && len(declarations) != 0 {
 		declaration = declarations[0]
 	}
