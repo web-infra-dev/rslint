@@ -47,7 +47,7 @@ func TestSessionReleasesCheckerLeaseAndPreservesEligibility(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := syntax.Query(t.Context(), Query{binding.Scope, &NodeRequest{Op: "nodeRecord", Node: NodeRef{name, 1}}}); err != nil {
+		if _, err := syntax.Query(t.Context(), Query{binding.Scope, &NodeRequest{Op: "nodeRecord", Node: NodeRef{File: name, Index: 1}}}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := syntax.Query(t.Context(), Query{binding.Scope, &VoidRequest{}}); err == nil {

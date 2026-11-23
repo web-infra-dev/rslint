@@ -100,11 +100,19 @@ function wrapList(
 /** A worker/generation owns stable native identities and a bounded decoded
  * source LRU. Proxies retain identities, never a dependency source buffer. */
 export class GenerationSyntaxViews {
-  private readonly identities = new WeakMap<object, NodeRef>();
+  private readonly identities = new WeakMap<object, SyntaxRef>();
   private readonly wrapped = new WeakObjectCache<string, object>();
+  private readonly generatedNodes = new WeakSet<object>();
   private readonly syntheticRefs = new WeakMap<Node, SyntheticRef>();
   private children = new WeakMap<object, object[]>();
-  private readonly sources = new Map<string, RemoteSourceFile>();
+  private readonly activeSources = new Map<
+    string,
+    { source: RemoteSourceFile; users: number }
+  >();
+  private readonly sources = new Map<
+    string,
+    { source: RemoteSourceFile; bytes: number }
+  >();
   private readonly summaries = new Map<
     string,
     { fact: NodeFact; bytes: number }
@@ -138,10 +146,12 @@ export class GenerationSyntaxViews {
     return `${this.sourceOrdinals.get(ref.file)}:${ref.index}`;
   }
   locationOrUndefined(node: object): NodeRef | undefined {
-    return this.identities.get(node);
+    const ref = this.identities.get(node);
+    return ref && !('owner' in ref) ? ref : undefined;
   }
   isStableNodeQuery(op: 'type' | 'constantValue', ref: NodeRef): boolean {
-    const node = this.sources.get(ref.file)?.getOrCreateNodeAtIndex(ref.index);
+    if (ref.token) return false;
+    const node = this.cachedSource(ref.file)?.getOrCreateNodeAtIndex(ref.index);
     // Enum declarations have fixed values. Other constant-value queries can
     // depend on a property access. Identifier uses can likewise have flow types.
     if (op === 'constantValue') return node?.kind === SyntaxKind.EnumMember;
@@ -151,10 +161,20 @@ export class GenerationSyntaxViews {
       Reflect.get(node.parent, 'name') === node
     );
   }
-  location(node: object): NodeRef {
+  parseTreeLocation(node: object): NodeRef | undefined {
     this.ensure();
     const ref = this.identities.get(node);
-    if (!ref) throw new Error('foreign compiler node handle');
+    if (!ref) {
+      if (this.generatedNodes.has(node)) return undefined;
+      throw new Error('foreign compiler node handle');
+    }
+    if (!('owner' in ref)) return ref;
+    const { kind, pos, end } = this.rawSyntax(ref);
+    return { ...ref.owner, token: { kind, pos, end } };
+  }
+  location(node: object): NodeRef {
+    const ref = this.parseTreeLocation(node);
+    if (!ref) throw new Error('generated compiler node has no source location');
     return ref;
   }
   metadata(node: object) {
@@ -208,26 +228,26 @@ export class GenerationSyntaxViews {
       ? this.nodeRef({ file: metadata.fileName, index: 1 })
       : undefined;
   }
-  private retain(source: RemoteSourceFile, bytes: number): void {
-    const previous = this.sources.get(source.fileName);
-    if (previous) {
-      this.sources.delete(source.fileName);
-      this.sources.set(source.fileName, previous);
-      return;
+  private cachedSource(file: string): RemoteSourceFile | undefined {
+    const active = this.activeSources.get(file);
+    if (active) return active.source;
+    const entry = this.sources.get(file);
+    if (entry) {
+      this.sources.delete(file);
+      this.sources.set(file, entry);
     }
-    // A source larger than the budget can service this access without retention.
+    return entry?.source;
+  }
+  private retain(source: RemoteSourceFile, bytes: number): void {
     if (bytes > this.maxSourceBytes) return;
     while (this.sourceBytes + bytes > this.maxSourceBytes) {
-      const key = this.sources.keys().next().value!;
-      this.sourceBytes -= this.sourceSizes.get(key)!;
-      this.sourceSizes.delete(key);
+      const [key, entry] = this.sources.entries().next().value!;
       this.sources.delete(key);
+      this.sourceBytes -= entry.bytes;
     }
-    this.sources.set(source.fileName, source);
-    this.sourceSizes.set(source.fileName, bytes);
+    this.sources.set(source.fileName, { source, bytes });
     this.sourceBytes += bytes;
   }
-  private readonly sourceSizes = new Map<string, number>();
   attach(
     tree: Uint8Array,
     expected?: { file: string; text: string },
@@ -241,30 +261,32 @@ export class GenerationSyntaxViews {
       (source.fileName !== expected.file || source.text !== expected.text)
     )
       throw new Error('type service projection belongs to a different source');
-    const previous = this.sources.get(source.fileName);
-    if (previous) return previous;
-    this.retain(source, tree.byteLength);
-    return source;
+    const previous = this.cachedSource(source.fileName);
+    if (!previous) this.retain(source, tree.byteLength);
+    const shared = previous ?? source;
+    if (expected) {
+      const active = this.activeSources.get(expected.file);
+      if (active) active.users++;
+      else this.activeSources.set(expected.file, { source: shared, users: 1 });
+    }
+    return shared;
+  }
+  releaseFile(file: string): void {
+    const active = this.activeSources.get(file);
+    if (active && --active.users === 0) this.activeSources.delete(file);
   }
   source(file: string): RemoteSourceFile | undefined {
     this.ensure();
     const metadata = this.metadataByName.get(file);
     if (!metadata) return undefined;
-    const old = this.sources.get(metadata.fileName);
-    if (old) {
-      this.sources.delete(metadata.fileName);
-      this.sources.set(metadata.fileName, old);
-      return old;
-    }
+    const old = this.cachedSource(metadata.fileName);
+    if (old) return old;
     const reply = this.lookup!(this.descriptor, metadata.fileName);
     if (!reply) return undefined;
     if (reply.fileName !== metadata.fileName)
       throw new Error('syntax source identity changed');
     if (!reply.tree) throw new Error('missing source syntax packet');
     return this.attach(reply.tree);
-  }
-  raw(node: object): RemoteNode {
-    return this.rawNode(this.location(node));
   }
   private rawNode(ref: NodeRef): RemoteNode {
     const source = this.source(ref.file);
@@ -316,7 +338,7 @@ export class GenerationSyntaxViews {
   }
   private nativeKind(ref: NodeRef): string {
     if (ref.index === 1) return 'SourceFile';
-    const source = this.sources.get(ref.file);
+    const source = this.cachedSource(ref.file);
     if (!source) return this.summary(ref).kind;
     const kind = source.getOrCreateNodeAtIndex(ref.index).kind;
     if (kind === SyntaxKind.QualifiedName) return 'QualifiedName';
@@ -416,7 +438,7 @@ export class GenerationSyntaxViews {
         },
       },
     );
-    if (!('owner' in identity)) this.identities.set(proxy, identity);
+    this.identities.set(proxy, identity);
     this.wrapped.set(cacheKey, proxy);
     return proxy;
   }
@@ -452,6 +474,10 @@ export class GenerationSyntaxViews {
         ? `list:${this.key(ref.owner)}:${ref.child}`
         : `token:${this.sourceOrdinals.get(ref.owner.file)}:${value.pos}:${value.end}`;
     return this.wrapRef(ref, key);
+  }
+  firstToken(ref: NodeRef): object | undefined {
+    const token = this.rawNode(ref).getFirstToken();
+    return token && this.wrapNode(token);
   }
   wrap(value: unknown): unknown {
     if (Array.isArray(value)) {
@@ -664,13 +690,13 @@ export class GenerationSyntaxViews {
           Reflect.apply(
             member,
             current,
-            args.map((a) =>
-              typeof a === 'object' && a !== null
-                ? this.locationOrUndefined(a)
-                  ? this.raw(a)
-                  : a
-                : a,
-            ),
+            args.map((arg) => {
+              const identity =
+                typeof arg === 'object' && arg !== null
+                  ? this.identities.get(arg)
+                  : undefined;
+              return identity ? this.rawSyntax(identity) : arg;
+            }),
           ),
         );
       };
@@ -777,6 +803,7 @@ export class GenerationSyntaxViews {
           },
         },
       );
+      this.generatedNodes.add(proxy);
       views.set(value, proxy);
       return proxy;
     };
@@ -795,16 +822,16 @@ export class GenerationSyntaxViews {
   private checkSource(file: string, sourceFile: object | undefined): void {
     this.ensure();
     if (sourceFile !== undefined) {
-      const ref = this.location(sourceFile);
-      if (ref.file !== file || ref.index !== 1)
+      const ref = this.locationOrUndefined(sourceFile);
+      if (ref?.file !== file || ref.index !== 1)
         throw new Error('foreign syntax source');
     }
   }
   close(): void {
     this.lookup = undefined;
     this.children = new WeakMap();
+    this.activeSources.clear();
     this.sources.clear();
-    this.sourceSizes.clear();
     this.summaries.clear();
     this.wrapped.clear();
     this.sourceBytes = 0;
@@ -815,7 +842,10 @@ export class GenerationSyntaxViews {
 /** Per-file ESTree mappings share the generation's canonical native objects. */
 export class FileSyntaxViews {
   private closed = false;
-  private forward = new WeakMap<ESTreeNode, number>();
+  private forward = new WeakMap<
+    ESTreeNode,
+    number | { firstTokenOf: number }
+  >();
   private reverse = new Map<number, number>();
   private readonly aliases = new Map<
     number,
@@ -843,6 +873,8 @@ export class FileSyntaxViews {
     this.aliases.clear();
     this.materializedAliases.clear();
     this.sequenceMembers.clear();
+    if (this.attached) this.registry.releaseFile(this.binding.sourceFileName);
+    this.attached = false;
     this.nodes = undefined;
     this.lineStarts = [];
   }
@@ -860,13 +892,15 @@ export class FileSyntaxViews {
     )
       throw new Error('stale or incompatible projection origins');
     if (
-      projection.sourceFileName !== sourceFileName ||
-      sourceFileName !== this.binding.sourceFileName ||
-      projection.binding.sourceFileName !== this.binding.sourceFileName
+      projection.sourceFileName !== this.binding.sourceFileName ||
+      projection.binding.sourceFileName !== this.binding.sourceFileName ||
+      (sourceFileName !== this.binding.sourceFileName &&
+        this.registry.sourceView(sourceFileName) !==
+          this.registry.sourceView(this.binding.sourceFileName))
     )
       throw new Error('type service projection belongs to a different source');
     this.registry.attach(projection.tree, {
-      file: sourceFileName,
+      file: this.binding.sourceFileName,
       text: frame.text,
     });
     this.attached = true;
@@ -876,6 +910,10 @@ export class FileSyntaxViews {
       const index = projection.origins[id];
       if (index) this.forward.set(frame.nodes[id]!, index);
     }
+    for (const [id, firstTokenOf] of Object.entries(
+      projection.firstTokens ?? {},
+    ))
+      this.forward.set(frame.nodes[Number(id)]!, { firstTokenOf });
     this.reverse = new Map(
       Object.entries(projection.reverse).map(([index, id]) => [
         Number(index),
@@ -899,10 +937,12 @@ export class FileSyntaxViews {
   readonly esTreeNodeToTSNodeMap = {
     get: (node: ESTreeNode): object | undefined => {
       this.ensure();
-      const index = this.forward.get(node);
-      return index
-        ? this.registry.nodeRef({ file: this.binding.sourceFileName, index })
-        : undefined;
+      const origin = this.forward.get(node);
+      if (origin === undefined) return undefined;
+      const file = this.binding.sourceFileName;
+      return typeof origin === 'number'
+        ? this.registry.nodeRef({ file, index: origin })
+        : this.registry.firstToken({ file, index: origin.firstTokenOf });
     },
     has: (node: ESTreeNode): boolean => {
       this.ensure();

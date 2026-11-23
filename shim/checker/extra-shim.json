@@ -49,6 +49,7 @@
       "getNumberLiteralType",
       "getBigIntLiteralType",
       "getNullableType",
+      "getMembersOfSymbol",
       "getIndexInfosOfIndexSymbol",
       "getPrivateIdentifierPropertyOfType",
       "lookupSymbolForPrivateIdentifierDeclaration",

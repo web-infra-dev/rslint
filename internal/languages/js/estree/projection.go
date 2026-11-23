@@ -167,6 +167,9 @@ func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Optio
 	p.text = file.Text()
 	p.sourceType = options.SourceType
 	p.mapping = mapping
+	if mapping != nil {
+		mapping.reverse = make(map[*ast.Node]uint32)
+	}
 	if options.SourceType == "commonjs" {
 		p.sourceType = "script"
 	}
@@ -193,7 +196,9 @@ func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Optio
 	if mapping != nil {
 		mapping.finish()
 		p.check()
-		return nil, nil
+		if mapping.originsOnly {
+			return nil, nil
+		}
 	}
 	initialTokenBytes := maxInitialFrameBytes - int(min(p.frameBytes, maxInitialFrameBytes))
 	b.tokens = slices.Grow(b.tokens[:0], min(max(16, file.NodeCount*2), initialTokenBytes/9))

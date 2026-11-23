@@ -25,7 +25,7 @@ type tokenCover struct {
 }
 
 func (p *estreeProjector) recordTokenCover(node *ast.Node, jsxName bool) {
-	if p.mapping != nil {
+	if p.mapping != nil && p.mapping.originsOnly {
 		return
 	}
 	// Projection already knows the name context. Walking every property's

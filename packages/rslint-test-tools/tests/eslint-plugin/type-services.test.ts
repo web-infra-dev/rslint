@@ -3,7 +3,6 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, relative } from 'node:path';
-import { inspect } from 'node:util';
 import { Worker } from 'node:worker_threads';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
@@ -374,6 +373,8 @@ const cases: Case[] = [
       pick('retired');
       pick(42);
       new Implementation().value;
+      void import.meta;
+      function target() { return new.target; }
     `,
     dependencies: {
       'dependency.ts': `
@@ -764,12 +765,16 @@ test('type and declaration identity survive closing one file', async () => {
       method: 'init',
       config,
     }) as TypeServiceDescriptor;
+    let syntaxReads = 0;
     const owner = new TypeServiceClient(
       enums,
       descriptor,
       (query) =>
         Buffer.from(host.request({ method: 'query', query }), 'base64'),
-      host.source,
+      (scope, file, metadataOnly) => {
+        if (!metadataOnly) syntaxReads++;
+        return host.source(scope, file, metadataOnly);
+      },
       {
         maxFactsBytes: 1 << 20,
         maxSyntaxBytes: 0,
@@ -788,11 +793,7 @@ test('type and declaration identity survive closing one file', async () => {
       };
       const frame = decodeFrame(Buffer.from(encoded.frame, 'base64'));
       const handle = owner.file(projection.binding);
-      const services = handle.parserServices(
-        frame,
-        projection,
-        file.replaceAll('\\', '/'),
-      );
+      const services = handle.parserServices(frame, projection, file);
       if (services.program === null)
         throw new Error('expected project-backed parser services');
       return { file, frame, projection, handle, services };
@@ -800,6 +801,11 @@ test('type and declaration identity survive closing one file', async () => {
     try {
       const first = open('first.ts');
       const declarations = (first.frame.ast.body as any[])[1].declarations;
+      const firstNode = first.services.esTreeNodeToTSNodeMap.get(
+        declarations[0].id,
+      ) as ts.Identifier;
+      expect(firstNode.getText()).toBe('a');
+      expect(syntaxReads).toBe(0);
       const firstType = first.services.getTypeAtLocation(declarations[0].id)!;
       expect(firstType.flags & ts.TypeFlags.NumberLiteral).toBeTruthy();
       const imported = ((first.frame.ast.body as any[])[0] as any).specifiers[0]
@@ -858,9 +864,6 @@ test('type and declaration identity survive closing one file', async () => {
       second.handle.close();
       owner.close();
       expect(getProperties).toThrow('closed');
-      expect(inspect(new Proxy(firstType, {}), { depth: 0 })).toBe(
-        inspect(firstType, { depth: 0 }),
-      );
       expect(() => declaration.kind).toThrow('closed');
       expect(() => firstType.flags).toThrow('closed');
     } finally {
@@ -994,22 +997,7 @@ await Promise.resolve(1);
     const collect = (ast: any, maps: any) => {
       const entries: any[] = [];
       const walk = (node: any, path: string) => {
-        let native = maps.esTreeNodeToTSNodeMap.get(node);
-        if (node.type === 'Identifier' && path.endsWith('.meta')) {
-          // Go stores this keyword as a scalar; JS TypeScript creates a
-          // virtual token. The synthetic identifier has no Go node handle.
-          if (maps === services) {
-            expect(native).toBeUndefined();
-            expect(() => services.getTypeAtLocation(node)).toThrow(
-              'no compiler origin',
-            );
-          } else
-            expect([
-              ts.SyntaxKind.NewKeyword,
-              ts.SyntaxKind.ImportKeyword,
-            ]).toContain(native.kind);
-          native = undefined;
-        }
+        const native = maps.esTreeNodeToTSNodeMap.get(node);
         if (node.type === 'MetaProperty')
           expect(native.keywordToken).toBe(
             node.meta.name === 'new'
@@ -1072,9 +1060,6 @@ await Promise.resolve(1);
     expect(call.getLastToken()).toBe(call.getChildAt(3));
     expect(call.getLastToken().getSourceFile()).toBe(beforeSource);
     expect(services.tsNodeToESTreeNodeMap.has(argumentsList)).toBe(false);
-    expect(() =>
-      services.program.getTypeChecker().getTypeAtLocation(awaitToken),
-    ).toThrow('foreign compiler node handle');
     const fn = body.find(
       (node) => node.type === 'ExportNamedDeclaration',
     ).declaration;
@@ -1617,11 +1602,12 @@ test('public checker, Program and source reads match TypeScript', async () => {
       'export type Dictionary = { [name: string]: number };',
       "export function isString(input: unknown): input is string { return typeof input === 'string'; }",
       'export type Select<T> = T extends string ? true : false;',
-      'export class Box { #value = 0; constructor(public label: string) {} read() { return this.#value; } }',
+      'export class Box { #value = 0; constructor(public label: string) {} read() { return this.#value; } [computedKey]() { return 1; } }',
       'export { id as alias };',
       'export const record = { n: 1 }; export const {n} = record;',
       "import type { External } from './external'; export type Used = External;",
       'export const grow = () => 1; grow.item = 1;',
+      'declare const computedKey: string;',
       'declare const condition: boolean; condition;',
     ].join('\r\n') + '\r\n';
   writeFileSync(file, code);
@@ -1729,6 +1715,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
           const indexSymbol = dictType
             .getSymbol()!
             .members!.get('__index' as ts.__String)!;
+          const computed = c.getSymbolAtLocation(box.members[3].name!)!;
           const imp = src.statements[12] as ts.ImportDeclaration;
           const grow = (src.statements[14] as ts.VariableStatement)
             .declarationList.declarations[0].initializer!;
@@ -1776,6 +1763,20 @@ test('public checker, Program and source reads match TypeScript', async () => {
             indices: c
               .getIndexInfosOfIndexSymbol(indexSymbol)
               .map((i) => format(i.type)),
+            computedIndices: [undefined, []].map((siblings) =>
+              c
+                .getIndexInfosOfIndexSymbol(computed, siblings)
+                .map((info) => format(info.type)),
+            ),
+            generatedType:
+              c.getTypeFromTypeNode(
+                c.typeToTypeNode(c.getStringType(), undefined, undefined)!,
+              ) ===
+              c.getTypeAtLocation(
+                (
+                  result as ts.VariableStatement
+                ).declarationList.getFirstToken()!,
+              ),
             modes: [
               p.getModeForUsageLocation(
                 src,
@@ -1906,27 +1907,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
     const literal = checker.getStringLiteralType('abc');
     expect(Reflect.set(literal, 'value', 'changed')).toBe(false);
     expect(checker.typeToString(literal)).toBe('"abc"');
-    Object.defineProperty(literal, Symbol.toStringTag, {
-      get() {
-        return this === literal ? 'RuleLiteral' : undefined;
-      },
-    });
-    const printed = inspect(literal, { depth: 0 });
-    expect(printed).toContain('[RuleLiteral]');
-    expect(printed).not.toContain('types:');
-    expect(inspect(literal, { depth: 0, customInspect: false })).toBe(printed);
-    const checkerField = Object.getOwnPropertyDescriptor(literal, 'checker');
-    expect(checkerField?.configurable).toBe(false);
-    Object.preventExtensions(literal);
-    expect(Object.getOwnPropertyDescriptor(literal, 'checker')).toEqual(
-      checkerField,
-    );
-    expect(() =>
-      checker.typeToString(Object.create(literal) as object),
-    ).toThrow('foreign type handle');
-    expect(
-      Object.getOwnPropertyDescriptor(checker.getBooleanType(), 'types')?.get,
-    ).toBeTypeOf('function');
     expect(() => owner.program.emit()).toThrow('Program.emit');
     const src = owner.program.getSourceFile(file) as ts.SourceFile;
     const dictionary = checker.getTypeFromTypeNode(

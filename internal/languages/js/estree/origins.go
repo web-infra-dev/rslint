@@ -9,6 +9,7 @@ import (
 
 type OriginTables struct {
 	Origins         []uint32            `json:"origins"`
+	FirstTokens     map[uint32]uint32   `json:"firstTokens,omitempty"`
 	Reverse         map[uint32]uint32   `json:"reverse"`
 	Aliases         []SequenceAlias     `json:"aliases"`
 	SequenceMembers map[uint32][]uint32 `json:"sequenceMembers,omitempty"`
@@ -37,12 +38,20 @@ type originProjection struct {
 	reverse      map[*ast.Node]uint32
 	chainRecord  uint32
 	chainReverse []*ast.Node
+	originsOnly  bool
+}
+
+// BuildWithOrigins produces the ESTree frame and its node maps in one traversal.
+func (b *Builder) BuildWithOrigins(ctx context.Context, file *ast.SourceFile, options Options, table *encoder.NodeIndexTable) ([]byte, OriginTables, error) {
+	mapping := originProjection{table: table}
+	frame, err := b.build(ctx, file, options, nil, &mapping)
+	return frame, mapping.OriginTables, err
 }
 
 // ProjectOrigins reproduces the existing frame's node IDs without scanning
 // tokens or encoding another frame.
 func (b *Builder) ProjectOrigins(ctx context.Context, file *ast.SourceFile, options Options, table *encoder.NodeIndexTable) (OriginTables, error) {
-	mapping := originProjection{table: table, reverse: make(map[*ast.Node]uint32)}
+	mapping := originProjection{table: table, originsOnly: true}
 	if _, err := b.build(ctx, file, options, nil, &mapping); err != nil {
 		return OriginTables{}, err
 	}

@@ -279,8 +279,12 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 		meta := p.add("Identifier", start, start+uint32(len(keyword)),
 			p.listValue(nil), p.stringValue(keyword), boolValue(false), undefinedValue())
 		if p.mapping != nil {
-			// The compiler stores this keyword as an enum, not an AST node.
+			// The parser maps this identifier to the MetaProperty's first token.
 			p.mapping.nodes[meta-1] = nil
+			if p.mapping.FirstTokens == nil {
+				p.mapping.FirstTokens = make(map[uint32]uint32)
+			}
+			p.mapping.FirstTokens[meta] = p.mapping.table.GetIndex(node)
 		}
 		return p.addNode("MetaProperty", node,
 			nodeValue(meta), nodeValue(p.convert(n.Name(), false)))

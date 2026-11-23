@@ -577,7 +577,7 @@ func nodeReference(p *program.Program, n *ast.Node) *NodeRef {
 	if index == 0 {
 		panic("declaration has no compiler node handle")
 	}
-	return &NodeRef{f.FileName(), index}
+	return &NodeRef{File: f.FileName(), Index: index}
 }
 func (s *Session) typeByID(id uint32) *checker.Type {
 	t := s.types[id]
@@ -746,11 +746,16 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		parameter, property := c.GetSymbolsOfParameterPropertyDeclaration(native, string(r.Name))
 		return Handles{s.symbolID(parameter), s.symbolID(property)}, nil
 	case *IndexSymbolRequest:
-		siblings := make([]*ast.Symbol, len(r.Siblings))
-		for i, id := range r.Siblings {
-			siblings[i] = s.symbolByID(id)
+		symbol := s.symbolByID(r.ID)
+		var siblings []*ast.Symbol
+		if r.Siblings == nil && symbol.Parent != nil {
+			siblings = slices.Collect(maps.Values(checker.Checker_getMembersOfSymbol(c, symbol.Parent)))
+		} else {
+			for _, id := range r.Siblings {
+				siblings = append(siblings, s.symbolByID(id))
+			}
 		}
-		infos := checker.Checker_getIndexInfosOfIndexSymbol(c, s.symbolByID(r.ID), siblings)
+		infos := checker.Checker_getIndexInfosOfIndexSymbol(c, symbol, siblings)
 		result := make(IndexInfos, len(infos))
 		for i, info := range infos {
 			result[i] = s.indexInfo(info)
@@ -1096,6 +1101,8 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 	case *IntrinsicRequest:
 		switch r.Op {
+		case "errorType":
+			return Handle(s.typeID(c.GetErrorType())), nil
 		case "anyType":
 			return Handle(s.typeID(c.GetAnyType())), nil
 		case "unknownType":
@@ -1235,7 +1242,25 @@ func resolveNode(f *ast.SourceFile, node NodeRef) (*ast.Node, error) {
 	if node.Index == 0 || int(node.Index) >= len(table.Nodes) || table.Nodes[node.Index] == nil {
 		return nil, errors.New("invalid compiler node handle")
 	}
-	return table.Nodes[node.Index], nil
+	parent := table.Nodes[node.Index]
+	if node.Token == nil {
+		return parent, nil
+	}
+	token := node.Token
+	positions := f.GetPositionMap()
+	pos, end := positions.UTF16ToUTF8(token.Pos), positions.UTF16ToUTF8(token.End)
+	if pos < parent.Pos() || end < pos || end > parent.End() {
+		return nil, errors.New("invalid compiler token range")
+	}
+	if token.Kind == ast.KindSyntaxList {
+		list := ast.NewNodeFactory(ast.NodeFactoryHooks{}).NewSyntaxList(nil)
+		list.Loc, list.Parent = core.NewTextRange(pos, end), parent
+		return list, nil
+	}
+	if !ast.IsTokenKind(token.Kind) {
+		return nil, errors.New("invalid compiler token kind")
+	}
+	return f.GetOrCreateToken(token.Kind, pos, end, parent, ast.TokenFlagsNone), nil
 }
 
 func encodeGeneratedNode(node *ast.Node) (Result, error) {

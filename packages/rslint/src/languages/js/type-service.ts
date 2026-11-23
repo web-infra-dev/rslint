@@ -473,32 +473,6 @@ function canonicalView<T extends object>(view: T & { [serviceView]?: T }): T {
     : view;
 }
 
-const inspectCustom = Symbol.for('nodejs.util.inspect.custom');
-const localInspection = Symbol();
-const inspectionReceivers = new WeakSet<object>();
-const closedInspections = new WeakMap<object, object>();
-const rejectTypeEdit = () => false;
-
-const typeInspection = {
-  configurable: true,
-  writable: true,
-  value(
-    this: object & { [localInspection]?: object },
-    _depth: number,
-    options: { getters?: boolean | string },
-  ) {
-    const closed = this[localInspection];
-    if (closed) return closed;
-    if (!options?.getters || inspectionReceivers.has(this)) return this;
-    // With getters enabled, Node calls each accessor on the proxy's target.
-    // Give it the rule's actual receiver. Returning this on the second pass
-    // keeps cycle detection and formatting inside the original inspection.
-    const receiver = new Proxy(this, {});
-    inspectionReceivers.add(receiver);
-    return receiver;
-  },
-} satisfies PropertyDescriptor;
-
 export function guarded<T extends object>(object: T, ensure: () => void): T {
   const proxy: T = new Proxy(object, {
     get(target, key, receiver) {
@@ -639,7 +613,6 @@ function makeTypePrototype(
   for (const key of Object.keys(prototype)) {
     Object.defineProperty(prototype, key, { enumerable: false });
   }
-  Object.defineProperty(prototype, inspectCustom, typeInspection);
   return prototype;
 }
 
@@ -776,10 +749,29 @@ export class TypeServiceClient {
       options.maxSyntaxBytes ?? 16 << 20,
       options.maxSyntaxFactsBytes ?? 1 << 20,
     );
-    const nodeType = (op: 'type' | 'fromTypeNode' | 'context', n: object) =>
-      this.type(
-        this.query({ op: op, args: { node: this.syntax.location(n) } }),
-      );
+    const errorType = () => this.query({ op: 'errorType', args: {} });
+    const nodeHandle = (
+      op:
+        | 'type'
+        | 'fromTypeNode'
+        | 'context'
+        | 'typeOfAssignmentPattern'
+        | 'symbol'
+        | 'signature'
+        | 'exportSpecifierLocalTargetSymbol'
+        | 'propertySymbolOfDestructuringAssignment'
+        | 'shorthandValueSymbol',
+      n: object,
+    ) => {
+      const node = this.syntax.parseTreeLocation(n);
+      if (node) return this.query({ op, args: { node } });
+      // TypeScript's checker looks for an original parse-tree node on generated syntax.
+      return op === 'type' ||
+        op === 'fromTypeNode' ||
+        op === 'typeOfAssignmentPattern'
+        ? errorType()
+        : 0;
+    };
     const typeType = (
       op:
         | 'constraint'
@@ -852,19 +844,9 @@ export class TypeServiceClient {
             args: { id: this.id(s, 'symbol') },
           }),
         getExportSpecifierLocalTargetSymbol: (n) =>
-          this.symbol(
-            this.query({
-              op: 'exportSpecifierLocalTargetSymbol',
-              args: { node: this.syntax.location(n) },
-            }),
-          ),
+          this.symbol(nodeHandle('exportSpecifierLocalTargetSymbol', n)),
         getPropertySymbolOfDestructuringAssignment: (n) =>
-          this.symbol(
-            this.query({
-              op: 'propertySymbolOfDestructuringAssignment',
-              args: { node: this.syntax.location(n) },
-            }),
-          ),
+          this.symbol(nodeHandle('propertySymbolOfDestructuringAssignment', n)),
         getJsxIntrinsicTagNamesAt: (n) =>
           this.namedSymbolsFor(
             this.query({
@@ -873,27 +855,24 @@ export class TypeServiceClient {
             }),
           ),
         getTypeOfAssignmentPattern: (n) =>
-          this.type(
-            this.query({
-              op: 'typeOfAssignmentPattern',
-              args: { node: this.syntax.location(n) },
-            }),
-          ),
+          this.type(nodeHandle('typeOfAssignmentPattern', n)),
         isOptionalParameter: (n) =>
           this.query({
             op: 'isOptionalParameter',
             args: { node: this.syntax.location(n) },
           }),
-        getConstantValue: (n) =>
-          this.query({
-            op: 'constantValue',
-            args: { node: this.syntax.location(n) },
-          }),
-        isImplementationOfOverload: (n) =>
-          this.query({
-            op: 'isImplementationOfOverload',
-            args: { node: this.syntax.location(n) },
-          }),
+        getConstantValue: (n) => {
+          const node = this.syntax.parseTreeLocation(n);
+          return node
+            ? this.query({ op: 'constantValue', args: { node } })
+            : undefined;
+        },
+        isImplementationOfOverload: (n) => {
+          const node = this.syntax.parseTreeLocation(n);
+          return node
+            ? this.query({ op: 'isImplementationOfOverload', args: { node } })
+            : undefined;
+        },
         getTypeArgumentsForResolvedSignature: (s) => {
           const ids = this.query({
             op: 'typeArgumentsForResolvedSignature',
@@ -990,7 +969,7 @@ export class TypeServiceClient {
             args: {
               id: this.id(s, 'signature'),
               kind: nativeKind,
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           });
@@ -1002,7 +981,7 @@ export class TypeServiceClient {
             args: {
               id: this.id(s, 'symbol'),
               kind: 0,
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           });
@@ -1014,7 +993,7 @@ export class TypeServiceClient {
             args: {
               id: this.id(s, 'symbol'),
               kind: 0,
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           });
@@ -1033,7 +1012,7 @@ export class TypeServiceClient {
             args: {
               id: this.id(t, 'type'),
               kind: 0,
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           });
@@ -1045,7 +1024,7 @@ export class TypeServiceClient {
             args: {
               id: this.id(s, 'symbol'),
               kind: meaning >>> 0,
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           });
@@ -1057,7 +1036,7 @@ export class TypeServiceClient {
             args: {
               id: this.id(s, 'symbol'),
               kind: meaning >>> 0,
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           });
@@ -1069,7 +1048,7 @@ export class TypeServiceClient {
             args: {
               id: this.id(s, 'symbol'),
               kind: (meaning ?? 0) >>> 0,
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           }),
@@ -1084,7 +1063,7 @@ export class TypeServiceClient {
                   : nameToUnits(predicate.parameterName),
               position: predicate.parameterIndex,
               type: predicate.type ? this.id(predicate.type, 'type') : 0,
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags ?? 16384,
             },
           }),
@@ -1097,15 +1076,15 @@ export class TypeServiceClient {
               readonly: info.isReadonly,
               declaration:
                 info.declaration && this.syntax.location(info.declaration),
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags,
             },
           });
           return data && this.syntax.generatedTypeNode(data);
         },
-        getTypeAtLocation: (n) => nodeType('type', n),
-        getTypeFromTypeNode: (n) => nodeType('fromTypeNode', n),
-        getContextualType: (n) => nodeType('context', n),
+        getTypeAtLocation: (n) => this.type(nodeHandle('type', n)),
+        getTypeFromTypeNode: (n) => this.type(nodeHandle('fromTypeNode', n)),
+        getContextualType: (n) => this.type(nodeHandle('context', n)),
         getContextualTypeForArgumentAtIndex: (n, index) =>
           this.type(
             this.query({
@@ -1123,7 +1102,7 @@ export class TypeServiceClient {
             op: 'typeNode',
             args: {
               id: this.id(t, 'type'),
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           });
@@ -1175,7 +1154,7 @@ export class TypeServiceClient {
             op: 'typeString',
             args: {
               id: this.id(t, 'type'),
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           }),
@@ -1184,25 +1163,23 @@ export class TypeServiceClient {
             op: 'signatureString',
             args: {
               id: this.id(s, 'signature'),
-              node: enclosing && this.syntax.location(enclosing),
+              node: enclosing && this.syntax.parseTreeLocation(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
               kind,
             },
           }),
-        getSymbolAtLocation: (n) =>
-          this.symbol(
-            this.query({
-              op: 'symbol',
-              args: { node: this.syntax.location(n) },
-            }),
-          ),
-        getSymbolsInScope: (n, meaning) =>
-          this.namedSymbolsFor(
-            this.query({
-              op: 'symbolsInScope',
-              args: { node: this.syntax.location(n), meaning: meaning | 0 },
-            }),
-          ),
+        getSymbolAtLocation: (n) => this.symbol(nodeHandle('symbol', n)),
+        getSymbolsInScope: (n, meaning) => {
+          const node = this.syntax.parseTreeLocation(n);
+          return node
+            ? this.namedSymbolsFor(
+                this.query({
+                  op: 'symbolsInScope',
+                  args: { node, meaning: meaning | 0 },
+                }),
+              )
+            : [];
+        },
         resolveName: (name, location, kind, excludeGlobals) =>
           this.symbol(
             this.query({
@@ -1249,13 +1226,7 @@ export class TypeServiceClient {
             }),
           ),
         getShorthandAssignmentValueSymbol: (n) =>
-          n &&
-          this.symbol(
-            this.query({
-              op: 'shorthandValueSymbol',
-              args: { node: this.syntax.location(n) },
-            }),
-          ),
+          n && this.symbol(nodeHandle('shorthandValueSymbol', n)),
         getTypeOfSymbol: (s) =>
           this.type(
             this.query({
@@ -1263,16 +1234,15 @@ export class TypeServiceClient {
               args: { id: this.id(s, 'symbol') },
             }),
           ),
-        getTypeOfSymbolAtLocation: (s, n) =>
-          this.type(
-            this.query({
-              op: 'symbolType',
-              args: {
-                id: this.id(s, 'symbol'),
-                node: this.syntax.location(n),
-              },
-            }),
-          ),
+        getTypeOfSymbolAtLocation: (s, n) => {
+          const id = this.id(s, 'symbol');
+          const node = this.syntax.parseTreeLocation(n);
+          return this.type(
+            node
+              ? this.query({ op: 'symbolType', args: { id, node } })
+              : errorType(),
+          );
+        },
         getDeclaredTypeOfSymbol: (s) =>
           this.type(
             this.query({
@@ -1326,14 +1296,10 @@ export class TypeServiceClient {
         isTupleType: (t) =>
           this.query({ op: 'isTuple', args: { id: this.id(t, 'type') } }),
         getSignatureFromDeclaration: (n) =>
-          this.signature(
-            this.query({
-              op: 'signature',
-              args: { node: this.syntax.location(n) },
-            }),
-          ),
+          this.signature(nodeHandle('signature', n)),
         getResolvedSignature: (n, candidates, argumentCount) => {
-          const node = this.syntax.location(n);
+          const node = this.syntax.parseTreeLocation(n);
+          if (!node) return undefined;
           if (candidates !== undefined || argumentCount !== undefined) {
             if (candidates?.length)
               throw new Error('signature candidate output array must be empty');
@@ -1780,11 +1746,6 @@ export class TypeServiceClient {
     if (fact.id) this.indexInfos.set(fact.id, info);
     return info;
   }
-  private typeFieldNames?: ReadonlySet<PropertyKey>;
-  private canInspectType(): boolean {
-    this.cancellation?.throwIfCancellationRequested();
-    return !this.closed && (this.shared?.isOpen ?? true);
-  }
   private wrapType(
     fields: TypeView,
     hasField: (
@@ -1795,229 +1756,75 @@ export class TypeServiceClient {
     mappedFields: () => readonly number[] | undefined,
     hasDeclaredMembers: () => boolean,
   ): TypeView {
-    Object.defineProperties(fields, {
-      id: { writable: false, configurable: false },
-      checker: { writable: false, configurable: false },
-    });
-    const native = (this.typeFieldNames ??= new Set(Reflect.ownKeys(fields)));
-    // Node can unwrap again when a getter returns this. Keep compiler reads
-    // and configurable plugin metadata independent of the inspection target.
     const target: TypeView = Object.create(this.typePrototype);
-    let pluginFields: Set<PropertyKey> | undefined;
-    const managed = (key: PropertyKey) =>
-      native.has(key) && !pluginFields?.has(key);
-    const nativeDescriptor = (
-      key: PropertyKey,
-      descriptor = Reflect.getOwnPropertyDescriptor(fields, key)!,
-    ) => {
+    const install = (key: PropertyKey) => {
+      const descriptor = Object.getOwnPropertyDescriptor(fields, key)!;
       descriptor.configurable = false;
+      if ('value' in descriptor) descriptor.writable = false;
       Object.defineProperty(target, key, descriptor);
       return descriptor;
     };
-    // Non-configurable properties must remain visible even if a raw debugger
-    // getter defined them directly. A non-extensible target fixes all its keys.
-    const required = (key: PropertyKey) => {
-      const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
-      return descriptor &&
-        (!descriptor.configurable || !Object.isExtensible(target))
-        ? descriptor
-        : undefined;
-    };
-    const own = (key: PropertyKey, live = true) => {
-      const fixed = required(key);
-      if (fixed || !Object.isExtensible(target)) return fixed;
-      const descriptor = Reflect.getOwnPropertyDescriptor(fields, key);
-      if (!descriptor || !managed(key)) return descriptor;
-      return key === 'id' || (live && hasField(key))
-        ? nativeDescriptor(key, descriptor)
-        : undefined;
-    };
-    const keys = (live = true) => {
-      const extensible = Object.isExtensible(target);
-      const fixed = new Set(
-        Reflect.ownKeys(target).filter((key) => !extensible || required(key)),
-      );
-      const declared = live && extensible && hasDeclaredMembers();
-      const mapped = live && extensible ? mappedFields() : undefined;
-      const publicKeys = Reflect.ownKeys(fields).filter((key) => {
-        if (fixed.delete(key)) return true;
-        if (!extensible) return false;
-        if (!managed(key)) return true;
+    install('id');
+    install('checker');
+    const own = (key: PropertyKey) =>
+      Reflect.getOwnPropertyDescriptor(target, key) ??
+      (Object.isExtensible(target) &&
+      Object.hasOwn(fields, key) &&
+      hasField(key)
+        ? install(key)
+        : undefined);
+    const materializeKeys = () => {
+      if (!Object.isExtensible(target)) return;
+      const declared = hasDeclaredMembers();
+      const mapped = mappedFields();
+      for (const key of Reflect.ownKeys(fields)) {
         if (
-          key !== 'id' &&
-          !(
-            live &&
-            (declaredMemberKeys.has(key)
-              ? declared
-              : hasField(key, false, mapped))
-          )
+          !Object.hasOwn(target, key) &&
+          (declaredMemberKeys.has(key)
+            ? declared
+            : hasField(key, false, mapped))
         )
-          return false;
-        nativeDescriptor(key);
-        return true;
-      });
-      if (!fixed.size) return publicKeys;
-      return Reflect.ownKeys(
-        Object.fromEntries([...publicKeys, ...fixed].map((key) => [key, true])),
-      );
-    };
-    const definePluginField = (
-      key: PropertyKey,
-      attributes: PropertyDescriptor,
-    ) => {
-      if (required(key)) {
-        if (!Reflect.defineProperty(target, key, attributes)) return false;
-        return (
-          !Object.hasOwn(fields, key) ||
-          Reflect.defineProperty(
-            fields,
-            key,
-            Reflect.getOwnPropertyDescriptor(target, key)!,
-          )
-        );
+          install(key);
       }
-      if (
-        !Object.isExtensible(target) ||
-        !Reflect.defineProperty(fields, key, attributes)
-      )
-        return false;
-      const descriptor = Reflect.getOwnPropertyDescriptor(fields, key)!;
-      if (!descriptor.configurable)
-        Object.defineProperty(target, key, descriptor);
-      return true;
     };
-    const backing: TypeView = new Proxy(target, {
-      set: rejectTypeEdit,
-      defineProperty: rejectTypeEdit,
-      deleteProperty: rejectTypeEdit,
-      preventExtensions: rejectTypeEdit,
-      setPrototypeOf: rejectTypeEdit,
-      get: (_target, key, receiver: object) => {
-        const self =
-          receiver === backing &&
-          (key === Symbol.toStringTag || key === inspectCustom)
-            ? view
-            : receiver;
+    const view = new Proxy(target, {
+      get: (target, key, receiver) => {
         if (key === serviceView) return view;
-        if (key === localInspection) {
-          if (this.canInspectType() || canonicalView(self) !== view)
-            return undefined;
-          const previous = closedInspections.get(self);
-          if (previous) return previous;
-          // The type can stay in an error or a plugin cache after teardown.
-          // Render its local data without evaluating expired compiler getters.
-          const display = {};
-          for (const name of keys(false)) {
-            if (name === inspectCustom || (name !== 'id' && managed(name)))
-              continue;
-            const desc = own(name, false)!;
-            if (desc.get) {
-              const getter = desc.get;
-              desc.get = () => {
-                try {
-                  return Reflect.apply(getter, self, []) as unknown;
-                } catch (error) {
-                  // Node 22 reads the display tag outside its getter formatter.
-                  if (name === Symbol.toStringTag) return undefined;
-                  throw error;
-                }
-              };
-            }
-            Object.defineProperty(display, name, desc);
-          }
-          closedInspections.set(self, Object.freeze(display));
-          return display;
-        }
-        if (key === Symbol.toStringTag && !this.canInspectType())
-          return (
-            required(key) ?? Reflect.getOwnPropertyDescriptor(fields, key)
-          )?.value;
-        if (receiver !== backing && managed(key) && key !== 'id') this.ensure();
-        const fixed = required(key);
-        const value: unknown = Reflect.get(fixed ? target : fields, key, self);
-        if (value === undefined && !fixed && managed(key)) {
-          const proto = Reflect.getPrototypeOf(fields);
-          if (proto && Reflect.has(proto, key) && !hasField(key))
-            return Reflect.get(proto, key, self);
-        }
-        return value;
+        if (!Object.hasOwn(fields, key))
+          return Reflect.get(target, key, receiver);
+        if (key !== 'id') this.ensure();
+        if (Object.hasOwn(target, key) || !Object.isExtensible(target))
+          return Reflect.get(target, key, receiver);
+        const value: unknown = Reflect.get(fields, key, receiver);
+        return value === undefined && Reflect.has(target, key) && !hasField(key)
+          ? Reflect.get(target, key, receiver)
+          : value;
       },
-      has: (_target, key) => {
-        if (!managed(key) || !Object.hasOwn(fields, key))
-          return !!required(key) || Reflect.has(fields, key);
-        const proto = Reflect.getPrototypeOf(fields);
-        return (
-          !!own(key, this.canInspectType()) ||
-          (proto !== null && Reflect.has(proto, key))
-        );
+      has: (target, key) => Reflect.has(target, key) || !!own(key),
+      getOwnPropertyDescriptor: (_target, key) => own(key),
+      ownKeys: () => {
+        materializeKeys();
+        return Reflect.ownKeys(target);
       },
-      ownKeys: () => keys(this.canInspectType()),
-      getOwnPropertyDescriptor: (_object, key) =>
-        own(key, this.canInspectType()),
-    });
-    const view = new Proxy(backing, {
-      setPrototypeOf: (_target, proto) => {
-        this.ensure();
-        return (
-          Reflect.setPrototypeOf(target, proto) &&
-          Reflect.setPrototypeOf(fields, proto)
-        );
-      },
-      set: (_target, key, value, receiver) => {
-        this.ensure();
-        if (managed(key) && !hasField(key, true))
-          return Reflect.set(
-            Reflect.getPrototypeOf(fields) ?? Object.create(null),
-            key,
-            value,
-            receiver,
-          );
-        return Reflect.set(
-          required(key) ? target : fields,
-          key,
-          value,
-          receiver,
-        );
-      },
-      defineProperty: (_target, key, attributes) => {
+      defineProperty: (target, key, descriptor) => {
         this.ensure();
         if (key === 'typeArguments') return false;
-        if (!managed(key)) return definePluginField(key, attributes);
-        if (hasField(key, true))
-          return !!own(key) && Reflect.defineProperty(target, key, attributes);
-        // An absent placeholder must not supply the descriptor defaults for
-        // a new plugin property.
-        if (!Object.isExtensible(fields)) return false;
-        Reflect.deleteProperty(fields, key);
-        (pluginFields ??= new Set()).add(key);
-        return definePluginField(key, attributes);
-      },
-      deleteProperty: (_target, key) => {
-        this.ensure();
-        return managed(key)
-          ? !own(key)
-          : Reflect.deleteProperty(target, key) &&
-              Reflect.deleteProperty(fields, key);
-      },
-      preventExtensions: () => {
-        this.ensure();
-        if (Object.isExtensible(fields)) {
-          const keep = new Set(keys());
-          for (const key of Reflect.ownKeys(target))
-            if (!keep.has(key) && !Reflect.deleteProperty(target, key))
-              return false;
-          for (const key of Reflect.ownKeys(fields)) {
-            if (!keep.has(key)) Reflect.deleteProperty(fields, key);
-            else if (!managed(key) && !required(key))
-              Object.defineProperty(
-                target,
-                key,
-                Reflect.getOwnPropertyDescriptor(fields, key)!,
-              );
+        if (Object.hasOwn(fields, key) && !Object.hasOwn(target, key)) {
+          if (hasField(key, true)) {
+            if (!own(key)) return false;
+          } else {
+            if (!Reflect.defineProperty(target, key, descriptor)) return false;
+            Reflect.deleteProperty(fields, key);
+            return true;
           }
-          Reflect.preventExtensions(target);
         }
-        return Reflect.preventExtensions(fields);
+        return Reflect.defineProperty(target, key, descriptor);
+      },
+      deleteProperty: (target, key) =>
+        !own(key) || Reflect.deleteProperty(target, key),
+      preventExtensions: () => {
+        materializeKeys();
+        return Reflect.preventExtensions(target);
       },
     });
     return view;
@@ -2708,7 +2515,7 @@ export class TypeServiceFile {
   parserServices(
     frame: DecodedFrame,
     projection: TypeServiceProjection,
-    sourceFileName: string,
+    sourceFileName = this.binding.sourceFileName,
   ) {
     if (this.closed) throw new Error('file type services are closed');
     this.syntax.attach(frame, projection, sourceFileName);

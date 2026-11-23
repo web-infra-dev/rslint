@@ -16,8 +16,17 @@ type Scope struct {
 	Checker    uint32 `json:"checker"`
 }
 type NodeRef struct {
-	File  string `json:"file"`
-	Index uint32 `json:"index"`
+	File  string       `json:"file"`
+	Index uint32       `json:"index"`
+	Token *SyntaxToken `json:"token,omitempty"`
+}
+
+// The binary compiler tree stores punctuation and some keywords on their parent.
+// A syntax reader identifies those children by their UTF-16 range.
+type SyntaxToken struct {
+	Kind ast.Kind `json:"kind"`
+	Pos  int      `json:"pos"`
+	End  int      `json:"end"`
 }
 
 // Name is a lossless JS property/identifier name on the finite query wire.
@@ -285,7 +294,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 		request = &PredicateStringRequest{Op: wire.Op}
 	case "indexDeclaration":
 		request = &IndexDeclarationRequest{Op: wire.Op}
-	case "anyType", "unknownType", "stringType", "numberType", "booleanType", "bigIntType", "eSSymbolType", "nonPrimitiveType", "neverType", "nullType", "undefinedType", "trueType", "falseType", "ambientModules":
+	case "errorType", "anyType", "unknownType", "stringType", "numberType", "booleanType", "bigIntType", "eSSymbolType", "nonPrimitiveType", "neverType", "nullType", "undefinedType", "trueType", "falseType", "ambientModules":
 		request = &IntrinsicRequest{Op: wire.Op}
 	case "augmentedPropertiesOfType":
 		request = &TypeRequest{Op: wire.Op}

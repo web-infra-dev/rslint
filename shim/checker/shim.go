@@ -107,6 +107,8 @@ func Checker_getWriteTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *ch
 func Checker_getSymbolOfDeclaration(recv *checker.Checker, node *ast.Node) *ast.Symbol
 //go:linkname Checker_getSymbolOfNode github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getSymbolOfNode
 func Checker_getSymbolOfNode(recv *checker.Checker, node *ast.Node) *ast.Symbol
+//go:linkname Checker_getMembersOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getMembersOfSymbol
+func Checker_getMembersOfSymbol(recv *checker.Checker, symbol *ast.Symbol) ast.SymbolTable
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType

@@ -110,17 +110,12 @@ func main() {
 				}
 				ctx := context.Background()
 				options := estree.Options{SourceType: "module", HasBOM: strings.HasPrefix(f.Text(), "\ufeff")}
-				frame, frameErr := projector.Build(ctx, f, options)
-				if frameErr != nil {
-					err = frameErr
-					return
-				}
 				tree, table, encodeErr := encoder.EncodeSourceFile(f)
 				if encodeErr != nil {
 					err = encodeErr
 					return
 				}
-				origins, projectErr := projector.ProjectOrigins(ctx, f, options, table)
+				frame, origins, projectErr := projector.BuildWithOrigins(ctx, f, options, table)
 				projector.Reset()
 				value = struct {
 					estree.OriginTables

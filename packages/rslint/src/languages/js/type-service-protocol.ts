@@ -8,6 +8,7 @@ export interface Scope {
 export interface NodeRef {
   file: string;
   index: number;
+  token?: { kind: number; pos: number; end: number };
 }
 export interface FileBinding extends Scope {
   sourceFileName: string;
@@ -31,6 +32,7 @@ export interface TypeServiceProjection {
   binding: FileBinding;
   tree: Uint8Array;
   origins: number[];
+  firstTokens?: Record<number, number>;
   reverse: Record<string, number>;
   aliases: Array<{
     index: number;
@@ -227,6 +229,7 @@ export interface QueryArguments {
     node?: NodeRef;
     flags?: number;
   };
+  errorType: Record<string, never>;
   anyType: Record<string, never>;
   unknownType: Record<string, never>;
   stringType: Record<string, never>;
@@ -376,6 +379,7 @@ export interface QueryResults {
   symbolString: string;
   predicateString: string;
   indexDeclaration: Uint8Array | undefined;
+  errorType: number;
   anyType: number;
   unknownType: number;
   stringType: number;
@@ -649,13 +653,19 @@ const operations = [
   'simplifiedForWriting',
   'typeParameterConstraint',
   'declaredMembers',
+  'errorType',
 ] as const;
 const operationIDs = new Map<Operation, number>(
   operations.map((op, index) => [op, index + 1]),
 );
 export function typeQueryKey(q: TypeServiceQuery): string {
-  const nodeKey = (node: NodeRef | undefined): string =>
-    node ? `${node.file.length}:${node.file}:${node.index}` : '-';
+  const nodeKey = (node: NodeRef | undefined): string => {
+    if (!node) return '-';
+    const key = `${node.file.length}:${node.file}:${node.index}`;
+    return node.token
+      ? `${key}:${node.token.kind}:${node.token.pos}:${node.token.end}`
+      : key;
+  };
   const prefix = `${q.generation}:${q.checker}:${operationIDs.get(q.op)}:`;
   switch (q.op) {
     case 'configFileParsingDiagnostics':
@@ -696,6 +706,7 @@ export function typeQueryKey(q: TypeServiceQuery): string {
     case 'predicateString':
     case 'indexDeclaration':
       return prefix + JSON.stringify(q.args);
+    case 'errorType':
     case 'anyType':
     case 'unknownType':
     case 'stringType':
@@ -818,6 +829,7 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   symbolString: 3,
   predicateString: 3,
   indexDeclaration: 14,
+  errorType: 1,
   anyType: 1,
   unknownType: 1,
   stringType: 1,
