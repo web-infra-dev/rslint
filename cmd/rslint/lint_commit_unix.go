@@ -4,8 +4,11 @@ package main
 
 import "syscall"
 
+// Stat_t.Dev is signed on Darwin and unsigned on Linux.
+type deviceID uint64
+
 type fixFileID struct {
-	device uint64
+	device deviceID
 	inode  uint64
 }
 
@@ -14,5 +17,5 @@ func statFixFile(path string) (fixFileID, error) {
 	if err := syscall.Stat(path, &stat); err != nil {
 		return fixFileID{}, err
 	}
-	return fixFileID{uint64(stat.Dev), stat.Ino}, nil
+	return fixFileID{deviceID(stat.Dev), stat.Ino}, nil
 }

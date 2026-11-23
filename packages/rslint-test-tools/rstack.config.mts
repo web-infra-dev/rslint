@@ -14,6 +14,7 @@ const ecosystemTests = {
     './tests/eslint-plugin/pool-isolation/harness.test.ts',
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/bulk-suppressions.test.ts',
     './tests/cli/spawn-cli.test.ts',
     './tests/cli/color-matrix.test.ts',
     './tests/cli/file-args.test.ts',
