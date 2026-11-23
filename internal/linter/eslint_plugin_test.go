@@ -1225,6 +1225,7 @@ func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T
 	files := []EslintPluginFileInput{
 		{Path: "/repo/present.ts", Text: &text, Rules: rules},
 		{Path: "/repo/missing.ts", Text: &text, Rules: rules},
+		{Path: "/repo/stopped.ts", Text: &text, Rules: rules},
 	}
 	outcome := testDispatchEslintPluginRulesWithOutcome(
 		context.Background(),
@@ -1240,7 +1241,7 @@ func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T
 					{RuleName: "external/throws", Message: "finding before failure"},
 					{RuleName: "external/unconfigured", Message: "unexpected diagnostic"},
 				},
-			}}}, nil
+			}, {FilePath: "/repo/stopped.ts", ParseError: eslintPluginShutdownSentinel}}}, nil
 		}),
 		files,
 		false,
@@ -1256,6 +1257,9 @@ func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T
 		{Kind: EslintPluginMissingFileResult, FilePath: "/repo/missing.ts"},
 		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/missing.ts", RuleName: "external/throws"},
 		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/missing.ts", RuleName: "external/healthy"},
+		{Kind: EslintPluginUnverifiedFile, FilePath: "/repo/stopped.ts"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/stopped.ts", RuleName: "external/throws"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/stopped.ts", RuleName: "external/healthy"},
 	}
 	if !reflect.DeepEqual(outcome.Notices, want) {
 		t.Fatalf("notices = %+v, want %+v", outcome.Notices, want)
@@ -1466,9 +1470,12 @@ func TestDispatchEslintPluginProjectionFailureCannotFallBack(t *testing.T) {
 	if called || len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message.Description, "does not match Program syntax") {
 		t.Fatalf("projection failure became a successful lint: %v/%+v", called, outcome)
 	}
-	wantNotice := EslintPluginProtocolNotice{Kind: EslintPluginUnverifiedRule, FilePath: input.Path, RuleName: "plugin/check"}
-	if !slices.Equal(outcome.Notices, []EslintPluginProtocolNotice{wantNotice}) {
-		t.Fatalf("projection failure notices = %+v, want %+v", outcome.Notices, wantNotice)
+	want := []EslintPluginProtocolNotice{
+		{Kind: EslintPluginUnverifiedFile, FilePath: input.Path},
+		{Kind: EslintPluginUnverifiedRule, FilePath: input.Path, RuleName: "plugin/check"},
+	}
+	if !slices.Equal(outcome.Notices, want) {
+		t.Fatalf("projection failure notices = %+v, want %+v", outcome.Notices, want)
 	}
 	input.Text = nil
 	var builder estree.Builder

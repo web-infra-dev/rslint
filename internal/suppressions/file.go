@@ -13,16 +13,13 @@ import (
 	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
 
-// Open reads the CLI baseline. workingDirectory is the spelling of the process
-// working directory used to select lint targets. A check without a baseline returns nil.
-func Open(workingDirectory string, options Options) (*File, error) {
-	selected := filepath.ToSlash(workingDirectory)
-	f := &File{options: options, path: filepath.Join(filepath.FromSlash(selected), DefaultFilename)}
+// Open reads the file CLI's baseline. A check without a baseline returns nil.
+func Open(options Options) (*File, error) {
+	f := &File{options: options, path: DefaultFilename}
 	var cwd string
 	var err error
 	if location := options.Location; location != "" {
@@ -63,33 +60,57 @@ func Open(workingDirectory string, options Options) (*File, error) {
 		if err != nil {
 			return nil, err
 		}
+		f.path = filepath.Join(cwd, DefaultFilename)
 	}
-	physical := filepath.ToSlash(cwd)
 	if runtime.GOOS == "windows" {
-		physical = osvfs.FS().Realpath(physical)
+		// Windows Getwd can retain the name of a junction.
+		cwd, err = filepath.EvalSymlinks(cwd)
+		if err != nil {
+			return nil, err
+		}
 	}
-	f.cwd = tspath.EnsureTrailingDirectorySeparator(physical)
-	if selected != physical {
-		f.cwdAlias = selected
-	}
+	f.cwd = cwd
 	f.entries = data
 	return f, nil
 }
 
-// The working directory itself may have a caller-visible symlink spelling.
-// Keep the suffix as lint reported it, including symlinks below that directory.
+// Keep the linted spelling: different paths to one file can activate different rules.
 func (f *File) fileKey(path string) string {
-	if f.cwdAlias != "" {
-		if relative, err := filepath.Rel(f.cwdAlias, path); err == nil && filepath.IsLocal(relative) {
-			return filepath.ToSlash(relative)
-		}
-	}
-	if relative, ok := strings.CutPrefix(path, f.cwd); ok {
-		return relative
-	}
 	relative, err := filepath.Rel(f.cwd, path)
 	if err != nil {
 		return path // A file on another Windows drive or share has no relative path.
+	}
+	if runtime.GOOS == "windows" {
+		return windowsRelativeKey(f.cwd, path, relative)
+	}
+	return filepath.ToSlash(relative)
+}
+
+// Rel folds every Windows directory name, but a case-sensitive directory can contain
+// both pkg and Pkg. Verify only spellings that Rel actually folded.
+func windowsRelativeKey(cwd, target, relative string) string {
+	cwd, target = filepath.Clean(cwd), filepath.Clean(target)
+	resolved := filepath.Join(cwd, relative)
+	baseVolume, targetVolume := filepath.VolumeName(cwd), filepath.VolumeName(target)
+	if resolved[len(baseVolume):] == target[len(targetVolume):] {
+		return filepath.ToSlash(relative)
+	}
+	sep := string(filepath.Separator)
+	from := strings.Split(strings.TrimPrefix(cwd[len(baseVolume):], sep), sep)
+	to := strings.Split(strings.TrimPrefix(target[len(targetVolume):], sep), sep)
+	for i := range min(len(from), len(to)) {
+		if from[i] == to[i] {
+			continue
+		}
+		if !strings.EqualFold(from[i], to[i]) {
+			break
+		}
+		// Compare the entries themselves to distinguish junctions to the same target.
+		left, leftErr := os.Lstat(baseVolume + sep + strings.Join(from[:i+1], sep))
+		right, rightErr := os.Lstat(targetVolume + sep + strings.Join(to[:i+1], sep))
+		if leftErr != nil || rightErr != nil || !os.SameFile(left, right) {
+			return strings.Repeat("../", len(from)-i) + strings.Join(to[i:], "/")
+		}
 	}
 	return filepath.ToSlash(relative)
 }
@@ -152,7 +173,12 @@ func (f *File) read(path string) (entries, error) {
 // The exclusive staging file is also the writer lock. Read the latest counts
 // after creating it, then replace the destination with the completed JSON.
 func (f *File) update(ctx context.Context, files map[string]*checkedFile) error {
-	path := filepath.FromSlash(osvfs.FS().Realpath(filepath.ToSlash(f.path)))
+	path, err := filepath.EvalSymlinks(f.path)
+	if errors.Is(err, fs.ErrNotExist) {
+		path = f.path // A new baseline has no symlink target to resolve.
+	} else if err != nil {
+		return err
+	}
 	stagePath := path + ".tmp"
 	stage, err := os.OpenFile(stagePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o666)
 	if errors.Is(err, fs.ErrExist) {
@@ -173,7 +199,7 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	// Realpath returns its input on failure. Never replace a dangling symlink.
+	// A dangling symlink also reports ErrNotExist during resolution.
 	if info != nil && info.Mode()&fs.ModeSymlink != 0 {
 		return fmt.Errorf("cannot resolve suppressions destination %q", path)
 	}

@@ -29,11 +29,10 @@ type entry struct {
 type entries map[string]map[string]entry
 
 type File struct {
-	cwd      string // Physical cwd with a trailing slash.
-	cwdAlias string // Cwd used for target selection, if different.
-	path     string
-	options  Options
-	entries  entries
+	cwd     string // Physical working directory.
+	path    string
+	options Options
+	entries entries
 }
 
 // FileResult identifies a linted target. A completed rule with no diagnostics

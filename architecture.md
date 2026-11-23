@@ -1495,9 +1495,11 @@ and checked files to `internal/suppressions`, excluding files with syntax errors
 The lint plan identifies rules skipped for lack of type information. The plugin
 dispatcher identifies the files and error-level rules affected by incomplete
 worker results. The CLI passes these exclusions to the package, which compares
-completed rule counts and owns baseline persistence. The CLI blocks baseline
-writes after configuration or plugin failures and supplies visible diagnostics
-and any baseline failure to report assembly.
+completed rule counts and owns baseline persistence. The discovery catalog
+records where an actual file or directory lookup fell back to an ancestor.
+Those targets keep their diagnostics and baseline entries. A failed plugin rule
+keeps its own count. An incomplete worker response prevents a baseline update.
+The CLI supplies visible diagnostics and any baseline failure to report assembly.
 
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider

@@ -341,19 +341,11 @@ export function mergeListeners(
       } else {
         const compilation = getSelectorCompilation(cleanSelector);
         if (compilation.kind === 'invalid') {
-          // #3: a buggy plugin rule's invalid esquery selector must not
-          // throw out of `mergeListeners` → `lintFile` (whose contract is
-          // to never throw; per-rule failures surface via `ruleErrors`).
-          // Record it against the owning rule(s) and skip this selector —
-          // ESLint isolates a broken rule the same way, leaving sibling
-          // rules running.
-          for (const tl of tagged) {
-            merged.selectorErrors.push({
-              ruleName: tl.ruleName,
-              selector: cleanSelector,
-              message: compilation.message,
-            });
-          }
+          merged.selectorErrors.push({
+            ruleName,
+            selector: cleanSelector,
+            message: compilation.message,
+          });
           continue;
         }
         entry = {
@@ -706,6 +698,7 @@ export function visit(
   };
   const result: VisitResult = { cancelled: false, visitedNodes: 0 };
   const errH = opts.onListenerError;
+  let reportedMatchErrors: Set<EsqEntry> | undefined;
   const cancelFlag = opts.cancelFlag;
 
   // No-ESQuery fast path. When the merged set contains no esquery
@@ -729,8 +722,10 @@ export function visit(
       try {
         matched = esquery().matches(node, entry.selector!, reversedAncestry());
       } catch (err) {
-        if (errH) {
-          // A shared selector prevented each of its owning rules from running.
+        if (errH && !reportedMatchErrors?.has(entry)) {
+          // The selector may still match later nodes in this visit.
+          reportedMatchErrors ??= new Set();
+          reportedMatchErrors.add(entry);
           const owners = new Set(
             entry.listeners.map((listener) => listener.ruleName),
           );

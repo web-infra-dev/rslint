@@ -36,9 +36,9 @@ This baseline records two `no-debugger` errors in `src/app.js`.
 
 If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
 
-File keys use `/` as their separator. Entering the project through a symlink gives files inside the working directory the same relative keys. For files outside it, Rslint records the linted name relative to the physical working directory. A file on another Windows drive or UNC share uses its absolute path.
+File keys use the name Rslint linted, relative to the physical working directory, with `/` as the separator. A file on another Windows drive or UNC share uses its absolute path.
 
-Each count belongs to the name Rslint actually linted. For example, if `linked.js` points to `src/app.js`, checking `linked.js` alone updates its own entry. If a run selects both names, Rslint checks the file once and applies counts for the selected name.
+If `linked.js` points to `src/app.js`, checking `linked.js` alone updates its own entry. The same applies to a directory symlink, including one used to enter the working directory. Each spelling can match different lint rules. If a run selects both names, Rslint checks the file once and applies counts for the selected name.
 
 To reuse an ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. Entries apply when the file path and rule ID match.
 
@@ -54,8 +54,12 @@ rslint --prune-suppressions
 
 Pruning lowers counts, removes entries that reach zero, and removes entries for deleted files. A partial run keeps entries for unchecked files unless Rslint can verify their deletion. This includes keeping entries in inaccessible directories or on disconnected drives. Entries with UNC paths such as `//server/share/file.ts` are updated only when Rslint checks those files.
 
+On a case-insensitive filesystem, a rename from `file.js` to `File.js` can leave the old spelling accessible. Remove its JSON entry if you no longer lint that spelling.
+
 Ignored files and files with syntax errors keep their entries. If a file moves outside its TypeScript project, Rslint keeps the counts for enabled rules that require type information. Other rules in that file can still be checked and pruned. If you turn a rule off or lower its severity to `"warn"`, pruning removes its old count the next time Rslint checks the file.
 
-During a normal check, a plugin rule that throws reports its failure and any findings it emitted. Completed rules still use their recorded counts. Recording and pruning require a successful plugin and configuration run.
+A plugin rule that throws reports its failure and any findings it emitted. An incomplete rule keeps its recorded count, while completed rules can still record and prune theirs. If a plugin worker fails to return a usable response, the CLI reports the problem and stops the update.
+
+If a config fails to load, files linted with a fallback config report their findings and keep their original baseline entries. The command exits with code `2`. Files with a working config can still record and prune their counts.
 
 To defer cleanup, run `rslint --pass-on-unpruned-suppressions`. Lint errors and the configured warning limit still determine the exit status.

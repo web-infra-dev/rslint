@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"slices"
 	"sort"
 	"sync/atomic"
 
@@ -107,6 +108,11 @@ type ConfigFailure struct {
 	Message   string
 }
 
+type fallbackScope struct {
+	path  string // Literal input or directory scanned with a fallback config.
+	owner string // The successful owner used for that input.
+}
+
 type ConfigDiscoveryStats struct {
 	DirectoriesVisited int
 	ConfigsRequested   int
@@ -128,10 +134,33 @@ type ConfigCatalog struct {
 	EslintPlugins      []rslintconfig.EslintPluginEntry
 	Scopes             map[string]target.OwnerScope
 	Failures           []ConfigFailure
+	fallbacks          map[fallbackScope]bool
 	Stats              ConfigDiscoveryStats
 	// Explicit reports that the catalog came from one explicitly selected
 	// invocation-wide flat config rather than hierarchical auto discovery.
 	Explicit bool
+}
+
+// FilesWithConfigFallback identifies targets whose actual discovery route
+// skipped a failed config. Literal files have their own config lookup.
+func (catalog *ConfigCatalog) FilesWithConfigFallback(files []target.File) map[string]bool {
+	if len(catalog.fallbacks) == 0 {
+		return nil
+	}
+	result := make(map[string]bool)
+	for _, file := range files {
+		_, literal := slices.BinarySearch(catalog.Scopes[file.ConfigDirectory].ExplicitFiles, file.Path)
+		for path := file.Path; path != ""; path = configDiscoveryParent(path) {
+			if catalog.fallbacks[fallbackScope{path, file.ConfigDirectory}] {
+				result[file.Path] = true
+				break
+			}
+			if literal {
+				break
+			}
+		}
+	}
+	return result
 }
 
 func (catalog *ConfigCatalog) ConfigDirectories() []string {

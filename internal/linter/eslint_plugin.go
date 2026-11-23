@@ -438,6 +438,8 @@ type EslintPluginProtocolNoticeKind uint8
 const (
 	EslintPluginMissingFileResult EslintPluginProtocolNoticeKind = iota
 	EslintPluginUnconfiguredDiagnostic
+	// EslintPluginUnverifiedFile means the worker could not lint this input.
+	EslintPluginUnverifiedFile
 	// EslintPluginUnverifiedRule marks an error-level rule whose finding count is incomplete.
 	EslintPluginUnverifiedRule
 )
@@ -881,19 +883,24 @@ func applyEslintPluginResults(
 			timing.addFileRuleTimesMS(fr.FilePath, fr.RuleTimes)
 		}
 
+		tsf, ok := eslintPluginSourceFile(f)
+		if !ok || fr.ParseError != "" {
+			if onNotice != nil {
+				onNotice(EslintPluginProtocolNotice{Kind: EslintPluginUnverifiedFile, FilePath: f.Path})
+			}
+			reportUnverifiedPluginRules(f, onNotice)
+			if !ok {
+				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, newTextSourceFile(""),
+					"rslint/plugin-lint-error", "ESLint plugin lint failed: no source frame for "+f.Path))
+			} else if fr.ParseError != eslintPluginShutdownSentinel {
+				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf,
+					"rslint/plugin-lint-error", "ESLint plugin lint failed: "+fr.ParseError))
+			}
+			continue
+		}
 		sevByRule := map[string]rule.DiagnosticSeverity{}
 		for _, cr := range f.Rules {
 			sevByRule[cr.Name] = cr.Severity
-		}
-		tsf, ok := eslintPluginSourceFile(f)
-		if !ok {
-			// No frame to rebuild against (neither a native SourceFile nor an
-			// overlay was provided) — shouldn't happen; surface rather than
-			// collapse every diagnostic to offset 0.
-			onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, newTextSourceFile(""),
-				"rslint/plugin-lint-error", "ESLint plugin lint failed: no source frame for "+f.Path))
-			reportUnverifiedPluginRules(f, onNotice)
-			continue
 		}
 		text := tsf.Text()
 		// The worker computes every offset against the BOM-stripped source (it
@@ -910,17 +917,6 @@ func applyEslintPluginResults(
 			return p
 		}
 
-		// Program owns syntax errors. Projection/decoder and worker failures
-		// use this existing error field and must remain visible. The sole benign
-		// value is the "shutdown" sentinel (graceful pool teardown racing a task).
-		if fr.ParseError != "" {
-			if fr.ParseError != eslintPluginShutdownSentinel {
-				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf,
-					"rslint/plugin-lint-error", "ESLint plugin lint failed: "+fr.ParseError))
-			}
-			reportUnverifiedPluginRules(f, onNotice)
-			continue
-		}
 		// Rule throws are authoritative — the editor never renders stderr,
 		// so surface each as a visible diagnostic.
 		for _, re := range fr.RuleErrors {

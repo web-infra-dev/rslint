@@ -55,7 +55,7 @@ describe('CLI bulk suppressions', () => {
       cwd,
     );
     expect(stale.exitCode).toBe(2);
-    expect(stale.stdout).toContain('error   Lint failed');
+    expect(stale.stdout).toContain('Lint failed');
     expect(stale.stderr).toContain('--prune-suppressions');
 
     await fs.writeFile(path.join(cwd, 'a.js'), 'var a = 1; var b = 2;');
@@ -135,9 +135,12 @@ describe('CLI bulk suppressions', () => {
     expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
   });
 
-  test('keeps entries across working directory aliases', async () => {
+  test('keeps the physical target when pruning through a working directory alias', async () => {
     const temp = await project({
-      'rslint.config.mjs': "export default [{rules:{'no-debugger':'error'}}];",
+      'rslint.config.mjs': `export default [
+        {rules:{'no-debugger':'error'}},
+        {files:['nested/link/**/*.js'],rules:{'no-debugger':'off'}}
+      ];`,
       'shared.js': 'debugger;',
       'work/src/app.js': 'debugger;',
     });
@@ -148,13 +151,14 @@ describe('CLI bulk suppressions', () => {
     const cwd = path.join(nested, 'link');
     await fs.symlink(work, cwd, 'junction');
     const shared = path.join(root, 'shared.js');
+    const physicalFile = path.join(work, 'src/app.js');
     const baseline = path.join(work, 'rslint-suppressions.json');
     const fromAlias = (...args: string[]) =>
       runCliProcess(process.execPath, [RSLINT_BIN, ...args], {
         cwd,
         env: { ...process.env, PWD: cwd },
       });
-    const recorded = await fromAlias('--suppress-all', shared, 'src/app.js');
+    const recorded = await fromAlias('--suppress-all', shared, physicalFile);
     expect(recorded.exitCode, recorded.stderr).toBe(0);
     const saved = await fs.readFile(baseline, 'utf8');
     expect(JSON.parse(saved)).toEqual({
@@ -162,7 +166,13 @@ describe('CLI bulk suppressions', () => {
       'src/app.js': { 'no-debugger': { count: 1 } },
     });
 
-    const physical = await runRslint(['src/app.js', shared], work);
+    const pruned = await fromAlias(
+      '--prune-suppressions',
+      path.join(cwd, 'src/app.js'),
+    );
+    expect(pruned.exitCode, pruned.stderr).toBe(0);
+    expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
+    const physical = await runRslint([physicalFile, shared], work);
     expect(physical.exitCode, physical.stderr).toBe(0);
   });
 
@@ -208,7 +218,9 @@ describe('CLI bulk suppressions', () => {
     );
   });
 
-  test('keeps plugin failures visible and preserves the baseline on an incomplete update', async () => {
+  test('keeps a failed plugin rule visible and updates independent counts', async () => {
+    const config =
+      "import local from './local.mjs'; export default [{files:['a.js'],plugins:{local},rules:{'no-debugger':'error','local/healthy':'error','local/throws':'error'}},{files:['fixed.js'],rules:{'no-var':'error'}}];";
     const saved = JSON.stringify({
       'a.js': {
         'no-debugger': { count: 1 },
@@ -227,8 +239,7 @@ describe('CLI bulk suppressions', () => {
           throw Error('fixture failure');
         } }; } },
       } };`,
-      'rslint.config.mjs':
-        "import local from './local.mjs'; export default [{files:['a.js'],plugins:{local},rules:{'no-debugger':'error','local/healthy':'error','local/throws':'error'}},{files:['fixed.js'],rules:{'no-var':'error'}}];",
+      'rslint.config.mjs': config,
       'rslint-suppressions.json': saved,
     });
     const args = ['--format', 'jsonline', 'a.js'];
@@ -246,28 +257,98 @@ describe('CLI bulk suppressions', () => {
       ['--prune-suppressions', ...args, 'fixed.js'],
       cwd,
     );
-    expect(write.exitCode).toBe(2);
-    expect(write.stderr).toContain('incomplete');
-    expect(
-      await fs.readFile(path.join(cwd, 'rslint-suppressions.json'), 'utf8'),
-    ).toBe(saved);
+    expect(write.exitCode).toBe(1);
+    expect(write.stdout).toContain('finding before failure');
+    expect(await readBaseline(cwd)).toEqual({
+      'a.js': JSON.parse(saved)['a.js'],
+    });
+    // A warning-level plugin failure in a.js must not block recording fixed.js.
+    await fs.writeFile(
+      path.join(cwd, 'rslint.config.mjs'),
+      config.replace("'local/throws':'error'", "'local/throws':'warn'"),
+    );
+    await fs.writeFile(path.join(cwd, 'fixed.js'), 'var value = 1;');
+    const record = await runRslint(
+      [
+        '--suppress-rule',
+        'no-var',
+        '--pass-on-unpruned-suppressions',
+        ...args,
+        'fixed.js',
+      ],
+      cwd,
+    );
+    expect(record.exitCode).toBe(1);
+    expect((await readBaseline(cwd))['fixed.js']).toEqual({
+      'no-var': { count: 1 },
+    });
   });
 
   test('preserves recorded counts when a nested config fails to load', async () => {
-    const saved = { 'nested/a.js': { 'no-var': { count: 1 } } };
+    const count = { 'no-console': { count: 1 } };
     const cwd = await project({
-      'rslint.config.mjs': "export default [{rules:{'no-debugger':'error'}}];",
-      'nested/rslint.config.mjs': 'throw Error("broken config");',
-      'nested/a.js': 'debugger;',
-      'rslint-suppressions.json': JSON.stringify(saved),
+      'rslint.config.mjs':
+        "export default [{rules:{'no-console':['error',{allow:['log']}]}}];",
+      'nested/rslint.config.mjs':
+        "export default [{rules:{'no-console':['error',{allow:['warn']}]}}];",
+      'nested/a.js': 'console.log(1);\nconsole.warn(2);',
+      'nested/ok/rslint.config.mjs':
+        "export default [{rules:{'no-console':'error'}}];",
+      'nested/ok/b.js': 'console.log(1);',
     });
-    const result = await runRslint(
-      ['--prune-suppressions', 'nested/a.js'],
-      cwd,
+    const check = (...flags: string[]) =>
+      runRslint(['--format', 'jsonline', ...flags, '.'], cwd);
+    expect((await check('--suppress-all')).exitCode).toBe(0);
+    expect(await readBaseline(cwd)).toEqual({
+      'nested/a.js': count,
+      'nested/ok/b.js': count,
+    });
+    await fs.writeFile(
+      path.join(cwd, 'nested/rslint.config.mjs'),
+      'throw Error("broken config");',
     );
+    const result = await check('--pass-on-unpruned-suppressions');
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain('configuration failed');
-    expect(await readBaseline(cwd)).toEqual(saved);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      filePath: 'nested/a.js',
+      ruleName: 'no-console',
+      range: { start: { line: 2 } },
+    });
+    await fs.writeFile(path.join(cwd, 'nested/ok/b.js'), '');
+    expect((await check('--prune-suppressions')).exitCode).toBe(2);
+    expect(await readBaseline(cwd)).toEqual({ 'nested/a.js': count });
+  });
+
+  test('keeps directory-scan counts when a literal file tries a different config', async () => {
+    const cwd = await project({
+      'rslint.config.mjs':
+        "export default [{ignores:['sub/rslint.config.js']},{rules:{'no-console':'error','no-debugger':'error'}}];",
+      'sub/rslint.config.js': 'throw Error("broken config");',
+      'sub/rslint.config.mjs':
+        "export default [{rules:{'no-debugger':'error'}}];",
+      'sub/a.js': 'console.log(1);',
+      'sub/b.js': 'debugger;',
+    });
+    const check = () =>
+      runRslint(
+        ['--suppress-all', '--format', 'jsonline', '.', 'sub/a.js'],
+        cwd,
+      );
+    const result = await check();
+    expect(result.exitCode).toBe(2);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      filePath: 'sub/a.js',
+      ruleName: 'no-console',
+    });
+    expect(await readBaseline(cwd)).toEqual({
+      'sub/b.js': { 'no-debugger': { count: 1 } },
+    });
+    await fs.unlink(path.join(cwd, 'sub/rslint.config.mjs'));
+    expect(JSON.parse((await check()).stdout)).toMatchObject({
+      filePath: 'sub/a.js',
+      ruleName: 'no-console',
+    });
   });
 
   test('preserves a type-aware count when the file is outside its TypeScript project', async () => {

@@ -12,13 +12,21 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
+func tempWorkingDirectory(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	return dir
+}
+
 func TestScopedUpdate(t *testing.T) {
-	cwd := t.TempDir()
-	t.Chdir(cwd)
+	cwd := tempWorkingDirectory(t)
 	checked := filepath.ToSlash(filepath.Join(cwd, "a.ts"))
 	private := filepath.Join(cwd, "private")
 	if err := os.Mkdir(private, 0o755); err != nil {
@@ -56,7 +64,7 @@ func TestScopedUpdate(t *testing.T) {
 	}
 	run := func(options Options, unused bool) *File {
 		t.Helper()
-		file, err := Open(cwd, options)
+		file, err := Open(options)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -86,15 +94,14 @@ func TestScopedUpdate(t *testing.T) {
 }
 
 func TestMissingBaseline(t *testing.T) {
-	cwd := t.TempDir()
-	t.Chdir(cwd)
-	if file, err := Open(cwd, Options{}); err != nil || file != nil {
+	cwd := tempWorkingDirectory(t)
+	if file, err := Open(Options{}); err != nil || file != nil {
 		t.Fatalf("plain check: file=%v, err=%v", file, err)
 	}
-	if _, err := Open(cwd, Options{Location: "missing.json"}); err == nil {
+	if _, err := Open(Options{Location: "missing.json"}); err == nil {
 		t.Fatal("explicit missing baseline was accepted")
 	}
-	f, err := Open(cwd, Options{Mode: Prune})
+	f, err := Open(Options{Mode: Prune})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +121,7 @@ func reportError(ctx context.Context, f *File, path, id string) ([]rule.RuleDiag
 }
 
 func TestWorkingDirectoryPaths(t *testing.T) {
-	root := filepath.FromSlash(osvfs.FS().Realpath(filepath.ToSlash(t.TempDir())))
+	root := tempWorkingDirectory(t)
 	repo, link := filepath.Join(root, "project", "repo"), filepath.Join(root, "link")
 	src := filepath.Join(repo, "src")
 	if err := os.MkdirAll(src, 0o755); err != nil {
@@ -131,7 +138,7 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 	run := func(cwd, name string, mode Mode, wantVisible int) *File {
 		t.Helper()
 		t.Chdir(cwd)
-		f, err := Open(cwd, Options{Mode: mode})
+		f, err := Open(Options{Mode: mode})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -142,11 +149,18 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 		return f
 	}
 	run(link, filepath.Join(link, "src", "app.js"), Record, 0)
-	run(repo, filepath.Join(src, "app.js"), Check, 0)
+	run(repo, filepath.Join(link, "src", "app.js"), Check, 0)
+	run(repo, filepath.Join(src, "app.js"), Check, 1)
+	run(repo, filepath.Join(src, "app.js"), Record, 0)
 	run(repo, filepath.Join(repo, "other", "app.js"), Check, 1)
 	run(repo, filepath.Join(repo, "other", "app.js"), Record, 0)
 	f := run(link, filepath.Join(filepath.Dir(repo), "shared.js"), Record, 0)
-	want := entries{"src/app.js": {"x": {Count: 1}}, "other/app.js": {"x": {Count: 1}}, "../shared.js": {"x": {Count: 1}}}
+	want := entries{
+		"../../link/src/app.js": {"x": {Count: 1}},
+		"src/app.js":            {"x": {Count: 1}},
+		"other/app.js":          {"x": {Count: 1}},
+		"../shared.js":          {"x": {Count: 1}},
+	}
 	if !reflect.DeepEqual(f.entries, want) {
 		t.Fatalf("recorded %v, want %v", f.entries, want)
 	}
@@ -163,7 +177,7 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 		root:             filepath.Join(root, "rslint-suppressions_"+cwdHash(native)),
 		"../shared.json": filepath.Join(filepath.Dir(native), "shared.json"),
 	} {
-		f, err := Open(link, Options{Mode: Record, Location: location})
+		f, err := Open(Options{Mode: Record, Location: location})
 		if err != nil || f.path != want {
 			t.Fatalf("location %q: file=%v err=%v, want %q", location, f, err, want)
 		}
@@ -181,13 +195,51 @@ func TestFileKeyUsesNativeRelativePaths(t *testing.T) {
 	check("/tree/pkg/", "/tree/pkg-extra/File.js", "../pkg-extra/File.js")
 	check("/", "/File.js", "File.js")
 	if runtime.GOOS == "windows" {
-		check("C:/tree/pkg/", "c:/tree/Pkg/File.js", "File.js")
+		check("C:/tree/pkg/", "c:/tree/pkg/File.js", "File.js")
 		check("C:/tree/", "d:/Shared/File.js", "d:/Shared/File.js")
-		check("//server/share/pkg/", "//server/share/Pkg/File.js", "File.js")
-		check("//server/share/pkg/", "//SERVER/SHARE/Pkg/File.js", "File.js")
+		check("//server/share/pkg/", "//SERVER/SHARE/pkg/File.js", "File.js")
 		check("//server/share/pkg/", "//server/other/File.js", "//server/other/File.js")
 	} else {
 		check("/tree/pkg/", "/tree/Pkg/File.js", "../Pkg/File.js")
+	}
+}
+
+func TestWindowsFileKeyDirectoryCase(t *testing.T) {
+	for _, tc := range []struct{ name, want string }{
+		{"insensitive", "File.js"},
+		{"sensitive", "../Pkg/File.js"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			lower, upper := filepath.Join(root, "pkg"), filepath.Join(root, "Pkg")
+			if tc.name == "sensitive" && runtime.GOOS == "windows" {
+				// cspell:ignore fsutil
+				if out, err := exec.Command("fsutil.exe", "file", "setCaseSensitiveInfo", root, "enable").CombinedOutput(); err != nil {
+					t.Skipf("case-sensitive directories unavailable: %v: %s", err, out)
+				}
+			}
+			if err := os.Mkdir(lower, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if tc.name == "sensitive" {
+				if err := os.Mkdir(upper, 0o755); errors.Is(err, os.ErrExist) && runtime.GOOS != "windows" {
+					t.Skip("temporary directory is case insensitive")
+				} else if err != nil {
+					t.Fatal(err)
+				}
+			} else if _, err := os.Stat(upper); err != nil {
+				t.Skipf("temporary directory is case sensitive: %v", err)
+			}
+			// Supply the relative path Windows computes, on either kind of host filesystem.
+			path := filepath.Join(upper, "File.js")
+			got := windowsRelativeKey(lower, path, "File.js")
+			if runtime.GOOS == "windows" {
+				got = (&File{cwd: lower}).fileKey(filepath.ToSlash(path))
+			}
+			if got != tc.want {
+				t.Errorf("file key = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -204,11 +256,10 @@ func makeDirectoryLink(t *testing.T, destination, link string) {
 }
 
 func TestConcurrentUpdates(t *testing.T) {
-	cwd := t.TempDir()
-	t.Chdir(cwd)
+	cwd := tempWorkingDirectory(t)
 	var writers [2]*File
 	for i := range writers {
-		f, err := Open(cwd, Options{Mode: Record})
+		f, err := Open(Options{Mode: Record})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -238,7 +289,7 @@ func TestConcurrentUpdates(t *testing.T) {
 	if _, _, err := reportError(ctx, writers[0], name, "cancelled"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled write returned %v", err)
 	}
-	f, err := Open(cwd, Options{})
+	f, err := Open(Options{})
 	want := entries{"test.js": {"rule0": {Count: 1}, "rule1": {Count: 1}}}
 	if err != nil || f == nil || !reflect.DeepEqual(f.entries, want) {
 		t.Fatalf("concurrent updates: file=%v err=%v, want %v", f, err, want)
@@ -246,8 +297,7 @@ func TestConcurrentUpdates(t *testing.T) {
 }
 
 func TestUpdateThroughFileSymlink(t *testing.T) {
-	cwd := t.TempDir()
-	t.Chdir(cwd)
+	cwd := tempWorkingDirectory(t)
 	path := filepath.Join(cwd, DefaultFilename)
 	if err := os.WriteFile(path, []byte("{}"), 0o600); err != nil {
 		t.Fatal(err)
@@ -256,14 +306,14 @@ func TestUpdateThroughFileSymlink(t *testing.T) {
 	if err := os.Symlink(DefaultFilename, link); err != nil {
 		t.Skipf("file symlink unavailable: %v", err)
 	}
-	f, err := Open(cwd, Options{Mode: Record, Location: link})
+	f, err := Open(Options{Mode: Record, Location: link})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "x"); err != nil {
 		t.Fatal(err)
 	}
-	defaultFile, err := Open(cwd, Options{})
+	defaultFile, err := Open(Options{})
 	if err != nil || defaultFile == nil || defaultFile.entries["test.js"]["x"].Count != 1 {
 		t.Fatalf("write via symlink: file=%v err=%v", defaultFile, err)
 	}
@@ -275,6 +325,36 @@ func TestUpdateThroughFileSymlink(t *testing.T) {
 	}
 	if name, err := os.Readlink(link); err != nil || name != DefaultFilename {
 		t.Fatalf("stored symlink = %q, err=%v", name, err)
+	}
+}
+
+func TestUpdatePreservesLiteralBackslash(t *testing.T) {
+	if filepath.Separator == '\\' {
+		t.Skip("backslash is a path separator")
+	}
+	cwd := tempWorkingDirectory(t)
+	const location = `cache\base.json`
+	if err := os.Mkdir("cache", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{location, "cache/base.json"} {
+		if err := os.WriteFile(name, []byte("{}"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := Open(Options{Mode: Record, Location: location})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "x"); err != nil {
+		t.Fatal(err)
+	}
+	f, err = Open(Options{Location: location})
+	if err != nil || f == nil || f.entries["test.js"]["x"].Count != 1 {
+		t.Fatalf("recorded baseline: file=%v err=%v", f, err)
+	}
+	if content, err := os.ReadFile("cache/base.json"); err != nil || string(content) != "{}" {
+		t.Fatalf("other baseline: %q, %v", content, err)
 	}
 }
 

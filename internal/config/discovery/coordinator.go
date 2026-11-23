@@ -215,6 +215,9 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		if seed.ownerDir == "" {
 			continue
 		}
+		if seed.usingFallback {
+			coordinator.draft.addFallback(seed.path, seed.ownerDir)
+		}
 		state := coordinator.modules.state(seed.ownerPath)
 		if state == nil {
 			continue
@@ -327,6 +330,7 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 		EslintPlugins:      eslintPlugins,
 		Scopes:             scopes,
 		Failures:           coordinator.modules.failures(),
+		fallbacks:          coordinator.draft.fallbacks,
 		Stats: ConfigDiscoveryStats{
 			DirectoriesVisited: coordinator.walkStats.directoriesVisited,
 			ConfigsRequested:   coordinator.modules.configsRequested,

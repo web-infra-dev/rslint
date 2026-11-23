@@ -32,6 +32,7 @@ type discoveryWalkResult struct {
 	files              []string
 	pending            *suspendedDiscoveryNode
 	candidateToAdopt   *configLoadState
+	fallbackOwner      string
 	directoriesVisited int
 	directoriesPruned  int
 	err                error
@@ -65,6 +66,9 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 				return result.err
 			}
 			coordinator.walkStats.directoriesVisited += result.directoriesVisited
+			if result.fallbackOwner != "" {
+				coordinator.draft.addFallback(queue[index].directory, result.fallbackOwner)
+			}
 			coordinator.walkStats.directoriesPruned += result.directoriesPruned
 			for _, file := range result.files {
 				coordinator.reachableFiles[file] = true
@@ -176,6 +180,8 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 				node.ownerDir = state.candidate.directory
 				node.ownerPath = state.candidate.path
 				node.ignoreMatcher = state.ignoreMatcher
+			} else {
+				result.fallbackOwner = node.ownerDir
 			}
 		}
 	}

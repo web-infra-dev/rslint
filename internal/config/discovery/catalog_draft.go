@@ -22,6 +22,14 @@ type catalogDraft struct {
 	configs         map[string]rslintconfig.RslintConfig
 	selectedSources map[string]selectedConfigSource
 	scopes          map[string]target.OwnerScope
+	fallbacks       map[fallbackScope]bool
+}
+
+func (draft *catalogDraft) addFallback(path, owner string) {
+	if draft.fallbacks == nil {
+		draft.fallbacks = make(map[fallbackScope]bool)
+	}
+	draft.fallbacks[fallbackScope{path, owner}] = true
 }
 
 func newCatalogDraft() catalogDraft {
