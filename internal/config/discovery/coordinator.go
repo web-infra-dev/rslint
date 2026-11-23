@@ -36,6 +36,8 @@ func newDiscoveryCoordinator(
 	explicit *ExplicitConfigRequest,
 	transactionID string,
 ) discoveryCoordinator {
+	git := gitignore.NewReader(fsys)
+	git.BeforeConfigRead = request.BeforeGitConfigRead
 	return discoveryCoordinator{
 		ctx:           ctx,
 		fs:            fsys,
@@ -50,7 +52,7 @@ func newDiscoveryCoordinator(
 			request.Fresh,
 			request.SingleThreaded,
 		),
-		git:                 gitignore.NewReader(fsys),
+		git:                 git,
 		draft:               newCatalogDraft(),
 		physicalDirectories: make(map[string]string),
 		inputNames:          rslintconfig.NewInputPathNames(fsys),

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 	"sort"
+	"sync"
 	"sync/atomic"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -69,8 +70,11 @@ type ConfigDiscoveryRequest struct {
 	ImplicitCWD          bool
 	// AdditionalGitFiles supply frozen file identities for Git source collection only.
 	AdditionalGitFiles []rslintconfig.PathIdentity
-	Fresh              bool
-	SingleThreaded     bool
+	// BeforeGitConfigRead subscribes before discovery reads native repository
+	// settings. Calls are serialized, and an error aborts discovery.
+	BeforeGitConfigRead func(paths []string) error
+	Fresh               bool
+	SingleThreaded      bool
 }
 
 // ExplicitConfigRequest supplies one invocation-wide config array, either
@@ -96,6 +100,7 @@ type ExplicitConfigRequest struct {
 	LimitDirectoryWalkToFiles bool
 	RecursiveDirectories      []rslintconfig.DirectoryIdentity
 	AdditionalGitFiles        []rslintconfig.PathIdentity
+	BeforeGitConfigRead       func(paths []string) error
 	Fresh                     bool
 	SingleThreaded            bool
 }
@@ -224,6 +229,7 @@ func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoa
 		LimitDirectoryWalkToFiles: request.LimitDirectoryWalkToFiles,
 		RecursiveDirectories:      request.RecursiveDirectories,
 		AdditionalGitFiles:        request.AdditionalGitFiles,
+		BeforeGitConfigRead:       request.BeforeGitConfigRead,
 		ImplicitCWD:               request.TargetFiles == nil && request.TargetDirectories == nil,
 		Fresh:                     request.Fresh,
 		SingleThreaded:            request.SingleThreaded,
@@ -242,6 +248,24 @@ func buildConfigCatalog(
 		return nil, errors.New("config discovery requires a filesystem")
 	}
 	transactionID := nextConfigDiscoveryTransactionID()
+	if watch := request.BeforeGitConfigRead; watch != nil {
+		var cancel context.CancelCauseFunc
+		ctx, cancel = context.WithCancelCause(ctx)
+		defer cancel(nil)
+		var mu sync.Mutex // Different repositories can be discovered in parallel.
+		request.BeforeGitConfigRead = func(paths []string) error {
+			mu.Lock()
+			defer mu.Unlock()
+			if err := context.Cause(ctx); err != nil {
+				return err
+			}
+			err := watch(paths)
+			if err != nil {
+				cancel(err)
+			}
+			return err
+		}
+	}
 
 	coordinator := newDiscoveryCoordinator(
 		ctx,
@@ -251,7 +275,11 @@ func buildConfigCatalog(
 		explicit,
 		transactionID,
 	)
-	return coordinator.build()
+	catalog, err := coordinator.build()
+	if request.BeforeGitConfigRead != nil && ctx.Err() != nil {
+		return nil, context.Cause(ctx)
+	}
+	return catalog, err
 }
 
 func normalizeDiscoveryPath(path string, cwd string) string {

@@ -348,11 +348,16 @@ func awaitConfigWatchEvent(t *testing.T, result <-chan error) error {
 }
 
 func TestGitPolicyFileWatchers(t *testing.T) {
+	gitConfig := "C:/Repo/.git/config"
+	server := &Server{gitConfigWatchFiles: map[string]string{config.ExactPathID(gitConfig): gitConfig}}
+	if !server.isWatchedGitConfig("c:/Repo/.git/config") || server.isWatchedGitConfig("C:/repo/.git/config") {
+		t.Fatal("Git config events should preserve directory spelling and accept either drive letter case")
+	}
 	roots := []config.DirectoryIdentity{{LexicalPath: "/workspace/packages/app", CanonicalPath: "/physical/app"}}
 	files := []config.PathIdentity{{Path: "/external-link/source.ts", CanonicalParentPath: "/outside/src"}}
 	directories := gitPolicyWatchDirectories(roots, files)
 	for _, relative := range []bool{false, true} {
-		watchers := gitPolicyFileWatchers(roots, directories, relative)
+		watchers := gitPolicyFileWatchers(roots, directories, []string{"/repo/.git/config"}, relative)
 		patterns := make(map[string]bool)
 		for _, watcher := range watchers {
 			pattern := watcher.GlobPattern.Pattern
@@ -370,6 +375,7 @@ func TestGitPolicyFileWatchers(t *testing.T) {
 			"/workspace/packages/app/**/.gitignore", "/workspace/packages/app/**/.git",
 			"/physical/app/**/.gitignore", "/physical/app/**/.git",
 			"/outside/src/.gitignore", "/outside/src/.git", "/outside/.git", "/.gitignore", "/.git",
+			"/repo/.git/config",
 		} {
 			if !patterns[path] {
 				t.Fatalf("relative=%v missing watcher %q: %+v", relative, path, patterns)

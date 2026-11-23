@@ -1431,8 +1431,11 @@ Additional current behaviors:
   Each request checks the document's current entry name and physical target so
   a rename or a new symlink destination takes effect before a file notification.
 - Dynamic Git watches cover workspace lexical/physical trees and open-document
-  ancestor chains for `.gitignore` and `.git` marker creation/deletion, never
-  `.git` contents. Watch ranges are registered before source observation and
+  ancestor chains for `.gitignore` and `.git` marker creation/deletion.
+  Before reading a repository's `core.ignoreCase`, discovery lets the LSP
+  register its shared Git config and its worktree-specific config. A linked
+  worktree can keep its Git directory outside the workspace.
+  Watch ranges are registered before source observation and
   replaced without dropping last-good or newly requested ranges after failure.
   Once the current range is registered, old-subscription cleanup failures do
   not block configuration refresh. The existing watcher set retains failed or
@@ -1508,8 +1511,9 @@ file identities before config discovery. On macOS the physical path uses the
 spelling stored on disk. Directory and glob selections retain their requested
 names through config discovery, including at nested configs. At physical file
 deduplication, target selection can report two distinct names that would
-share one lint result. The file CLI uses this fact to reject recording or
-verifying counts for those names together. Updates repeat this check against
+share one lint result. The file CLI checks the effective rules for each name.
+It reports a conflict if either name already has counts or a rule being
+recorded is enabled as an error for either name. Updates repeat this check against
 the latest baseline under the write lock. When one command fixes source and
 updates the baseline, the CLI computes both changes in memory. Under the lock
 it validates the counts, stages the JSON, applies the source edits and then

@@ -2636,10 +2636,12 @@ func TestCLIFinalChangeCommitterChecksUnchangedNameForSingleLink(t *testing.T) {
 		{PathIdentity: rslintconfig.FreezeFileIdentity(path, nil)},
 		{PathIdentity: rslintconfig.FreezeFileIdentity(alias, nil)},
 	}
+	// Use drive-qualified display names to exercise their spelling on every host.
+	files[0].Path, files[1].Path = "C:/project/file.js", "C:/project/alias.js"
 	result, err := newCLIFinalChangeCommitter(files).CommitFinalChanges(t.Context(), []linter.FileChange{
-		{Path: path, Before: "before", After: "fixed"},
+		{Path: files[0].Path, Before: "before", After: "fixed"},
 	})
-	if err == nil || !strings.Contains(err.Error(), alias) || !strings.Contains(err.Error(), path) || len(result.ConfirmedPaths) != 0 {
+	if err == nil || !strings.Contains(err.Error(), files[1].Path) || !strings.Contains(err.Error(), files[0].Path) || len(result.ConfirmedPaths) != 0 {
 		t.Fatalf("single-link alias conflict: result=%+v error=%v", result, err)
 	}
 	if content, err := os.ReadFile(alias); err != nil || string(content) != "before" {

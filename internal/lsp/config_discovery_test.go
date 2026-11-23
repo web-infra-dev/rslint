@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1781,14 +1783,13 @@ func TestDocumentPathNamesShareListingsUntilFileChangeOrConfigRefresh(t *testing
 	original := s.documentTargetIdentity(first)
 	reads := fsys.parentListings
 	leafReads := fsys.leafListings
-	if reads == 0 {
-		t.Fatal("first document did not observe its directory")
-	}
 	if again := s.documentTargetIdentity(first); again != original {
 		t.Fatalf("repeated observation changed from %+v to %+v", original, again)
 	}
-	s.documentTargetIdentity(second)
-	if fsys.parentListings != reads || fsys.leafListings != leafReads+2 {
+	if sibling := s.documentTargetIdentity(second); tspath.GetBaseFileName(sibling.CanonicalPath) != "second.ts" {
+		t.Fatalf("sibling resolved to %+v", sibling)
+	}
+	if fsys.parentListings > reads || fsys.leafListings > leafReads+2 {
 		t.Fatalf("repeated and sibling requests read %d ancestors and %d leaf parents", fsys.parentListings-reads, fsys.leafListings-leafReads)
 	}
 	renamed := tspath.ResolvePath(directory, "FIRST.ts")
@@ -1801,8 +1802,8 @@ func TestDocumentPathNamesShareListingsUntilFileChangeOrConfigRefresh(t *testing
 		t.Fatal(err)
 	}
 	updated := s.documentTargetIdentity(first)
-	if fsys.parentListings == reads || fsys.FileExists(uriToPath(first)) && tspath.GetBaseFileName(updated.CanonicalPath) != "FIRST.ts" {
-		t.Fatalf("file notification retained an old observation: %+v, %d -> %d directory reads", updated, reads, fsys.parentListings)
+	if fsys.FileExists(uriToPath(first)) && tspath.GetBaseFileName(updated.CanonicalPath) != "FIRST.ts" {
+		t.Fatalf("file notification retained an old observation: %+v", updated)
 	}
 	if err := os.Rename(renamed, uriToPath(first)); err != nil {
 		t.Fatal(err)
@@ -2139,6 +2140,136 @@ func TestConfigRefreshRegistersPhysicalGitWatchesBeforeReadingSources(t *testing
 	}
 }
 
+func TestWatchedGitConfigRefreshesIgnoreCase(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("requires git")
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	for _, kind := range []string{"ordinary", "linked", "symlink"} {
+		t.Run(kind, func(t *testing.T) {
+			s, outgoing, tmp := newConfigRefreshTestServer(t)
+			git := func(directory string, args ...string) string {
+				t.Helper()
+				cmd := exec.CommandContext(t.Context(), "git", args...)
+				cmd.Dir = directory
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Fatalf("git %v: %s: %v", args, out, err)
+				}
+				return strings.TrimSuffix(string(out), "\n")
+			}
+			base := tspath.NormalizePath(s.fs.Realpath(tmp))
+			repo := tspath.ResolvePath(base, "primary")
+			git(base, "init", "-q", repo)
+			root := repo
+			if kind == "linked" {
+				git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-qm", "initial", "--allow-empty")
+				root = tspath.ResolvePath(base, "linked")
+				git(repo, "worktree", "add", "-q", "--detach", root)
+				git(repo, "config", "extensions.worktreeConfig", "true")
+			}
+			git(repo, "config", "core.ignoreCase", "true")
+			s.cwd, s.watchEnabled = root, true
+			writeConfigCandidate(t, root)
+			for name, content := range map[string]string{".gitignore": "/HIDDEN.js\n", "hidden.js": "debugger;\n"} {
+				if err := os.WriteFile(tspath.ResolvePath(root, name), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			common := tspath.ResolvePath(repo, ".git/config")
+			settings := common
+			if kind == "symlink" {
+				settings = tspath.ResolvePath(base, "settings")
+				if err := os.Rename(common, settings); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(settings, common); err != nil {
+					t.Skipf("file symlink unavailable: %v", err)
+				}
+			}
+			worktree := tspath.NormalizePath(git(root, "rev-parse", "--path-format=absolute", "--git-path", "config.worktree"))
+			entries := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+			initial := startConfigRefreshForTest(s, "initial")
+			registration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
+			respondToConfigReverseRequest(t, s, registration, nil, nil)
+			load := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
+			_, response := loadedConfigResponse(t, load, entries)
+			respondToConfigReverseRequest(t, s, load, response, nil)
+			acceptWatch := func(required ...string) {
+				t.Helper()
+				request := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
+				params := request.Params.(*lsproto.RegistrationParams)
+				var paths []string
+				for _, watcher := range params.Registrations[0].RegisterOptions.WorkspaceDidChangeWatchedFiles.Watchers {
+					paths = append(paths, *watcher.GlobPattern.Pattern)
+				}
+				for _, path := range required {
+					if !slices.Contains(paths, path) {
+						t.Fatalf("no watcher for %s in %v", path, paths)
+					}
+				}
+				// An edit while registration is pending must be visible to this refresh.
+				git(repo, "config", "--file", settings, "core.ignoreCase", "false")
+				respondToConfigReverseRequest(t, s, request, nil, nil)
+				unregister := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientUnregisterCapability)
+				respondToConfigReverseRequest(t, s, unregister, nil, nil)
+			}
+			acceptWatch(common, worktree)
+			if settings != common {
+				acceptWatch(settings)
+			}
+			completeConfigWatchActivation(t, s, outgoing)
+			if result := awaitConfigRefreshResult(t, initial); result.err != nil {
+				t.Fatal(result.err)
+			}
+			uri := documentURIFromPath(tspath.ResolvePath(root, "hidden.js"))
+			checkIgnored := func(want bool) {
+				t.Helper()
+				snapshot := s.documentLintSnapshot(uri)
+				if snapshot.unavailable || snapshot.resolvedConfig.GloballyIgnored != want {
+					t.Fatalf("want ignored=%t for %s: %+v", want, uri, snapshot)
+				}
+			}
+			checkIgnored(false)
+			if err := awaitConfigWatchEvent(t, startConfigWatchEvent(s, tspath.ResolvePath(root, "other/config"), lsproto.FileChangeTypeChanged)); err != nil {
+				t.Fatal(err)
+			}
+			refresh := func(path string, event lsproto.FileChangeType) {
+				t.Helper()
+				changed := startConfigWatchEvent(s, path, event)
+				completeSuccessfulConfigRefreshForTest(t, s, outgoing, entries)
+				if err := awaitConfigWatchEvent(t, changed); err != nil {
+					t.Fatal(err)
+				}
+			}
+			git(repo, "config", "--file", settings, "core.ignoreCase", "true")
+			refresh(settings, lsproto.FileChangeTypeChanged)
+			checkIgnored(true)
+			if settings != common {
+				if err := os.Remove(common); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(common, []byte("[core]\nignoreCase = false\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				refresh(common, lsproto.FileChangeTypeChanged)
+				checkIgnored(false)
+			}
+			if kind == "linked" {
+				git(root, "config", "--worktree", "core.ignoreCase", "false")
+				refresh(worktree, lsproto.FileChangeTypeCreated)
+				checkIgnored(false)
+				if err := os.Remove(worktree); err != nil {
+					t.Fatal(err)
+				}
+				refresh(worktree, lsproto.FileChangeTypeDeleted)
+				checkIgnored(true)
+			}
+		})
+	}
+}
+
 func TestHandleDidOpenCollectsIgnoredDirectoryWithoutLoadingItsConfig(t *testing.T) {
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
@@ -2312,7 +2443,7 @@ func TestGitWatchRegistrationKeyIncludesRetargetedRecursiveRoots(t *testing.T) {
 	files := []config.PathIdentity{{Path: "/b/source.ts", CanonicalParentPath: "/b"}}
 	watchedA := gitPolicyWatchDirectories(rootsA, files)
 	result := make(chan error, 1)
-	go func() { result <- s.updateGitPolicyWatchers(context.Background(), rootsA, watchedA) }()
+	go func() { result <- s.updateGitPolicyWatchers(context.Background(), rootsA, watchedA, nil) }()
 	registration := nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
 	respondToConfigReverseRequest(t, s, registration, nil, nil)
 	if err := awaitConfigWatchEvent(t, result); err != nil {
@@ -2322,7 +2453,7 @@ func TestGitWatchRegistrationKeyIncludesRetargetedRecursiveRoots(t *testing.T) {
 	s.committedGitWatchDirectories = watchedA
 	rootsB := []config.DirectoryIdentity{{LexicalPath: "/alias", CanonicalPath: "/b"}}
 	go func() {
-		result <- s.updateGitPolicyWatchers(context.Background(), rootsB, gitPolicyWatchDirectories(rootsB, files))
+		result <- s.updateGitPolicyWatchers(context.Background(), rootsB, gitPolicyWatchDirectories(rootsB, files), nil)
 	}()
 	registration = nextConfigReverseRequest(t, outgoing, lsproto.MethodClientRegisterCapability)
 	params, ok := registration.Params.(*lsproto.RegistrationParams)

@@ -47,7 +47,7 @@ func TestScopedUpdate(t *testing.T) {
 	}
 	run := func(options Options, unused bool) *File {
 		t.Helper()
-		file, err := Open(options, nil)
+		file, err := Open(options, cwd, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -80,17 +80,18 @@ func TestScopedUpdate(t *testing.T) {
 }
 
 func TestWorkingDirectoryLookupRequiresAnActiveBaseline(t *testing.T) {
-	t.Chdir(t.TempDir())
+	cwd := t.TempDir()
+	t.Chdir(cwd)
 	directory := ""
 	stored := func(cwd string) string {
 		directory = cwd
 		return "/stored"
 	}
-	empty, err := Open(Options{}, stored)
+	empty, err := Open(Options{}, cwd, stored)
 	if err != nil || empty != nil || directory != "" {
 		t.Fatalf("empty check: baseline=%v, observed directory=%q, err=%v", empty, directory, err)
 	}
-	active, err := Open(Options{Mode: Record}, stored)
+	active, err := Open(Options{Mode: Record}, cwd, stored)
 	if err != nil || directory == "" || active.fileKey("/stored/file.js") != "file.js" {
 		t.Fatalf("active baseline: observed directory=%q, err=%v", directory, err)
 	}
@@ -125,7 +126,7 @@ func TestLintedPathsFromSymlinkedDirectory(t *testing.T) {
 	alias := filepath.ToSlash(filepath.Join(link, "src", "File.js"))
 	run := func(mode Mode, display string, found, visibleCount int) *File {
 		t.Helper()
-		baseline, err := Open(Options{Mode: mode, Location: path}, nil)
+		baseline, err := Open(Options{Mode: mode, Location: path}, cwd, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -163,7 +164,7 @@ func TestLintedPathsFromSymlinkedDirectory(t *testing.T) {
 		root:             filepath.Join(root, "rslint-suppressions_"+cwdHash(native)),
 		"../shared.json": filepath.Join(filepath.Dir(native), "shared.json"),
 	} {
-		store, err := Open(Options{Mode: Record, Location: location}, nil)
+		store, err := Open(Options{Mode: Record, Location: location}, cwd, nil)
 		if err != nil || store.path != expected {
 			t.Fatalf("location %q: got %v, error %v, want %q", location, store, err, expected)
 		}
@@ -212,11 +213,11 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 	makeDirectoryLink(t, cwd, link)
 	t.Chdir(link)
 	options := Options{Mode: Record}
-	first, err := Open(options, nil)
+	first, err := Open(options, link, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := Open(options, nil)
+	second, err := Open(options, link, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +256,7 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 	if err := update(ctx, first, "cancelled"); err == nil {
 		t.Fatal("cancelled update succeeded")
 	}
-	reopened, err := Open(Options{}, nil)
+	reopened, err := Open(Options{}, link, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,14 +269,14 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 		if err := os.Symlink(DefaultFilename, location); err != nil {
 			t.Skipf("file symlink unavailable: %v", err)
 		}
-		linked, err := Open(Options{Mode: Record, Location: location}, nil)
+		linked, err := Open(Options{Mode: Record, Location: location}, link, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := update(t.Context(), linked, "linked"); err != nil {
 			t.Fatal(err)
 		}
-		reopened, err := Open(Options{}, nil)
+		reopened, err := Open(Options{}, link, nil)
 		if err != nil || reopened == nil || reopened.entries["test.js"]["linked"].Count != 1 {
 			t.Fatalf("update through file symlink: %v, error %v", reopened, err)
 		}
@@ -299,15 +300,17 @@ func TestUpdateRechecksTargetAliases(t *testing.T) {
 	}{
 		{"prune", Options{Mode: Prune}, "app.js"},
 		{"record no rules", Options{Mode: Record, Rules: []string{}}, "entry.js"},
+		{"record unrelated rule", Options{Mode: Record, Rules: []string{"other"}}, "entry.js"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			t.Chdir(t.TempDir())
-			baseline, err := Open(test.options, nil)
+			cwd := t.TempDir()
+			t.Chdir(cwd)
+			baseline, err := Open(test.options, cwd, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 			selected := baseline.cwd + "app.js"
-			baseline.NoteTargetAlias(selected, baseline.cwd+"entry.js")
+			baseline.NoteTargetAlias(selected, baseline.cwd+"entry.js", false)
 			if err := baseline.CheckTargetAliases(); err != nil {
 				t.Fatal(err)
 			}
@@ -334,7 +337,7 @@ func TestPreparePreservesProtectedCountsFromAnotherWriter(t *testing.T) {
 	if err := os.WriteFile(target, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	baseline, err := Open(Options{Mode: Prune}, nil)
+	baseline, err := Open(Options{Mode: Prune}, cwd, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

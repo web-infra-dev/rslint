@@ -179,7 +179,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 	var baseline *suppressions.File
 	if !typeCheckOnly {
-		baseline, err = suppressions.Open(args.Suppressions, args.storedWorkingDirectory)
+		baseline, err = suppressions.Open(args.Suppressions, workingDirectory, args.storedWorkingDirectory)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 2
@@ -367,8 +367,11 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			PathSpaces:      pathSpaces,
 			SingleThreaded:  singleThreaded,
 		}
+		var aliases [][2]target.File
 		if baseline != nil {
-			request.OnFileAlias = baseline.NoteTargetAlias
+			request.OnFileAlias = func(kept, discarded target.File) {
+				aliases = append(aliases, [2]target.File{kept, discarded})
+			}
 		}
 		targetPlan, err = target.Resolve(request)
 		if err != nil {
@@ -388,11 +391,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				}
 			}
 		}
-		if baseline != nil && (fix || args.Suppressions.Mode != suppressions.Check) {
-			if err := baseline.CheckTargetAliases(); err != nil {
-				return abortRun(2, err.Error(), err.Error())
-			}
-		}
 		configResolver = configLint.NewResolver(configLint.ResolverOptions{
 			ConfigsByOwner:       configMap,
 			Config:               rslintConfig,
@@ -403,6 +401,15 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			GitPolicy:            targetPlan.GitPolicy(),
 			FS:                   fs,
 		})
+		for _, pair := range aliases {
+			kept, other := pair[0], pair[1]
+			baseline.NoteTargetAlias(kept.Path, other.Path, mayRecordAlias(args.Suppressions, configResolver, kept, other))
+		}
+		if baseline != nil && (fix || args.Suppressions.Mode != suppressions.Check) {
+			if err := baseline.CheckTargetAliases(); err != nil {
+				return abortRun(2, err.Error(), err.Error())
+			}
+		}
 		projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files, singleThreaded)
 		if err != nil {
 			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))

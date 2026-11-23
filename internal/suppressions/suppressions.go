@@ -23,6 +23,11 @@ type Options struct {
 	Rules    []string // In Record mode nil selects all rules and an empty list selects none.
 }
 
+// SelectsRule reports whether a rule is included by the requested rule filter.
+func (o Options) SelectsRule(name string) bool {
+	return o.Rules == nil || slices.Contains(o.Rules, name)
+}
+
 type entry struct {
 	Count int `json:"count"`
 }
@@ -31,10 +36,12 @@ type entries map[string]map[string]entry
 
 type targetAlias struct {
 	selected, other string
+	mayRecord       bool
 }
 
 type File struct {
 	cwd           string // Physical working directory, slash-separated and ending in a slash.
+	cwdAlias      string // Working directory used for target selection when it differs from cwd.
 	path          string
 	options       Options
 	entries       entries
@@ -44,8 +51,9 @@ type File struct {
 }
 
 // NoteTargetAlias records two selected filenames for which lint will run only once.
-func (f *File) NoteTargetAlias(selected, other string) {
-	alias := targetAlias{selected: f.fileKey(selected), other: f.fileKey(other)}
+// mayRecord reports whether either enables an error rule selected for recording.
+func (f *File) NoteTargetAlias(selected, other string, mayRecord bool) {
+	alias := targetAlias{selected: f.fileKey(selected), other: f.fileKey(other), mayRecord: mayRecord}
 	if alias.selected != alias.other {
 		f.targetAliases = append(f.targetAliases, alias)
 	}
@@ -66,9 +74,8 @@ func (f *File) PreserveCounts(path string, reason error) {
 }
 
 func (f *File) checkTargetAliases(data entries) error {
-	recordingRules := f.options.Mode == Record && (f.options.Rules == nil || len(f.options.Rules) > 0)
 	for _, alias := range f.targetAliases {
-		if recordingRules || len(data[alias.selected]) != 0 || len(data[alias.other]) != 0 {
+		if alias.mayRecord || len(data[alias.selected]) != 0 || len(data[alias.other]) != 0 {
 			return fmt.Errorf("cannot verify suppressions for %q and %q together because they refer to the same file. Run rslint on each path separately or exclude one path", alias.selected, alias.other)
 		}
 	}
@@ -148,7 +155,7 @@ func (f *File) record(data entries, files map[string]*checkedFile) (bool, error)
 	changed := false
 	for _, file := range files {
 		for id, count := range file.counts {
-			if f.options.Rules != nil && !slices.Contains(f.options.Rules, id) {
+			if !f.options.SelectsRule(id) {
 				continue
 			}
 			if data[file.key][id].Count == count {

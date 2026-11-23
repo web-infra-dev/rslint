@@ -47,6 +47,11 @@ type Reader struct {
 	covered        map[tspath.Path]string
 	blockedEntries map[tspath.Path]string
 	ancestors      map[tspath.Path]Cursor
+
+	// BeforeConfigRead subscribes to a native repository's configuration files
+	// before reading its ignore-case setting. Nil paths mean Git could not
+	// identify the current files. It can be called concurrently.
+	BeforeConfigRead func(paths []string) error
 }
 
 type repositoryMarker struct {
@@ -89,14 +94,49 @@ func (reader *Reader) repositoryCaseInsensitive(directory, marker string) bool {
 	if os.SameFile(info, info) && (info.Mode().IsRegular() && info.Size() > 0 ||
 		info.IsDir() && reader.fs.FileExists(tspath.CombinePaths(marker, "HEAD"))) {
 		if native, err := os.Stat(marker); err == nil && os.SameFile(info, native) {
-			cmd := exec.Command("git", "--git-dir="+marker, "config", "--bool", "--default=false", "--get", "core.ignoreCase")
-			cmd.Dir = directory
-			if value, err := cmd.Output(); err == nil {
-				return strings.TrimSpace(string(value)) == "true"
+			if reader.BeforeConfigRead != nil {
+				if err := reader.watchRepositoryConfig(directory, marker); err != nil {
+					return false
+				}
+			}
+			if value, ok := repositoryGitOutput(directory, "--git-dir="+marker, "config", "--bool", "--default=false", "--get", "core.ignoreCase"); ok {
+				return strings.TrimSpace(value) == "true"
 			}
 		}
 	}
 	return reader.caseInsensitive(directory, ".git")
+}
+
+func repositoryGitOutput(directory string, args ...string) (string, bool) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = directory
+	value, err := cmd.Output()
+	return strings.TrimSuffix(string(value), "\n"), err == nil
+}
+
+func (reader *Reader) watchRepositoryConfig(directory, marker string) error {
+	var entries []string
+	for _, file := range []struct{ option, name string }{{"--git-common-dir", "config"}, {"--absolute-git-dir", "config.worktree"}} {
+		dir, ok := repositoryGitOutput(directory, "--git-dir="+marker, "rev-parse", "--path-format=absolute", file.option)
+		if !ok {
+			return reader.BeforeConfigRead(nil)
+		}
+		entries = append(entries, tspath.CombinePaths(tspath.NormalizePath(dir), file.name))
+	}
+	if err := reader.BeforeConfigRead(entries); err != nil {
+		return err
+	}
+	// Subscribe to changes of the link before observing its current target.
+	var targets []string
+	for _, entry := range entries {
+		if target := reader.fs.Realpath(entry); target != "" && target != entry {
+			targets = append(targets, tspath.NormalizePath(target))
+		}
+	}
+	if len(targets) != 0 {
+		return reader.BeforeConfigRead(targets)
+	}
+	return nil
 }
 
 func (reader *Reader) newRoot(directory string) Cursor {

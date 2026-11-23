@@ -4,10 +4,28 @@ import (
 	"context"
 	"slices"
 
+	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/suppressions"
 )
+
+// Lint runs once, but rules and their options can differ between the two names.
+func mayRecordAlias(options suppressions.Options, resolver *configLint.Resolver, kept, discarded target.File) bool {
+	if options.Mode != suppressions.Record || (options.Rules != nil && len(options.Rules) == 0) {
+		return false
+	}
+	for _, file := range [...]target.File{kept, discarded} {
+		resolved, ok := resolver.ResolveTarget(file)
+		if !ok || slices.ContainsFunc(resolved.EnabledRules, func(r rule.ConfiguredRule) bool {
+			return r.Severity == rule.SeverityError && options.SelectsRule(r.Name)
+		}) {
+			return true
+		}
+	}
+	return false
+}
 
 func applyLintSuppressions(
 	ctx context.Context,

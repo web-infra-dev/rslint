@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"sort"
 	"strings"
@@ -310,6 +311,7 @@ type preparedLSPConfigSnapshot struct {
 	gitPolicy                *config.GitPolicy
 	inputNames               *config.InputPathNames
 	gitWatchDirectories      []string
+	gitConfigFiles           map[string]string
 }
 
 // lspDiscoveredConfigSnapshot is commit-ready: its configuration state and
@@ -439,26 +441,46 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 		gitFiles = append(gitFiles, file)
 	}
 	gitWatchDirectories := gitPolicyWatchDirectories(directories, gitFiles)
-	if err := s.updateGitPolicyWatchers(ctx, directories, gitWatchDirectories); err != nil {
+	if err := s.updateGitPolicyWatchers(ctx, directories, gitWatchDirectories, nil); err != nil {
 		return configRefreshResponse{}, err
+	}
+	configFiles := make(map[string]string)
+	beforeGitConfigRead := func(paths []string) error {
+		if paths == nil {
+			// Git may reject a malformed config even while locating its directory.
+			maps.Copy(configFiles, s.gitConfigWatchFiles)
+			return nil
+		}
+		missing := false
+		for _, path := range paths {
+			id := config.ExactPathID(path)
+			configFiles[id] = path
+			missing = missing || s.gitConfigWatchFiles[id] == ""
+		}
+		if missing {
+			return s.updateGitPolicyWatchers(ctx, directories, gitWatchDirectories, configFiles)
+		}
+		return nil
 	}
 	var configCatalog *discovery.ConfigCatalog
 	var err error
 	if s.configRefreshConfigPath == "" {
 		configCatalog, err = discovery.DiscoverAutomatic(ctx, snapshotFS, loader, discovery.ConfigDiscoveryRequest{
-			CWD:                cwd,
-			ImplicitCWD:        true,
-			Directories:        directories,
-			AdditionalGitFiles: gitFiles,
-			Fresh:              true,
+			CWD:                 cwd,
+			ImplicitCWD:         true,
+			Directories:         directories,
+			AdditionalGitFiles:  gitFiles,
+			BeforeGitConfigRead: beforeGitConfigRead,
+			Fresh:               true,
 		})
 	} else {
 		configCatalog, err = discovery.LoadExplicitConfig(ctx, snapshotFS, loader, discovery.ExplicitConfigRequest{
-			CWD:                cwd,
-			ConfigPath:         s.configRefreshConfigPath,
-			TargetDirectories:  directories,
-			AdditionalGitFiles: gitFiles,
-			Fresh:              true,
+			CWD:                 cwd,
+			ConfigPath:          s.configRefreshConfigPath,
+			TargetDirectories:   directories,
+			AdditionalGitFiles:  gitFiles,
+			BeforeGitConfigRead: beforeGitConfigRead,
+			Fresh:               true,
 		})
 	}
 	if err != nil {
@@ -489,6 +511,7 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 		)
 	}
 	preparedSnapshot.gitWatchDirectories = gitWatchDirectories
+	preparedSnapshot.gitConfigFiles = configFiles
 	preparedSnapshot.inputNames = names
 	// The candidate already contains an immutable Git policy. A later
 	// filesystem mutation belongs to the next transaction and cannot alter this
@@ -834,6 +857,7 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.documentPathNames = snapshot.inputNames
 	s.failedGitPolicyDirectories = nil
 	s.committedGitWatchDirectories = snapshot.gitWatchDirectories
+	s.gitConfigWatchFiles = snapshot.gitConfigFiles
 	for _, ruleName := range snapshot.shadowedPluginRules {
 		fmt.Fprintf(
 			os.Stderr,

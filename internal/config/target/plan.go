@@ -42,9 +42,9 @@ type Request struct {
 	GitPolicy       *rslintconfig.GitPolicy
 	PathSpaces      *rslintconfig.PathSpaceSnapshot
 	SingleThreaded  bool
-	// OnFileAlias receives the kept and discarded names when two distinct
+	// OnFileAlias receives the kept and discarded targets when two distinct
 	// selected paths share a physical file and config owner.
-	OnFileAlias func(kept, discarded string)
+	OnFileAlias func(kept, discarded File)
 }
 
 // Resolve discovers the exact lint target set and rejects
@@ -143,7 +143,7 @@ func Resolve(request Request) (Plan, error) {
 				)
 			}
 			if request.OnFileAlias != nil && existing.Path != target.Path {
-				request.OnFileAlias(existing.Path, target.Path)
+				request.OnFileAlias(existing, target)
 			}
 			continue
 		}

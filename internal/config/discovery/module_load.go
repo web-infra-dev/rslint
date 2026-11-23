@@ -242,7 +242,6 @@ func (coordinator *moduleLoadCoordinator) configOwner(candidate configCandidate)
 // with different case sensitivity from the host default. Verify that each
 // differing component addresses the same directory entry.
 func sameDirectoryEntries(fsys vfs.FS, left, right string) bool {
-	left, right = rslintconfig.ExactPathID(left), rslintconfig.ExactPathID(right)
 	native, _ := fsys.(interface{ SameDirectoryEntry(left, right string) bool })
 
 	for left != right {

@@ -14,13 +14,15 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
 
-// Open reads the CLI baseline from the process working directory.
-// A plain check without a baseline returns nil.
-func Open(options Options, storedDirectory func(string) string) (*File, error) {
+// Open reads the CLI baseline from the native process working directory.
+// workingDirectory is the spelling used to select lint targets. A plain
+// check without a baseline returns nil.
+func Open(options Options, workingDirectory string, storedDirectory func(string) string) (*File, error) {
 	cwd, err := syscall.Getwd()
 	if err != nil {
 		return nil, err
@@ -65,12 +67,22 @@ func Open(options Options, storedDirectory func(string) string) (*File, error) {
 		cwd = storedDirectory(cwd)
 	}
 	f.cwd = tspath.EnsureTrailingDirectorySeparator(cwd)
+	if selected := filepath.ToSlash(workingDirectory); selected != cwd {
+		f.cwdAlias = tspath.EnsureTrailingDirectorySeparator(utils.NormalizeAbsoluteDrive(selected))
+	}
 	f.entries = data
 	return f, nil
 }
 
 // Lint paths under cwd already contain their slash-separated JSON key.
 func (f *File) fileKey(path string) string {
+	// A target under the cwd used for selection has the same relative name
+	// when the caller enters through a symlink. Keep links below that cwd.
+	if f.cwdAlias != "" {
+		if relative, ok := strings.CutPrefix(utils.NormalizeAbsoluteDrive(path), f.cwdAlias); ok {
+			return relative
+		}
+	}
 	dir := f.cwd
 	if relative, ok := strings.CutPrefix(path, dir); ok {
 		return relative

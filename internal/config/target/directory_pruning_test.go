@@ -2,6 +2,7 @@ package target
 
 import (
 	"context"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -482,11 +483,22 @@ func TestDiscoverFilesOutsidePrograms_UnrootedNegationConservative(t *testing.T)
 // macOS/Windows walks enter every ignored directory in large repositories.
 func TestDiscoverFilesOutsidePrograms_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *testing.T) {
 	configDir, paths := setupDiscoveryTxtarFixture(t, "case-insensitive")
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("Git is required to set the repository's ignore-case policy")
+	}
+	for _, args := range [][]string{{"init", "--quiet"}, {"config", "core.ignoreCase", "true"}} {
+		cmd := exec.Command(git, args...)
+		cmd.Dir = configDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, output)
+		}
+	}
 	config := rslintconfig.RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
-	spy := &caseInsensitiveSpyFS{spyFS: &spyFS{FS: osvfs.FS()}}
+	spy := &spyFS{FS: osvfs.FS()}
 	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, true)
 	dirs := spy.snapshotAccessedDirs()
 

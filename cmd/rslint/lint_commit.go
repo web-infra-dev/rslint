@@ -157,14 +157,14 @@ func (committer cliFinalChangeCommitter) checkHardLinkConflicts(ctx context.Cont
 				continue
 			}
 			if err != nil {
-				return fmt.Errorf("stat selected lint target %q: %w", path, err)
+				return fmt.Errorf("stat selected lint target %q: %w", file.Path, err)
 			}
 		}
 		first := firstByID[current.id]
 		if first == nil || (current.change != nil && current.change.After == first.After) {
 			continue
 		}
-		pair := [2]string{min(first.Path, path), max(first.Path, path)}
+		pair := [2]string{min(first.Path, file.Path), max(first.Path, file.Path)}
 		if conflict[0] == "" || slices.Compare(pair[:], conflict[:]) < 0 {
 			conflict = pair
 		}

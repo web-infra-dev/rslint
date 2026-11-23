@@ -196,6 +196,8 @@ type Server struct {
 	gitPolicyWatcherGeneration   uint64
 	gitPolicyWatcherKey          string
 	committedGitWatchDirectories []string
+	// Includes newly watched candidates until a successful commit replaces them.
+	gitConfigWatchFiles map[string]string
 	// jsUnavailableConfigs contains absolute config-directory paths for failed
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}

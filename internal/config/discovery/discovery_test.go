@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
@@ -2765,7 +2766,7 @@ func TestConfigDiscoveryCaseAliasDirectoryAndGlobReachNestedOwner(t *testing.T) 
 		Files:           catalog.TargetFiles,
 		Directories:     directories[:1],
 		ScanDirectories: map[string][]string{globFile: file.ScanDirectories},
-		OnFileAlias:     func(_, discarded string) { selected = append(selected, discarded) },
+		OnFileAlias:     func(_, discarded target.File) { selected = append(selected, discarded.Path) },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -3019,6 +3020,13 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 }
 
 func TestConfigDiscoveryUsesStoredOwnerNames(t *testing.T) {
+	const root = "C:/repo"
+	physical := tspath.CombinePaths(root, "physical")
+	module := tspath.CombinePaths(physical, "rslint.config.js")
+	disk := iovfs.From(fstest.MapFS{
+		module:                  &fstest.MapFile{Data: []byte("export default [];")},
+		physical + "/.git/HEAD": &fstest.MapFile{},
+	}, true)
 	for _, test := range []struct {
 		name         string
 		left, right  string
@@ -3030,12 +3038,9 @@ func TestConfigDiscoveryUsesStoredOwnerNames(t *testing.T) {
 		{"separate directory links", "Straße", "STRASSE", []string{"Straße", "STRASSE"}, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			root := discoveryTempDir(t)
-			physical := tspath.CombinePaths(root, "physical")
-			module := writeConfigCandidate(t, physical, "rslint.config.js")
 			left, right := tspath.CombinePaths(root, test.left), tspath.CombinePaths(root, test.right)
 			fsys := &configDiscoveryCaseSensitivityFS{
-				FS:             &configDiscoveryRealpathFS{FS: discoveryTestFS(), realPaths: map[string]string{left: physical, right: physical}},
+				FS:             &configDiscoveryRealpathFS{FS: disk, realPaths: map[string]string{left: physical, right: physical}},
 				directoryNames: map[string][]string{root: test.entries},
 			}
 			loader := newFixtureConfigLoader()
@@ -3105,7 +3110,7 @@ func TestConfigDiscoveryCoalescesNativeCaseAliasesWithoutRealpathCaseNormalizati
 	plan, err := target.Resolve(target.Request{
 		ConfigMap: catalog.Configs, OwnerScopes: catalog.Scopes, PathSpaces: catalog.PathSpaces,
 		Files: catalog.TargetFiles, GitPolicy: catalog.GitPolicy, FS: fsys,
-		OnFileAlias: func(kept, discarded string) { aliases = append(aliases, kept, discarded) },
+		OnFileAlias: func(kept, discarded target.File) { aliases = append(aliases, kept.Path, discarded.Path) },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -3143,7 +3148,7 @@ func TestConfigDiscoveryPreservesRequestedDirectorySpellingUnderRecursiveRoot(t 
 	_, err = target.Resolve(target.Request{
 		ConfigMap: catalog.Configs, OwnerScopes: catalog.Scopes, PathSpaces: catalog.PathSpaces,
 		Directories: catalog.TargetDirectories, GitPolicy: catalog.GitPolicy, FS: fsys,
-		OnFileAlias: func(kept, discarded string) { names = append(names, kept, discarded) },
+		OnFileAlias: func(kept, discarded target.File) { names = append(names, kept.Path, discarded.Path) },
 	})
 	if err != nil {
 		t.Fatal(err)
