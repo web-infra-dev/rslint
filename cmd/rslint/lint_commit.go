@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -19,32 +18,15 @@ import (
 // cliFinalChangeCommitter performs the CLI's one terminal disk projection.
 // All fix rounds happen in linter-owned memory before this adapter is called.
 type cliFinalChangeCommitter struct {
-	filesByPath map[string]*target.File
-	protected   map[string]error
+	canonicalByPath map[string]string
 }
 
 func newCLIFinalChangeCommitter(files []target.File) cliFinalChangeCommitter {
-	paths := make(map[string]*target.File, len(files))
-	for i := range files {
-		paths[rslintconfig.ExactPathID(files[i].Path)] = &files[i]
+	paths := make(map[string]string, len(files))
+	for _, file := range files {
+		paths[rslintconfig.ExactPathID(file.Path)] = tspath.NormalizePath(file.CanonicalPath)
 	}
-	return cliFinalChangeCommitter{filesByPath: paths}
-}
-
-// A config module or a plugin can replace a previously physical directory
-// with a symlink. Recheck the frozen paths before using their lint results to
-// change disk, including the separate containing directory of a leaf symlink.
-func verifyLintDestination(file *target.File) error {
-	fs := osvfs.FS()
-	physical := tspath.NormalizePath(file.CanonicalPath)
-	redirected := func(path string) bool {
-		return rslintconfig.ExactPathID(fs.Realpath(path)) != rslintconfig.ExactPathID(path)
-	}
-	if redirected(physical) || (file.CanonicalParentPath != "" &&
-		file.CanonicalParentPath != tspath.GetDirectoryPath(physical) && redirected(file.CanonicalParentPath)) {
-		return fmt.Errorf("lint target %q changed after lint generation. Run rslint again", file.Path)
-	}
-	return nil
+	return cliFinalChangeCommitter{canonicalByPath: paths}
 }
 
 func (committer cliFinalChangeCommitter) CommitFinalChanges(
@@ -66,21 +48,11 @@ func (committer cliFinalChangeCommitter) CommitFinalChanges(
 			preflightErrors = append(preflightErrors, err)
 			break
 		}
-		id := rslintconfig.ExactPathID(change.Path)
-		if err := committer.protected[id]; err != nil {
-			preflightErrors = append(preflightErrors, err)
-			continue
-		}
-		file, selected := committer.filesByPath[id]
+		physical, selected := committer.canonicalByPath[rslintconfig.ExactPathID(change.Path)]
 		if !selected {
 			preflightErrors = append(preflightErrors, fmt.Errorf("fix target %q is not a selected lint target", change.Path))
 			continue
 		}
-		if err := verifyLintDestination(file); err != nil {
-			preflightErrors = append(preflightErrors, err)
-			continue
-		}
-		physical := tspath.NormalizePath(file.CanonicalPath)
 		destinations[index] = physical
 		current, ok := readPhysicalFileText(physical)
 		if !ok {
@@ -92,9 +64,6 @@ func (committer cliFinalChangeCommitter) CommitFinalChanges(
 		}
 	}
 	if err := errors.Join(preflightErrors...); err != nil {
-		return result, err
-	}
-	if err := committer.checkHardLinkConflicts(ctx, changes, destinations); err != nil {
 		return result, err
 	}
 
@@ -111,68 +80,6 @@ func (committer cliFinalChangeCommitter) CommitFinalChanges(
 		result.ConfirmedPaths = append(result.ConfirmedPaths, change.Path)
 	}
 	return result, errors.Join(writeErrors...)
-}
-
-// An in-place write must agree with the final text verified for every selected
-// name for the file. Bind mounts can share a file even when its link count is one.
-func (committer cliFinalChangeCommitter) checkHardLinkConflicts(ctx context.Context, changes []linter.FileChange, destinations []string) error {
-	if len(committer.filesByPath) < 2 {
-		return nil
-	}
-	type changedFile struct {
-		change *linter.FileChange
-		id     fixFileID
-	}
-	// The first changed name in lexical order is enough to witness any
-	// disagreement, whether another name has a different edit or no edit.
-	firstByID := make(map[fixFileID]*linter.FileChange, len(changes))
-	byPath := make(map[string]changedFile, len(changes))
-	for index := range changes {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		change := &changes[index]
-		if change.Before == change.After {
-			continue
-		}
-		id, err := statFixFile(destinations[index])
-		if err != nil {
-			return fmt.Errorf("stat fix target %q: %w", change.Path, err)
-		}
-		byPath[rslintconfig.ExactPathID(change.Path)] = changedFile{change, id}
-		if first := firstByID[id]; first == nil || change.Path < first.Path {
-			firstByID[id] = change
-		}
-	}
-	var conflict [2]string
-	for path, file := range committer.filesByPath {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		current := byPath[path]
-		if current.change == nil {
-			var err error
-			current.id, err = statFixFile(tspath.NormalizePath(file.CanonicalPath))
-			if errors.Is(err, os.ErrNotExist) {
-				continue
-			}
-			if err != nil {
-				return fmt.Errorf("stat selected lint target %q: %w", file.Path, err)
-			}
-		}
-		first := firstByID[current.id]
-		if first == nil || (current.change != nil && current.change.After == first.After) {
-			continue
-		}
-		pair := [2]string{min(first.Path, file.Path), max(first.Path, file.Path)}
-		if conflict[0] == "" || slices.Compare(pair[:], conflict[:]) < 0 {
-			conflict = pair
-		}
-	}
-	if conflict[0] != "" {
-		return fmt.Errorf("hard-linked lint targets %q and %q require different final contents", conflict[0], conflict[1])
-	}
-	return nil
 }
 
 func readPhysicalFileText(path string) (string, bool) {

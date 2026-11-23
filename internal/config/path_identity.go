@@ -16,53 +16,12 @@ type PathIdentity struct {
 	Path                string
 	CanonicalPath       string
 	CanonicalParentPath string
-	// EntryName is the stored leaf name when it differs from the caller's spelling.
-	// For a symlink it names the link in its parent directory.
-	EntryName string
-	// An unlisted hard link can be read, but its stored name may affect Git
-	// exclusions. Capture any provable spelling constraints during discovery.
-	entryNameStatus entryNameStatus
-}
-
-type entryNameStatus uint8
-
-const (
-	entryNameUsable entryNameStatus = iota
-	entryNameUnlisted
-	entryNameUnlistedFoldedASCII
-	entryNameUnlistedExactASCII
-)
-
-func (identity PathIdentity) normalized() PathIdentity {
-	identity.Path = tspath.NormalizePath(identity.Path)
-	identity.CanonicalPath = tspath.NormalizePath(identity.CanonicalPath)
-	identity.CanonicalParentPath = tspath.NormalizePath(identity.CanonicalParentPath)
-	return identity
 }
 
 // DirectoryIdentity is the lexical and physical identity of one directory.
 // It is a low-level path value shared by lint-target and Git-ignore scope
 // planning; neither consumer owns the other's policy.
 type DirectoryIdentity = utils.DirectoryIdentity
-
-// FilesystemParentDirectory returns the lexical filesystem parent without walking
-// above a UNC share. tspath's generic root parser treats only the server as the
-// root, which is appropriate for URLs but not for filesystem traversal.
-func FilesystemParentDirectory(directory string) string {
-	directory = tspath.NormalizePath(directory)
-	if strings.HasPrefix(directory, "//") {
-		serverAndRest := strings.Trim(directory[2:], "/")
-		serverEnd := strings.IndexByte(serverAndRest, '/')
-		if serverEnd < 0 || !strings.Contains(serverAndRest[serverEnd+1:], "/") {
-			return ""
-		}
-	}
-	parent := tspath.GetDirectoryPath(directory)
-	if parent == directory {
-		return ""
-	}
-	return parent
-}
 
 // ResolveFileIdentities freezes requested file spellings without changing
 // their order or the distinction between omitted and empty input lists.

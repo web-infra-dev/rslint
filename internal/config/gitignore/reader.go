@@ -1,8 +1,6 @@
 package gitignore
 
 import (
-	"os"
-	"os/exec"
 	"sort"
 	"strings"
 	"sync"
@@ -12,17 +10,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// StoredEntryNamer reports the name stored in the parent directory without
-// following the entry's final symlink.
-type StoredEntryNamer interface {
-	StoredEntryName(path string) (string, error)
-}
-
 // Source is one observed .gitignore in physical repository coordinates.
 type Source struct {
-	Directory       string
-	Patterns        []Pattern
-	CaseInsensitive bool
+	Directory string
+	Patterns  []Pattern
 }
 
 // Snapshot owns the Git observations of one request. Empty roots and missing
@@ -32,6 +23,7 @@ type Snapshot struct {
 	Sources                 []Source
 	CoveredDirectories      []string
 	BlockedDirectoryEntries []string
+	UseCaseSensitive        bool
 }
 
 // Reader observes Git metadata once per request. It never resolves paths:
@@ -39,46 +31,39 @@ type Snapshot struct {
 // Same-directory observations share one initializer; unrelated directories may
 // perform IO concurrently. The mutex protects publication, never filesystem IO.
 type Reader struct {
-	fs             vfs.FS
-	mu             sync.Mutex
-	markers        map[tspath.Path]func() *repositoryMarker
-	sources        map[tspath.Path]func() Source
-	roots          map[tspath.Path]string
-	covered        map[tspath.Path]string
-	blockedEntries map[tspath.Path]string
-	ancestors      map[tspath.Path]Cursor
-
-	// BeforeConfigRead subscribes to a native repository's configuration files
-	// before reading its ignore-case setting. Nil paths mean Git could not
-	// identify the current files. It can be called concurrently.
-	BeforeConfigRead func(paths []string) error
-}
-
-type repositoryMarker struct {
-	caseInsensitive func() bool // Probed only if the repository contributes a rule.
+	fs               vfs.FS
+	useCaseSensitive bool
+	mu               sync.Mutex
+	markers          map[tspath.Path]func() bool
+	sources          map[tspath.Path]func() Source
+	roots            map[tspath.Path]string
+	covered          map[tspath.Path]string
+	blockedEntries   map[tspath.Path]string
+	ancestors        map[tspath.Path]Cursor
 }
 
 func NewReader(fsys vfs.FS) *Reader {
 	return &Reader{
-		fs:      fsys,
-		markers: make(map[tspath.Path]func() *repositoryMarker), sources: make(map[tspath.Path]func() Source),
+		fs: fsys, useCaseSensitive: fsys == nil || fsys.UseCaseSensitiveFileNames(),
+		markers: make(map[tspath.Path]func() bool), sources: make(map[tspath.Path]func() Source),
 		roots: make(map[tspath.Path]string), covered: make(map[tspath.Path]string),
 		blockedEntries: make(map[tspath.Path]string),
 		ancestors:      make(map[tspath.Path]Cursor),
 	}
 }
 
-func (reader *Reader) marker(directory string) *repositoryMarker {
-	id := DirectoryPathID(directory)
+func (reader *Reader) pathID(path string) tspath.Path {
+	return DirectoryPathID(path, reader.useCaseSensitive)
+}
+
+func (reader *Reader) hasMarker(directory string) bool {
+	id := reader.pathID(directory)
 	reader.mu.Lock()
 	load, ok := reader.markers[id]
 	if !ok {
 		marker := tspath.CombinePaths(directory, ".git")
-		load = sync.OnceValue(func() *repositoryMarker {
-			if reader.fs == nil || (!reader.fs.DirectoryExists(marker) && !reader.fs.FileExists(marker)) {
-				return nil
-			}
-			return &repositoryMarker{sync.OnceValue(func() bool { return reader.repositoryCaseInsensitive(directory, marker) })}
+		load = sync.OnceValue(func() bool {
+			return reader.fs != nil && (reader.fs.DirectoryExists(marker) || reader.fs.FileExists(marker))
 		})
 		reader.markers[id] = load
 	}
@@ -86,110 +71,11 @@ func (reader *Reader) marker(directory string) *repositoryMarker {
 	return load()
 }
 
-func (reader *Reader) repositoryCaseInsensitive(directory, marker string) bool {
-	// A linked worktree can have its config on another volume. A repository
-	// can also override the mode chosen by git init.
-	// Let Git resolve its own config only for a marker on the host filesystem.
-	info := reader.fs.Stat(marker)
-	if os.SameFile(info, info) && (info.Mode().IsRegular() && info.Size() > 0 ||
-		info.IsDir() && reader.fs.FileExists(tspath.CombinePaths(marker, "HEAD"))) {
-		if native, err := os.Stat(marker); err == nil && os.SameFile(info, native) {
-			if reader.BeforeConfigRead != nil {
-				if err := reader.watchRepositoryConfig(directory, marker); err != nil {
-					return false
-				}
-			}
-			if value, ok := repositoryGitOutput(directory, "--git-dir="+marker, "config", "--bool", "--default=false", "--get", "core.ignoreCase"); ok {
-				return strings.TrimSpace(value) == "true"
-			}
-		}
-	}
-	return reader.caseInsensitive(directory, ".git")
-}
-
-func repositoryGitOutput(directory string, args ...string) (string, bool) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = directory
-	value, err := cmd.Output()
-	return strings.TrimSuffix(string(value), "\n"), err == nil
-}
-
-func (reader *Reader) watchRepositoryConfig(directory, marker string) error {
-	var entries []string
-	for _, file := range []struct{ option, name string }{{"--git-common-dir", "config"}, {"--absolute-git-dir", "config.worktree"}} {
-		dir, ok := repositoryGitOutput(directory, "--git-dir="+marker, "rev-parse", "--path-format=absolute", file.option)
-		if !ok {
-			return reader.BeforeConfigRead(nil)
-		}
-		entries = append(entries, tspath.CombinePaths(tspath.NormalizePath(dir), file.name))
-	}
-	if err := reader.BeforeConfigRead(entries); err != nil {
-		return err
-	}
-	// Git resolves even a missing target. Watch the link first so replacing
-	// it while the target subscription is being installed triggers a refresh.
-	var targets []string
-	for _, entry := range entries {
-		if _, err := os.Readlink(entry); err != nil {
-			continue
-		}
-		target, ok := repositoryGitOutput(directory, "--git-dir="+marker, "rev-parse", "--path-format=absolute", "--git-path", tspath.GetBaseFileName(entry))
-		if !ok {
-			return reader.BeforeConfigRead(nil)
-		}
-		targets = append(targets, tspath.NormalizePath(target))
-	}
-	if len(targets) != 0 {
-		return reader.BeforeConfigRead(targets)
-	}
-	return nil
-}
-
 func (reader *Reader) newRoot(directory string) Cursor {
 	reader.mu.Lock()
-	reader.roots[DirectoryPathID(directory)] = directory
+	reader.roots[reader.pathID(directory)] = directory
 	reader.mu.Unlock()
-	return NewCursor(directory, true)
-}
-
-// The observed metadata entry is a read-only case probe on its own mount.
-// A case-sensitive directory can contain both spellings, even as hard links.
-func (reader *Reader) caseInsensitive(directory, name string) bool {
-	path := tspath.CombinePaths(directory, name)
-	alternate := tspath.CombinePaths(directory, strings.ToUpper(name))
-	if !reader.fs.FileExists(alternate) && !reader.fs.DirectoryExists(alternate) {
-		// Some virtual sources can be read without a corresponding file entry.
-		if name == ".gitignore" && !reader.fs.FileExists(path) {
-			return !reader.fs.UseCaseSensitiveFileNames()
-		}
-		return false
-	}
-	if native, ok := reader.fs.(StoredEntryNamer); ok {
-		left, _ := native.StoredEntryName(path)
-		right, _ := native.StoredEntryName(alternate)
-		if left != "" && right != "" {
-			return left == right
-		}
-	}
-	left, right := reader.fs.Stat(path), reader.fs.Stat(alternate)
-	// SameFile can only compare native FileInfo. Distinct native objects
-	// already prove independent names without reading their directory.
-	if os.SameFile(left, left) && os.SameFile(right, right) && !os.SameFile(left, right) {
-		return false
-	}
-	entries := reader.fs.GetAccessibleEntries(directory)
-	count := 0
-	for _, group := range [][]string{entries.Files, entries.Directories} {
-		for _, entry := range group {
-			if strings.EqualFold(entry, name) {
-				count++
-			}
-		}
-	}
-	if count == 0 {
-		return !reader.fs.UseCaseSensitiveFileNames()
-	}
-	return count == 1
+	return NewCursor(directory, reader.useCaseSensitive)
 }
 
 // Ancestors finds the nearest .git directory or file, falling back to the
@@ -197,7 +83,7 @@ func (reader *Reader) caseInsensitive(directory, name string) bool {
 // caller decides whether to Observe physicalDir itself.
 func (reader *Reader) Ancestors(physicalDir string) Cursor {
 	physicalDir = normalizeGlobPath(physicalDir)
-	id := DirectoryPathID(physicalDir)
+	id := reader.pathID(physicalDir)
 	reader.mu.Lock()
 	if cursor, exists := reader.ancestors[id]; exists {
 		reader.mu.Unlock()
@@ -206,7 +92,7 @@ func (reader *Reader) Ancestors(physicalDir string) Cursor {
 	reader.mu.Unlock()
 	root := reader.RootDirectory(physicalDir)
 	chain := []string{physicalDir}
-	for current := physicalDir; DirectoryPathID(current) != DirectoryPathID(root); {
+	for current := physicalDir; reader.pathID(current) != reader.pathID(root); {
 		parent := parentDir(current)
 		if parent == "" || parent == current {
 			break
@@ -234,7 +120,7 @@ func (reader *Reader) Ancestors(physicalDir string) Cursor {
 // configuration above or outside the Git chain.
 func (reader *Reader) RootDirectory(physicalDir string) string {
 	current := normalizeGlobPath(physicalDir)
-	for reader.marker(current) == nil {
+	for !reader.hasMarker(current) {
 		parent := parentDir(current)
 		if parent == "" || parent == current {
 			break
@@ -253,10 +139,10 @@ func (reader *Reader) Enter(parent Cursor, physicalDir string) (Cursor, bool) {
 	next, blocked := parent.Enter(physicalDir)
 	if blocked {
 		reader.mu.Lock()
-		reader.blockedEntries[DirectoryPathID(physicalDir)] = physicalDir
+		reader.blockedEntries[reader.pathID(physicalDir)] = physicalDir
 		reader.mu.Unlock()
 	}
-	if reader.marker(physicalDir) != nil {
+	if reader.hasMarker(physicalDir) {
 		return reader.newRoot(physicalDir), blocked
 	}
 	return next, blocked
@@ -268,7 +154,7 @@ func (reader *Reader) Enter(parent Cursor, physicalDir string) (Cursor, bool) {
 // always has the same repository-root coordinate, even on overlapping routes.
 func (reader *Reader) Observe(cursor Cursor, physicalDir string) Cursor {
 	physicalDir = normalizeGlobPath(physicalDir)
-	id := DirectoryPathID(physicalDir)
+	id := reader.pathID(physicalDir)
 	reader.mu.Lock()
 	reader.covered[id] = physicalDir
 	if !cursor.SourceReachable() {
@@ -288,13 +174,6 @@ func (reader *Reader) Observe(cursor Cursor, physicalDir string) Cursor {
 			if reader.fs != nil {
 				if content, exists := reader.fs.ReadFile(tspath.CombinePaths(physicalDir, ".gitignore")); exists {
 					source.Patterns = convertGitignoreToPatterns(content, relative)
-					if len(source.Patterns) > 0 {
-						if marker := reader.marker(cursor.rootDir); marker != nil {
-							source.CaseInsensitive = marker.caseInsensitive()
-						} else {
-							source.CaseInsensitive = reader.caseInsensitive(physicalDir, ".gitignore")
-						}
-					}
 				}
 			}
 			return source
@@ -302,8 +181,7 @@ func (reader *Reader) Observe(cursor Cursor, physicalDir string) Cursor {
 		reader.sources[id] = load
 	}
 	reader.mu.Unlock()
-	source := load()
-	return cursor.appendPatterns(source.Patterns, source.CaseInsensitive)
+	return cursor.appendPatterns(load().Patterns)
 }
 
 // Snapshot returns detached, deterministically ordered data. Later reader
@@ -311,7 +189,7 @@ func (reader *Reader) Observe(cursor Cursor, physicalDir string) Cursor {
 // observations published at the snapshot boundary without holding the mutex.
 func (reader *Reader) Snapshot() Snapshot {
 	reader.mu.Lock()
-	var snapshot Snapshot
+	snapshot := Snapshot{UseCaseSensitive: reader.useCaseSensitive}
 	for _, root := range reader.roots {
 		snapshot.Roots = append(snapshot.Roots, root)
 	}
@@ -341,12 +219,12 @@ func (reader *Reader) Snapshot() Snapshot {
 // ParentDirectory stops at filesystem volume boundaries, including UNC shares.
 func ParentDirectory(directory string) string { return parentDir(directory) }
 
-// DirectoryPathID keys a frozen physical directory, preserving its entries
-// even when a different volume in this process is case-insensitive.
-func DirectoryPathID(directory string) tspath.Path {
+// DirectoryPathID makes root spellings with or without a trailing slash share
+// one identity while preserving filesystem and drive roots.
+func DirectoryPathID(directory string, useCaseSensitive bool) tspath.Path {
 	directory = normalizeGlobPath(directory)
 	if directory != "/" && (len(directory) != 3 || directory[1] != ':') {
 		directory = strings.TrimSuffix(directory, "/")
 	}
-	return tspath.ToPath(utils.NormalizeAbsoluteDrive(directory), "", true)
+	return tspath.ToPath(utils.NormalizeAbsoluteDrive(directory), "", useCaseSensitive)
 }

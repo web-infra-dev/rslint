@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+
+	"github.com/web-infra-dev/rslint/internal/config"
 )
 
 func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextDocumentParams) error {
@@ -13,10 +15,6 @@ func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextD
 	uri := params.TextDocument.Uri
 	content := params.TextDocument.Text
 
-	if s.docGeneration[uri] != 0 {
-		// A closed document may have been renamed before it was reopened.
-		s.documentPathNames = nil
-	}
 	s.documents[uri] = content
 	var affected []lsproto.DocumentUri
 	if s.lintPrograms != nil {
@@ -74,10 +72,7 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 	// Never replace the versioned document mirror with this unversioned snapshot.
 	currentContent, open := s.documents[uri]
 	forwardSave := shouldForwardDidSave(currentContent, open, params.Text)
-	if forwardSave {
-		// A previously virtual file or directory may now have a disk entry.
-		s.documentPathNames = nil
-	} else {
+	if !forwardSave {
 		log.Printf("Ignoring stale didSave for open document %s", uri)
 	}
 
@@ -112,7 +107,8 @@ func (s *Server) refreshUncoveredDocument(ctx context.Context, uri lsproto.Docum
 	if !s.configDiscoveryActive || !isLintableScriptFile(uri) {
 		return
 	}
-	directory := lspGitDirectory(s.documentTargetIdentity(uri).Identity())
+	identity := config.FreezeFileIdentity(uriToPath(uri), s.fs)
+	directory := lspGitDirectory(identity)
 	if s.gitPolicy.CoversDirectory(directory) {
 		return
 	}
@@ -139,9 +135,6 @@ func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTex
 	log.Printf("Handling didClose: %s", params.TextDocument.Uri)
 	uri := params.TextDocument.Uri
 	delete(s.documents, uri)
-	if len(s.documents) == 0 {
-		s.documentPathNames = nil
-	}
 	delete(s.lintSchedule.pending, uri)
 	// Bump (do NOT delete) the generation on close so any in-flight plugin
 	// result for this URI is stale. Keeping the counter monotonic — rather

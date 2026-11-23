@@ -22,7 +22,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
-	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
@@ -57,7 +56,7 @@ func TestClassifyPaths(t *testing.T) {
 	}
 	missing := filepath.Join(dir, "nope.ts")
 
-	files, dirs := classifyPaths(dir, []string{dir, filepath.Base(file), missing})
+	files, dirs := classifyPaths([]string{dir, file, missing})
 
 	wantDir := tspath.NormalizePath(dir)
 	if len(dirs) != 1 || dirs[0] != wantDir {
@@ -66,64 +65,6 @@ func TestClassifyPaths(t *testing.T) {
 	wantFiles := []string{tspath.NormalizePath(file), tspath.NormalizePath(missing)}
 	if len(files) != 2 || files[0] != wantFiles[0] || files[1] != wantFiles[1] {
 		t.Errorf("files = %v, want %v", files, wantFiles)
-	}
-}
-
-func TestCLIWorkingDirectoryUsesStoredDirectoryName(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
-	stored := tspath.CombinePaths(root, "project")
-	if err := os.Mkdir(stored, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	alternate := tspath.CombinePaths(root, "PROJECT")
-	if _, err := os.Stat(alternate); os.IsNotExist(err) {
-		t.Skip("fixture requires case-insensitive directory lookup")
-	} else if err != nil {
-		t.Fatal(err)
-	}
-	t.Chdir(alternate)
-	cwd, err := new(lintArgs).cliWorkingDirectory()
-	if err != nil || cwd != stored {
-		t.Fatalf("working directory = %q, err = %v, want %q", cwd, err, stored)
-	}
-}
-
-func TestCLIDoubleSlashPaths(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		const unc = "//server/share/file.ts"
-		if got := target.NormalizeNativePath(unc); got != unc {
-			t.Fatalf("UNC path = %q, want %q", got, unc)
-		}
-		return
-	}
-
-	root := osvfs.FS().Realpath(txtarfs.MustParseFile(t, "testdata/cli_globs.txtar").Materialize(t, ""))
-	t.Chdir(root)
-	t.Setenv("PWD", "/"+root)
-	if cwd, err := new(lintArgs).cliWorkingDirectory(); err != nil || cwd != root {
-		t.Fatalf("working directory = %q, %v; want %q", cwd, err, root)
-	}
-	file := tspath.ResolvePath(root, "src/a.ts")
-	dir := tspath.ResolvePath(root, "other")
-	for _, prefix := range []string{"//", `/\`, `/\\`, `/\ignored/../`} {
-		for _, exact := range []bool{false, true} {
-			args := lintArgs{FS: osvfs.FS()}
-			wantFiles := []string{file}
-			inputs := []string{prefix + file[1:], prefix + dir[1:]}
-			var exactPaths []string
-			if exact {
-				exactPaths = inputs
-			} else {
-				args.Positional = append(inputs, prefix+root[1:]+`/src/\[ab\].ts`)
-				wantFiles = append(wantFiles, tspath.ResolvePath(root, "src/[ab].ts"))
-			}
-			if err := prepareCLIInputs(t.Context(), &args, exactPaths); err != nil {
-				t.Fatal(err)
-			}
-			if !slices.Equal(args.AllowFiles, wantFiles) || !slices.Equal(args.AllowDirs, []string{dir}) {
-				t.Fatalf("root %q, exact=%v: files %q, dirs %q; want %q, [%q]", prefix, exact, args.AllowFiles, args.AllowDirs, wantFiles, dir)
-			}
-		}
 	}
 }
 
@@ -543,66 +484,6 @@ func TestRunCLIRejectsPayloadFormatBeforeConfigDiscovery(t *testing.T) {
 	}
 	if output != "" {
 		t.Fatalf("invalid format unexpectedly produced stdout: %q", output)
-	}
-}
-
-func TestRunCLIMissingDiscoveryIntentPrecedesFilesystem(t *testing.T) {
-	stderr, err := os.CreateTemp(t.TempDir(), "stderr-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	previous := os.Stderr
-	os.Stderr = stderr
-	defer func() {
-		os.Stderr = previous
-		_ = stderr.Close()
-	}()
-	dir := t.TempDir()
-	t.Chdir(dir)
-	if runtime.GOOS != "windows" { // Unix permits unlinking the current directory.
-		if err := os.Remove(dir); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, format := range []string{"stylish", "jsonline"} {
-		cli, peer := newCLIChannelPair(t)
-		peer.Start()
-		done := make(chan int, 1)
-		go func() { done <- runIPCCommand(cli, nil) }()
-		if _, err := peer.SendRequest(t.Context(), kindInit, initPayload{Format: format, Files: []string{"relative.js"}}); err != nil {
-			t.Fatal(err)
-		}
-		if code := <-done; code != 2 {
-			t.Fatalf("%s exit code = %d, want 2", format, code)
-		}
-	}
-	data, err := os.ReadFile(stderr.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 2 || !strings.Contains(lines[0], `invalid output format "stylish"`) ||
-		lines[1] != "error: CLI host did not provide config discovery intent" {
-		t.Fatalf("preflight diagnostics: %q", data)
-	}
-}
-
-func TestRunCLIConfigDiscoveryPrecedesBaselineError(t *testing.T) {
-	dir := t.TempDir()
-	writeLintTargetContractFiles(t, dir, map[string]string{"rslint-suppressions.json": "invalid"})
-	payload := map[string]any{
-		"workingDirectory": dir,
-		"format":           "jsonline",
-		"configDiscovery":  map[string]any{},
-	}
-	code, output := runCLIInitForTest(t, payload, nil, 0, true)
-	if code != 1 || output != "" {
-		t.Fatalf("missing configuration: exit code = %d, stdout = %q", code, output)
-	}
-	writeLintTargetContractFiles(t, dir, map[string]string{"rslint.config.mjs": "export default [];"})
-	code, output = runCLIInitForTest(t, payload, config.RslintConfig{}, 0, true)
-	if code != 2 || output != "" {
-		t.Fatalf("invalid baseline: exit code = %d, stdout = %q", code, output)
 	}
 }
 

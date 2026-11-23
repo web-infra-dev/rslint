@@ -18,36 +18,38 @@ type gitPolicySource struct {
 // discovery, target selection and effective configuration. It owns no VFS or
 // config owner: all paths are physical and all observations precede matching.
 type GitPolicy struct {
-	roots          map[tspath.Path]string
-	sources        map[tspath.Path]gitPolicySource
-	covered        map[tspath.Path]struct{}
-	blockedEntries map[tspath.Path]struct{}
+	useCaseSensitive bool
+	roots            map[tspath.Path]string
+	sources          map[tspath.Path]gitPolicySource
+	covered          map[tspath.Path]struct{}
+	blockedEntries   map[tspath.Path]struct{}
 }
 
 func NewGitPolicy(snapshot gitignore.Snapshot) *GitPolicy {
 	policy := &GitPolicy{
-		roots:          make(map[tspath.Path]string),
-		sources:        make(map[tspath.Path]gitPolicySource),
-		covered:        make(map[tspath.Path]struct{}),
-		blockedEntries: make(map[tspath.Path]struct{}),
+		useCaseSensitive: snapshot.UseCaseSensitive,
+		roots:            make(map[tspath.Path]string),
+		sources:          make(map[tspath.Path]gitPolicySource),
+		covered:          make(map[tspath.Path]struct{}),
+		blockedEntries:   make(map[tspath.Path]struct{}),
 	}
 	for _, directory := range snapshot.Roots {
-		policy.roots[gitignore.DirectoryPathID(directory)] = tspath.NormalizePath(directory)
+		policy.roots[policy.pathID(directory)] = tspath.NormalizePath(directory)
 	}
 	for _, source := range snapshot.Sources {
 		if len(source.Patterns) == 0 {
 			continue
 		}
-		patterns := parseCollectedGitignorePatterns(source.Patterns, source.CaseInsensitive)
-		policy.sources[gitignore.DirectoryPathID(source.Directory)] = gitPolicySource{
+		patterns := parseCollectedGitignorePatterns(source.Patterns, !snapshot.UseCaseSensitive)
+		policy.sources[policy.pathID(source.Directory)] = gitPolicySource{
 			patterns: patterns, negationReach: buildNegReach(patterns),
 		}
 	}
 	for _, directory := range snapshot.CoveredDirectories {
-		policy.covered[gitignore.DirectoryPathID(directory)] = struct{}{}
+		policy.covered[policy.pathID(directory)] = struct{}{}
 	}
 	for _, directory := range snapshot.BlockedDirectoryEntries {
-		policy.blockedEntries[gitignore.DirectoryPathID(directory)] = struct{}{}
+		policy.blockedEntries[policy.pathID(directory)] = struct{}{}
 	}
 	return policy
 }
@@ -58,7 +60,7 @@ func (policy *GitPolicy) blocksDirectoryEntry(physicalDir string) bool {
 	if policy == nil {
 		return false
 	}
-	_, blocked := policy.blockedEntries[gitignore.DirectoryPathID(physicalDir)]
+	_, blocked := policy.blockedEntries[policy.pathID(physicalDir)]
 	return blocked
 }
 
@@ -72,13 +74,17 @@ func (policy *GitPolicy) blockedDirectoryOnRoute(physicalDir, scanRoot string) s
 	if root == "" {
 		return ""
 	}
-	rootID := gitignore.DirectoryPathID(root)
-	for current := physicalDir; current != "" && gitignore.DirectoryPathID(current) != rootID; current = gitignore.ParentDirectory(current) {
+	rootID := policy.pathID(root)
+	for current := physicalDir; current != "" && policy.pathID(current) != rootID; current = gitignore.ParentDirectory(current) {
 		if policy.blocksDirectoryEntry(current) {
 			return current
 		}
 	}
 	return ""
+}
+
+func (policy *GitPolicy) pathID(path string) tspath.Path {
+	return gitignore.DirectoryPathID(path, policy.useCaseSensitive)
 }
 
 // CoversDirectory reports a completed chain observation for this exact
@@ -87,7 +93,7 @@ func (policy *GitPolicy) CoversDirectory(physicalDir string) bool {
 	if policy == nil {
 		return false
 	}
-	_, covered := policy.covered[gitignore.DirectoryPathID(physicalDir)]
+	_, covered := policy.covered[policy.pathID(physicalDir)]
 	return covered
 }
 
@@ -102,7 +108,7 @@ func (policy *GitPolicy) repository(physicalPath string, directory bool) (string
 		start = tspath.GetDirectoryPath(start)
 	}
 	for current := start; current != ""; current = gitignore.ParentDirectory(current) {
-		if root, exists := policy.roots[gitignore.DirectoryPathID(current)]; exists {
+		if root, exists := policy.roots[policy.pathID(current)]; exists {
 			return root, start
 		}
 	}
@@ -110,26 +116,21 @@ func (policy *GitPolicy) repository(physicalPath string, directory bool) (string
 }
 
 func (policy *GitPolicy) ignored(physicalPath string) bool {
-	return policy.matchFile(physicalPath, nil)
-}
-
-func (policy *GitPolicy) matchFile(physicalPath string, possibility *unlistedGitMatch) bool {
 	root, directory := policy.repository(physicalPath, false)
 	if root == "" {
 		return false
 	}
-	relative, within := RelativePathWithinConfigRoot(physicalPath, root, true)
+	relative, within := RelativePathWithinConfigRoot(physicalPath, root, policy.useCaseSensitive)
 	if !within {
 		return false
 	}
 	state := newGitIgnorePathState(relative)
-	state.unlisted = possibility
 	// The containing source starts at the file node. Each parent source can
 	// decide one more ancestor node, while never deciding its own directory.
 	state.minimumDepth = state.fileDepth
-	rootID := gitignore.DirectoryPathID(root)
+	rootID := policy.pathID(root)
 	for current := directory; current != ""; current = gitignore.ParentDirectory(current) {
-		id := gitignore.DirectoryPathID(current)
+		id := policy.pathID(current)
 		if source, exists := policy.sources[id]; exists && state.evaluate(source.patterns) {
 			return true
 		}
@@ -146,14 +147,14 @@ func (policy *GitPolicy) directoryCoverage(physicalDir string) (covered, negatio
 	if root == "" {
 		return false, false
 	}
-	relative, within := RelativePathWithinConfigRoot(physicalDir, root, true)
+	relative, within := RelativePathWithinConfigRoot(physicalDir, root, policy.useCaseSensitive)
 	if !within || relative == "" {
 		return false, false
 	}
 	minimumDepth := 1 + strings.Count(relative, "/")
-	rootID := gitignore.DirectoryPathID(root)
+	rootID := policy.pathID(root)
 	for current := directory; current != ""; current = gitignore.ParentDirectory(current) {
-		id := gitignore.DirectoryPathID(current)
+		id := policy.pathID(current)
 		source := policy.sources[id]
 		negationCanReach = negationCanReach || source.negationReach.overlaps(relative)
 		if !covered {
@@ -179,18 +180,14 @@ func (policy *GitPolicy) directoryCoverage(physicalDir string) (covered, negatio
 	return covered, negationCanReach
 }
 
-// GitPath uses the containing directory and its entry name, including for
-// a leaf symlink whose target belongs to another repository.
+// GitPath preserves the original directory entry name even for a leaf symlink
+// whose target belongs to another repository.
 func GitPath(target PathIdentity) string {
 	parent := target.CanonicalParentPath
 	if parent == "" {
 		parent = tspath.GetDirectoryPath(target.Path)
 	}
-	name := target.EntryName
-	if name == "" {
-		name = tspath.GetBaseFileName(target.Path)
-	}
-	return tspath.CombinePaths(parent, name)
+	return tspath.CombinePaths(parent, tspath.GetBaseFileName(target.Path))
 }
 
 // CollectGitPolicy is the direct-configuration entrypoint. It observes only
@@ -305,8 +302,8 @@ func parseCollectedGitignorePatterns(collected []gitignore.Pattern, caseInsensit
 			// Git patterns are immutable after parsing. Fold them once here;
 			// the per-file matcher then only needs to fold the target path once,
 			// rather than allocating lower-case copies for every pattern/node.
-			pattern.Glob = gitignore.FoldCase(pattern.Glob)
-			nodeGlob = gitignore.FoldCase(nodeGlob)
+			pattern.Glob = strings.ToLower(pattern.Glob)
+			nodeGlob = strings.ToLower(nodeGlob)
 		}
 		if !strings.HasPrefix(pattern.Glob, nodeGlob) {
 			// Collected patterns always satisfy this compact-representation

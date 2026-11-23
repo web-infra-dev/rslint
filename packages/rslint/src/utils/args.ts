@@ -80,32 +80,30 @@ export function parseArgs(argv: string[]) {
         }
         continue;
       }
-      if (
-        token.name === 'suppress-rule' ||
-        token.name === 'suppressions-location'
-      ) {
-        // Bind the value before reordering. An omitted argument must reach
-        // Go as empty instead of consuming a positional lint target.
-        // ESLint treats a separate empty string as an empty rule list.
-        const value =
-          token.name === 'suppress-rule' &&
-          token.value === '' &&
-          !token.inlineValue
-            ? '[]'
-            : (token.value ?? '');
-        const looksLikeOption =
-          !token.inlineValue && value.length > 1 && value.startsWith('-');
-        flags.push(`${token.rawName}=${looksLikeOption ? '' : value}`);
-        continue;
-      }
-      if (
-        token.inlineValue &&
-        (token.name === 'suppress-all' ||
-          token.name === 'prune-suppressions' ||
-          token.name === 'pass-on-unpruned-suppressions')
-      ) {
-        flags.push(argv[token.index]);
-        continue;
+      switch (token.name) {
+        case 'suppress-all':
+        case 'prune-suppressions':
+        case 'pass-on-unpruned-suppressions':
+          flags.push(argv[token.index]); // Preserve an explicit =false.
+          continue;
+        case 'suppress-rule':
+        case 'suppressions-location': {
+          // Bind before reordering so a missing value cannot consume a file.
+          const value = token.value;
+          if (
+            value == null ||
+            (token.inlineValue && value === '') ||
+            (!token.inlineValue && value.startsWith('-') && value !== '-')
+          ) {
+            flags.push(`${token.rawName}=`);
+          } else if (token.name === 'suppress-rule') {
+            flags.push(`${token.rawName}=${value || '[]'}`);
+          } else if (value && value === values[token.name]) {
+            // Only the last location applies. A separate empty value restores the default.
+            flags.push(`${token.rawName}=${value}`);
+          }
+          continue;
+        }
       }
       flags.push(token.rawName);
       if (token.value != null) flags.push(token.value);

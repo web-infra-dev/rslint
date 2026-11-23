@@ -10,32 +10,6 @@ import {
 } from './helpers.js';
 
 describe('CLI config discovery (upward traversal)', () => {
-  test('checks suppression counts written during config evaluation', async () => {
-    const tempDir = await createTempDir({
-      'rslint-suppressions.json': '{"app.js":{"no-debugger":{"count":2}}}',
-      'app.js': 'debugger; debugger;',
-      'rslint.config.mjs': `import { writeFileSync } from 'node:fs';
-        writeFileSync('rslint-suppressions.json',
-          '{"app.js":{"no-debugger":{"count":1}}}');
-        export default [{ rules: { 'no-debugger': 'error' } }];`,
-    });
-    try {
-      const result = await runRslint(
-        ['--format', 'jsonline', 'app.js'],
-        tempDir,
-      );
-      expect(result.exitCode).toBe(1);
-      expect(
-        result.stdout
-          .trim()
-          .split('\n')
-          .map((line) => JSON.parse(line).ruleName),
-      ).toEqual(['no-debugger', 'no-debugger']);
-    } finally {
-      await cleanupTempDir(tempDir);
-    }
-  });
-
   test('invalid empty files array should fail before linting', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': `export default [
@@ -265,9 +239,6 @@ describe('CLI config discovery (upward traversal)', () => {
   });
 
   test('explicit file falls back from a broken nearest config to its ancestor', async () => {
-    const baseline = JSON.stringify({
-      'packages/broken/index.ts': { 'no-var': { count: 1 } },
-    });
     const tempDir = await createTempDir({
       'rslint.config.js': `export default [{
         files: ['**/*.ts'],
@@ -276,7 +247,6 @@ describe('CLI config discovery (upward traversal)', () => {
       'packages/broken/rslint.config.js':
         'export default [INVALID CHILD CONFIG;',
       'packages/broken/index.ts': 'debugger;\n',
-      'rslint-suppressions.json': baseline,
     });
     try {
       const result = await runRslint(
@@ -285,17 +255,6 @@ describe('CLI config discovery (upward traversal)', () => {
       );
       expect(result.stdout).toContain('no-debugger');
       expect(result.stderr).toContain('Warning: skipping config');
-      expect(result.exitCode).toBe(2);
-      expect(result.stderr).toContain('Fix the configuration');
-      expect(result.stderr).not.toContain('--prune-suppressions');
-      const update = await runRslint(
-        ['--prune-suppressions', 'packages/broken/index.ts'],
-        tempDir,
-      );
-      expect(update.exitCode).toBe(2);
-      expect(
-        fs.readFileSync(path.join(tempDir, 'rslint-suppressions.json'), 'utf8'),
-      ).toBe(baseline);
     } finally {
       await cleanupTempDir(tempDir);
     }

@@ -601,10 +601,10 @@ func dispatchOneBatch(
 			// Earlier windows have finished. The current window and any inputs
 			// still waiting in this batch have no complete worker result.
 			for _, input := range window {
-				reportUnverifiedPluginRules(input, nil, onNotice)
+				reportUnverifiedPluginRules(input, onNotice)
 			}
 			for _, input := range batch[offset:] {
-				reportUnverifiedPluginRules(input, nil, onNotice)
+				reportUnverifiedPluginRules(input, onNotice)
 			}
 		}
 	}()
@@ -871,7 +871,7 @@ func applyEslintPluginResults(
 					FilePath: f.Path,
 				})
 			}
-			reportUnverifiedPluginRules(f, nil, onNotice)
+			reportUnverifiedPluginRules(f, onNotice)
 			continue
 		}
 		if fr.Cancelled {
@@ -892,7 +892,7 @@ func applyEslintPluginResults(
 			// collapse every diagnostic to offset 0.
 			onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, newTextSourceFile(""),
 				"rslint/plugin-lint-error", "ESLint plugin lint failed: no source frame for "+f.Path))
-			reportUnverifiedPluginRules(f, nil, onNotice)
+			reportUnverifiedPluginRules(f, onNotice)
 			continue
 		}
 		text := tsf.Text()
@@ -918,19 +918,14 @@ func applyEslintPluginResults(
 				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf,
 					"rslint/plugin-lint-error", "ESLint plugin lint failed: "+fr.ParseError))
 			}
-			reportUnverifiedPluginRules(f, nil, onNotice)
+			reportUnverifiedPluginRules(f, onNotice)
 			continue
 		}
 		// Rule throws are authoritative — the editor never renders stderr,
 		// so surface each as a visible diagnostic.
-		if len(fr.RuleErrors) > 0 {
-			failedRules := make(map[string]bool)
-			for _, re := range fr.RuleErrors {
-				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf, re.Rule,
-					"rule error: "+re.Message))
-				failedRules[re.Rule] = true
-			}
-			reportUnverifiedPluginRules(f, failedRules, onNotice)
+		for _, re := range fr.RuleErrors {
+			onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf, re.Rule,
+				"rule error: "+re.Message))
 		}
 
 		for _, d := range fr.Diagnostics {
@@ -962,17 +957,25 @@ func applyEslintPluginResults(
 			}
 			onDiagnostic(rd)
 		}
+		if onNotice != nil {
+			// Severity is fully projected. Consume each failed error rule once.
+			for _, failure := range fr.RuleErrors {
+				if severity, known := sevByRule[failure.Rule]; known && severity == rule.SeverityError {
+					onNotice(EslintPluginProtocolNotice{Kind: EslintPluginUnverifiedRule, FilePath: f.Path, RuleName: failure.Rule})
+					delete(sevByRule, failure.Rule)
+				}
+			}
+		}
 	}
 	return nil
 }
 
-// A nil selection marks every configured error-level rule in the file.
-func reportUnverifiedPluginRules(file EslintPluginFileInput, failedRules map[string]bool, onNotice func(EslintPluginProtocolNotice)) {
+func reportUnverifiedPluginRules(file EslintPluginFileInput, onNotice func(EslintPluginProtocolNotice)) {
 	if onNotice == nil {
 		return
 	}
 	for _, configured := range file.Rules {
-		if configured.Severity == rule.SeverityError && (failedRules == nil || failedRules[configured.Name]) {
+		if configured.Severity == rule.SeverityError {
 			onNotice(EslintPluginProtocolNotice{Kind: EslintPluginUnverifiedRule, FilePath: file.Path, RuleName: configured.Name})
 		}
 	}

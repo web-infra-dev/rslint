@@ -74,8 +74,6 @@ type lintArgs struct {
 	// after read-only target/Program preparation and before any lint or fixes.
 	// The command also joins it on early failure. Nil means already activated.
 	CompleteConfigActivation func() error
-
-	workingDirectoryNames *rslintconfig.InputPathNames
 }
 
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
@@ -90,16 +88,11 @@ var suppressRuleID = regexp.MustCompile(`(?s)^(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\
 var quotedRuleEscape = regexp.MustCompile(`(?:\\u[0-9a-fA-F]{4})+|\\[^u]`)
 
 func decodeRuleEscape(escape string) string {
-	// ESLint's string-list parser accepts JSON escapes and drops the
-	// backslash before other characters, including a single quote.
-	switch escape[1] {
-	case 'b', 'f', 'n', 'r', 't', 'u', '\\':
-		var decoded string
-		_ = json.Unmarshal([]byte(`"`+escape+`"`), &decoded)
+	var decoded string
+	if json.Unmarshal([]byte(`"`+escape+`"`), &decoded) == nil {
 		return decoded
-	default:
-		return escape[1:]
 	}
+	return escape[1:] // ESLint drops the backslash from other escapes.
 }
 
 func appendSuppressRules(rules []string, value string) ([]string, error) {

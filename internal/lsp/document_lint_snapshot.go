@@ -124,14 +124,16 @@ func lspFilesystemPathID(filePath string, fs vfs.FS) string {
 	return lspLexicalPathID(filePath, caseSensitive)
 }
 
-func (s *Server) documentTargetIdentity(uri lsproto.DocumentUri) target.File {
-	// Resolve the target on every operation so a new symlink destination is
-	// visible even before its filesystem notification arrives.
-	physical := config.FreezeFileIdentity(uriToPath(uri), s.fs)
-	if s.documentPathNames == nil {
-		s.documentPathNames = config.NewInputPathNames(s.fs)
+func lspTargetIdentity(filePath string, fs vfs.FS) target.File {
+	return target.File{
+		PathIdentity: config.FreezeFileIdentity(filePath, fs),
 	}
-	return target.File{PathIdentity: s.documentPathNames.LiveFile(physical, s.fs)}
+}
+
+func lspConfigTarget(filePath string, configDirectory string, fs vfs.FS) target.File {
+	target := lspTargetIdentity(filePath, fs)
+	target.ConfigDirectory = tspath.NormalizePath(configDirectory)
+	return target
 }
 
 func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {
@@ -299,7 +301,7 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 // its owner, config, and TypeScript projects from that same identity. This is
 // the only production entry from an editor URI into lint configuration.
 func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnapshot {
-	target := s.documentTargetIdentity(uri)
+	target := lspTargetIdentity(uriToPath(uri), s.fs)
 	selection := s.selectDocumentConfig(target)
 	target.ConfigDirectory = selection.directory
 	_, unavailable := s.jsUnavailableConfigs[selection.configKey]
@@ -372,7 +374,7 @@ func (s *Server) documentWorkspaceDirectory(file target.File, pathSpaces *config
 // lint operations use documentLintSnapshot so config and project ownership
 // cannot be resolved in separate filesystem observations.
 func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
-	target := s.documentTargetIdentity(uri)
+	target := lspTargetIdentity(uriToPath(uri), s.fs)
 	selection := s.selectDocumentConfig(target)
 	return selection.entries, selection.directory, selection.configKey != ""
 }
@@ -397,7 +399,7 @@ func lspGitDirectory(identity config.PathIdentity) string {
 // uri. Matching uses normalized filesystem paths instead of URI identity;
 // lexical ownership is tried before a realpath fallback.
 func (s *Server) nearestJSConfigKey(uri lsproto.DocumentUri) (string, bool) {
-	return s.jsConfigKeyForTarget(s.documentTargetIdentity(uri))
+	return s.jsConfigKeyForTarget(lspTargetIdentity(uriToPath(uri), s.fs))
 }
 
 func (s *Server) jsConfigKeyForTarget(target target.File) (string, bool) {

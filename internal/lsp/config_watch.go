@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"maps"
 	"net/url"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 
@@ -58,7 +56,7 @@ func gitPolicyWatchDirectories(directories []config.DirectoryIdentity, files []c
 	return result
 }
 
-func gitPolicyFileWatchers(directories []config.DirectoryIdentity, sourceDirectories, configFiles []string, relativePatterns bool) []*lsproto.FileSystemWatcher {
+func gitPolicyFileWatchers(directories []config.DirectoryIdentity, sourceDirectories []string, relativePatterns bool) []*lsproto.FileSystemWatcher {
 	seen := make(map[string]struct{})
 	var watchers []*lsproto.FileSystemWatcher
 	add := func(directory, pattern string) {
@@ -79,24 +77,22 @@ func gitPolicyFileWatchers(directories []config.DirectoryIdentity, sourceDirecto
 		add(directory, ".gitignore")
 		add(directory, ".git")
 	}
-	for _, path := range configFiles {
-		add(tspath.GetDirectoryPath(path), tspath.GetBaseFileName(path))
-	}
 	return watchers
 }
 
-func (s *Server) updateGitPolicyWatchers(ctx context.Context, roots []config.DirectoryIdentity, currentDirectories []string, currentConfigs map[string]string) error {
-	configs := make(map[string]string, len(currentConfigs)+len(s.gitConfigWatchFiles))
-	maps.Copy(configs, s.gitConfigWatchFiles)
-	maps.Copy(configs, currentConfigs)
+func (s *Server) updateGitPolicyWatchers(ctx context.Context, roots []config.DirectoryIdentity, current []string) error {
 	if !s.watchEnabled || s.outgoingQueue == nil {
-		s.gitConfigWatchFiles = configs
 		return nil
 	}
-	directories := slices.Concat(currentDirectories, s.committedGitWatchDirectories)
-	slices.Sort(directories)
-	directories = slices.Compact(directories)
-	configFiles := slices.Sorted(maps.Values(configs))
+	directorySet := make(map[string]struct{}, len(current)+len(s.committedGitWatchDirectories))
+	for _, directory := range append(append([]string(nil), current...), s.committedGitWatchDirectories...) {
+		directorySet[directory] = struct{}{}
+	}
+	directories := make([]string, 0, len(directorySet))
+	for directory := range directorySet {
+		directories = append(directories, directory)
+	}
+	sort.Strings(directories)
 	// Exact source chains and recursive roots are different subscriptions. An
 	// alias can move between already observed directories without changing the
 	// exact-directory union, while its recursive watch must still be replaced.
@@ -107,9 +103,6 @@ func (s *Server) updateGitPolicyWatchers(ctx context.Context, roots []config.Dir
 	for _, root := range roots {
 		scopeKeys = append(scopeKeys, "recursive:"+root.LexicalPath, "recursive:"+root.CanonicalPath)
 	}
-	for id := range configs {
-		scopeKeys = append(scopeKeys, "config:"+id)
-	}
 	sort.Strings(scopeKeys)
 	key := strings.Join(scopeKeys, "\x00")
 	if key != s.gitPolicyWatcherKey {
@@ -119,12 +112,11 @@ func (s *Server) updateGitPolicyWatchers(ctx context.Context, roots []config.Dir
 		}
 		s.gitPolicyWatcherGeneration++
 		id := project.WatcherID(fmt.Sprintf("%s-%d", gitignoreWatcherID, s.gitPolicyWatcherGeneration))
-		if err := s.WatchFiles(ctx, id, gitPolicyFileWatchers(roots, directories, configFiles, relativePatterns)); err != nil {
+		if err := s.WatchFiles(ctx, id, gitPolicyFileWatchers(roots, directories, relativePatterns)); err != nil {
 			return err
 		}
 		s.gitPolicyWatcherID, s.gitPolicyWatcherKey = id, key
 	}
-	s.gitConfigWatchFiles = configs
 	// The current range is installed. Old registrations can cause redundant
 	// notifications, but their cleanup cannot invalidate this configuration.
 	for id := range s.watchers.Keys() {
@@ -214,10 +206,9 @@ func validateRuleOptionsForConfig(
 
 // handleDidChangeWatchedFiles handles file change notifications from the client.
 func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsproto.DidChangeWatchedFilesParams) error {
-	if params == nil || len(params.Changes) == 0 {
+	if params == nil {
 		return nil
 	}
-	s.documentPathNames = nil
 	if s.lintPrograms != nil &&
 		s.lintPrograms.DidChangeWatchedFiles(params.Changes) {
 		s.invalidateOpenDocumentDiagnostics()
@@ -229,14 +220,13 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	needsAncestorJSConfigRefresh := false
 	for _, change := range params.Changes {
 		uri := string(change.Uri)
-		path := uriToPath(change.Uri)
 		if isTsConfigURI(uri) {
 			needsTypeInfoRebuild = true
 		}
-		if isGitignoreURI(uri) || isGitMarkerURI(uri) || s.isWatchedGitConfig(path) {
+		if isGitignoreURI(uri) || isGitMarkerURI(uri) {
 			needsIgnoreRefresh = true
 		}
-		if isStrictAncestorAutoJSConfigPath(path, s.cwd, s.fs) {
+		if isStrictAncestorAutoJSConfigPath(uriToPath(change.Uri), s.cwd, s.fs) {
 			needsAncestorJSConfigRefresh = true
 		}
 	}
@@ -289,24 +279,6 @@ func isGitignoreURI(uri string) bool {
 func isGitMarkerURI(uri string) bool {
 	idx := strings.LastIndex(uri, "/")
 	return idx >= 0 && strings.EqualFold(uri[idx+1:], ".git")
-}
-
-func (s *Server) isWatchedGitConfig(path string) bool {
-	if len(s.gitConfigWatchFiles) == 0 {
-		return false
-	}
-	if s.gitConfigWatchFiles[config.ExactPathID(path)] != "" {
-		return true
-	}
-	name := tspath.GetBaseFileName(path)
-	if !strings.EqualFold(name, "config") && !strings.EqualFold(name, "config.worktree") {
-		return false
-	}
-	// A client may report an alias of the physical repository directory. Use
-	// the parent as well so deletion of a previously present file still matches.
-	file := config.FreezeFileIdentity(path, s.fs)
-	return s.gitConfigWatchFiles[config.ExactPathID(file.CanonicalPath)] != "" ||
-		s.gitConfigWatchFiles[config.ExactPathID(tspath.CombinePaths(file.CanonicalParentPath, name))] != ""
 }
 
 func isStrictAncestorAutoJSConfigPath(filePath string, cwd string, fsys vfs.FS) bool {

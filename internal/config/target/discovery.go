@@ -207,7 +207,7 @@ func discoverLintTargetsWithinRoot(
 		dirIgnore sync.Map // map[string]bool — pattern check cache
 	)
 
-	stopWalkDirs := normalizeStopWalkDirs(normalizedScanRoot, stopDirs)
+	stopWalkDirs := normalizeStopWalkDirs(normalizedScanRoot, stopDirs, useCaseSensitive)
 
 	workers := runtime.GOMAXPROCS(0)
 	if workers < 2 {
@@ -222,7 +222,7 @@ func discoverLintTargetsWithinRoot(
 			return []string{fullPath}
 		}
 		return projectPathThroughRequestedDirectories(
-			fullPath, physicalPath, resolvedAllowDirs,
+			fullPath, physicalPath, resolvedAllowDirs, useCaseSensitive,
 		)
 	}
 	allProjectedDirectoriesMatch := func(
@@ -310,7 +310,7 @@ func discoverLintTargetsWithinRoot(
 					continue
 				}
 				childPath := path.Join(walkPath, name)
-				if isStoppedWalkPath(childPath, stopWalkDirs) {
+				if isStoppedWalkPath(childPath, stopWalkDirs, useCaseSensitive) {
 					continue
 				}
 				if cached, ok := dirIgnore.Load(childPath); ok {
@@ -358,6 +358,7 @@ func discoverLintTargetsWithinRoot(
 			)
 		},
 		stopWalkDirs,
+		useCaseSensitive,
 	)
 	pool.submitMany(walkRoots)
 	pool.run(work)

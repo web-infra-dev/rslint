@@ -2,7 +2,6 @@ package target
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -58,7 +57,7 @@ func TestExpandGlobPrunesShallowDirectories(t *testing.T) {
 	}
 	root, paths := setupDiscoveryFixture(t, layout)
 	fsys := &globWalkRecorder{FS: osvfs.FS()}
-	expansions, err := expandGlobs(context.Background(), fsys, root, []string{"src/*.ts", "src/*/../*.ts", "src/**/../*.ts"}, tspath.NormalizePath)
+	expansions, err := expandGlobs(context.Background(), fsys, root, []string{"src/*.ts", "src/*/../*.ts", "src/**/../*.ts"})
 	assert.NilError(t, err)
 	for _, expansion := range expansions {
 		assert.Equal(t, expansion.Root, tspath.ResolvePath(root, "src"))
@@ -92,11 +91,6 @@ func TestSelectInputsPreservesLiteralAndScanRoles(t *testing.T) {
 			"/project/src/b.ts": {"/project/src"},
 		})
 	}
-	const unc = "//server/share/file.ts"
-	uncFS := &caseInsensitiveDiscoveryFS{FS: fsys, files: map[string]bool{unc: true}}
-	selection, err := SelectInputs(context.Background(), uncFS, "/project", []string{unc})
-	assert.NilError(t, err)
-	assert.DeepEqual(t, selection.Files, []string{unc})
 }
 
 func TestSelectInputsDecodedPatterns(t *testing.T) {
@@ -152,7 +146,7 @@ func TestSelectInputsWindowsPaths(t *testing.T) {
 		{"//server/share/repo", "../../a.ts", "//server/share/a.ts"},
 		{"C:/project", "//server/share/../../a.ts", "//server/share/a.ts"},
 	} {
-		got, err := resolveInputPath(test.cwd, test.input, tspath.NormalizePath)
+		got, err := resolveInputPath(test.cwd, test.input)
 		assert.NilError(t, err)
 		assert.Equal(t, got, test.want)
 	}
@@ -228,7 +222,7 @@ func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
 				t.Skip("backslash glob escapes are POSIX-only")
 			}
 			fsys := &globWalkRecorder{FS: osvfs.FS()}
-			expansions, err := expandGlobs(context.Background(), fsys, root, test.patterns, tspath.NormalizePath)
+			expansions, err := expandGlobs(context.Background(), fsys, root, test.patterns)
 			assert.NilError(t, err)
 			assert.Equal(t, len(expansions), len(test.patterns))
 			var wantRoots []string
@@ -298,7 +292,7 @@ func TestExpandGlobsPreservesNegationContext(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := &globWalkRecorder{FS: fsys}
-			expansions, err := expandGlobs(context.Background(), recorder, test.cwd, test.patterns, tspath.NormalizePath)
+			expansions, err := expandGlobs(context.Background(), recorder, test.cwd, test.patterns)
 			assert.NilError(t, err)
 			assert.DeepEqual(t, recorder.roots, []string{"/project/src"})
 			for index := range test.patterns {
@@ -483,22 +477,11 @@ func TestDiscoverFilesOutsidePrograms_UnrootedNegationConservative(t *testing.T)
 // macOS/Windows walks enter every ignored directory in large repositories.
 func TestDiscoverFilesOutsidePrograms_CaseInsensitiveAnchoredNegationPrunesUnrelatedDir(t *testing.T) {
 	configDir, paths := setupDiscoveryTxtarFixture(t, "case-insensitive")
-	git, err := exec.LookPath("git")
-	if err != nil {
-		t.Skip("Git is required to set the repository's ignore-case policy")
-	}
-	for _, args := range [][]string{{"init", "--quiet"}, {"config", "core.ignoreCase", "true"}} {
-		cmd := exec.Command(git, args...)
-		cmd.Dir = configDir
-		if output, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, output)
-		}
-	}
 	config := rslintconfig.RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
 
-	spy := &spyFS{FS: osvfs.FS()}
+	spy := &caseInsensitiveSpyFS{spyFS: &spyFS{FS: osvfs.FS()}}
 	gapFiles := discoverFilesOutsideProgramsForTest(config, configDir, spy, map[string]struct{}{}, nil, nil, true)
 	dirs := spy.snapshotAccessedDirs()
 

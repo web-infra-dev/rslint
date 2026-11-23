@@ -47,13 +47,6 @@ func newTestServer() *Server {
 	}
 }
 
-func lspConfigTarget(filePath string, configDirectory string, fs vfs.FS) target.File {
-	return target.File{
-		PathIdentity:    config.NewInputPathNames(fs).File(config.FreezeFileIdentity(filePath, fs), false),
-		ConfigDirectory: tspath.NormalizePath(configDirectory),
-	}
-}
-
 func TestCurrentRuleCatalogRequiresInitialization(t *testing.T) {
 	defer func() {
 		if recover() == nil {

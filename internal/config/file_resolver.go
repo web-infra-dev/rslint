@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -25,6 +26,12 @@ type configTargetResolution struct {
 	globallyIgnored bool
 }
 
+type configTargetCacheKey struct {
+	path                string
+	canonicalPath       string
+	canonicalParentPath string
+}
+
 // FileConfigResolver resolves config and rules for one immutable config root.
 // It interns files with the same exact matched-entry shape for the resolver's
 // lifetime and is safe for concurrent use by native and plugin lint workers.
@@ -35,7 +42,7 @@ type FileConfigResolver struct {
 	targetResolver  *configTargetResolver
 	matchSource     *targetMatchSource
 
-	filePlans  publishOnceCache[PathIdentity, *configTargetResolution]
+	filePlans  publishOnceCache[configTargetCacheKey, *configTargetResolution]
 	shapePlans publishOnceCache[configMatchKey, *effectiveConfigPlan]
 	// Compatibility is checked once per discovery matcher, never per file.
 	matchSources publishOnceCache[*targetMatchSource, bool]
@@ -193,11 +200,20 @@ func (r *FileConfigResolver) resolutionForTarget(
 	target PathIdentity,
 	match *TargetMatch,
 ) *configTargetResolution {
-	target = target.normalized()
-	return r.filePlans.getOrInit(target, func() *configTargetResolution {
-		decision, reused := r.reuseTargetMatch(target, match)
+	key := configTargetCacheKey{
+		path:                tspath.NormalizePath(target.Path),
+		canonicalPath:       tspath.NormalizePath(target.CanonicalPath),
+		canonicalParentPath: tspath.NormalizePath(target.CanonicalParentPath),
+	}
+	return r.filePlans.getOrInit(key, func() *configTargetResolution {
+		identity := PathIdentity{
+			Path:                key.path,
+			CanonicalPath:       key.canonicalPath,
+			CanonicalParentPath: key.canonicalParentPath,
+		}
+		decision, reused := r.reuseTargetMatch(identity, match)
 		if !reused {
-			decision = r.targetResolver.resolveTarget(target)
+			decision = r.targetResolver.resolveTarget(identity)
 		}
 		resolution := &configTargetResolution{
 			globallyIgnored: decision.globallyIgnored,

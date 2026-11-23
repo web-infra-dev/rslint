@@ -2483,7 +2483,7 @@ func TestDeduplicateTypeScriptDiagnosticsPrefersCallerTarget(t *testing.T) {
 }
 
 func TestCLIFinalChangeCommitterValidatesCompleteDeltaBeforeWriting(t *testing.T) {
-	directoryPath := osvfs.FS().Realpath(t.TempDir())
+	directoryPath := t.TempDir()
 	filePath := filepath.Join(directoryPath, "untouched.ts")
 	if err := os.WriteFile(filePath, []byte("a"), 0o644); err != nil {
 		t.Fatal(err)
@@ -2512,140 +2512,35 @@ func TestCLIFinalChangeCommitterValidatesCompleteDeltaBeforeWriting(t *testing.T
 }
 
 func TestCLIFinalChangeCommitterCommitsCompleteFinalDelta(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
-	paths := []string{tspath.ResolvePath(root, "first.ts"), tspath.ResolvePath(root, "second.ts"), tspath.ResolvePath(root, "unchanged.ts")}
-	stamp := time.Unix(1700000000, 0)
+	directoryPath := t.TempDir()
+	paths := []string{filepath.Join(directoryPath, "first.ts"), filepath.Join(directoryPath, "second.ts")}
 	for _, path := range paths {
 		if err := os.WriteFile(path, []byte("before"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.Chtimes(path, stamp, stamp); err != nil {
-			t.Fatal(err)
-		}
 	}
-	// The preflight can identify a file with the same size and time even
-	// when its contents are no longer readable.
-	if err := os.Chmod(paths[2], 0); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(paths[2], 0o600) })
 	// Low-level targets without a realpath retain their lexical disk paths.
 	files := make([]target.File, len(paths))
 	for index, path := range paths {
 		files[index] = target.File{PathIdentity: rslintconfig.FreezeFileIdentity(path, nil)}
 	}
 	committer := newCLIFinalChangeCommitter(files)
-	fixedPaths := paths[:2]
-	changes := make([]linter.FileChange, len(fixedPaths))
-	for index, path := range fixedPaths {
+	changes := make([]linter.FileChange, len(paths))
+	for index, path := range paths {
 		changes[index] = linter.FileChange{Path: path, Before: "before", After: fmt.Sprintf("after-%d", index)}
 	}
 	result, err := committer.CommitFinalChanges(context.Background(), changes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(result.ConfirmedPaths, fixedPaths) {
-		t.Fatalf("confirmed paths = %+v, want %+v", result.ConfirmedPaths, fixedPaths)
+	if !slices.Equal(result.ConfirmedPaths, paths) {
+		t.Fatalf("confirmed paths = %+v, want %+v", result.ConfirmedPaths, paths)
 	}
-	for index, path := range fixedPaths {
+	for index, path := range paths {
 		content, readErr := os.ReadFile(path)
 		if readErr != nil || string(content) != fmt.Sprintf("after-%d", index) {
 			t.Fatalf("committed file %q: content=%q error=%v", path, content, readErr)
 		}
-	}
-}
-
-func TestCLIFinalChangeCommitterChecksSelectedHardLinks(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
-	first, second := tspath.ResolvePath(root, "first.js"), tspath.ResolvePath(root, "second.js")
-	if err := os.WriteFile(first, []byte("before"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Link(first, second); err != nil {
-		t.Fatal(err)
-	}
-	for _, test := range []struct {
-		name         string
-		selectSecond bool
-		secondAfter  string
-		conflict     bool
-	}{
-		{name: "different fixes", selectSecond: true, secondAfter: "other", conflict: true},
-		{name: "unchanged selected link", selectSecond: true, conflict: true},
-		{name: "same fix", selectSecond: true, secondAfter: "fixed"},
-		{name: "single selected link"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			if err := os.WriteFile(first, []byte("before"), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			files := []target.File{{PathIdentity: rslintconfig.FreezeFileIdentity(first, nil)}}
-			if test.selectSecond {
-				files = append(files, target.File{PathIdentity: rslintconfig.FreezeFileIdentity(second, nil)})
-			}
-			if test.conflict && test.secondAfter != "" {
-				// Three incompatible names must consistently report the first pair.
-				third := tspath.ResolvePath(root, "third.js")
-				if err := os.Link(first, third); err != nil {
-					t.Fatal(err)
-				}
-				files = append(files, target.File{PathIdentity: rslintconfig.FreezeFileIdentity(third, nil)})
-			}
-			changes := []linter.FileChange{{Path: first, Before: "before", After: "fixed"}}
-			if test.secondAfter != "" {
-				changes = append(changes, linter.FileChange{Path: second, Before: "before", After: test.secondAfter})
-				if test.conflict {
-					slices.Reverse(changes)
-				}
-			}
-			result, err := newCLIFinalChangeCommitter(files).CommitFinalChanges(t.Context(), changes)
-			want := "fixed"
-			if test.conflict {
-				if err == nil || !strings.Contains(err.Error(), first) || !strings.Contains(err.Error(), second) || len(result.ConfirmedPaths) != 0 {
-					t.Fatalf("hard-link conflict: result=%+v error=%v", result, err)
-				}
-				want = "before"
-			} else {
-				wantPaths := []string{first}
-				if test.secondAfter != "" {
-					wantPaths = append(wantPaths, second)
-				}
-				if err != nil || !slices.Equal(result.ConfirmedPaths, wantPaths) {
-					t.Fatalf("commit: result=%+v error=%v", result, err)
-				}
-			}
-			if text, err := os.ReadFile(second); err != nil || string(text) != want {
-				t.Fatalf("linked file = %q, %v; want %q", text, err, want)
-			}
-		})
-	}
-}
-
-func TestCLIFinalChangeCommitterChecksUnchangedNameForSingleLink(t *testing.T) {
-	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
-	path, alias := tspath.ResolvePath(root, "file.js"), tspath.ResolvePath(root, "alias.js")
-	if err := os.WriteFile(path, []byte("before"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	// A second filesystem path can reach the same single-link file, as with
-	// a bind mount. Keep both names in this committer's input.
-	if err := os.Symlink(path, alias); err != nil {
-		t.Skipf("creating a symlink: %v", err)
-	}
-	files := []target.File{
-		{PathIdentity: rslintconfig.FreezeFileIdentity(path, nil)},
-		{PathIdentity: rslintconfig.FreezeFileIdentity(alias, nil)},
-	}
-	// Use drive-qualified display names to exercise their spelling on every host.
-	files[0].Path, files[1].Path = "C:/project/file.js", "C:/project/alias.js"
-	result, err := newCLIFinalChangeCommitter(files).CommitFinalChanges(t.Context(), []linter.FileChange{
-		{Path: files[0].Path, Before: "before", After: "fixed"},
-	})
-	if err == nil || !strings.Contains(err.Error(), files[1].Path) || !strings.Contains(err.Error(), files[0].Path) || len(result.ConfirmedPaths) != 0 {
-		t.Fatalf("single-link alias conflict: result=%+v error=%v", result, err)
-	}
-	if content, err := os.ReadFile(alias); err != nil || string(content) != "before" {
-		t.Fatalf("unchanged selection contains %q, %v", content, err)
 	}
 }
 
@@ -2779,7 +2674,7 @@ func TestCLIFinalChangeCommitterRejectsUnselectedPathBeforeAnyWrite(t *testing.T
 }
 
 func TestCLIFinalChangeCommitterRejectsStaleDiskGeneration(t *testing.T) {
-	filePath := filepath.Join(osvfs.FS().Realpath(t.TempDir()), "stale.ts")
+	filePath := filepath.Join(t.TempDir(), "stale.ts")
 	if err := os.WriteFile(filePath, []byte("new"), 0o644); err != nil {
 		t.Fatal(err)
 	}

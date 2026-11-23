@@ -1251,8 +1251,8 @@ func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T
 		t.Fatalf("outcome = %+v, want three rule failures and both findings", outcome)
 	}
 	want := []EslintPluginProtocolNotice{
-		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/present.ts", RuleName: "external/throws"},
 		{Kind: EslintPluginUnconfiguredDiagnostic, FilePath: "/repo/present.ts", RuleName: "external/unconfigured"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/present.ts", RuleName: "external/throws"},
 		{Kind: EslintPluginMissingFileResult, FilePath: "/repo/missing.ts"},
 		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/missing.ts", RuleName: "external/throws"},
 		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/missing.ts", RuleName: "external/healthy"},

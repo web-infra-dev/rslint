@@ -105,16 +105,16 @@ const (
 	OutcomePassed OutcomeKind = iota
 	OutcomeDiagnosticsFailed
 	OutcomeWarningLimitExceeded
+	OutcomeFailed
 )
 
 type Outcome struct {
-	Kind             OutcomeKind
-	WarningLimit     int
-	SuppressionError string
+	Kind         OutcomeKind
+	WarningLimit int
 }
 
 func (outcome Outcome) Failed() bool {
-	return outcome.Kind != OutcomePassed || outcome.SuppressionError != ""
+	return outcome.Kind != OutcomePassed
 }
 
 // Summary contains the default formatter's completed-run facts that are not

@@ -12,34 +12,27 @@ rslint [options] [files/directories...]
 
 ## Options
 
-| Flag                              | Description                                                                                    |
-| --------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `--init`                          | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
-| `-c, --config <path>`             | Specify which JS/TS module config file to use                                                  |
-| `--fix`                           | Automatically fix problems                                                                     |
-| `--type-check`                    | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
-| `--type-check-only`               | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
-| `--format <format>`               | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
-| `--quiet`                         | Report errors only, suppress warnings                                                          |
-| `--timing [all\|n]`               | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
-| `--max-warnings <n>`              | Exit with error if warning count exceeds this number                                           |
-| `--rule <rule>`                   | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
-| `--no-color`                      | Disable colored output ([details](/guide/environment-variables))                               |
-| `--force-color`                   | Force colored output ([details](/guide/environment-variables))                                 |
-| `--help`, `-h`                    | Show help information                                                                          |
-| `--suppress-all`                  | Record current error counts for all lint rules                                                 |
-| `--suppress-rule <id>`            | Record errors for selected rules (repeatable, `a,b`, or `"[a,b]"`)                             |
-| `--suppressions-location <path>`  | Select the suppressions file or its directory                                                  |
-| `--prune-suppressions`            | Reduce or remove unused counts and remove entries for deleted files                            |
-| `--pass-on-unpruned-suppressions` | Allow unused counts when checking the exit status                                              |
+| Flag                  | Description                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| `--init`              | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
+| `-c, --config <path>` | Specify which JS/TS module config file to use                                                  |
+| `--fix`               | Automatically fix problems                                                                     |
+| `--type-check`        | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
+| `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
+| `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
+| `--quiet`             | Report errors only, suppress warnings                                                          |
+| `--timing [all\|n]`   | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
+| `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
+| `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
+| `--no-color`          | Disable colored output ([details](/guide/environment-variables))                               |
+| `--force-color`       | Force colored output ([details](/guide/environment-variables))                                 |
+| `--help`, `-h`        | Show help information                                                                          |
 
-To record existing errors and use the baseline in CI, see [Bulk suppressions](/guide/bulk-suppressions).
+The [Bulk suppressions guide](/guide/bulk-suppressions) covers `--suppress-all`, `--suppress-rule`, `--suppressions-location`, `--prune-suppressions`, and `--pass-on-unpruned-suppressions`.
 
 ## File and Directory Arguments
 
 You can pass file paths, directory paths, quoted glob patterns, or a mix of them. Rslint discovers the config file by walking upward from the target location.
-
-If two selected files are hard links to the same content, `--fix` can write changes when both names would have identical final text. If their rules require different final text, Rslint reports the conflict before writing any fixes.
 
 ```bash
 # Lint specific files

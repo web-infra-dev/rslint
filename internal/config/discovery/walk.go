@@ -73,10 +73,10 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 				if err := coordinator.adoptCandidate(result.candidateToAdopt, false); err != nil {
 					return err
 				}
-				node := queue[index]
-				coordinator.draft.addDirectory(result.candidateToAdopt.candidate.directory, rslintconfig.DirectoryIdentity{
-					LexicalPath: node.directory, CanonicalPath: node.canonicalDirectory,
-				}, node.recursive)
+				candidate := result.candidateToAdopt.candidate
+				coordinator.draft.addDirectory(candidate.directory, rslintconfig.DirectoryIdentity{
+					LexicalPath: candidate.directory, CanonicalPath: candidate.physicalDirectory,
+				}, queue[index].recursive)
 			}
 			next = append(next, result.children...)
 			if result.pending != nil {
@@ -95,7 +95,7 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 						return err
 					}
 					coordinator.draft.addDirectory(state.candidate.directory, rslintconfig.DirectoryIdentity{
-						LexicalPath: item.node.directory, CanonicalPath: item.node.canonicalDirectory,
+						LexicalPath: state.candidate.directory, CanonicalPath: state.candidate.physicalDirectory,
 					}, item.node.recursive)
 					item.node.ownerDir = state.candidate.directory
 					item.node.ownerPath = state.candidate.path
@@ -204,9 +204,6 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	entries := coordinator.fs.GetAccessibleEntries(node.canonicalDirectory)
 	directories := append([]string(nil), entries.Directories...)
 	sort.Strings(directories)
-	if walkTargets != nil {
-		walkTargets.resolveChildNames(node.canonicalDirectory, directories, coordinator.fs)
-	}
 	parentRealPath := ""
 	if entries.Symlinks == nil && len(directories) > 0 {
 		parentRealPath = node.canonicalDirectory
@@ -215,7 +212,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	for _, name := range directories {
 		var childTargets *discoveryTargetTrie
 		if walkTargets != nil {
-			childTargets = walkTargets.children[name]
+			childTargets = walkTargets.child(name, coordinator.fs.UseCaseSensitiveFileNames())
 			if childTargets == nil && !node.recursive {
 				continue
 			}

@@ -27,25 +27,6 @@ type InputSelection struct {
 // each entrypoint keeps its existing reporting policy without admitting overlay
 // dependencies as fallback targets.
 func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string) (*InputSelection, error) {
-	return selectInputs(ctx, fsys, cwd, inputs, tspath.NormalizePath)
-}
-
-// SelectNativeInputs interprets CLI arguments in the host filesystem's path space.
-func SelectNativeInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string) (*InputSelection, error) {
-	return selectInputs(ctx, fsys, cwd, inputs, NormalizeNativePath)
-}
-
-// NormalizeNativePath maps a concrete host path into tsgo's path space. On
-// POSIX, collapse a repeated root before tsgo could treat it as a UNC host.
-func NormalizeNativePath(path string) string {
-	path = tspath.NormalizeSlashes(path)
-	if runtime.GOOS != "windows" && strings.HasPrefix(path, "//") {
-		path = "/" + strings.TrimLeft(path, "/")
-	}
-	return tspath.NormalizePath(path)
-}
-
-func selectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string, normalize func(string) string) (*InputSelection, error) {
 	selection := &InputSelection{Files: []string{}, ScanDirectories: make(map[string][]string)}
 	type input struct {
 		path      string
@@ -56,7 +37,7 @@ func selectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string,
 	classified := make([]input, len(inputs))
 	var patterns []string
 	for index, raw := range inputs {
-		absolute, err := resolveInputPath(cwd, raw, normalize)
+		absolute, err := resolveInputPath(cwd, raw)
 		if err != nil {
 			return nil, err
 		}
@@ -73,7 +54,7 @@ func selectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string,
 		decoded, literal := literalPatternPath(pattern)
 		if raw != "" && (!literal || decoded != pattern) {
 			if literal {
-				directory, err := resolveInputPath(cwd, decoded, normalize)
+				directory, err := resolveInputPath(cwd, decoded)
 				if err != nil {
 					return nil, err
 				}
@@ -85,7 +66,7 @@ func selectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string,
 			patterns = append(patterns, pattern)
 		}
 	}
-	expansions, err := expandGlobs(ctx, fsys, cwd, patterns, normalize)
+	expansions, err := expandGlobs(ctx, fsys, cwd, patterns)
 	if err != nil {
 		return nil, err
 	}
@@ -156,9 +137,9 @@ func selectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string,
 // relative inputs use the request's cwd on that drive; other drives retain the
 // operating system's per-drive working directory. Native cleaning protects UNC
 // share roots from parent segments without changing the process cwd.
-func resolveInputPath(cwd, name string, normalize func(string) string) (string, error) {
+func resolveInputPath(cwd, name string) (string, error) {
 	if runtime.GOOS != "windows" {
-		return normalize(tspath.CombinePaths(cwd, name)), nil
+		return tspath.ResolvePath(cwd, name), nil
 	}
 	if !filepath.IsAbs(name) {
 		volume := filepath.VolumeName(name)

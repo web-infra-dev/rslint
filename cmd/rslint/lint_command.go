@@ -12,8 +12,11 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -163,12 +166,13 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		defer pprof.StopCPUProfile()
 	}
 
-	workingDirectory, err := args.cliWorkingDirectory()
+	currentDirectory, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting current directory: %v\n", err)
 		return 1
 	}
-	currentDirectory := workingDirectory
+	currentDirectory = tspath.NormalizePath(currentDirectory)
+	workingDirectory := currentDirectory
 
 	if init {
 		if err := rslintconfig.InitDefaultConfig(currentDirectory); err != nil {
@@ -178,20 +182,13 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return 0
 	}
 	var baseline *suppressions.File
+	var baselineErr error
 	if !typeCheckOnly {
-		baseline, err = suppressions.Open(args.Suppressions, workingDirectory, args.storedWorkingDirectory)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 2
-		}
+		baseline, baselineErr = suppressions.Open(workingDirectory, args.Suppressions)
 	}
 	if configCatalog == nil {
 		fmt.Fprintln(os.Stderr, "error: config discovery did not produce a catalog")
 		return 1
-	}
-	if args.Suppressions.Mode != suppressions.Check && len(configCatalog.Failures) > 0 {
-		fmt.Fprintln(os.Stderr, "error: cannot update suppressions because a lint configuration failed to load")
-		return 2
 	}
 	if !configCatalog.Explicit && len(configCatalog.Configs) == 0 {
 		fmt.Fprintln(os.Stderr, "error: no rslint config found; run `rslint --init` to create one")
@@ -200,7 +197,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 
 	fs := args.FS
 	if fs == nil {
-		fs = newCLIFileSystem()
+		fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	}
 	eslintPlugins := configCatalog.EslintPlugins
 	ruleCatalog, shadowedPluginRules := rules.All().ForESLintPlugins(eslintPlugins)
@@ -285,7 +282,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 		return 1
 	}
-	abortRun := func(code int, reason, legacyMessage string) int {
+	abortRun := func(reason, legacyMessage string) int {
 		// The IPC owner reports the signal or disconnect that canceled the run.
 		if ctx.Err() != nil {
 			return 1
@@ -297,7 +294,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		} else {
 			fmt.Fprintln(os.Stderr, legacyMessage)
 		}
-		return code
+		return 1
 	}
 
 	// Project declarations and target discovery use the pre-override config.
@@ -313,7 +310,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			break
 		}
 	}
-	// Display paths are relative to the invocation's working directory.
+	// Use CWD for display paths (not any config directory).
+	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
+	// so it already holds the normalized CWD.
 	cwd := workingDirectory
 
 	comparePathOptions := tspath.ComparePathsOptions{
@@ -349,11 +348,16 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// target discovery. Per-file service/root options require selected targets
 	// before their effective values can contribute project candidates.
 	var targetPlan target.Plan
-	var protectedWrites map[string]error
 	var configResolver *configLint.Resolver
 	var projectPolicies map[target.File]rslintconfig.ProjectPolicy
 	if !typeCheckOnly || hasProjectOptions {
-		request := target.Request{
+		targetDirectories := configCatalog.TargetDirectories
+		if len(args.GlobRoots) > 0 {
+			// Glob roots govern config discovery; only literal directory inputs
+			// authorize recursive lint-target walking.
+			targetDirectories = rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, fs)
+		}
+		targetPlan, err = target.Resolve(target.Request{
 			ConfigMap:       targetConfigMap,
 			Config:          targetRslintConfig,
 			ConfigDirectory: currentDirectory,
@@ -362,34 +366,13 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			FS:              fs,
 			Files:           configCatalog.TargetFiles,
 			ScanDirectories: args.ScanDirectories,
-			Directories:     configCatalog.TargetDirectories,
+			Directories:     targetDirectories,
 			GitPolicy:       configCatalog.GitPolicy,
 			PathSpaces:      pathSpaces,
 			SingleThreaded:  singleThreaded,
-		}
-		var aliases [][2]target.File
-		if baseline != nil {
-			request.OnFileAlias = func(kept, discarded target.File) {
-				aliases = append(aliases, [2]target.File{kept, discarded})
-			}
-		}
-		targetPlan, err = target.Resolve(request)
+		})
 		if err != nil {
-			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
-		}
-		if fix || args.Suppressions.Mode != suppressions.Check {
-			for _, file := range targetPlan.Files {
-				if match := file.Match(); match != nil && match.GitEntryUnverified() {
-					reason := fmt.Errorf("cannot update %q because its directory entry cannot be verified against .gitignore without read access to its parent", file.Path)
-					if protectedWrites == nil {
-						protectedWrites = make(map[string]error)
-					}
-					protectedWrites[rslintconfig.ExactPathID(file.Path)] = reason
-					if baseline != nil && args.Suppressions.Mode != suppressions.Check {
-						baseline.PreserveCounts(file.Path, reason)
-					}
-				}
-			}
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		configResolver = configLint.NewResolver(configLint.ResolverOptions{
 			ConfigsByOwner:       configMap,
@@ -401,18 +384,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			GitPolicy:            targetPlan.GitPolicy(),
 			FS:                   fs,
 		})
-		for _, pair := range aliases {
-			kept, other := pair[0], pair[1]
-			baseline.NoteTargetAlias(kept.Path, other.Path, mayRecordAlias(args.Suppressions, configResolver, kept, other))
-		}
-		if baseline != nil && (fix || args.Suppressions.Mode != suppressions.Check) {
-			if err := baseline.CheckTargetAliases(); err != nil {
-				return abortRun(2, err.Error(), err.Error())
-			}
-		}
 		projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files, singleThreaded)
 		if err != nil {
-			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		pathSpaces = targetPlan.PathSpaces()
 	}
@@ -422,7 +396,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// lexical, while every generation reads the same planned physical inputs.
 	sourceFS, err := loader.WithFrozenIO(fs, pathSpaces, targetPlan.Files)
 	if err != nil {
-		return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
+		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 	}
 	programSession := loader.NewSession(sourceFS)
 	hasEslintPlugins := !typeCheckOnly && len(eslintPlugins) > 0
@@ -575,24 +549,21 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		PluginFailure: linter.PluginKeepPartialWithSynthetic,
 	}
 	var pipelineRequest linter.PipelineRequest
-	var stagedSourceCommitter *cliFinalChangeCommitter
 	if fix {
-		committer := newCLIFinalChangeCommitter(targetPlan.Files)
-		committer.protected = protectedWrites
-		autofix := linter.AutofixPolicy{
-			VerifyAfterLastRound: true,
-			VerificationDemand: linter.ArtifactDemand{
-				SkippedErrorRules: baseline != nil,
-				Native:            rule.EditDemandNone,
-				Plugin:            rule.EditDemandAll,
+		pipelineRequest = linter.NewAutofixRequestWithCommitter(
+			provider,
+			newCLIFinalChangeCommitter(targetPlan.Files),
+			observationPolicy,
+			linter.AutofixPolicy{
+				VerifyAfterLastRound: true,
+				VerificationDemand: linter.ArtifactDemand{
+					SkippedErrorRules: baseline != nil,
+					Native:            rule.EditDemandNone,
+					Plugin:            rule.EditDemandAll,
+				},
 			},
-		}
-		if baseline != nil && args.Suppressions.Mode != suppressions.Check {
-			stagedSourceCommitter = &committer
-			pipelineRequest = linter.NewAutofixRequest(provider, observationPolicy, autofix, dispatch)
-		} else {
-			pipelineRequest = linter.NewAutofixRequestWithCommitter(provider, committer, observationPolicy, autofix, dispatch)
-		}
+			dispatch,
+		)
 	} else {
 		observationPolicy.ProgramExecution = linter.ProgramComplete
 		pipelineRequest = linter.NewLintRequest(provider, observationPolicy, dispatch)
@@ -600,11 +571,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	pipelineResult, err := linter.RunPipeline(ctx, pipelineRequest)
 	var loadError *linter.GenerationLoadError
 	if _, fixing := pipelineResult.AppliedFixes(); !fixing && errors.As(err, &loadError) {
-		return abortRun(1, loadError.Error(), fmt.Sprintf("error: %v", loadError))
+		return abortRun(loadError.Error(), fmt.Sprintf("error: %v", loadError))
 	}
 
-	pluginRecords := pipelineResult.PluginOutcomes()
-	for _, pluginRecord := range pluginRecords {
+	var finalPlugin linter.PluginDispatchRecord
+	for _, pluginRecord := range pipelineResult.PluginOutcomes() {
+		if pluginRecord.Observation == pipelineResult.Observation.Index {
+			finalPlugin = pluginRecord
+		}
 		reportEslintPluginDispatchOutcome(linter.EslintPluginDispatchOutcome{
 			Notices:       pluginRecord.Notices,
 			DispatchError: pluginRecord.DispatchError,
@@ -617,30 +591,20 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			operation = "applying fixes"
 			reason = operation + ": " + reason
 		}
-		return abortRun(1, reason, fmt.Sprintf("error %s: %v", operation, err))
+		return abortRun(reason, fmt.Sprintf("error %s: %v", operation, err))
 	}
 	allDiags, complete := pipelineResult.Observation.CompleteDiagnostics()
 	if !complete {
 		const reason = "CLI lint returned an incomplete observation"
-		return abortRun(1, reason, "error running linter: "+reason)
+		return abortRun(reason, "error running linter: "+reason)
 	}
 	lintResult := pipelineResult.Observation.Native.Lint
 	initialObservation := pipelineResult.Observation
 	fixedCount := 0
-	var commitSources func() error
-	var sourceWriteErr error
-	var sourceCommitAttempted bool
 	if applied, ok := pipelineResult.AppliedFixes(); ok {
 		initialObservation = applied.Initial
 		for _, round := range applied.Rounds {
 			fixedCount += round.AppliedDiagnostics
-		}
-		if stagedSourceCommitter != nil && len(applied.FinalChanges) != 0 {
-			commitSources = func() error {
-				sourceCommitAttempted = true
-				_, sourceWriteErr = stagedSourceCommitter.CommitFinalChanges(ctx, applied.FinalChanges)
-				return sourceWriteErr
-			}
 		}
 	}
 	lintedfileCount := initialObservation.Native.Lint.LintedFileCount
@@ -659,25 +623,11 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
 	var suppressionError string
-	if baseline != nil {
-		if err := ctx.Err(); err != nil {
-			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
-		}
-		if args.Suppressions.Mode != suppressions.Check {
-			for i := range targetPlan.Files {
-				file := &targetPlan.Files[i]
-				if err := verifyLintDestination(file); err != nil {
-					baseline.PreserveCounts(file.Path, err)
-				}
-			}
-		}
-		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args, commitSources)
-		if sourceWriteErr != nil {
-			return abortRun(1, "applying fixes: "+sourceWriteErr.Error(), fmt.Sprintf("error applying fixes: %v", sourceWriteErr))
-		}
-		if commitSources != nil && !sourceCommitAttempted && suppressionError != "" {
-			return abortRun(2, suppressionError, "error: "+suppressionError)
-		}
+	switch {
+	case baselineErr != nil:
+		suppressionError = baselineErr.Error()
+	case baseline != nil:
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation.Native.Files, allDiags, finalPlugin, args)
 	}
 	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0
@@ -710,19 +660,18 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 	if err := ctx.Err(); err != nil {
-		return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
+		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 	}
 	report, err := assembleLintReport(lintReportInput{
-		Mode:             mode,
-		Diagnostics:      allDiags,
-		Summary:          summary,
-		MaxWarnings:      maxWarnings,
-		SuppressionError: suppressionError,
-		IncludeSource:    format == output.FormatDefault,
+		Mode:          mode,
+		Diagnostics:   allDiags,
+		Summary:       summary,
+		MaxWarnings:   maxWarnings,
+		Failed:        suppressionError != "",
+		IncludeSource: format == output.FormatDefault,
 	})
 	if err != nil {
 		return abortRun(
-			1,
 			"assembling lint report: "+err.Error(),
 			fmt.Sprintf("error assembling lint report: %v", err),
 		)
@@ -731,7 +680,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	outputOptions.ComparePaths = comparePathOptions
 	if err := renderLintReport(ctx, os.Stdout, report, outputOptions); err != nil {
 		return abortRun(
-			1,
 			"writing lint report: "+err.Error(),
 			fmt.Sprintf("error writing lint report: %v", err),
 		)
@@ -742,8 +690,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	if format != output.FormatDefault && outcome.Kind == output.OutcomeWarningLimitExceeded {
 		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)
 	}
-	if format != output.FormatDefault && outcome.SuppressionError != "" {
-		fmt.Fprintln(os.Stderr, outcome.SuppressionError)
+	if suppressionError != "" {
+		fmt.Fprintln(os.Stderr, suppressionError)
 	}
 
 	// The timing table goes to stderr so machine-readable stdout formats
@@ -761,7 +709,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
-	if outcome.SuppressionError != "" {
+	if suppressionError != "" {
 		return 2
 	}
 	if outcome.Failed() {

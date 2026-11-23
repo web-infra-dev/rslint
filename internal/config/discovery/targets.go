@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
@@ -14,7 +13,7 @@ import (
 // invocation target. A nil trie means the current subtree is unbounded. A
 // leaf still visits that directory so its sources can govern files within it.
 type discoveryTargetTrie struct {
-	children map[string]*discoveryTargetTrie
+	children map[tspath.Path]*discoveryTargetTrie
 	files    []*rslintconfig.PathIdentity
 }
 
@@ -22,35 +21,27 @@ func addDiscoveryTarget(
 	root *discoveryTargetTrie,
 	configDir string,
 	file *rslintconfig.PathIdentity,
-	fsys vfs.FS,
+	useCaseSensitive bool,
 ) bool {
-	parent := tspath.GetDirectoryPath(file.Path)
 	relative, within := rslintconfig.RelativePathWithinConfigRoot(
-		parent, configDir, true,
+		tspath.GetDirectoryPath(file.Path),
+		configDir,
+		useCaseSensitive,
 	)
 	if !within {
-		relative, within = rslintconfig.RelativePathWithinConfigRoot(parent, configDir, false)
-		if !within {
-			return false
-		}
-		aliasRoot := parent
-		for range splitDiscoveryPath(relative) {
-			aliasRoot = tspath.GetDirectoryPath(aliasRoot)
-		}
-		if !fsys.DirectoryExists(aliasRoot) || !sameDirectoryEntries(fsys, aliasRoot, configDir) {
-			return false
-		}
+		return false
 	}
 
 	node := root
 	for _, component := range splitDiscoveryPath(relative) {
 		if node.children == nil {
-			node.children = make(map[string]*discoveryTargetTrie)
+			node.children = make(map[tspath.Path]*discoveryTargetTrie)
 		}
-		child := node.children[component]
+		identity := tspath.ToPath(component, "", useCaseSensitive)
+		child := node.children[identity]
 		if child == nil {
 			child = &discoveryTargetTrie{}
-			node.children[component] = child
+			node.children[identity] = child
 		}
 		node = child
 	}
@@ -58,22 +49,13 @@ func addDiscoveryTarget(
 	return true
 }
 
-func (coordinator *discoveryCoordinator) resolveInputNames(files []DiscoveryFile, directories []rslintconfig.DirectoryIdentity) {
-	for i := range directories {
-		directories[i].CanonicalPath = coordinator.inputNames.Directory(directories[i].CanonicalPath)
-	}
-	for i := range files {
-		file := &files[i]
-		file.PathIdentity = coordinator.inputNames.File(file.PathIdentity, !file.Explicit && len(file.ScanDirectories) != 0)
-	}
-}
-
 func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconfig.DirectoryIdentity {
 	raw := coordinator.request.Directories
 	if len(raw) == 0 && len(coordinator.request.Files) == 0 && coordinator.request.ImplicitCWD {
 		raw = rslintconfig.ResolveDirectoryIdentities([]string{coordinator.request.CWD}, coordinator.fs)
 	}
-	byIdentity := make(map[string]rslintconfig.DirectoryIdentity, len(raw))
+	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
+	byIdentity := make(map[tspath.Path]rslintconfig.DirectoryIdentity, len(raw))
 	for _, directory := range raw {
 		directory.LexicalPath = normalizeDiscoveryPath(directory.LexicalPath, coordinator.request.CWD)
 		if directory.CanonicalPath == "" {
@@ -81,7 +63,7 @@ func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconf
 		} else {
 			directory.CanonicalPath = normalizeDiscoveryPath(directory.CanonicalPath, coordinator.request.CWD)
 		}
-		identity := rslintconfig.ExactPathID(directory.LexicalPath)
+		identity := tspath.ToPath(directory.LexicalPath, "", useCaseSensitive)
 		if current, exists := byIdentity[identity]; !exists || directory.LexicalPath < current.LexicalPath {
 			byIdentity[identity] = directory
 		}
@@ -95,9 +77,8 @@ func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconf
 }
 
 func (coordinator *discoveryCoordinator) recursiveDirectory(path string) bool {
-	root := rslintconfig.ExactPathID(path)
 	return slices.ContainsFunc(coordinator.request.RecursiveDirectories, func(directory rslintconfig.DirectoryIdentity) bool {
-		return rslintconfig.ExactPathID(normalizeDiscoveryPath(directory.LexicalPath, coordinator.request.CWD)) == root
+		return discoveryPathsEqual(path, directory.LexicalPath, coordinator.fs.UseCaseSensitiveFileNames())
 	})
 }
 
@@ -153,18 +134,21 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 	files []DiscoveryFile,
 ) map[string]*discoveryTargetTrie {
 	tries := make(map[string]*discoveryTargetTrie, len(roots))
-	for _, directory := range roots {
-		root := directory.LexicalPath
-		rootID := rslintconfig.ExactPathID(root)
-		trie := &discoveryTargetTrie{}
-		for index := range files {
-			file := &files[index]
+	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
+	for index := range files {
+		file := &files[index]
+		for _, directory := range roots {
+			root := directory.LexicalPath
 			if !file.Explicit && file.ScanDirectories != nil && !slices.ContainsFunc(file.ScanDirectories, func(directory string) bool {
-				return rslintconfig.ExactPathID(directory) == rootID
+				return discoveryPathsEqual(directory, root, useCaseSensitive)
 			}) {
 				continue
 			}
-			if addDiscoveryTarget(trie, root, &file.PathIdentity, coordinator.fs) {
+			trie := tries[root]
+			if trie == nil {
+				trie = &discoveryTargetTrie{}
+			}
+			if addDiscoveryTarget(trie, root, &file.PathIdentity, useCaseSensitive) {
 				tries[root] = trie
 			}
 		}
@@ -172,41 +156,12 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 	return tries
 }
 
-// Each trie belongs to one walk root. A caller may supply a native alias for
-// an existing directory, while glob expansion already supplies stored names.
-func (trie *discoveryTargetTrie) resolveChildNames(parent string, directories []string, fsys vfs.FS) {
-	for requested, child := range trie.children {
-		if _, exists := slices.BinarySearch(directories, requested); exists {
-			continue
-		}
-		name := rslintconfig.StoredEntryName(directories, requested)
-		if name == "" || !fsys.DirectoryExists(tspath.CombinePaths(parent, requested)) {
-			continue
-		}
-		if existing := trie.children[name]; existing != nil {
-			existing.merge(child)
-		} else {
-			trie.children[name] = child
-		}
-		delete(trie.children, requested)
+func (trie *discoveryTargetTrie) child(name string, useCaseSensitive bool) *discoveryTargetTrie {
+	if trie == nil || len(trie.children) == 0 {
+		return nil
 	}
+	return trie.children[tspath.ToPath(name, "", useCaseSensitive)]
 }
-
-func (trie *discoveryTargetTrie) merge(other *discoveryTargetTrie) {
-	trie.files = append(trie.files, other.files...)
-	if trie.children == nil {
-		trie.children = other.children
-		return
-	}
-	for name, child := range other.children {
-		if existing := trie.children[name]; existing != nil {
-			existing.merge(child)
-		} else {
-			trie.children[name] = child
-		}
-	}
-}
-
 func splitDiscoveryPath(path string) []string {
 	path = strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 	var components []string

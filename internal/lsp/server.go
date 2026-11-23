@@ -188,16 +188,12 @@ type Server struct {
 	// A nil value means discovery has not committed yet; bootstrap operations
 	// collect one exact target with a request-local reader.
 	gitPolicy *config.GitPolicy
-	// Stored path spellings are shared by open documents on the dispatch loop.
-	documentPathNames *config.InputPathNames
 	// Failed uncovered-directory refreshes belong to the committed generation.
 	failedGitPolicyDirectories   map[string]struct{}
 	gitPolicyWatcherID           project.WatcherID
 	gitPolicyWatcherGeneration   uint64
 	gitPolicyWatcherKey          string
 	committedGitWatchDirectories []string
-	// Includes newly watched candidates until a successful commit replaces them.
-	gitConfigWatchFiles map[string]string
 	// jsUnavailableConfigs contains absolute config-directory paths for failed
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}

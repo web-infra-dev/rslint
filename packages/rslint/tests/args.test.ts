@@ -221,15 +221,18 @@ describe('parseArgs positionals', () => {
 });
 
 describe('parseArgs rest ordering', () => {
-  test('distinguishes an empty --suppress-rule list from a missing value', () => {
+  test('distinguishes an empty suppression argument from a missing value', () => {
     expect(parseArgs(['--suppress-rule', '']).rest).toEqual([
       '--suppress-rule=[]',
     ]);
-    for (const flag of ['--suppress-rule', '--suppress-rule=']) {
-      expect(parseArgs(['a.js', flag]).rest).toEqual([
-        '--suppress-rule=',
-        'a.js',
-      ]);
+    const location = '--suppressions-location';
+    expect(
+      parseArgs(['a.js', location, 'custom.json', location, '']).rest,
+    ).toEqual(['a.js']);
+    for (const flag of ['--suppress-rule', location]) {
+      for (const arg of [flag, `${flag}=`]) {
+        expect(parseArgs(['a.js', arg]).rest).toEqual([`${flag}=`, 'a.js']);
+      }
     }
   });
 

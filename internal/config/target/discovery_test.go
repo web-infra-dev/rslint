@@ -1,6 +1,6 @@
 package target
 
-// cspell:ignore cmpopts gitdir Straße STRASSE
+// cspell:ignore cmpopts gitdir
 
 import (
 	"os"
@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -25,11 +24,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"gotest.tools/v3/assert"
 )
-
-var compareDiscoveredFiles = cmp.Options{
-	cmpopts.IgnoreFields(File{}, "match"),
-	cmpopts.EquateComparable(rslintconfig.PathIdentity{}),
-}
 
 func strconvI(i int) string { return strconv.Itoa(i) }
 
@@ -786,7 +780,7 @@ func TestDiscoverLintTargetsFromRoot_WalksEveryRequestedDirectory(t *testing.T) 
 	assert.DeepEqual(t, targets, []File{
 		{PathIdentity: rslintconfig.PathIdentity{Path: firstFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(firstFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(firstDir))}, ConfigDirectory: configDir},
 		{PathIdentity: rslintconfig.PathIdentity{Path: secondFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(secondFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(secondDir))}, ConfigDirectory: configDir},
-	}, compareDiscoveredFiles)
+	}, cmpopts.IgnoreFields(File{}, "match"))
 }
 
 func TestDiscoverLintTargetsFromRoot_PreservesDistinctLexicalDirectorySelectors(t *testing.T) {
@@ -975,7 +969,7 @@ func TestDiscoverLintTargetsFromRoot_UnionsFilesAndDirectories(t *testing.T) {
 	assert.DeepEqual(t, targets, []File{
 		{PathIdentity: rslintconfig.PathIdentity{Path: directoryFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(directoryRoot))}, ConfigDirectory: configDir},
 		{PathIdentity: rslintconfig.PathIdentity{Path: exactFile, CanonicalPath: tspath.NormalizePath(osvfs.FS().Realpath(exactFile)), CanonicalParentPath: tspath.NormalizePath(osvfs.FS().Realpath(filepath.Dir(exactFile)))}, ConfigDirectory: configDir},
-	}, compareDiscoveredFiles)
+	}, cmpopts.IgnoreFields(File{}, "match"))
 }
 
 func TestDiscoverLintTargetsFromRoot_RequestedAncestorWidensOnlyScanScope(t *testing.T) {
@@ -1198,7 +1192,7 @@ func TestDiscoverLintTargets_MissingSymlinkMetadataResolvesFileIdentity(t *testi
 			CanonicalParentPath: "/repo/src",
 		},
 		ConfigDirectory: configDir,
-	}}, compareDiscoveredFiles)
+	}}, cmpopts.IgnoreFields(File{}, "match"))
 }
 
 func TestDiscoverWalkRootsMapsCanonicalDirectoryAlias(t *testing.T) {
@@ -1437,26 +1431,6 @@ func TestDiscoverLintFilesMultiConfig_DoesNotWalkChildConfigFromParent(t *testin
 	assert.Equal(t, childAccesses, 1, "child config directory should be entered only by its owning config")
 }
 
-func TestChildConfigBoundaryPreservesCaseDistinctSibling(t *testing.T) {
-	const root, child, sibling = "/repo", "/repo/SRC", "/repo/src"
-	fsys := &discoveryMockFS{
-		FS: osvfs.FS(),
-		entries: map[string]vfs.Entries{
-			root:    {Directories: []string{"SRC", "src"}},
-			child:   {Files: []string{"good.js"}},
-			sibling: {Files: []string{"bad.js"}},
-		},
-		caseSensitiveFS: false,
-	}
-	configs := map[string]rslintconfig.RslintConfig{root: nil, child: nil}
-	targets := discoverLintTargetsMultiConfig(configs, nil, fsys, nil, []string{root}, true)
-	owners := make(map[string]string)
-	for _, target := range targets {
-		owners[target.Path] = target.ConfigDirectory
-	}
-	assert.DeepEqual(t, owners, map[string]string{child + "/good.js": child, sibling + "/bad.js": root})
-}
-
 func TestConfigDirectoryIndex_UsesImmediateBoundariesAndNearestOwner(t *testing.T) {
 	configMap := map[string]rslintconfig.RslintConfig{
 		"/repo":          nil,
@@ -1551,7 +1525,7 @@ func TestDiscoverLintTargetsMultiConfig_MatchesIgnoresInPhysicalConfigSpace(t *t
 			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["src/keep.ts"]))),
 		},
 		ConfigDirectory: linkDir,
-	}}, compareDiscoveredFiles)
+	}}, cmpopts.IgnoreFields(File{}, "match"))
 }
 
 func TestDiscoverLintTargetsMultiConfig_AssignsExplicitFilesBeforeConfigProcessing(t *testing.T) {
@@ -1655,7 +1629,7 @@ func TestDiscoverLintTargetsMultiConfig_MergesAutomaticAndHostAssignedFilesForSa
 			},
 			ConfigDirectory: childDir,
 		},
-	}, compareDiscoveredFiles)
+	}, cmpopts.IgnoreFields(File{}, "match"))
 }
 
 func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFiles(t *testing.T) {
@@ -1694,7 +1668,7 @@ func TestDiscoverLintTargetsMultiConfig_ExplicitOnlyConfigDoesNotOwnAutomaticFil
 			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(paths["ignored/explicit.ts"]))),
 		},
 		ConfigDirectory: ignoredDir,
-	}}, compareDiscoveredFiles)
+	}}, cmpopts.IgnoreFields(File{}, "match"))
 }
 
 func TestDiscoverLintTargetsMultiConfig_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
@@ -2067,6 +2041,7 @@ func TestProjectPathThroughRequestedDirectoriesPreservesCallerCasing(t *testing.
 			LexicalPath:   "c:/repo/src",
 			CanonicalPath: "C:/Repo/src",
 		}},
+		false,
 	)
 	if len(projections) != 1 ||
 		projections[0] != "c:/repo/src/a.TS" {
@@ -2080,21 +2055,12 @@ func TestProjectPathThroughRequestedDirectoriesPreservesCallerCasing(t *testing.
 			{LexicalPath: "C:/Repo/src", CanonicalPath: "C:/Repo/src"},
 			{LexicalPath: "c:/repo/src", CanonicalPath: "c:/repo/src"},
 		},
+		false,
 	)
 	if len(projections) != 1 ||
 		projections[0] != "C:/Repo/src/a.TS" {
 		t.Fatalf("distinct case-only roots produced projections %+v", projections)
 	}
-
-	const owner, physical = "/repo/STRASSE/pkg", "/repo/Straße/pkg"
-	projections = projectPathThroughRequestedDirectories(
-		owner+"/app.js", physical+"/app.js",
-		[]resolvedAllowedDirectory{
-			{LexicalPath: owner, CanonicalPath: physical},
-			{LexicalPath: physical, CanonicalPath: physical},
-		},
-	)
-	assert.DeepEqual(t, projections, []string{owner + "/app.js", physical + "/app.js"})
 }
 
 func TestDiscoverFilesOutsideProgramsMultiConfig_UsesNearestConfigOwner(t *testing.T) {

@@ -411,7 +411,6 @@ type readerTestFS struct {
 }
 
 func (fsys *readerTestFS) UseCaseSensitiveFileNames() bool { return fsys.caseSensitive }
-func (*readerTestFS) Stat(string) vfs.FileInfo             { return nil }
 func (fsys *readerTestFS) DirectoryExists(path string) bool {
 	if fsys.beforeMarker != nil {
 		fsys.beforeMarker(path)
@@ -448,27 +447,6 @@ func newReaderTestFS(files map[string]string, directories ...string) *readerTest
 		fsys.directories[directory] = true
 	}
 	return fsys
-}
-
-type namedMarkerFS struct {
-	*readerTestFS
-	lookups []string
-}
-
-func (fsys *namedMarkerFS) StoredEntryName(path string) (string, error) {
-	fsys.lookups = append(fsys.lookups, path)
-	return ".git", nil
-}
-
-func TestReaderUsesStoredMarkerNameWithoutListing(t *testing.T) {
-	fsys := &namedMarkerFS{readerTestFS: newReaderTestFS(map[string]string{
-		"/repo/.git": "", "/repo/.GIT": "", "/repo/.gitignore": "/SRC/\n",
-	})}
-	reader := NewReader(fsys)
-	cursor := reader.Observe(reader.Ancestors("/repo"), "/repo")
-	_, blocked := cursor.Enter("/repo/src")
-	assert.Assert(t, blocked)
-	assert.DeepEqual(t, fsys.lookups, []string{"/repo/.git", "/repo/.GIT"})
 }
 
 func TestReaderNearestGitBoundaryIncludesDirectoryAndFileMarkers(t *testing.T) {

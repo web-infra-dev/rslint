@@ -347,11 +347,13 @@ export function mergeListeners(
           // Record it against the owning rule(s) and skip this selector —
           // ESLint isolates a broken rule the same way, leaving sibling
           // rules running.
-          merged.selectorErrors.push({
-            ruleName,
-            selector: cleanSelector,
-            message: compilation.message,
-          });
+          for (const tl of tagged) {
+            merged.selectorErrors.push({
+              ruleName: tl.ruleName,
+              selector: cleanSelector,
+              message: compilation.message,
+            });
+          }
           continue;
         }
         entry = {
@@ -704,7 +706,6 @@ export function visit(
   };
   const result: VisitResult = { cancelled: false, visitedNodes: 0 };
   const errH = opts.onListenerError;
-  let reportedMatchErrors: Set<string> | undefined;
   const cancelFlag = opts.cancelFlag;
 
   // No-ESQuery fast path. When the merged set contains no esquery
@@ -729,14 +730,11 @@ export function visit(
         matched = esquery().matches(node, entry.selector!, reversedAncestry());
       } catch (err) {
         if (errH) {
-          // A selector can still match later nodes. Report each distinct
-          // matching failure once per owner during this traversal.
-          reportedMatchErrors ??= new Set();
-          const message = String((err as Error)?.message ?? err);
-          for (const { ruleName } of entry.listeners) {
-            const key = JSON.stringify([ruleName, entry.raw, message]);
-            if (reportedMatchErrors.has(key)) continue;
-            reportedMatchErrors.add(key);
+          // A shared selector prevented each of its owning rules from running.
+          const owners = new Set(
+            entry.listeners.map((listener) => listener.ruleName),
+          );
+          for (const ruleName of owners) {
             errH({ ruleName, selector: entry.raw, node, err });
           }
         }

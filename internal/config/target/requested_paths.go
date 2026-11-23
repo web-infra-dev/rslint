@@ -7,18 +7,25 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
-// Child config boundaries use the lexical directory entries admitted by
-// discovery. The host's default casing may differ from the volume being walked.
-func normalizeStopWalkDirs(configDir string, stopDirs []string) []string {
+func normalizeStopWalkDirs(configDir string, stopDirs []string, useCaseSensitive bool) []string {
 	if len(stopDirs) == 0 {
 		return nil
 	}
 
+	compareOptions := tspath.ComparePathsOptions{
+		CurrentDirectory:          configDir,
+		UseCaseSensitiveFileNames: useCaseSensitive,
+	}
 	seen := make(map[string]struct{}, len(stopDirs))
 	normalized := make([]string, 0, len(stopDirs))
-	for _, dir := range stopDirs {
-		rel, within := rslintconfig.RelativePathWithinConfigRoot(dir, configDir, true)
-		if !within || rel == "" {
+	for _, rawDir := range stopDirs {
+		dir := tspath.NormalizePath(rawDir)
+		if pathsEqual(dir, configDir, useCaseSensitive) ||
+			!tspath.StartsWithDirectory(dir, configDir, useCaseSensitive) {
+			continue
+		}
+		rel := tspath.NormalizePath(tspath.GetRelativePathFromDirectory(configDir, dir, compareOptions))
+		if rel == "" || rel == "." {
 			continue
 		}
 		if _, ok := seen[rel]; ok {
@@ -36,6 +43,7 @@ func filterInitialWalkRoots(
 	isDefaultExcluded func(string) bool,
 	canPrune func(string) bool,
 	stopWalkDirs []string,
+	useCaseSensitive bool,
 ) []string {
 	if len(roots) == 0 {
 		return roots
@@ -53,7 +61,7 @@ func filterInitialWalkRoots(
 		if isDefaultExcluded != nil && isDefaultExcluded(root) {
 			continue
 		}
-		if isStoppedWalkPath(root, stopWalkDirs) ||
+		if (root != "." && isStoppedWalkPath(root, stopWalkDirs, useCaseSensitive)) ||
 			(canPrune != nil && canPrune(root)) {
 			continue
 		}
@@ -62,7 +70,7 @@ func filterInitialWalkRoots(
 	return filtered
 }
 
-func isStoppedWalkPath(walkPath string, stopWalkDirs []string) bool {
+func isStoppedWalkPath(walkPath string, stopWalkDirs []string, useCaseSensitive bool) bool {
 	if len(stopWalkDirs) == 0 {
 		return false
 	}
@@ -71,7 +79,8 @@ func isStoppedWalkPath(walkPath string, stopWalkDirs []string) bool {
 		return false
 	}
 	for _, stopDir := range stopWalkDirs {
-		if walkPath == stopDir || tspath.StartsWithDirectory(walkPath, stopDir, true) {
+		if pathsEqual(walkPath, stopDir, useCaseSensitive) ||
+			tspath.StartsWithDirectory(walkPath, stopDir, useCaseSensitive) {
 			return true
 		}
 	}
@@ -89,6 +98,7 @@ func projectPathThroughRequestedDirectories(
 	filePath string,
 	physicalPath string,
 	allowDirs []resolvedAllowedDirectory,
+	useCaseSensitive bool,
 ) []string {
 	projections := make([]string, 0, len(allowDirs))
 	seen := make(map[string]struct{}, len(allowDirs))
@@ -102,10 +112,37 @@ func projectPathThroughRequestedDirectories(
 		projections = append(projections, path)
 	}
 	for _, dir := range allowDirs {
-		if relative, within := rslintconfig.RelativePathWithinConfigRoot(filePath, dir.LexicalPath, true); within {
+		if _, within := rslintconfig.RelativePathWithinConfigRoot(filePath, dir.LexicalPath, useCaseSensitive); within {
+			relative, exactWithin := rslintconfig.RelativePathWithinConfigRoot(
+				filePath,
+				dir.LexicalPath,
+				true,
+			)
+			if !exactWithin {
+				// A case-insensitive lexical resemblance is authoritative only
+				// when the frozen physical spelling verifies the same root. This
+				// keeps native casing aliases while rejecting a distinct tree that
+				// differs only by case on a case-sensitive filesystem facade.
+				physicalRelative, verified := rslintconfig.RelativePathWithinConfigRoot(
+					filePath,
+					dir.CanonicalPath,
+					true,
+				)
+				if !verified && physicalPath != filePath {
+					physicalRelative, verified = rslintconfig.RelativePathWithinConfigRoot(
+						physicalPath,
+						dir.CanonicalPath,
+						true,
+					)
+				}
+				if !verified {
+					continue
+				}
+				relative = physicalRelative
+			}
 			appendProjection(tspath.ResolvePath(dir.LexicalPath, relative))
 		}
-		if dir.LexicalPath == dir.CanonicalPath && filePath == physicalPath {
+		if dir.LexicalPath == dir.CanonicalPath {
 			continue
 		}
 		relative, within := rslintconfig.RelativePathWithinConfigRoot(filePath, dir.CanonicalPath, true)

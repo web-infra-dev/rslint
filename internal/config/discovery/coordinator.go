@@ -22,7 +22,6 @@ type discoveryCoordinator struct {
 	draft               catalogDraft
 	walkStats           discoveryWalkStats
 	physicalDirectories map[string]string
-	inputNames          *rslintconfig.InputPathNames
 	targetFiles         []rslintconfig.PathIdentity
 	targetDirectories   []rslintconfig.DirectoryIdentity
 	reachableFiles      map[string]bool
@@ -36,8 +35,6 @@ func newDiscoveryCoordinator(
 	explicit *ExplicitConfigRequest,
 	transactionID string,
 ) discoveryCoordinator {
-	git := gitignore.NewReader(fsys)
-	git.BeforeConfigRead = request.BeforeGitConfigRead
 	return discoveryCoordinator{
 		ctx:           ctx,
 		fs:            fsys,
@@ -52,10 +49,9 @@ func newDiscoveryCoordinator(
 			request.Fresh,
 			request.SingleThreaded,
 		),
-		git:                 git,
+		git:                 gitignore.NewReader(fsys),
 		draft:               newCatalogDraft(),
 		physicalDirectories: make(map[string]string),
-		inputNames:          rslintconfig.NewInputPathNames(fsys),
 	}
 }
 
@@ -71,13 +67,6 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 	coordinator.request.CWD = cwd
 	files := coordinator.normalizedFiles()
 	directoryRoots := coordinator.normalizedDirectoryRoots()
-	// A project-only explicit config may use only its declared tsconfig.
-	// Its implicit working directory becomes a lint input only if that config
-	// actually requests target discovery.
-	deferredWorkingDirectory := coordinator.explicit != nil && coordinator.explicit.Config == nil && coordinator.explicit.ProjectOnly && coordinator.request.ImplicitCWD
-	if !deferredWorkingDirectory {
-		coordinator.resolveInputNames(files, directoryRoots)
-	}
 	coordinator.request.Files = files
 	coordinator.request.Directories = directoryRoots
 	coordinator.targetDirectories = directoryRoots
@@ -140,12 +129,6 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			return nil, err
 		}
 		if !explicit.ProjectOnly || rslintconfig.HasProjectOptions(state.entries) {
-			if deferredWorkingDirectory {
-				coordinator.resolveInputNames(files, directoryRoots)
-				for _, directory := range directoryRoots {
-					coordinator.physicalDirectories[directory.LexicalPath] = directory.CanonicalPath
-				}
-			}
 			if err := coordinator.collectExplicitGitSources(state.candidate.directory, state.candidate.path, state.ignoreMatcher, targetsByRoot); err != nil {
 				return nil, err
 			}
@@ -170,9 +153,9 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			// A default-excluded directory is a downward traversal boundary, not a
 			// reason to discard still-reachable configuration outside it. Skip the
 			// root and every default-excluded ancestor, then resolve normally.
-			searchDirectory = rslintconfig.FilesystemParentDirectory(directory)
+			searchDirectory = configDiscoveryParent(directory)
 			for searchDirectory != "" && isDefaultDiscoveryExcluded(searchDirectory, cwd, useCaseSensitive) {
-				searchDirectory = rslintconfig.FilesystemParentDirectory(searchDirectory)
+				searchDirectory = configDiscoveryParent(searchDirectory)
 			}
 			if searchDirectory == "" {
 				continue
@@ -308,33 +291,23 @@ func (coordinator *discoveryCoordinator) adoptCandidate(state *configLoadState, 
 }
 
 func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
-	configs, scopes, effectiveIDs, err := coordinator.draft.finalize(coordinator.physicalDirectory, coordinator.fs)
+	configs, scopes, effectiveIDs, err := coordinator.draft.finalize(coordinator.physicalDirectory, coordinator.fs.UseCaseSensitiveFileNames())
 	if err != nil {
 		return nil, err
-	}
-	pathSpaces := coordinator.modules.pathSpaces
-	var directoryAliases []rslintconfig.DirectoryIdentity
-	for owner, scope := range scopes {
-		// A shared config module can govern multiple spellings of its directory.
-		// Preserve each admitted entry for the target owner's frozen index.
-		for _, directory := range scope.Directories {
-			if _, frozen := pathSpaces.PhysicalDirectory(directory.LexicalPath); !frozen {
-				directoryAliases = append(directoryAliases, directory)
-			}
-		}
-		if len(coordinator.request.RecursiveDirectories) > 0 && scope.RecursiveDirectories == nil {
-			scope.RecursiveDirectories = []rslintconfig.DirectoryIdentity{}
-			scopes[owner] = scope
-		}
-	}
-	if len(directoryAliases) > 0 {
-		pathSpaces = pathSpaces.WithConfigBases(nil, coordinator.fs, directoryAliases...)
 	}
 	eslintPlugins, err := coordinator.modules.activateEffectiveConfigs(effectiveIDs)
 	if err != nil {
 		return nil, err
 	}
-	targetFiles, targetDirectories := coordinator.targetFiles, coordinator.targetDirectories
+	if len(coordinator.request.RecursiveDirectories) > 0 {
+		for owner, scope := range scopes {
+			if scope.RecursiveDirectories == nil {
+				scope.RecursiveDirectories = []rslintconfig.DirectoryIdentity{}
+				scopes[owner] = scope
+			}
+		}
+	}
+	targetFiles := coordinator.targetFiles
 	if coordinator.reachableFiles != nil {
 		targetFiles = make([]rslintconfig.PathIdentity, 0, len(coordinator.targetFiles))
 		for _, file := range coordinator.targetFiles {
@@ -342,21 +315,13 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 				targetFiles = append(targetFiles, file)
 			}
 		}
-		// A glob root bounds config discovery. Only literal directory inputs
-		// authorize recursive linting alongside the expanded files.
-		targetDirectories = nil
-		for _, directory := range coordinator.targetDirectories {
-			if coordinator.recursiveDirectory(directory.LexicalPath) {
-				targetDirectories = append(targetDirectories, directory)
-			}
-		}
 	}
 	return &ConfigCatalog{
 		TransactionID:      coordinator.transactionID,
 		GitPolicy:          rslintconfig.NewGitPolicy(coordinator.git.Snapshot()),
-		PathSpaces:         pathSpaces,
+		PathSpaces:         coordinator.modules.pathSpaces,
 		TargetFiles:        targetFiles,
-		TargetDirectories:  targetDirectories,
+		TargetDirectories:  coordinator.targetDirectories,
 		Configs:            configs,
 		EffectiveConfigIDs: effectiveIDs,
 		EslintPlugins:      eslintPlugins,

@@ -21,29 +21,10 @@ func normalizeGlobPath(path string) string {
 	return strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 }
 
-// FoldCase applies Git's ASCII-only case folding to an ignore pattern or path.
-func FoldCase(s string) string {
-	start := strings.IndexAny(s, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	if start < 0 {
-		return s
-	}
-	var result strings.Builder
-	result.Grow(len(s))
-	result.WriteString(s[:start])
-	for i := start; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		result.WriteByte(c)
-	}
-	return result.String()
-}
-
 func matchGitignoreGlob(pattern string, path string, useCaseSensitive bool) bool {
 	if !useCaseSensitive {
-		pattern = FoldCase(pattern)
-		path = FoldCase(path)
+		pattern = strings.ToLower(pattern)
+		path = strings.ToLower(path)
 	}
 	return utils.MatchGlob(pattern, path)
 }
@@ -60,8 +41,7 @@ func patternGlobs(patterns []Pattern) []string {
 }
 
 type gitignorePruneRule struct {
-	patterns        []Pattern
-	caseInsensitive bool
+	patterns []Pattern
 }
 
 // Cursor is an immutable, filesystem-independent view of the .gitignore
@@ -156,15 +136,15 @@ func (cursor Cursor) AppendSourcePatterns(directory string, content string) (Cur
 	}
 
 	patterns := convertGitignoreToPatterns(content, relative)
-	return cursor.appendPatterns(patterns, !cursor.useCaseSensitive), patterns
+	return cursor.appendPatterns(patterns), patterns
 }
 
-func (cursor Cursor) appendPatterns(patterns []Pattern, caseInsensitive bool) Cursor {
+func (cursor Cursor) appendPatterns(patterns []Pattern) Cursor {
 	next := cursor
 	if len(patterns) > 0 {
 		next.rules = append(
 			append([]gitignorePruneRule(nil), cursor.rules...),
-			gitignorePruneRule{patterns: patterns, caseInsensitive: caseInsensitive},
+			gitignorePruneRule{patterns: patterns},
 		)
 	}
 	return next
@@ -181,7 +161,7 @@ func (cursor Cursor) blocksDirectoryNode(directory string) bool {
 	ignored := false
 	for _, rule := range cursor.rules {
 		for _, pattern := range rule.patterns {
-			if gitignorePrunePatternMatchesDirectoryNode(pattern, relative, !rule.caseInsensitive) {
+			if gitignorePrunePatternMatchesDirectoryNode(pattern, relative, cursor.useCaseSensitive) {
 				ignored = !pattern.Negated
 			}
 		}
