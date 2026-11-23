@@ -221,7 +221,73 @@ func TestNoDuplicateTypeConstituentsUnicodeDirectiveTargets(t *testing.T) {
 			}
 		}
 	}
+	// TypeScript 6.0.3 accepts any ECMAScript whitespace before the @, but
+	// tsgo omits these spellings from CommentDirectives.
+	for _, directive := range []string{"//\u00a0@ts-expect-error", "/// \ufeff@ts-ignore", "/*\u00a0@ts-expect-error */", "/*\n\u2003* \u00a0@ts-ignore */"} {
+		code := "type AsString<T extends string> = string;\n" + directive + "\nexport type T = string | AsString<123>;"
+		line := strings.Count(code, "\n") + 1
+		column := len("export type T = string | ") + 1
+		cases = append(cases, rule_tester.InvalidTestCase{
+			Code:   code,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "duplicate", Message: "Union type constituent is duplicated with string.", Line: line, Column: column, EndLine: line, EndColumn: column + len("AsString<123>")}},
+		})
+	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoDuplicateTypeConstituentsRule, nil, cases)
+}
+
+// TypeScript classifies skipped lines textually, so a //-prefixed line of
+// template text still lies between a directive and the line it targets, and
+// a diagnostic on that line is suppressed too. tsgo additionally accepts
+// extra slashes, which TypeScript 6.0.3 does not; both must stay valid.
+func TestNoDuplicateTypeConstituentsSkippedLineTargets(t *testing.T) {
+	for _, code := range []string{
+		"type AsString<T extends string> = string;\nexport type T = `path${/* @ts-expect-error */ string}\n// ${string | AsString<123>}`;",
+		"type AsString<T extends string> = string;\nexport type T = `path${/* @ts-expect-error */ string}\n\n// first\n// ${string | AsString<123>}`;",
+		"type AsString<T extends string> = string;\n//// @ts-expect-error\nexport type T = string | AsString<123>;",
+	} {
+		diagnostics := lintSafetyFixture(t, code, rule.EditDemandAll)
+		if len(diagnostics) != 1 || diagnostics[0].Message.Id != "duplicate" {
+			t.Fatalf("expected one duplicate diagnostic: %v", diagnostics)
+		}
+		if len(diagnostics[0].Fixes()) != 0 {
+			t.Fatalf("fix edits a line the directive reaches:\n%s", code)
+		}
+	}
+	// A //-prefixed line past the directive's target is not reached.
+	code := "// @ts-expect-error\nconst bad: number = 'x';\nexport type T = `${string}\n// ${string | string}`;"
+	diagnostics := lintSafetyFixture(t, code, rule.EditDemandAll)
+	if len(diagnostics) != 1 || len(diagnostics[0].Fixes()) == 0 {
+		t.Fatalf("unreached template line lost its quick fix: %v", diagnostics)
+	}
+	fixed, _, _ := linter.ApplyRuleFixes(code, diagnostics)
+	lintSafetyFixture(t, fixed, rule.EditDemandNone)
+}
+
+// Directives after every edit, or separated from it by a code line, are
+// never inspected: the search walks back from the edit.
+func TestNoDuplicateTypeConstituentsDirectiveSearchIsLocal(t *testing.T) {
+	var code strings.Builder
+	code.WriteString("type Tail = string | string;\n")
+	for i := range 4000 {
+		fmt.Fprintf(&code, "// @ts-expect-error\nconst bad%d: number = 'x';\n", i)
+	}
+	code.WriteString("type Last = number | number;")
+	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/file.ts", Path: "/file.ts"}, code.String(), core.ScriptKindTS)
+	statements := source.Statements.Nodes
+	for _, statement := range []*ast.Node{statements[0], statements[len(statements)-1]} {
+		members := statement.AsTypeAliasDeclaration().Type.AsUnionTypeNode().Types.Nodes
+		body := utils.TrimNodeTextRange(source, members[1])
+		guard := fixDirectiveGuard{source: source, comments: func() []*ast.CommentRange {
+			t.Fatal("an unrelated fix scanned comments from the whole file")
+			return nil
+		}}
+		if !guard.safe(body, members[0].End(), []rule.RuleFix{rule.RuleFixRemoveRange(body)}) {
+			t.Fatal("unrelated directives prevented a safe fix")
+		}
+		if guard.coveredLines != nil {
+			t.Fatal("a one-line search should not allocate a memo")
+		}
+	}
 }
 
 func TestNoDuplicateTypeConstituentsInlineDirectiveQuickFix(t *testing.T) {
@@ -266,41 +332,55 @@ func BenchmarkNoDuplicateTypeConstituentsDirectiveTargets(b *testing.B) {
 	for _, blankLines := range []int{0, 2000} {
 		for _, duplicateTypes := range []int{1, 1000} {
 			b.Run(fmt.Sprintf("blank_%d/types_%d", blankLines, duplicateTypes), func(b *testing.B) {
-				helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
-				program, source, err := helper.CreateTestProgram(typeScriptBlankBenchmarkSource(blankLines, duplicateTypes), "ts-directive-benchmark.ts", "tsconfig.json")
-				if err != nil {
-					b.Fatal(err)
-				}
-				plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
-					Programs:         []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-					TargetsByProgram: [][]string{{source.FileName()}}, SingleThreaded: true,
-					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
-						return []rule.ConfiguredRule{{Name: NoDuplicateTypeConstituentsRule.Name, Environment: &rule.RuleEnvironment{}, Severity: rule.SeverityError,
-							Run: func(ctx rule.RuleContext) rule.RuleListeners { return NoDuplicateTypeConstituentsRule.Run(ctx, nil) }}}
-					},
-				})
-				if err != nil {
-					b.Fatal(err)
-				}
-				b.ReportAllocs()
-				b.ResetTimer()
-				for b.Loop() {
-					count := 0
-					_, err := linter.RunLinter(linter.RunLinterOptions{SingleThreaded: true, LintPlan: plan,
-						Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) {
-							count++
-							if len(d.Fixes()) == 0 {
-								b.Fatal("unrelated directive prevented a quick fix")
-							}
-						}}})
-					if err != nil {
-						b.Fatal(err)
-					}
-					if count != duplicateTypes {
-						b.Fatalf("expected %d duplicates, got %d", duplicateTypes, count)
-					}
-				}
+				benchmarkDirectivePass(b, typeScriptBlankBenchmarkSource(blankLines, duplicateTypes), duplicateTypes)
 			})
+		}
+	}
+	// The only edit precedes every directive.
+	b.Run("directives_after_edit", func(b *testing.B) {
+		var code strings.Builder
+		code.WriteString("type Tail = string | string;\n")
+		for i := range 4000 {
+			fmt.Fprintf(&code, "// @ts-expect-error\nconst bad%d: number = 'x';\n", i)
+		}
+		benchmarkDirectivePass(b, code.String(), 1)
+	})
+}
+
+// Reuse the Program and plan: rebuilding them would obscure per-pass work.
+func benchmarkDirectivePass(b *testing.B, code string, duplicateTypes int) {
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, source, err := helper.CreateTestProgram(code, "ts-directive-benchmark.ts", "tsconfig.json")
+	if err != nil {
+		b.Fatal(err)
+	}
+	plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
+		TargetsByProgram: [][]string{{source.FileName()}}, SingleThreaded: true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: NoDuplicateTypeConstituentsRule.Name, Environment: &rule.RuleEnvironment{}, Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners { return NoDuplicateTypeConstituentsRule.Run(ctx, nil) }}}
+		},
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		count := 0
+		_, err := linter.RunLinter(linter.RunLinterOptions{SingleThreaded: true, LintPlan: plan,
+			Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) {
+				count++
+				if len(d.Fixes()) == 0 {
+					b.Fatal("unrelated directive prevented a quick fix")
+				}
+			}}})
+		if err != nil {
+			b.Fatal(err)
+		}
+		if count != duplicateTypes {
+			b.Fatalf("expected %d duplicates, got %d", duplicateTypes, count)
 		}
 	}
 }

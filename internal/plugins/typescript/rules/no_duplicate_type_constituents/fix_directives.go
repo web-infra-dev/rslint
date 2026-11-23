@@ -16,14 +16,14 @@ import (
 // A comment's text is only part of its meaning: line directives also depend on
 // the code they cover. This guard runs before reserving any member for removal.
 type fixDirectiveGuard struct {
-	source    *ast.SourceFile
-	comments  func() []*ast.CommentRange
-	tsTargets []typeScriptDirectiveTarget
-}
-
-type typeScriptDirectiveTarget struct {
-	directive core.TextRange
-	target    core.TextRange
+	source   *ast.SourceFile
+	comments func() []*ast.CommentRange
+	// coveredLines memoizes typeScriptCovers for runs of blank or // lines.
+	coveredLines map[int]bool
+	lineStarts   []core.TextPos
+	// 0 until checked, then 1 if the file can contain a TypeScript directive
+	// and -1 otherwise.
+	typeScriptDirectiveText int8
 }
 
 func (g *fixDirectiveGuard) safe(bodyRange core.TextRange, triviaStart int, fixes []rule.RuleFix) bool {
@@ -37,9 +37,7 @@ func (g *fixDirectiveGuard) safe(bodyRange core.TextRange, triviaStart int, fixe
 			removesLines = true
 		}
 	}
-	// Parser-owned metadata handles @ts-ignore/@ts-expect-error without
-	// mistaking directive-like strings for comments or scanning unrelated ASTs.
-	if g.affectsTypeScriptDirective(fixes) {
+	if g.editsTypeScriptTarget(fixes) {
 		return false
 	}
 	inspectStart := min(start, triviaStart)
@@ -68,11 +66,15 @@ func (g *fixDirectiveGuard) safe(bodyRange core.TextRange, triviaStart int, fixe
 		if comment.Pos() >= inspectEnd {
 			break
 		}
+		removed := comment.Pos() < bodyRange.End() && bodyRange.Pos() < comment.End()
+		if removed && g.typeScriptDirective(comment) {
+			return false // its target would lose its suppression
+		}
 		value := ecmascript.StringTrim(utils.CommentValue(text, comment))
 		if !fixDirectiveComment(comment.Kind, value) {
 			continue
 		}
-		if comment.Pos() < bodyRange.End() && bodyRange.Pos() < comment.End() {
+		if removed {
 			return false // deleting a global/block directive changes file semantics
 		}
 		if removesLines && fixLineDirective(value) {
@@ -128,74 +130,165 @@ func fixLineDirective(value string) bool {
 	return false
 }
 
-// Targets follow TypeScript 6.0.3: directives are keyed by their ending
-// line, and diagnostics look back through trimmed blank or // comment lines.
-// A shared advancing cursor visits each intervening line only once per file.
-func (g *fixDirectiveGuard) typeScriptTargets() []typeScriptDirectiveTarget {
-	directives := g.source.CommentDirectives
-	if len(directives) == 0 {
-		return nil
-	}
-	if g.tsTargets != nil {
-		return g.tsTargets
-	}
-	text := g.source.Text()
-	lineStarts := scanner.GetECMALineStarts(g.source)
-	g.tsTargets = make([]typeScriptDirectiveTarget, 0, len(directives))
-	nextLine := 0
-	for _, directive := range directives {
-		directiveLine := scanner.GetECMALineOfPosition(g.source, directive.Loc.End())
-		nextLine = max(nextLine, directiveLine+1)
-		for nextLine < len(lineStarts) {
-			lineEnd := len(text)
-			if nextLine+1 < len(lineStarts) {
-				lineEnd = int(lineStarts[nextLine+1])
-			}
-			lineText := ecmascript.StringTrim(text[int(lineStarts[nextLine]):lineEnd])
-			if lineText != "" && !strings.HasPrefix(lineText, "//") {
-				break
-			}
-			nextLine++
+// A @ts-expect-error or @ts-ignore directive applies to every diagnostic
+// whose line is reached by looking back through blank or //-prefixed lines.
+// Those lines are classified textually, so they include template and JSX
+// text. An edit on any line a directive reaches may change what it
+// suppresses, and joining lines moves the edit onto such a line, so both
+// are covered by checking each line an edit touches.
+//
+// The search walks back from each edit, so files whose directives all follow
+// the edits, or end before the preceding code line, cost one line check.
+func (g *fixDirectiveGuard) editsTypeScriptTarget(fixes []rule.RuleFix) bool {
+	if g.typeScriptDirectiveText == 0 {
+		text := g.source.Text()
+		g.typeScriptDirectiveText = -1
+		if len(g.source.CommentDirectives) != 0 || strings.Contains(text, "@ts-expect-error") || strings.Contains(text, "@ts-ignore") {
+			g.typeScriptDirectiveText = 1
 		}
-		targetStart, targetEnd := len(text), len(text)
-		if nextLine < len(lineStarts) {
-			targetStart = int(lineStarts[nextLine])
-			if nextLine+1 < len(lineStarts) {
-				targetEnd = int(lineStarts[nextLine+1])
-			}
-		}
-		g.tsTargets = append(g.tsTargets, typeScriptDirectiveTarget{directive: directive.Loc, target: core.NewTextRange(targetStart, targetEnd)})
 	}
-	return g.tsTargets
-}
-
-func (g *fixDirectiveGuard) affectsTypeScriptDirective(fixes []rule.RuleFix) bool {
-	targets := g.typeScriptTargets()
-	if len(targets) == 0 {
+	if g.typeScriptDirectiveText < 0 {
 		return false
 	}
-	text := g.source.Text()
+	if g.lineStarts == nil {
+		g.lineStarts = scanner.GetECMALineStarts(g.source)
+	}
+	// The edits of one fix are close together: search once, then step.
+	start := fixes[0].Range.Pos()
+	for _, fix := range fixes[1:] {
+		start = min(start, fix.Range.Pos())
+	}
+	anchor := scanner.ComputeLineOfPosition(g.lineStarts, start)
+	lineOf := func(pos int) int {
+		line := anchor
+		for line+1 < len(g.lineStarts) && int(g.lineStarts[line+1]) <= pos {
+			line++
+		}
+		return line
+	}
+	checked := -1 // token edits usually share a line
 	for _, fix := range fixes {
-		start, end := fix.Range.Pos(), fix.Range.End()
-		// Both sequences are monotonic: each target follows its directive.
-		// Skip directives whose target ended before this edit, and those whose
-		// comments start after it. Retained comments in gaps between separate
-		// token edits are not treated as removed.
-		first := sort.Search(len(targets), func(i int) bool { return targets[i].target.End() > start })
-		last := sort.Search(len(targets), func(i int) bool { return targets[i].directive.Pos() >= end })
-		for i := first; i < last; i++ {
-			item := targets[i]
-			if start < item.directive.End() && item.directive.Pos() < end {
+		last := lineOf(fix.Range.End())
+		for line := lineOf(fix.Range.Pos()); line <= last; line++ {
+			if line != checked && g.typeScriptCovers(line) {
 				return true
 			}
-			if start < item.target.End() && item.target.Pos() < end {
-				return true
-			}
-			gapStart, gapEnd := max(start, item.directive.End()), min(end, item.target.Pos())
-			if gapStart < gapEnd && strings.ContainsAny(text[gapStart:gapEnd], ecmascript.LineTerminators) {
-				return true
-			}
+		}
+		checked = last
+	}
+	return false
+}
+
+func (g *fixDirectiveGuard) typeScriptCovers(line int) bool {
+	if covered, ok := g.coveredLines[line]; ok {
+		return covered
+	}
+	covered := false
+	previous := line - 1
+	for ; previous >= 0; previous-- {
+		if g.typeScriptDirectiveOnLine(previous) {
+			covered = true
+			break
+		}
+		if !g.blankOrCommentLine(previous) {
+			break
+		}
+		// A skipped line continues the same search.
+		if known, ok := g.coveredLines[previous]; ok {
+			covered = known
+			break
+		}
+	}
+	if previous < line-1 {
+		if g.coveredLines == nil {
+			g.coveredLines = make(map[int]bool)
+		}
+		for skipped := max(previous+1, 0); skipped <= line; skipped++ {
+			g.coveredLines[skipped] = covered
+		}
+	}
+	return covered
+}
+
+func (g *fixDirectiveGuard) lineBounds(line int) (int, int) {
+	end := len(g.source.Text())
+	if line+1 < len(g.lineStarts) {
+		end = int(g.lineStarts[line+1])
+	}
+	return int(g.lineStarts[line]), end
+}
+
+// Mirrors TypeScript 6.0.3's String.prototype.trim and /^\s*\/\/.*$/ test,
+// a superset of tsgo's space/tab-only check.
+func (g *fixDirectiveGuard) blankOrCommentLine(line int) bool {
+	start, end := g.lineBounds(line)
+	lineText := g.source.Text()[start:end]
+	for i := 0; i < len(lineText); i++ {
+		switch b := lineText[i]; {
+		case b == ' ' || b == '\t' || b == '\v' || b == '\f':
+			continue
+		case b < utf8.RuneSelf:
+			return b == '\n' || b == '\r' || strings.HasPrefix(lineText[i:], "//")
+		}
+		lineText = ecmascript.StringTrim(lineText[i:])
+		return lineText == "" || strings.HasPrefix(lineText, "//")
+	}
+	return true
+}
+
+// Directives are keyed by the line on which their comment ends.
+func (g *fixDirectiveGuard) typeScriptDirectiveOnLine(line int) bool {
+	start, end := g.lineBounds(line)
+	if end == len(g.source.Text()) {
+		end++ // a comment may end at EOF
+	}
+	// Both TypeScript 6.0.3 and tsgo require the name on the last line.
+	lineText := g.source.Text()[start:min(end, len(g.source.Text()))]
+	if !strings.Contains(lineText, "@ts-") || !strings.Contains(lineText, "@ts-expect-error") && !strings.Contains(lineText, "@ts-ignore") {
+		return false
+	}
+	directives := g.source.CommentDirectives
+	i := sort.Search(len(directives), func(i int) bool { return directives[i].Loc.End() >= start })
+	if i < len(directives) && directives[i].Loc.End() < end {
+		return true
+	}
+	comments := g.comments()
+	for j := sort.Search(len(comments), func(j int) bool { return comments[j].End() >= start }); j < len(comments) && comments[j].End() < end; j++ {
+		if typeScript6Directive(g.source.Text(), comments[j]) {
+			return true
 		}
 	}
 	return false
+}
+
+// The fix must stay safe under both checkers users run: tsgo, whose
+// CommentDirectives the parser records, and TypeScript 6.0.3. Neither
+// grammar contains the other: tsgo accepts any number of extra slashes, while
+// TypeScript 6.0.3 accepts any ECMAScript whitespace before the @.
+func (g *fixDirectiveGuard) typeScriptDirective(comment *ast.CommentRange) bool {
+	directives := g.source.CommentDirectives
+	i := sort.Search(len(directives), func(i int) bool { return directives[i].Loc.End() >= comment.End() })
+	if i < len(directives) && directives[i].Loc.End() == comment.End() {
+		return true
+	}
+	return typeScript6Directive(g.source.Text(), comment)
+}
+
+// TypeScript 6.0.3 tests a line comment with /^\/\/\/?\s*@(ts-expect-error|ts-ignore)/
+// and the trimmed last line of a block comment with
+// /^(?:\/|\*)*\s*@(ts-expect-error|ts-ignore)/.
+func typeScript6Directive(text string, comment *ast.CommentRange) bool {
+	value := text[comment.Pos():comment.End()]
+	trimStart := func(s string) string { return strings.TrimLeftFunc(s, ecmascript.IsWhiteSpaceOrLineTerminator) }
+	if comment.Kind == ast.KindSingleLineCommentTrivia {
+		value = strings.TrimPrefix(strings.TrimPrefix(value, "//"), "/")
+	} else {
+		if i := strings.LastIndexAny(value, ecmascript.LineTerminators); i >= 0 {
+			_, size := utf8.DecodeRuneInString(value[i:])
+			value = value[i+size:]
+		}
+		value = strings.TrimLeft(trimStart(value), "/*")
+	}
+	value = trimStart(value)
+	return strings.HasPrefix(value, "@ts-expect-error") || strings.HasPrefix(value, "@ts-ignore")
 }
