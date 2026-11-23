@@ -322,11 +322,7 @@ function forEachSyntaxChild(
     return undefined;
   };
   const kind = node.kind;
-  if (
-    kind === SyntaxKind.JSDocSignature ||
-    kind === SyntaxKind.JSDocTypeLiteral
-  )
-    return node.forEachChild(visit);
+  if (kind === SyntaxKind.JSDocSignature) return node.forEachChild(visit);
   if (
     kind !== SyntaxKind.JSDoc &&
     (kind < SyntaxKind.FirstJSDocTagNode || kind > SyntaxKind.LastJSDocTagNode)

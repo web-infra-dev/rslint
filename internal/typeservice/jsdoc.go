@@ -1,9 +1,12 @@
 package typeservice
 
 import (
+	"cmp"
 	"slices"
+	"sort"
 	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -200,6 +203,75 @@ func docTags(node *ast.Node) []*ast.Node {
 		return list.Nodes
 	}
 	return nil
+}
+
+// The encoder may visit the same JSDoc on a reparsed declaration and then on
+// its source owner. Only source comments need indexing, once per queried JS file.
+var jsDocIndicesKey = ast.NewSourceFileDataKey[[]uint32]()
+
+func jsDocNodeIndex(node *ast.Node, file *ast.SourceFile, table *encoder.NodeIndexTable) uint32 {
+	docs := ast.GetOrComputeSourceFileData(file, jsDocIndicesKey, func(*ast.SourceFile) []uint32 {
+		var indices []uint32
+		for i, n := range table.Nodes {
+			if n != nil && n.Kind == ast.KindJSDoc && n.Flags&ast.NodeFlagsReparsed == 0 {
+				indices = append(indices, uint32(i))
+			}
+		}
+		slices.SortStableFunc(indices, func(i, j uint32) int { return cmp.Compare(table.Nodes[i].Pos(), table.Nodes[j].Pos()) })
+		return indices
+	})
+	next := sort.Search(len(docs), func(i int) bool { return table.Nodes[docs[i]].Pos() > node.Pos() })
+	if next == 0 {
+		return 0
+	}
+	start := docs[next-1]
+	if node.Pos() > table.Nodes[start].End() {
+		return 0
+	}
+	var match uint32
+	for i, source := range table.Nodes[start:] {
+		if source == nil {
+			continue
+		}
+		if i > 0 && (source.Kind == ast.KindJSDoc || source.Flags&ast.NodeFlagsJSDoc == 0) {
+			break
+		}
+		if source == node {
+			return start + uint32(i)
+		}
+		if match == 0 && isSourceJSDocNode(source, node) {
+			match = start + uint32(i)
+		}
+	}
+	return match
+}
+
+func isSourceJSDocNode(source, node *ast.Node) bool {
+	if source.Kind == ast.KindJSDocSignature && source.Parent.Kind == ast.KindJSDocOverloadTag {
+		// The native overload declaration uses just the @overload tag name's range.
+		if ast.IsFunctionLike(node) && node.Loc == source.Parent.TagName().Loc {
+			return true
+		}
+	}
+	if source.Loc != node.Loc {
+		return false
+	}
+	if source.Kind == node.Kind {
+		return true
+	}
+	switch source.Kind {
+	case ast.KindJSDocTypedefTag, ast.KindJSDocCallbackTag:
+		return node.Kind == ast.KindJSTypeAliasDeclaration
+	case ast.KindJSDocImportTag:
+		return node.Kind == ast.KindJSImportDeclaration
+	case ast.KindJSDocPropertyTag, ast.KindJSDocParameterTag:
+		return node.Kind == ast.KindPropertySignature || node.Kind == ast.KindParameter
+	case ast.KindJSDocSignature:
+		return node.Kind == ast.KindFunctionType
+	case ast.KindJSDocTypeLiteral:
+		return node.Kind == ast.KindTypeLiteral || node.Kind == ast.KindArrayType
+	}
+	return false
 }
 
 func belongsToTypeAlias(tags []*ast.Node) bool {

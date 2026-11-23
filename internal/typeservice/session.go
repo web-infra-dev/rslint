@@ -538,12 +538,16 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 func nodeFacts(p *program.Program, node *ast.Node) NodeFacts {
 	facts := NodeFacts{}
 	seen := map[*ast.Node]bool{}
-	add := func(n *ast.Node) {
-		if n == nil || seen[n] {
-			return
+	add := func(n *ast.Node) *ast.Node {
+		if n == nil {
+			return nil
+		}
+		ref, n := syntaxReference(p, n)
+		if seen[n] {
+			return n
 		}
 		seen[n] = true
-		fact := NodeFact{Node: *nodeReference(p, n), Kind: strings.TrimPrefix(n.Kind.String(), "Kind"), Flags: uint32(n.Flags), Parent: nodeReference(p, syntaxParent(n))}
+		fact := NodeFact{Node: *ref, Kind: strings.TrimPrefix(n.Kind.String(), "Kind"), Flags: uint32(n.Flags), Parent: nodeReference(p, syntaxParent(n))}
 		if n.Flags&ast.NodeFlagsPossiblyContainsDeprecatedTag != 0 && ast.GetJSDocDeprecatedTag(n) == nil {
 			fact.Flags &^= uint32(ast.NodeFlagsPossiblyContainsDeprecatedTag)
 		}
@@ -559,9 +563,10 @@ func nodeFacts(p *program.Program, node *ast.Node) NodeFacts {
 		}
 		fact.Name = nodeReference(p, syntaxName(n))
 		facts = append(facts, fact)
+		return n
 	}
 	for current := node; current != nil; current = syntaxParent(current) {
-		add(current)
+		current = add(current)
 		add(syntaxName(current))
 	}
 	return facts
@@ -592,44 +597,30 @@ func syntaxName(node *ast.Node) *ast.Node {
 }
 
 func nodeReference(p *program.Program, n *ast.Node) *NodeRef {
+	ref, _ := syntaxReference(p, n)
+	return ref
+}
+
+func syntaxReference(p *program.Program, n *ast.Node) (*NodeRef, *ast.Node) {
 	if n == nil {
-		return nil
+		return nil, nil
 	}
 	f := ast.GetSourceFileOfNode(n)
 	if !p.OwnsSourceFile(f) {
 		panic("declaration is outside Program")
 	}
-	if n.Kind == ast.KindJSTypeAliasDeclaration {
-		for _, doc := range n.JSDoc(f) {
-			for _, tag := range docTags(doc) {
-				if tag.Loc == n.Loc && (tag.Kind == ast.KindJSDocTypedefTag || tag.Kind == ast.KindJSDocCallbackTag) {
-					n = tag
-					break
-				}
-			}
-		}
-	}
 	table := encoder.GetNodeIndexTable(f)
-	index := table.GetIndex(n)
-	// The encoder visits a JS alias's JSDoc again on its source declaration.
-	// GetIndex can select either occurrence of the same Go pointer.
-	if n.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsJavaScriptFile) == ast.NodeFlagsJSDoc|ast.NodeFlagsJavaScriptFile {
-		host := n.Parent
-		if n.Kind != ast.KindJSDoc {
-			host = ast.GetJSDocHost(n)
-		}
-		if host != nil {
-			if start := table.GetIndex(host); index < start {
-				if offset := slices.Index(table.Nodes[start:], n); offset >= 0 {
-					index = start + uint32(offset)
-				}
-			}
-		}
+	index := uint32(0)
+	if n.Flags&ast.NodeFlagsJavaScriptFile != 0 && n.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0 {
+		index = jsDocNodeIndex(n, f, table)
+	}
+	if index == 0 {
+		index = table.GetIndex(n)
 	}
 	if index == 0 {
 		panic("declaration has no compiler node handle")
 	}
-	return &NodeRef{File: f.FileName(), Index: index}
+	return &NodeRef{File: f.FileName(), Index: index}, table.Nodes[index]
 }
 func (s *Session) typeByID(id uint32) *checker.Type {
 	t := s.types[id]
