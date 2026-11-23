@@ -381,10 +381,13 @@ const cases: Case[] = [
     rule: 'no-deprecated',
     code: `
       import { pick, Contract } from './dependency';
+      import { Inherits, Own } from './legacy.js';
       class Implementation implements Contract { value = 1; }
       pick('retired');
       pick(42);
       new Implementation().value;
+      new Inherits().read();
+      new Own().read();
       void import.meta;
       function target() { return new.target; }
     `,
@@ -399,8 +402,24 @@ const cases: Case[] = [
           value: number;
         }
       `,
+      'legacy.js': `
+        class Base {
+          /** @overload
+           * @returns {number}
+           */
+          /** @deprecated Use fresh. */
+          read() { return 1; }
+        }
+        export class Inherits extends Base { read() { return 2; } }
+        export class Own extends Base {
+          /** @overload
+           * @returns {number}
+           */
+          read() { return 2; }
+        }
+      `,
     },
-    reports: 2,
+    reports: 3,
   },
   {
     name: 'default type arguments of a constructor-valued base class',
@@ -662,7 +681,9 @@ describe('original npm typed rules over Go type services', () => {
         config,
         JSON.stringify({
           compilerOptions: {
-            allowJs: c.js,
+            allowJs:
+              c.js ||
+              Object.keys(c.dependencies ?? {}).some((f) => f.endsWith('.js')),
             checkJs: c.js,
             strict: true,
             target: 'ES2022',

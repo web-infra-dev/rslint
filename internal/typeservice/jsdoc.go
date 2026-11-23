@@ -15,11 +15,11 @@ import (
 )
 
 func documentation(c *checker.Checker, declarations []*ast.Node, active map[*ast.Symbol]bool) DisplayParts {
-	declarations = uniqueDeclarations(declarations)
+	var single [1]*ast.Node
+	declarations = documentationDeclarations(declarations, &single)
 	var parts DisplayParts
 	var comments []DisplayParts
 	for _, decl := range declarations {
-		decl = sourceJSDocDeclaration(decl)
 		nodes := jsDocCommentNodes(decl)
 		if decl.Kind == ast.KindJSDocParameterTag || decl.Kind == ast.KindJSDocPropertyTag {
 			nodes = []*ast.Node{decl}
@@ -75,10 +75,11 @@ func documentation(c *checker.Checker, declarations []*ast.Node, active map[*ast
 }
 
 func jsDocTags(c *checker.Checker, declarations []*ast.Node, active map[*ast.Symbol]bool) JSDocTags {
-	declarations = uniqueDeclarations(declarations)
+	var single [1]*ast.Node
+	declarations = documentationDeclarations(declarations, &single)
 	var tags JSDocTags
 	for _, decl := range declarations {
-		nodes := declarationTags(sourceJSDocDeclaration(decl))
+		nodes := declarationTags(decl)
 		if !belongsToTypeAlias(nodes) {
 			tags = appendTags(c, tags, nodes)
 		}
@@ -91,17 +92,27 @@ func jsDocTags(c *checker.Checker, declarations []*ast.Node, active map[*ast.Sym
 	return tags
 }
 
-func uniqueDeclarations(declarations []*ast.Node) []*ast.Node {
-	if len(declarations) == 1 && declarations[0] == nil {
+// Direct and inherited documentation must see the same authored declarations.
+// The caller's slot avoids allocating a slice for a single signature or property.
+func documentationDeclarations(declarations []*ast.Node, single *[1]*ast.Node) []*ast.Node {
+	switch len(declarations) {
+	case 0:
 		return nil
-	}
-	if len(declarations) < 2 {
-		return declarations
+	case 1:
+		if declarations[0] == nil {
+			return nil
+		}
+		single[0] = sourceJSDocDeclaration(declarations[0])
+		return single[:]
 	}
 	unique := make([]*ast.Node, 0, len(declarations))
 	seen := make(map[*ast.Node]bool, len(declarations))
 	for _, declaration := range declarations {
-		if declaration != nil && !seen[declaration] {
+		if declaration == nil {
+			continue
+		}
+		declaration = sourceJSDocDeclaration(declaration)
+		if !seen[declaration] {
 			seen[declaration] = true
 			unique = append(unique, declaration)
 		}
@@ -316,13 +327,22 @@ func sourceJSDocDeclaration(node *ast.Node) *ast.Node {
 
 // tsgo binds JSDoc parameters on generated declarations. The authored nodes
 // retain the enclosing JS scope, including locals of the documented function.
-func jsDocLocalScopes(location *ast.Node) iter.Seq2[*ast.Node, ast.SymbolTable] {
+func jsDocLocalScopes(location *ast.Node, resolveTemplateNames bool) iter.Seq2[*ast.Node, ast.SymbolTable] {
 	return func(yield func(*ast.Node, ast.SymbolTable) bool) {
 		for n := location; n != nil && n.Flags&ast.NodeFlagsJSDoc != 0; n = n.Parent {
 			var bound *ast.Node
 			switch n.Kind {
 			case ast.KindJSDocSignature, ast.KindJSDocCallbackTag, ast.KindJSDocTypedefTag:
 				bound = boundJSDocDeclaration(n)
+			case ast.KindJSDocTemplateTag:
+				// resolveName sees the type alias that owns these parameters.
+				// getSymbolsInScope only walks the template's syntactic parents.
+				if parameters := n.TypeParameters(); resolveTemplateNames && len(parameters) != 0 {
+					name := parameters[0].Name()
+					if clone := ast.GetReparsedNodeForNode(name); clone != name && clone.Parent.Parent.Kind == ast.KindJSTypeAliasDeclaration {
+						bound = clone.Parent.Parent
+					}
+				}
 			default:
 				if n.LocalsContainerData() != nil {
 					bound = ast.GetReparsedNodeForNode(n)
@@ -336,7 +356,7 @@ func jsDocLocalScopes(location *ast.Node) iter.Seq2[*ast.Node, ast.SymbolTable] 
 }
 
 func resolveName(c *checker.Checker, name string, location *ast.Node, meaning ast.SymbolFlags, excludeGlobals bool) *ast.Symbol {
-	for source, locals := range jsDocLocalScopes(location) {
+	for source, locals := range jsDocLocalScopes(location, meaning&ast.SymbolFlagsTypeParameter != 0) {
 		if local := locals[name]; visibleJSDocLocal(local, meaning) {
 			// Name resolution inside a parameter or return annotation sees
 			// type parameters. Value parameters are visible on the signature itself.
@@ -358,7 +378,7 @@ func resolveName(c *checker.Checker, name string, location *ast.Node, meaning as
 func symbolsInScope(c *checker.Checker, location *ast.Node, meaning ast.SymbolFlags) []*ast.Symbol {
 	symbols := c.GetSymbolsInScope(location, meaning)
 	var inner ast.SymbolTable
-	for _, locals := range jsDocLocalScopes(location) {
+	for _, locals := range jsDocLocalScopes(location, false) {
 		for name, sym := range locals {
 			if visibleJSDocLocal(sym, meaning) && inner[name] == nil {
 				if inner == nil {

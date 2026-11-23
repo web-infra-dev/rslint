@@ -1125,8 +1125,9 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return Handle(s.typeID(c.GetTypeOfSymbol(s.symbolByID(r.ID)))), nil
 		case "symbolRecord":
 			sym := s.symbolByID(r.ID)
-			declarations, value := copySymbolDeclarations(sym)
-			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: declarations, valueNode: value}, nil
+			declarations, value := symbolDeclarations(sym)
+			// The record outlives the checker lease.
+			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: slices.Clone(declarations), valueNode: value}, nil
 		}
 	case *SymbolDocsRequest:
 		if !r.WithChecker {
@@ -1308,8 +1309,6 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	return nil, fmt.Errorf("unsupported type service operation %q", request.operation())
 }
 
-// Go inserts three write-access bits before ContainsStatic and has private
-// cache flags above Unresolved. Neither group exists in JS CheckFlags.
 func resolveNode(f *ast.SourceFile, node NodeRef) (*ast.Node, error) {
 	if f == nil {
 		return nil, errors.New("foreign source handle")
@@ -1382,6 +1381,8 @@ func overloadImplementation(c *checker.Checker, node *ast.Node) Boolean {
 	return Boolean(len(signatures) > 1 || len(signatures) == 1 && signatures[0].Declaration() != node)
 }
 
+// Go inserts three write-access bits before ContainsStatic and has private
+// cache flags above Unresolved. Neither group exists in JS CheckFlags.
 func jsCheckFlags(flags ast.CheckFlags) uint32 {
 	const low = ast.CheckFlagsContainsWritePublic - 1
 	const high = (ast.CheckFlagsUnresolved*2 - 1) &^ (ast.CheckFlagsContainsStatic - 1)
@@ -1414,33 +1415,27 @@ func isJSDocOverloadDeclaration(decl *ast.Node) bool {
 }
 
 func symbolDeclarations(symbol *ast.Symbol) ([]*ast.Node, *ast.Node) {
-	if !slices.ContainsFunc(symbol.Declarations, isJSDocOverloadDeclaration) {
-		return symbol.Declarations, symbol.ValueDeclaration
-	}
-	return copySymbolDeclarations(symbol)
-}
-
-// Symbol records keep their own slice after releasing the checker.
-func copySymbolDeclarations(symbol *ast.Symbol) ([]*ast.Node, *ast.Node) {
+	nodes := symbol.Declarations
 	value := symbol.ValueDeclaration
-	if symbol.Declarations == nil {
-		return nil, value
-	}
-	declarations := make([]*ast.Node, 0, len(symbol.Declarations))
+	var kept []*ast.Node
+	start := 0
 	useImplementation := false
-	for _, decl := range symbol.Declarations {
-		// The JS parser inserts @overload signatures immediately before their
-		// implementation. The symbol exposes the implementation, even when
-		// the checker picked one of its overloads as the value declaration.
+	// The JS parser inserts generated overloads immediately before their
+	// implementation. Usually all authored declarations form a single suffix.
+	for i, decl := range nodes {
 		if isJSDocOverloadDeclaration(decl) {
+			if start < i {
+				kept = append(kept, nodes[start:i]...)
+			}
+			start = i + 1
 			useImplementation = useImplementation || decl == value
-			continue
-		}
-		if useImplementation {
+		} else if useImplementation {
 			value = decl
 			useImplementation = false
 		}
-		declarations = append(declarations, decl)
 	}
-	return declarations, value
+	if kept == nil {
+		return nodes[start:], value
+	}
+	return append(kept, nodes[start:]...), value
 }
