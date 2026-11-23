@@ -481,7 +481,7 @@ func inheritedDeclarations[T ~[]E, E any](c *checker.Checker, declarations []*as
 				continue
 			}
 			seen[symbol] = true
-			baseDeclarations := symbolDeclarations(symbol, false)
+			baseDeclarations, _ := symbolDeclarations(symbol, false)
 			if !accessor && tags && len(baseDeclarations) != 1 {
 				continue
 			}
