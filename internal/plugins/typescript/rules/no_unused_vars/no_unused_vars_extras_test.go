@@ -542,3 +542,36 @@ export function update(value: unknown) {
 		},
 	)
 }
+
+// A dotted namespace segment defines nothing in scope-manager, so a reference
+// that only the segment's merged meaning could satisfy reads no other
+// declaration of that name.
+func TestNoUnusedVarsDottedNamespaceMergedMeaning(t *testing.T) {
+	unused := func(line, column, endColumn int) []rule_tester.InvalidTestCaseError {
+		return []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: line, Column: column, EndLine: line, EndColumn: endColumn}}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "type bad_name=string;namespace bad_name.Inner{export type T=string;}export type U=bad_name.Inner.T;"},
+			{Code: "type bad_name=string;namespace bad_name{export type T=1;}namespace bad_name.Inner{export const x=1;}export const root=bad_name;"},
+			{Code: "class bad_name{} namespace bad_name.Inner{export const x=1;} export const root=bad_name;"},
+			{Code: "type bad_name=string;namespace bad_name.Inner{export const x=1;}export { bad_name };"},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: "type bad_name = string;\nnamespace bad_name.Inner {\n  export const root = bad_name;\n}", Errors: unused(1, 6, 14)},
+			{Code: "interface bad_name {}\nnamespace bad_name.Inner {\n  export const root = bad_name;\n}", Errors: unused(1, 11, 19)},
+			{Code: "type bad_name=string;namespace bad_name.Inner{export const x=1;}console.log(bad_name);", Errors: unused(1, 6, 14)},
+			{Code: "type bad_name=string;namespace bad_name.Inner{export const x=1;}console.log(bad_name.Inner.x);", Errors: unused(1, 6, 14)},
+			{Code: "type bad_name=string;namespace bad_name.Inner{export const x=1;}import y = bad_name.Inner; y;", Errors: unused(1, 6, 14)},
+			{Code: "function bad_name(){} namespace bad_name.Inner{export type T=string;} export type U=bad_name.Inner.T;", Errors: unused(1, 10, 18)},
+			// The outer const is read; only the namespace and its type alias are unused.
+			{
+				Code: "const bad_name=1;namespace Outer{type bad_name=string;namespace bad_name.Inner{export const z=1;}export const y=bad_name;}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Line: 1, Column: 28, EndLine: 1, EndColumn: 33},
+					{MessageId: "unusedVar", Line: 1, Column: 39, EndLine: 1, EndColumn: 47},
+				},
+			},
+		},
+	)
+}

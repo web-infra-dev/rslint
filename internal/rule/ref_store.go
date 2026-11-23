@@ -1,6 +1,8 @@
 package rule
 
 import (
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -337,6 +339,7 @@ func (s *RefStore) IsNameDefinedInFileWithMeaning(location *ast.Node, name strin
 // the rejected binding, so an outer declaration of the same name is still
 // found.
 func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.SymbolFlags) *ast.Symbol {
+	origin := location
 	for location != nil {
 		result := s.resolver.Resolve(location, name, meaning, nil, true /*isUse*/, false /*excludeGlobals*/)
 		if result == nil {
@@ -350,7 +353,7 @@ func (s *RefStore) resolveName(location *ast.Node, name string, meaning ast.Symb
 			location = outerExportScopeLocation(result.Declarations[0])
 			continue
 		}
-		if isQualifiedNamespaceNameOnly(result) {
+		if isQualifiedNamespaceMeaningOnly(result, origin, name, meaning) {
 			if scope := bindingScope(result, name); scope != nil {
 				location = scope.Parent
 				continue
@@ -408,6 +411,69 @@ func isQualifiedNamespaceNameOnly(symbol *ast.Symbol) bool {
 		}
 	}
 	return true
+}
+
+// isQualifiedNamespaceMeaningOnly reports whether symbol can satisfy the
+// lookup of name at location only through segments of a dotted namespace
+// name. Such a segment is no definition (see isQualifiedNamespaceNameOnly),
+// yet the binder still merges it into a same-named symbol: in `type N =
+// string; namespace N.M { export const x = 1 }` the instantiated segment gives
+// N a value meaning the type alias lacks. A value reference to N must then
+// step over the binding, as scope-manager's value/type check does, while a
+// type reference still finds the alias.
+func isQualifiedNamespaceMeaningOnly(symbol *ast.Symbol, location *ast.Node, name string, meaning ast.SymbolFlags) bool {
+	if !slices.ContainsFunc(symbol.Declarations, utils.IsQualifiedNamespaceSegment) {
+		return false
+	}
+	space := lookupReferenceSpace(location, name, meaning)
+	for _, declaration := range symbol.Declarations {
+		if !utils.IsQualifiedNamespaceSegment(declaration) && declarationSatisfiesSpace(declaration, space) {
+			return false
+		}
+	}
+	return true
+}
+
+// declarationSatisfiesSpace applies scope-manager's definition capabilities
+// to one declaration: interfaces, type aliases and type parameters are types;
+// classes, enums, namespaces and imports are both; the rest are values.
+func declarationSatisfiesSpace(declaration *ast.Node, space scope.ReferenceSpace) bool {
+	declaresValue, declaresType := true, false
+	switch declaration.Kind {
+	case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindJSTypeAliasDeclaration, ast.KindTypeParameter:
+		declaresValue, declaresType = false, true
+	case ast.KindClassDeclaration, ast.KindClassExpression, ast.KindEnumDeclaration, ast.KindModuleDeclaration,
+		ast.KindImportEqualsDeclaration, ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportSpecifier:
+		declaresType = true
+	}
+	return space.IncludesValue() && declaresValue || space.IncludesType() && declaresType
+}
+
+const (
+	valueOnlyMeaning = ast.SymbolFlagsValue &^ (ast.SymbolFlagsType | ast.SymbolFlagsNamespace)
+	typeOnlyMeaning  = ast.SymbolFlagsType &^ (ast.SymbolFlagsValue | ast.SymbolFlagsNamespace)
+)
+
+// lookupReferenceSpace is the scope-manager space of a lookup. A reference
+// identifier carries its own; a bare name lookup is approximated from its
+// declaration-space meaning, where a namespace meaning alone is the root of a
+// qualified type name.
+func lookupReferenceSpace(location *ast.Node, name string, meaning ast.SymbolFlags) scope.ReferenceSpace {
+	if location != nil && location.Kind == ast.KindIdentifier && location.Text() == name && scope.IsReferenceIdentifier(location) {
+		return scope.ESLintReferenceSpace(location)
+	}
+	var space scope.ReferenceSpace
+	if meaning&valueOnlyMeaning != 0 {
+		space |= scope.ReferenceValue
+	}
+	if meaning&typeOnlyMeaning != 0 || space == 0 && meaning&ast.SymbolFlagsNamespace != 0 {
+		space |= scope.ReferenceType
+	}
+	if space == 0 {
+		// Unclassifiable: never step over a binding on its account.
+		return scope.ReferenceDual
+	}
+	return space
 }
 
 // bindingScope returns the node whose symbol table binds name to symbol —
@@ -712,6 +778,16 @@ func (s *RefStore) binderReferenceSymbol(node *ast.Node, meaning ast.SymbolFlags
 // type binding is the actual target. ResolveName applies meaning during the
 // scope walk, preserving both declaration-space selection and shadowing.
 func (s *RefStore) checkerReferenceSymbol(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
+	target := s.checkerReferenceTarget(node, meaning)
+	// The checker does not know that the binder walk stepped over a dotted
+	// namespace segment and would hand the same symbol straight back.
+	if target != nil && isQualifiedNamespaceMeaningOnly(target, node, node.Text(), meaning) {
+		return nil
+	}
+	return target
+}
+
+func (s *RefStore) checkerReferenceTarget(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
 	if s.tc == nil {
 		return nil
 	}
