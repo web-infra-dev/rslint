@@ -2247,6 +2247,14 @@ func TestWatchedGitConfigRefreshesIgnoreCase(t *testing.T) {
 			refresh(settings, lsproto.FileChangeTypeChanged)
 			checkIgnored(true)
 			if settings != common {
+				if err := os.Remove(settings); err != nil {
+					t.Fatal(err)
+				}
+				refresh(settings, lsproto.FileChangeTypeDeleted)
+				checkIgnored(false)
+				git(repo, "config", "--file", settings, "core.ignoreCase", "true")
+				refresh(settings, lsproto.FileChangeTypeCreated)
+				checkIgnored(true)
 				if err := os.Remove(common); err != nil {
 					t.Fatal(err)
 				}

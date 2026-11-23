@@ -126,12 +126,18 @@ func (reader *Reader) watchRepositoryConfig(directory, marker string) error {
 	if err := reader.BeforeConfigRead(entries); err != nil {
 		return err
 	}
-	// Subscribe to changes of the link before observing its current target.
+	// Git resolves even a missing target. Watch the link first so replacing
+	// it while the target subscription is being installed triggers a refresh.
 	var targets []string
 	for _, entry := range entries {
-		if target := reader.fs.Realpath(entry); target != "" && target != entry {
-			targets = append(targets, tspath.NormalizePath(target))
+		if _, err := os.Readlink(entry); err != nil {
+			continue
 		}
+		target, ok := repositoryGitOutput(directory, "--git-dir="+marker, "rev-parse", "--path-format=absolute", "--git-path", tspath.GetBaseFileName(entry))
+		if !ok {
+			return reader.BeforeConfigRead(nil)
+		}
+		targets = append(targets, tspath.NormalizePath(target))
 	}
 	if len(targets) != 0 {
 		return reader.BeforeConfigRead(targets)
