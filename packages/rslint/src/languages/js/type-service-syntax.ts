@@ -90,13 +90,22 @@ const sourceProperties = [
   'ambientModuleNames',
   'externalModuleIndicator',
 ];
-function heritageNode(raw: Node): boolean {
-  let current: Node | undefined = raw;
-  while (current?.kind === SyntaxKind.QualifiedName) current = current.parent;
-  return (
-    current?.kind === SyntaxKind.TypeReference &&
-    current.parent?.kind === SyntaxKind.HeritageClause
-  );
+function publicSyntaxKind(node: Node): SyntaxKind {
+  if (
+    node.kind === SyntaxKind.QualifiedName ||
+    node.kind === SyntaxKind.TypeReference
+  ) {
+    let parent: Node | undefined = node;
+    while (parent?.kind === SyntaxKind.QualifiedName) parent = parent.parent;
+    if (
+      parent?.kind === SyntaxKind.TypeReference &&
+      parent.parent?.kind === SyntaxKind.HeritageClause
+    )
+      return node.kind === SyntaxKind.TypeReference
+        ? SyntaxKind.ExpressionWithTypeArguments
+        : SyntaxKind.PropertyAccessExpression;
+  }
+  return node.kind;
 }
 
 // The compiler's child table excludes scalar fields exposed by the JS AST.
@@ -128,8 +137,18 @@ const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
 
 type JsDocKinds = TypeServiceCompilerData['jsDocKinds'];
 
+// The Go parser reserves these child slots. The JS factory omits them.
+const nativeOnlyFields: Partial<Record<SyntaxKind, readonly string[]>> = {
+  [SyntaxKind.BinaryExpression]: ['type', 'modifiers'],
+  [SyntaxKind.PropertyAssignment]: ['type'],
+  [SyntaxKind.ShorthandPropertyAssignment]: ['type'],
+  [SyntaxKind.ExportAssignment]: ['type'],
+  [SyntaxKind.ModuleDeclaration]: ['attributes'],
+  [SyntaxKind.DefaultClause]: ['expression'],
+};
+
 function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
-  const kind = raw.kind;
+  const kind = publicSyntaxKind(raw);
   const fields = [
     'pos',
     'end',
@@ -139,11 +158,8 @@ function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
     'original',
     ...(scalarFields[kind] ?? []),
   ];
-  const heritage =
-    (kind === SyntaxKind.QualifiedName || kind === SyntaxKind.TypeReference) &&
-    heritageNode(raw);
   for (const key of childProperties[kind] ?? []) {
-    if (key === undefined) continue;
+    if (key === undefined || nativeOnlyFields[kind]?.includes(key)) continue;
     if (key === 'postfixToken') {
       fields.push('questionToken');
       if (
@@ -153,15 +169,11 @@ function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
         fields.push('exclamationToken');
       continue;
     }
-    if (heritage && (key === 'typeName' || key === 'left'))
-      fields.push('expression');
-    else if (heritage && key === 'right') fields.push('name');
-    else
-      fields.push(
-        kind === SyntaxKind.TypeParameter && key === 'defaultType'
-          ? 'default'
-          : key,
-      );
+    fields.push(
+      kind === SyntaxKind.TypeParameter && key === 'defaultType'
+        ? 'default'
+        : key,
+    );
   }
   if (
     kind >= SyntaxKind.FirstLiteralToken &&
@@ -242,16 +254,14 @@ function wrapList(
 ): unknown[] {
   const list = value.map(wrap);
   for (const key of ['pos', 'end', 'hasTrailingComma'])
-    if (key in value)
-      Object.defineProperty(list, key, {
-        value:
-          key === 'hasTrailingComma'
-            ? Reflect.get(value, key)
-            : Number(Reflect.get(value, key)) | 0,
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
+    if (key in value) {
+      const field = Reflect.get(value, key);
+      Reflect.set(
+        list,
+        key,
+        key === 'hasTrailingComma' ? field : (field as number) | 0,
+      );
+    }
   return list;
 }
 
@@ -783,21 +793,6 @@ export class GenerationSyntaxViews {
     }
     if (key === 'children' && raw.kind === SyntaxKind.SyntaxList)
       return this.childNodes(ref, proxy);
-    const heritageReference =
-      raw.kind === SyntaxKind.TypeReference &&
-      raw.parent?.kind === SyntaxKind.HeritageClause;
-    const heritageName =
-      real && raw.kind === SyntaxKind.QualifiedName && heritageNode(raw);
-    if (key === 'kind' && heritageReference)
-      return this.typescript.SyntaxKind.ExpressionWithTypeArguments;
-    if (key === 'kind' && heritageName)
-      return this.typescript.SyntaxKind.PropertyAccessExpression;
-    if (key === 'expression' && heritageReference)
-      return this.wrap(Reflect.get(raw, 'typeName', raw));
-    if (heritageName && (key === 'expression' || key === 'name'))
-      return this.wrap(
-        Reflect.get(raw, key === 'expression' ? 'left' : 'right', raw),
-      );
     const member = this.syntaxMember(raw, key);
     if (typeof member === 'function')
       return (...args: unknown[]) => {
@@ -829,6 +824,21 @@ export class GenerationSyntaxViews {
   }
   private syntaxMember(raw: Node, key: string | symbol): unknown {
     if (key === 'postfixToken') return undefined;
+    const kind = publicSyntaxKind(raw);
+    if (typeof key === 'string' && nativeOnlyFields[kind]?.includes(key))
+      return undefined;
+    if (kind !== raw.kind) {
+      if (key === 'expression')
+        return Reflect.get(
+          raw,
+          kind === SyntaxKind.PropertyAccessExpression ? 'left' : 'typeName',
+        );
+      if (key === 'name' && kind === SyntaxKind.PropertyAccessExpression)
+        return Reflect.get(raw, 'right');
+      if (key === 'typeName' || key === 'left' || key === 'right')
+        return undefined;
+    }
+    if (key === 'kind') return this.translateKind(SyntaxKind[kind]);
     if (
       (key === 'questionToken' || key === 'exclamationToken') &&
       childProperties[raw.kind]?.includes('postfixToken')
@@ -842,7 +852,6 @@ export class GenerationSyntaxViews {
         : undefined;
     }
     if (
-      key === 'kind' ||
       key === 'operator' ||
       key === 'token' ||
       key === 'keywordToken' ||
@@ -881,54 +890,73 @@ export class GenerationSyntaxViews {
   // Generated nodes keep their own syntax identity. Checker queries can follow
   // an original parse node when the compiler supplies one.
   generatedTypeNode({ tree, origins }: GeneratedSyntax): object {
-    const root = new RemoteSourceFile(
+    const reader = new RemoteSourceFile(
       tree,
       new Wtf8Decoder('utf-8', { ignoreBOM: true }),
     );
+    // The decoder's first slot holds a generated node, with no SourceFile fields.
+    const root = new RemoteNode(
+      reader.view,
+      1,
+      reader,
+      reader,
+      reader._offsetNodes,
+    );
+    reader.nodes[1] = root;
     const views = new WeakMap<object, object>();
     const getSourceFile = () => {
       this.ensure();
       return undefined;
     };
-    const copyListRange = (list: readonly unknown[]) => {
+    const restoreListMetadata = (list: readonly unknown[]) => {
       if (!('parent' in list) || !(list.parent instanceof RemoteNode)) return;
       const owner = list.parent;
-      if (owner.pos < 0 || (Number(Reflect.get(list, 'pos')) | 0) >= 0) return;
+      if (((Reflect.get(list, 'pos') as number) | 0) >= 0) return;
       const ref = origins?.[(owner as unknown as { index: number }).index];
       if (!ref) return;
       const field = childProperties[owner.kind]?.find(
         (key) => key !== undefined && Reflect.get(owner, key) === list,
       );
+      if (!field) return;
       const source = this.rawNode(ref);
       if (
-        !field ||
         source.kind !== owner.kind ||
-        source.pos !== owner.pos ||
-        source.end !== owner.end
+        (owner.pos >= 0 &&
+          (source.pos !== owner.pos || source.end !== owner.end))
       )
         return;
       const original = Reflect.get(source, field);
       if (!Array.isArray(original)) return;
-      for (const key of ['pos', 'end', 'hasTrailingComma'])
+      const fields =
+        owner.pos < 0
+          ? ['hasTrailingComma']
+          : ['pos', 'end', 'hasTrailingComma'];
+      for (const key of fields)
         Object.defineProperty(list, key, { value: Reflect.get(original, key) });
     };
-    const childrenOf = (
-      node: Node,
-      file: Parameters<Node['getChildren']>[0],
-    ) => {
-      if (node instanceof RemoteNode && node.pos >= 0)
-        node.forEachChild(() => undefined, copyListRange);
-      return node.getChildren(file);
-    };
-    // The reader caches scanned tokens by span on the supplied file. Keep a
-    // generated tree's tokens with their own parents, even at the same span.
+    // The reader uses these caches for recursive navigation. Generated tokens
+    // need their own parents even when their spans match tokens in the file.
     const scanSource = (arg: unknown) => {
       if (typeof arg !== 'object' || arg === null) return arg;
       let source = views.get(arg);
       if (!source) {
         source = Object.create(arg, {
           tokenCache: { writable: true },
-          childrenCache: { writable: true },
+          childrenCache: {
+            value: new (class extends Map<Node, readonly Node[]> {
+              override get(owner: Node) {
+                const children = super.get(owner);
+                if (
+                  children === undefined &&
+                  owner instanceof RemoteNode &&
+                  owner.pos >= 0
+                ) {
+                  owner.forEachChild(() => undefined, restoreListMetadata);
+                }
+                return children;
+              }
+            })(),
+          },
         }) as object;
         views.set(arg, source);
       }
@@ -939,7 +967,7 @@ export class GenerationSyntaxViews {
       const old = views.get(value);
       if (old) return old;
       if (Array.isArray(value)) {
-        copyListRange(value);
+        restoreListMetadata(value);
         const list = wrapList(value, wrap);
         views.set(value, list);
         return list;
@@ -986,40 +1014,7 @@ export class GenerationSyntaxViews {
                 throw new Error(
                   'Node must have a real position for this operation',
                 );
-              if (
-                key === 'getChildren' ||
-                key === 'getChildAt' ||
-                key === 'getChildCount' ||
-                key === 'getFirstToken' ||
-                key === 'getLastToken'
-              ) {
-                const file = scanSource(
-                  args[key === 'getChildAt' ? 1 : 0],
-                ) as Parameters<Node['getChildren']>[0];
-                if (key === 'getFirstToken' || key === 'getLastToken') {
-                  let current = node;
-                  while (current.kind > SyntaxKind.LastToken) {
-                    const children = childrenOf(current, file);
-                    const edge =
-                      key === 'getLastToken'
-                        ? children.at(-1)
-                        : children.find(
-                            (child) =>
-                              child.kind < SyntaxKind.FirstJSDocNode ||
-                              child.kind > SyntaxKind.LastJSDocNode,
-                          );
-                    if (!edge) return undefined;
-                    current = edge;
-                  }
-                  return current === node ? undefined : wrap(current);
-                }
-                const children = childrenOf(node, file);
-                if (key === 'getChildCount') return children.length;
-                return wrap(
-                  key === 'getChildAt' ? children[args[0] as number] : children,
-                );
-              }
-              return wrap(Reflect.apply(member, node, args));
+              return wrap(Reflect.apply(member, node, args.map(scanSource)));
             };
           return wrap(member);
         },

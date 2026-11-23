@@ -1203,6 +1203,7 @@ await Promise.resolve(1);
       ),
     );
     expect(generated.getSourceFile()).toBeUndefined();
+    expect('referencedFiles' in generated).toBe(false);
     const contextualToken = (source: ts.SourceFile) => {
       const fn = source.statements.find(
         (node): node is ts.FunctionDeclaration =>
@@ -1588,7 +1589,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
     [
       "export enum Values { N = 3, S = 'three', C = id(3) }",
       'export type Pair = readonly [first: string, second?: number];',
-      'export function id<T extends { valueOf?(): number }>(input: T): T { return input; }',
+      'export function id<T extends { valueOf?<U,>(): number }>(input: T): T { return input; }',
       'export const result = id(42);',
       "export const incorrect: number = 'bad';",
       'export type Dictionary = { [name: string]: number };',
@@ -1641,6 +1642,13 @@ test('public checker, Program and source reads match TypeScript', async () => {
       )!;
       const generatedParameter = generatedSignature.parameters[0];
       const constraint = generatedSignature.typeParameters![0]
+        .constraint as ts.TypeLiteralNode;
+      const detached = c.typeToTypeNode(
+        c.getTypeAtLocation(decl.name!),
+        undefined,
+        0,
+      ) as ts.FunctionTypeNode;
+      const detachedConstraint = detached.typeParameters![0]
         .constraint as ts.TypeLiteralNode;
       const param = decl.parameters[0],
         symbol = c.getSymbolAtLocation(param.name)!;
@@ -1780,6 +1788,8 @@ test('public checker, Program and source reads match TypeScript', async () => {
                 .getChildren(src)
                 .map((child) => [child.kind, child.pos, child.end]),
               (constraint.members[0] as ts.MethodSignature).questionToken?.kind,
+              (detachedConstraint.members[0] as ts.MethodSignature)
+                .typeParameters?.hasTrailingComma,
               c.isOptionalParameter(generatedParameter),
             ],
             modes: [
