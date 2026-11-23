@@ -277,12 +277,11 @@ function syntaxView(
 function wrapList(
   value: unknown[],
   wrap: (item: unknown) => unknown,
-  skipReparsed = false,
 ): unknown[] {
   const list: unknown[] = [];
   for (const item of value) {
-    if (!skipReparsed || !((item as Node).flags & NodeFlags.Reparsed))
-      list.push(wrap(item));
+    const visible = wrap(item);
+    if (visible !== undefined) list.push(visible);
   }
   for (const key of ['pos', 'end', 'hasTrailingComma'])
     if (key in value) {
@@ -294,6 +293,81 @@ function wrapList(
       );
     }
   return list;
+}
+
+function jsDocComment(node: Node) {
+  const parts = Reflect.get(node, 'comment') as readonly Node[] | undefined;
+  if (!parts?.length) return undefined;
+  return parts.length === 1 && parts[0].kind === SyntaxKind.JSDocText
+    ? (Reflect.get(parts[0], 'text') as string)
+    : parts;
+}
+
+function forEachSyntaxChild(
+  node: Node,
+  wrap: (item: unknown) => unknown,
+  cb: (node: unknown) => unknown,
+  cbNodes?: (nodes: unknown) => unknown,
+): unknown {
+  const visit = (child: Node | readonly Node[], callback = cb) => {
+    const visible = wrap(child);
+    return visible === undefined ? undefined : callback(visible);
+  };
+  const visitList = (list: readonly Node[]): unknown => {
+    if (cbNodes) return visit(list, cbNodes);
+    for (const child of list) {
+      const result = visit(child);
+      if (result) return result;
+    }
+    return undefined;
+  };
+  const kind = node.kind;
+  if (
+    kind === SyntaxKind.JSDocSignature ||
+    kind === SyntaxKind.JSDocTypeLiteral
+  )
+    return node.forEachChild(visit);
+  if (
+    kind !== SyntaxKind.JSDoc &&
+    (kind < SyntaxKind.FirstJSDocTagNode || kind > SyntaxKind.LastJSDocTagNode)
+  )
+    return node.forEachChild(visit, cbNodes && visitList);
+
+  let fields = childProperties[kind];
+  if (
+    (kind === SyntaxKind.JSDocParameterTag ||
+      kind === SyntaxKind.JSDocPropertyTag) &&
+    !Reflect.get(node, 'isNameFirst')
+  )
+    fields = ['tagName', 'typeExpression', 'name', 'comment'];
+  if (
+    kind === SyntaxKind.JSDocCallbackTag ||
+    (kind === SyntaxKind.JSDocTypedefTag &&
+      Reflect.get(node, 'typeExpression')?.kind !==
+        SyntaxKind.JSDocTypeExpression)
+  )
+    fields = ['tagName', 'name', 'typeExpression', 'comment'];
+  for (const field of fields ?? []) {
+    if (!field) continue;
+    const value: unknown =
+      field === 'comment' ? jsDocComment(node) : Reflect.get(node, field);
+    if (!value || typeof value === 'string') continue;
+    const result = Array.isArray(value)
+      ? visitList(value)
+      : visit(value as Node);
+    if (result) return result;
+  }
+  return undefined;
+}
+
+function isJSDocCast(node: Node | undefined): boolean {
+  return !!(
+    node &&
+    (node.kind === SyntaxKind.AsExpression ||
+      node.kind === SyntaxKind.SatisfiesExpression) &&
+    node.flags & NodeFlags.JavaScriptFile &&
+    (Reflect.get(node, 'type') as Node).flags & NodeFlags.Reparsed
+  );
 }
 
 // These literals use TypeScript's NodeObject methods, like non-token nodes.
@@ -602,6 +676,7 @@ export class GenerationSyntaxViews {
     };
   }
   private wrapNode(value: Node): object {
+    while (isJSDocCast(value)) value = Reflect.get(value, 'expression') as Node;
     if (value instanceof RemoteNode) return this.nodeRef(this.ref(value))!;
     const parent = value.parent;
     if (!(parent instanceof RemoteNode))
@@ -642,15 +717,12 @@ export class GenerationSyntaxViews {
         });
         const found = this.wrapped.get(key);
         if (found) return found;
-        const list = wrapList(
-          value,
-          (item) => this.wrapNode(item as Node),
-          !!(value.parent.flags & NodeFlags.JavaScriptFile),
-        );
+        const list = wrapList(value, (item) => this.wrap(item));
         if (
           value.length &&
           !list.length &&
           (Reflect.get(value.parent, 'typeParameters') === value ||
+            Reflect.get(value.parent, 'typeArguments') === value ||
             Reflect.get(value.parent, 'heritageClauses') === value ||
             Reflect.get(value.parent, 'modifiers') === value)
         )
@@ -660,14 +732,15 @@ export class GenerationSyntaxViews {
       }
       return wrapList(value, (item) => this.wrap(item));
     }
-    if (value instanceof RemoteNode && value.flags & NodeFlags.Reparsed)
-      return undefined;
+    if (value instanceof RemoteNode)
+      return value.flags & NodeFlags.Reparsed
+        ? undefined
+        : this.wrapNode(value);
     if (
-      value instanceof RemoteNode ||
-      (typeof value === 'object' &&
-        value !== null &&
-        'kind' in value &&
-        'getSourceFile' in value)
+      typeof value === 'object' &&
+      value !== null &&
+      'kind' in value &&
+      'getSourceFile' in value
     )
       return this.wrapNode(value as Node);
     return value;
@@ -782,15 +855,11 @@ export class GenerationSyntaxViews {
         cbNodes?: (nodes: unknown) => unknown,
       ) => {
         this.ensure();
-        return this.rawSyntax(ref).forEachChild(
-          (n) =>
-            n.flags & NodeFlags.Reparsed ? undefined : cb(this.wrapNode(n)),
-          cbNodes
-            ? (nodes) => {
-                const visible = this.wrap(nodes);
-                return visible === undefined ? undefined : cbNodes(visible);
-              }
-            : undefined,
+        return forEachSyntaxChild(
+          this.rawSyntax(ref),
+          (item) => this.wrap(item),
+          cb,
+          cbNodes,
         );
       };
     if (key === 'getChildren')
@@ -874,6 +943,11 @@ export class GenerationSyntaxViews {
     return value;
   }
   private syntaxMember(raw: Node, key: string | symbol): unknown {
+    if (key === 'parent') {
+      let parent = raw.parent;
+      while (parent && isJSDocCast(parent)) parent = parent.parent;
+      return parent;
+    }
     if (key === 'postfixToken') return undefined;
     const kind = publicSyntaxKind(raw);
     if (key === 'jsDocPropertyTags' && kind === SyntaxKind.JSDocTypeLiteral) {
@@ -899,11 +973,7 @@ export class GenerationSyntaxViews {
       kind >= SyntaxKind.FirstJSDocNode &&
       kind <= SyntaxKind.LastJSDocNode
     ) {
-      const parts = Reflect.get(raw, 'comment') as readonly Node[] | undefined;
-      if (!parts?.length) return undefined;
-      return parts.length === 1 && parts[0].kind === SyntaxKind.JSDocText
-        ? Reflect.get(parts[0], 'text')
-        : parts;
+      return jsDocComment(raw);
     }
     if (key === 'hasExtendedUnicodeEscape' && kind === SyntaxKind.StringLiteral)
       return !!(
@@ -1046,10 +1116,7 @@ export class GenerationSyntaxViews {
               cbNodes?: (nodes: unknown) => unknown,
             ) => {
               this.ensure();
-              return node.forEachChild(
-                (n) => cb(wrap(n)),
-                cbNodes ? (nodes) => cbNodes(wrap(nodes)) : undefined,
-              );
+              return forEachSyntaxChild(node, wrap, cb, cbNodes);
             };
           const member = this.syntaxMember(node, key);
           if (typeof member === 'function')

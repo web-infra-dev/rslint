@@ -1216,7 +1216,7 @@ await Promise.resolve(1);
     const contextFlags = contextualToken(referenceFn.getSourceFile()).flags;
     expect(contextFlags & ts.NodeFlags.ContextFlags).toBeTruthy();
     expect(contextualToken(beforeSource).flags).toBe(contextFlags);
-    const nodeFlagSamples = (source: ts.SourceFile) => {
+    const flagsAndModifiers = (source: ts.SourceFile) => {
       const samples: number[] = [];
       const visit = (n: ts.Node) => {
         if (
@@ -1226,13 +1226,15 @@ await Promise.resolve(1);
           (ts.isFunctionDeclaration(n) && n.name?.text === 'docsTarget')
         )
           samples.push(n.flags);
+        if (ts.isModuleDeclaration(n))
+          samples.push(ts.getModifiers(n)?.length ?? 0);
         n.forEachChild(visit);
       };
       visit(source);
       return samples;
     };
-    expect(nodeFlagSamples(beforeSource)).toEqual(
-      nodeFlagSamples(referenceFn.getSourceFile()),
+    expect(flagsAndModifiers(beforeSource)).toEqual(
+      flagsAndModifiers(referenceFn.getSourceFile()),
     );
     const formatted = (
       typeChecker: ts.TypeChecker,

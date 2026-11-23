@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/printer"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 var nextGeneration atomic.Uint32
@@ -542,7 +543,7 @@ func nodeFacts(p *program.Program, node *ast.Node) NodeFacts {
 			return
 		}
 		seen[n] = true
-		fact := NodeFact{Node: *nodeReference(p, n), Kind: strings.TrimPrefix(n.Kind.String(), "Kind"), Flags: uint32(n.Flags), Parent: nodeReference(p, n.Parent)}
+		fact := NodeFact{Node: *nodeReference(p, n), Kind: strings.TrimPrefix(n.Kind.String(), "Kind"), Flags: uint32(n.Flags), Parent: nodeReference(p, syntaxParent(n))}
 		if n.Flags&ast.NodeFlagsPossiblyContainsDeprecatedTag != 0 && ast.GetJSDocDeprecatedTag(n) == nil {
 			fact.Flags &^= uint32(ast.NodeFlagsPossiblyContainsDeprecatedTag)
 		}
@@ -559,11 +560,19 @@ func nodeFacts(p *program.Program, node *ast.Node) NodeFacts {
 		fact.Name = nodeReference(p, syntaxName(n))
 		facts = append(facts, fact)
 	}
-	for current := node; current != nil; current = current.Parent {
+	for current := node; current != nil; current = syntaxParent(current) {
 		add(current)
 		add(syntaxName(current))
 	}
 	return facts
+}
+
+func syntaxParent(node *ast.Node) *ast.Node {
+	parent := node.Parent
+	for parent != nil && (parent.Kind == ast.KindAsExpression || parent.Kind == ast.KindSatisfiesExpression) && utils.JSDocTypeCastExpression(parent) != nil {
+		parent = parent.Parent
+	}
+	return parent
 }
 
 func syntaxName(node *ast.Node) *ast.Node {
@@ -590,7 +599,33 @@ func nodeReference(p *program.Program, n *ast.Node) *NodeRef {
 	if !p.OwnsSourceFile(f) {
 		panic("declaration is outside Program")
 	}
-	index := encoder.GetNodeIndexTable(f).GetIndex(n)
+	if n.Kind == ast.KindJSTypeAliasDeclaration {
+		for _, doc := range n.JSDoc(f) {
+			for _, tag := range docTags(doc) {
+				if tag.Loc == n.Loc && (tag.Kind == ast.KindJSDocTypedefTag || tag.Kind == ast.KindJSDocCallbackTag) {
+					n = tag
+					break
+				}
+			}
+		}
+	}
+	table := encoder.GetNodeIndexTable(f)
+	index := table.GetIndex(n)
+	// The encoder visits a JS alias's JSDoc again on its source declaration.
+	// GetIndex can select either occurrence of the same Go pointer.
+	if n.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsJavaScriptFile) == ast.NodeFlagsJSDoc|ast.NodeFlagsJavaScriptFile {
+		host := n.Parent
+		if n.Kind != ast.KindJSDoc {
+			host = ast.GetJSDocHost(n)
+		}
+		if host != nil {
+			if start := table.GetIndex(host); index < start {
+				if offset := slices.Index(table.Nodes[start:], n); offset >= 0 {
+					index = start + uint32(offset)
+				}
+			}
+		}
+	}
 	if index == 0 {
 		panic("declaration has no compiler node handle")
 	}
