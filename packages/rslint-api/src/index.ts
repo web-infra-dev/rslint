@@ -15,6 +15,7 @@ export {
   RemoteSourceFile,
   RemoteNode,
 } from '../../../typescript-go/packages/typescript/src/api/node/node.ts';
+export { childProperties } from '../../../typescript-go/packages/typescript/src/api/node/protocol.generated.ts';
 export {
   SyntaxKind,
   NodeFlags,

@@ -369,6 +369,9 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 }
 func materializeReferences(p *program.Program, result Result) {
 	switch fact := result.(type) {
+	case *EncodedTypeNode:
+		fact.origins = nodeRefs(p, fact.parseNodes)
+		fact.parseNodes = nil
 	case *DeclaredMembers:
 		if fact != nil {
 			materializeReferences(p, fact.indices)
@@ -749,7 +752,18 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		symbol := s.symbolByID(r.ID)
 		var siblings []*ast.Symbol
 		if r.Siblings == nil && symbol.Parent != nil {
-			siblings = slices.Collect(maps.Values(checker.Checker_getMembersOfSymbol(c, symbol.Parent)))
+			// The TS checker appends late-bound members to the binder's table.
+			var late []*ast.Symbol
+			for name, member := range checker.Checker_getMembersOfSymbol(c, symbol.Parent) {
+				if symbol.Parent.Members[name] != nil {
+					siblings = append(siblings, member)
+				} else {
+					late = append(late, member)
+				}
+			}
+			checker.Checker_sortSymbols(c, siblings)
+			checker.Checker_sortSymbols(c, late)
+			siblings = append(siblings, late...)
 		} else {
 			for _, id := range r.Siblings {
 				siblings = append(siblings, s.symbolByID(id))
@@ -780,7 +794,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		*checker.IndexInfo_declarationPtr(&info) = nodes.declaration
 		builder, release := checker.Checker_getNodeBuilder(c)
 		defer release()
-		return encodeGeneratedNode(builder.IndexInfoToIndexSignatureDeclaration(&info, native, nodebuilder.Flags(r.Flags), nodebuilder.InternalFlagsNone, nil))
+		return encodeGeneratedNode(builder.IndexInfoToIndexSignatureDeclaration(&info, native, nodebuilder.Flags(r.Flags), nodebuilder.InternalFlagsNone, nil), builder, native)
 	case *ContextualArgumentRequest:
 		return Handle(s.typeID(c.GetContextualTypeForArgumentAtIndex(native, r.Index))), nil
 	case *ResolvedSignatureRequest:
@@ -1169,19 +1183,19 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			builderFlags = nodebuilder.Flags(*r.Flags)
 		}
 		switch r.Op {
-		case "typeNode":
-			return encodeGeneratedNode(c.TypeToTypeNode(s.typeByID(r.ID), native, builderFlags, nil))
 		case "symbolString":
 			flags := checker.SymbolFormatFlagsAllowAnyNodeKind
 			if r.Flags != nil {
 				flags = checker.SymbolFormatFlags(*r.Flags)
 			}
 			return Text(c.SymbolToStringEx(s.symbolByID(r.ID), native, ast.SymbolFlags(r.Kind), flags)), nil
-		case "signatureDeclaration", "parameterDeclaration", "typeParameterDeclarations", "typeParameterDeclaration", "entityName", "symbolExpression":
+		case "typeNode", "signatureDeclaration", "parameterDeclaration", "typeParameterDeclarations", "typeParameterDeclaration", "entityName", "symbolExpression":
 			builder, release := checker.Checker_getNodeBuilder(c)
 			defer release()
 			var node *ast.Node
 			switch r.Op {
+			case "typeNode":
+				node = builder.TypeToTypeNode(s.typeByID(r.ID), native, builderFlags, nodebuilder.InternalFlagsNone, nil)
 			case "signatureDeclaration":
 				node = builder.SignatureToSignatureDeclaration(s.signatureByID(r.ID), ast.Kind(r.Kind), native, builderFlags, nodebuilder.InternalFlagsNone, nil)
 			case "parameterDeclaration":
@@ -1205,7 +1219,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 					node = factory.NewFunctionTypeNode(factory.NewNodeList(decls), factory.NewNodeList(nil), nil)
 				}
 			}
-			return encodeGeneratedNode(node)
+			return encodeGeneratedNode(node, builder, native)
 		}
 		flags := checker.TypeFormatFlagsNone
 		if r.Flags != nil {
@@ -1263,12 +1277,25 @@ func resolveNode(f *ast.SourceFile, node NodeRef) (*ast.Node, error) {
 	return f.GetOrCreateToken(token.Kind, pos, end, parent, ast.TokenFlagsNone), nil
 }
 
-func encodeGeneratedNode(node *ast.Node) (Result, error) {
+func encodeGeneratedNode(node *ast.Node, builder *checker.NodeBuilder, enclosing *ast.Node) (Result, error) {
 	if node == nil {
-		return EncodedTypeNode(nil), nil
+		return &EncodedTypeNode{}, nil
 	}
-	data, _, err := encoder.EncodeNode(node, nil)
-	return EncodedTypeNode(data), err
+	tree, table, err := encoder.EncodeNode(node, ast.GetSourceFileOfNode(enclosing))
+	if err != nil {
+		return nil, err
+	}
+	result := &EncodedTypeNode{tree: tree}
+	for index, generated := range table.Nodes {
+		origin := builder.EmitContext().ParseNode(generated)
+		if origin != nil && ast.GetSourceFileOfNode(origin) != nil {
+			if result.parseNodes == nil {
+				result.parseNodes = make([]*ast.Node, len(table.Nodes))
+			}
+			result.parseNodes[index] = origin
+		}
+	}
+	return result, nil
 }
 
 func constantValue(value any) Literal {

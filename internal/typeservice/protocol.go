@@ -394,7 +394,11 @@ func (Literal) result()         {}
 
 type Boolean bool
 type Text string
-type EncodedTypeNode []byte
+type EncodedTypeNode struct {
+	tree       []byte
+	parseNodes []*ast.Node
+	origins    []*NodeRef
+}
 type SuggestionDiagnostics []DiagnosticFact
 type DiagnosticFact struct {
 	File, Message, Source         string

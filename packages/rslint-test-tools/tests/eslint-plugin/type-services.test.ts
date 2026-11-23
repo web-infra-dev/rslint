@@ -1641,6 +1641,13 @@ test('public checker, Program and source reads match TypeScript', async () => {
       const [enm, pair, fn, result, , dict, guard, select] = src.statements;
       const decl = fn as ts.FunctionDeclaration,
         sig = c.getSignatureFromDeclaration(decl)!;
+      const generatedSignature = c.signatureToSignatureDeclaration(
+        sig,
+        ts.SyntaxKind.CallSignature,
+        decl,
+        0,
+      )!;
+      const generatedParameter = generatedSignature.parameters[0];
       const param = decl.parameters[0],
         symbol = c.getSymbolAtLocation(param.name)!;
       const call = (result as ts.VariableStatement).declarationList
@@ -1768,15 +1775,14 @@ test('public checker, Program and source reads match TypeScript', async () => {
                 .getIndexInfosOfIndexSymbol(computed, siblings)
                 .map((info) => format(info.type)),
             ),
-            generatedType:
+            generatedType: [
               c.getTypeFromTypeNode(
                 c.typeToTypeNode(c.getStringType(), undefined, undefined)!,
-              ) ===
-              c.getTypeAtLocation(
-                (
-                  result as ts.VariableStatement
-                ).declarationList.getFirstToken()!,
-              ),
+              ) === c.getAnyType(),
+              format(c.getTypeAtLocation(generatedParameter.name)),
+              c.getSymbolAtLocation(generatedParameter.name)?.name,
+              c.isOptionalParameter(generatedParameter),
+            ],
             modes: [
               p.getModeForUsageLocation(
                 src,
@@ -1837,14 +1843,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
           c.isImplementationOfOverload(decl),
         ],
         builds: [
-          name(
-            c.signatureToSignatureDeclaration(
-              sig,
-              ts.SyntaxKind.CallSignature,
-              decl,
-              0,
-            ),
-          ),
+          name(generatedSignature),
           name(c.symbolToParameterDeclaration(symbol, decl, 0)),
           name(c.typeParameterToDeclaration(sig.typeParameters![0], decl, 0)),
           name(c.indexInfoToIndexSignatureDeclaration(index, decl, 0)),

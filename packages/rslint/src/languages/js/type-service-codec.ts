@@ -382,8 +382,13 @@ export class TypePacketReader {
         break;
       case 14: {
         const len = this.word(8);
-        if (len !== this.bytes!.length - 12) return invalid();
-        value = len ? Uint8Array.from(this.bytes!.subarray(12)) : undefined;
+        if (16 + len > this.bytes!.length) return invalid();
+        value = len
+          ? {
+              tree: Uint8Array.from(this.bytes!.subarray(16, 16 + len)),
+              origins: this.optionalIDs(12)?.map((offset) => this.node(offset)),
+            }
+          : undefined;
         break;
       }
       case 16:

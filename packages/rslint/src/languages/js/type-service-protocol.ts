@@ -10,6 +10,10 @@ export interface NodeRef {
   index: number;
   token?: { kind: number; pos: number; end: number };
 }
+export interface GeneratedSyntax {
+  tree: Uint8Array;
+  origins?: readonly (NodeRef | undefined)[];
+}
 export interface FileBinding extends Scope {
   sourceFileName: string;
 }
@@ -370,15 +374,15 @@ export interface QueryResults {
   parameterPropertySymbols: readonly number[];
   expandoSymbol: number;
   indexSymbolInfos: readonly IndexInfoFact[];
-  signatureDeclaration: Uint8Array | undefined;
-  parameterDeclaration: Uint8Array | undefined;
-  typeParameterDeclarations: Uint8Array | undefined;
-  typeParameterDeclaration: Uint8Array | undefined;
-  entityName: Uint8Array | undefined;
-  symbolExpression: Uint8Array | undefined;
+  signatureDeclaration: GeneratedSyntax | undefined;
+  parameterDeclaration: GeneratedSyntax | undefined;
+  typeParameterDeclarations: GeneratedSyntax | undefined;
+  typeParameterDeclaration: GeneratedSyntax | undefined;
+  entityName: GeneratedSyntax | undefined;
+  symbolExpression: GeneratedSyntax | undefined;
   symbolString: string;
   predicateString: string;
-  indexDeclaration: Uint8Array | undefined;
+  indexDeclaration: GeneratedSyntax | undefined;
   errorType: number;
   anyType: number;
   unknownType: number;
@@ -423,7 +427,7 @@ export interface QueryResults {
   baseLiteral: number;
   nonNullable: number;
   typeString: string;
-  typeNode: Uint8Array | undefined;
+  typeNode: GeneratedSyntax | undefined;
   signatureString: string;
   awaited: number;
   widened: number;

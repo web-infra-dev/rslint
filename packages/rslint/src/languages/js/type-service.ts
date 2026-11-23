@@ -14,6 +14,7 @@ import {
   isCacheableTypeQuery,
   nameToUnits,
   type FileBinding,
+  type NodeRef,
   type TypeServiceDescriptor,
   type TypeServiceProjection,
   type QueryTransport,
@@ -750,6 +751,10 @@ export class TypeServiceClient {
       options.maxSyntaxFactsBytes ?? 1 << 20,
     );
     const errorType = () => this.query({ op: 'errorType', args: {} });
+    const atParseTreeNode = <T>(n: object, read: (node: NodeRef) => T) => {
+      const node = this.syntax.parseTreeLocation(n);
+      return node && read(node);
+    };
     const nodeHandle = (
       op:
         | 'type'
@@ -847,32 +852,33 @@ export class TypeServiceClient {
           this.symbol(nodeHandle('exportSpecifierLocalTargetSymbol', n)),
         getPropertySymbolOfDestructuringAssignment: (n) =>
           this.symbol(nodeHandle('propertySymbolOfDestructuringAssignment', n)),
-        getJsxIntrinsicTagNamesAt: (n) =>
-          this.namedSymbolsFor(
+        getJsxIntrinsicTagNamesAt: (n) => {
+          const node = this.syntax.sourceLocation(n);
+          if (!node)
+            unsupported(
+              'getJsxIntrinsicTagNamesAt on a node without a source file',
+            );
+          return this.namedSymbolsFor(
             this.query({
               op: 'jsxIntrinsicTagNamesAt',
-              args: { node: this.syntax.location(n) },
+              args: { node },
             }),
-          ),
+          );
+        },
         getTypeOfAssignmentPattern: (n) =>
           this.type(nodeHandle('typeOfAssignmentPattern', n)),
         isOptionalParameter: (n) =>
-          this.query({
-            op: 'isOptionalParameter',
-            args: { node: this.syntax.location(n) },
-          }),
-        getConstantValue: (n) => {
-          const node = this.syntax.parseTreeLocation(n);
-          return node
-            ? this.query({ op: 'constantValue', args: { node } })
-            : undefined;
-        },
-        isImplementationOfOverload: (n) => {
-          const node = this.syntax.parseTreeLocation(n);
-          return node
-            ? this.query({ op: 'isImplementationOfOverload', args: { node } })
-            : undefined;
-        },
+          atParseTreeNode(n, (node) =>
+            this.query({ op: 'isOptionalParameter', args: { node } }),
+          ) ?? false,
+        getConstantValue: (n) =>
+          atParseTreeNode(n, (node) =>
+            this.query({ op: 'constantValue', args: { node } }),
+          ),
+        isImplementationOfOverload: (n) =>
+          atParseTreeNode(n, (node) =>
+            this.query({ op: 'isImplementationOfOverload', args: { node } }),
+          ),
         getTypeArgumentsForResolvedSignature: (s) => {
           const ids = this.query({
             op: 'typeArgumentsForResolvedSignature',
@@ -913,15 +919,13 @@ export class TypeServiceClient {
             }),
           )!,
         getPrivateIdentifierPropertyOfType: (t, name, location) =>
-          this.symbol(
-            this.query({
-              op: 'privateIdentifierProperty',
-              args: {
-                id: this.id(t, 'type'),
-                name: nameToUnits(name),
-                node: this.syntax.location(location),
-              },
-            }),
+          atParseTreeNode(location, (node) =>
+            this.symbol(
+              this.query({
+                op: 'privateIdentifierProperty',
+                args: { id: this.id(t, 'type'), name: nameToUnits(name), node },
+              }),
+            ),
           ),
         tryGetMemberInModuleExports: (name, moduleSymbol) =>
           this.symbol(
@@ -934,10 +938,12 @@ export class TypeServiceClient {
             }),
           ),
         isValidPropertyAccess: (n, name) =>
-          this.query({
-            op: 'validPropertyAccess',
-            args: { node: this.syntax.location(n), name: nameToUnits(name) },
-          }),
+          atParseTreeNode(n, (node) =>
+            this.query({
+              op: 'validPropertyAccess',
+              args: { node, name: nameToUnits(name) },
+            }),
+          ) ?? false,
         getSymbolsOfParameterPropertyDeclaration: (n, name) =>
           this.symbolsFor(
             this.query({
@@ -945,13 +951,18 @@ export class TypeServiceClient {
               args: { node: this.syntax.location(n), name: nameToUnits(name) },
             }),
           ),
-        getSymbolOfExpando: (n, allowDeclaration) =>
-          this.symbol(
-            this.query({
-              op: 'expandoSymbol',
-              args: { node: this.syntax.location(n), allowDeclaration },
-            }),
-          ),
+        getSymbolOfExpando: (n, allowDeclaration) => {
+          const node = this.syntax.sourceLocation(n);
+          return (
+            node &&
+            this.symbol(
+              this.query({
+                op: 'expandoSymbol',
+                args: { node, allowDeclaration },
+              }),
+            )
+          );
+        },
         getIndexInfosOfIndexSymbol: (s, siblings) =>
           this.query({
             op: 'indexSymbolInfos',
@@ -1086,11 +1097,10 @@ export class TypeServiceClient {
         getTypeFromTypeNode: (n) => this.type(nodeHandle('fromTypeNode', n)),
         getContextualType: (n) => this.type(nodeHandle('context', n)),
         getContextualTypeForArgumentAtIndex: (n, index) =>
-          this.type(
-            this.query({
-              op: 'contextualArgument',
-              args: { node: this.syntax.location(n), index },
-            }),
+          atParseTreeNode(n, (node) =>
+            this.type(
+              this.query({ op: 'contextualArgument', args: { node, index } }),
+            ),
           ),
         getFullyQualifiedName: (symbol) =>
           this.query({
@@ -1186,7 +1196,7 @@ export class TypeServiceClient {
               op: 'resolveName',
               args: {
                 name: nameToUnits(name),
-                node: location ? this.syntax.location(location) : undefined,
+                node: location && this.syntax.sourceLocation(location),
                 kind,
                 excludeGlobals,
               },

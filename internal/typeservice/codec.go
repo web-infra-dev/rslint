@@ -78,8 +78,8 @@ func EncodePacket(result Result) ([]byte, error) {
 		kind, words = packetDisplayParts, 1
 	case JSDocTags:
 		kind, words = packetJSDocTags, 1
-	case EncodedTypeNode:
-		kind, words = packetTypeNode, 1
+	case *EncodedTypeNode:
+		kind, words = packetTypeNode, 2
 	case SuggestionDiagnostics:
 		kind, words = packetDiagnostics, 1
 	default:
@@ -235,9 +235,10 @@ func EncodePacket(result Result) ([]byte, error) {
 			tables |= 4
 		}
 		w.put(32, tables)
-	case EncodedTypeNode:
-		w.put(8, uint32(len(fact)))
-		w.data = append(w.data, fact...)
+	case *EncodedTypeNode:
+		w.put(8, uint32(len(fact.tree)))
+		w.data = append(w.data, fact.tree...)
+		w.put(12, w.nodeList(fact.origins))
 	case SuggestionDiagnostics:
 		w.put(8, w.diagnostics(fact))
 	case NodeFacts:
