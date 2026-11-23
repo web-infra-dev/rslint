@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/suppressions"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
@@ -52,6 +53,7 @@ type lintArgs struct {
 	Positional      []string
 	GlobRoots       []rslintconfig.DirectoryIdentity
 	ScanDirectories map[string][]string
+	inputRoot       target.InputRoot
 	// FS is an optional run-scoped filesystem shared with Go config discovery.
 	// Native CLI supplies one cached instance so the later target/program phases
 	// reuse directory entries already read by the staged frontier.

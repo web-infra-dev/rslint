@@ -1226,6 +1226,7 @@ func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T
 		{Path: "/repo/present.ts", Text: &text, Rules: rules},
 		{Path: "/repo/missing.ts", Text: &text, Rules: rules},
 		{Path: "/repo/stopped.ts", Text: &text, Rules: rules},
+		{Path: "/repo/bad-id.ts", Text: &text, Rules: rules},
 	}
 	outcome := testDispatchEslintPluginRulesWithOutcome(
 		context.Background(),
@@ -1241,25 +1242,31 @@ func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T
 					{RuleName: "external/throws", Message: "finding before failure"},
 					{RuleName: "external/unconfigured", Message: "unexpected diagnostic"},
 				},
-			}, {FilePath: "/repo/stopped.ts", ParseError: eslintPluginShutdownSentinel}}}, nil
+			}, {FilePath: "/repo/stopped.ts", ParseError: eslintPluginShutdownSentinel}, {
+				FilePath: "/repo/bad-id.ts", RuleErrors: []EslintPluginRuleError{{Rule: "external/unconfigured"}},
+			}}}, nil
 		}),
 		files,
 		false,
 		SuggestionsModeOff,
 		nil,
 	)
-	if outcome.DispatchError != nil || len(outcome.Diagnostics) != 5 {
-		t.Fatalf("outcome = %+v, want three rule failures and both findings", outcome)
+	if outcome.DispatchError != nil || len(outcome.Diagnostics) != 6 {
+		t.Fatalf("outcome = %+v, want four rule failures and both findings", outcome)
 	}
 	want := []EslintPluginProtocolNotice{
 		{Kind: EslintPluginUnconfiguredDiagnostic, FilePath: "/repo/present.ts", RuleName: "external/unconfigured"},
 		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/present.ts", RuleName: "external/throws"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/present.ts", RuleName: "external/healthy"},
 		{Kind: EslintPluginMissingFileResult, FilePath: "/repo/missing.ts"},
 		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/missing.ts", RuleName: "external/throws"},
 		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/missing.ts", RuleName: "external/healthy"},
 		{Kind: EslintPluginUnverifiedFile, FilePath: "/repo/stopped.ts"},
 		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/stopped.ts", RuleName: "external/throws"},
 		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/stopped.ts", RuleName: "external/healthy"},
+		{Kind: EslintPluginUnconfiguredDiagnostic, FilePath: "/repo/bad-id.ts", RuleName: "external/unconfigured"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/bad-id.ts", RuleName: "external/throws"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/bad-id.ts", RuleName: "external/healthy"},
 	}
 	if !reflect.DeepEqual(outcome.Notices, want) {
 		t.Fatalf("notices = %+v, want %+v", outcome.Notices, want)

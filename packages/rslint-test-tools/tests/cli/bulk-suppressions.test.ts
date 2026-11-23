@@ -158,7 +158,8 @@ describe('CLI bulk suppressions', () => {
         cwd,
         env: { ...process.env, PWD: cwd },
       });
-    const recorded = await fromAlias('--suppress-all', shared, physicalFile);
+    expect((await fromAlias('src/app.js')).exitCode).toBe(1);
+    const recorded = await fromAlias('--suppress-all', shared, '.');
     expect(recorded.exitCode, recorded.stderr).toBe(0);
     const saved = await fs.readFile(baseline, 'utf8');
     expect(JSON.parse(saved)).toEqual({
@@ -282,6 +283,24 @@ describe('CLI bulk suppressions', () => {
     expect((await readBaseline(cwd))['fixed.js']).toEqual({
       'no-var': { count: 1 },
     });
+
+    // A file-level plugin failure still leaves the selected native rule count available.
+    await fs.writeFile(path.join(cwd, 'a.js'), 'debugger; debugger;');
+    await fs.writeFile(
+      path.join(cwd, 'local.mjs'),
+      `export default { rules: { healthy: { create() { return {}; } },
+        throws: { create() { return { get Program() { throw Error('listener getter failed'); } }; } } } };`,
+    );
+    const partial = await runRslint(
+      ['--suppress-rule', 'no-debugger', ...args],
+      cwd,
+    );
+    expect(partial.exitCode).toBe(2);
+    expect(partial.stdout).toContain('listener getter failed');
+    expect((await readBaseline(cwd))['a.js']).toEqual({
+      ...JSON.parse(saved)['a.js'],
+      'no-debugger': { count: 2 },
+    });
   });
 
   test('preserves recorded counts when a nested config fails to load', async () => {
@@ -318,6 +337,17 @@ describe('CLI bulk suppressions', () => {
     await fs.writeFile(path.join(cwd, 'nested/ok/b.js'), '');
     expect((await check('--prune-suppressions')).exitCode).toBe(2);
     expect(await readBaseline(cwd)).toEqual({ 'nested/a.js': count });
+
+    // Without the root config, nested/a.js has no owner to fall back to.
+    await fs.unlink(path.join(cwd, 'rslint.config.mjs'));
+    await fs.unlink(path.join(cwd, 'rslint-suppressions.json'));
+    expect((await check()).exitCode).toBe(0);
+    expect((await check('--prune-suppressions')).exitCode).toBe(2);
+    expect(await readBaseline(cwd)).toEqual({});
+    expect((await check('--pass-on-unpruned-suppressions')).exitCode).toBe(2);
+    await fs.writeFile(path.join(cwd, 'nested/ok/b.js'), 'console.log(1);');
+    expect((await check('--suppress-all')).exitCode).toBe(2);
+    expect(await readBaseline(cwd)).toEqual({ 'nested/ok/b.js': count });
   });
 
   test('keeps directory-scan counts when a literal file tries a different config', async () => {

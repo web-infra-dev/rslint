@@ -1,6 +1,7 @@
 package target
 
 import (
+	"cmp"
 	"context"
 	"os"
 	"path/filepath"
@@ -27,6 +28,19 @@ type InputSelection struct {
 // each entrypoint keeps its existing reporting policy without admitting overlay
 // dependencies as fallback targets.
 func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string) (*InputSelection, error) {
+	return (InputRoot{Directory: cwd}).Select(ctx, fsys, inputs)
+}
+
+// InputRoot anchors ordinary paths at Directory. The file CLI also supplies
+// the native Windows working directory for current-drive and drive-relative
+// names, which can be on another volume when Directory resolves a junction.
+type InputRoot struct {
+	Directory              string
+	WindowsVolumeDirectory string
+}
+
+// Select expands the request's literal files, directories, and glob patterns.
+func (base InputRoot) Select(ctx context.Context, fsys vfs.FS, inputs []string) (*InputSelection, error) {
 	selection := &InputSelection{Files: []string{}, ScanDirectories: make(map[string][]string)}
 	type input struct {
 		path      string
@@ -37,7 +51,7 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 	classified := make([]input, len(inputs))
 	var patterns []string
 	for index, raw := range inputs {
-		absolute, err := resolveInputPath(cwd, raw)
+		absolute, err := base.ResolvePath(raw)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +68,7 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 		decoded, literal := literalPatternPath(pattern)
 		if raw != "" && (!literal || decoded != pattern) {
 			if literal {
-				directory, err := resolveInputPath(cwd, decoded)
+				directory, err := base.ResolvePath(decoded)
 				if err != nil {
 					return nil, err
 				}
@@ -66,7 +80,7 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 			patterns = append(patterns, pattern)
 		}
 	}
-	expansions, err := expandGlobs(ctx, fsys, cwd, patterns)
+	expansions, err := base.expandGlobs(ctx, fsys, patterns)
 	if err != nil {
 		return nil, err
 	}
@@ -133,20 +147,19 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 	return selection, nil
 }
 
-// resolveInputPath resolves filesystem paths, not glob syntax. Windows drive-
-// relative inputs use the request's cwd on that drive; other drives retain the
-// operating system's per-drive working directory. Native cleaning protects UNC
-// share roots from parent segments without changing the process cwd.
-func resolveInputPath(cwd, name string) (string, error) {
+// ResolvePath resolves filesystem paths, not glob syntax. A drive-relative
+// path on another Windows volume uses that drive's OS working directory.
+func (base InputRoot) ResolvePath(name string) (string, error) {
 	if runtime.GOOS != "windows" {
-		return tspath.ResolvePath(cwd, name), nil
+		return tspath.ResolvePath(base.Directory, name), nil
 	}
 	if !filepath.IsAbs(name) {
 		volume := filepath.VolumeName(name)
+		volumeDir := cmp.Or(base.WindowsVolumeDirectory, base.Directory)
 		switch {
 		case volume != "":
-			if strings.EqualFold(volume, filepath.VolumeName(cwd)) {
-				name = filepath.Join(cwd, name[len(volume):])
+			if strings.EqualFold(volume, filepath.VolumeName(volumeDir)) {
+				name = filepath.Join(volumeDir, name[len(volume):])
 			} else {
 				absolute, err := filepath.Abs(name)
 				if err != nil {
@@ -155,9 +168,9 @@ func resolveInputPath(cwd, name string) (string, error) {
 				name = absolute
 			}
 		case len(name) > 0 && os.IsPathSeparator(name[0]):
-			name = filepath.VolumeName(cwd) + name
+			name = filepath.VolumeName(volumeDir) + name
 		default:
-			name = filepath.Join(cwd, name)
+			name = filepath.Join(base.Directory, name)
 		}
 	}
 	return filepath.ToSlash(filepath.Clean(name)), nil

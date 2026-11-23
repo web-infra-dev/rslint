@@ -166,12 +166,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		defer pprof.StopCPUProfile()
 	}
 
-	currentDirectory, err := os.Getwd()
+	inputRoot, err := args.invocationRoot()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting current directory: %v\n", err)
 		return 1
 	}
-	currentDirectory = tspath.NormalizePath(currentDirectory)
+	currentDirectory := tspath.NormalizePath(inputRoot.Directory)
 	workingDirectory := currentDirectory
 
 	if init {
@@ -184,7 +184,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	var baseline *suppressions.File
 	var baselineErr error
 	if !typeCheckOnly {
-		baseline, baselineErr = suppressions.Open(args.Suppressions)
+		baseline, baselineErr = suppressions.Open(inputRoot.Directory, args.Suppressions)
 	}
 	if configCatalog == nil {
 		fmt.Fprintln(os.Stderr, "error: config discovery did not produce a catalog")
@@ -311,8 +311,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 	// Use CWD for display paths (not any config directory).
-	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
-	// so it already holds the normalized CWD.
 	cwd := workingDirectory
 
 	comparePathOptions := tspath.ComparePathsOptions{

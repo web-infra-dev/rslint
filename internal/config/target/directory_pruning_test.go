@@ -57,7 +57,7 @@ func TestExpandGlobPrunesShallowDirectories(t *testing.T) {
 	}
 	root, paths := setupDiscoveryFixture(t, layout)
 	fsys := &globWalkRecorder{FS: osvfs.FS()}
-	expansions, err := expandGlobs(context.Background(), fsys, root, []string{"src/*.ts", "src/*/../*.ts", "src/**/../*.ts"})
+	expansions, err := (InputRoot{Directory: root}).expandGlobs(context.Background(), fsys, []string{"src/*.ts", "src/*/../*.ts", "src/**/../*.ts"})
 	assert.NilError(t, err)
 	for _, expansion := range expansions {
 		assert.Equal(t, expansion.Root, tspath.ResolvePath(root, "src"))
@@ -131,7 +131,7 @@ func TestSelectInputsWindowsPaths(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("native Windows volume rules")
 	}
-	root, paths := setupDiscoveryFixture(t, []string{"a.ts", "src/a.ts", "src/b.ts"})
+	root, paths := setupDiscoveryFixture(t, []string{"a.ts", "src/a.ts", "src/b.ts", "[work]/src/c.ts"})
 	volume := filepath.VolumeName(root)
 	selection, err := SelectInputs(context.Background(), osvfs.FS(), root, []string{volume + "a.ts", volume + "src/a.ts", volume + "src/*.ts", volume + "src/*/../*.ts", volume + "src/*/../../src/*.ts"})
 	assert.NilError(t, err)
@@ -139,6 +139,27 @@ func TestSelectInputsWindowsPaths(t *testing.T) {
 	assert.DeepEqual(t, selection.Files, []string{paths["a.ts"], paths["src/a.ts"], paths["src/b.ts"]})
 	assert.Equal(t, len(selection.Unmatched), 0)
 	assert.DeepEqual(t, selection.ScanDirectories, map[string][]string{paths["src/b.ts"]: {tspath.ResolvePath(root, "src")}})
+	// Emulate a junction from another drive to this one. A drive-relative
+	// glob must use this drive's OS working directory, including literal '['.
+	t.Chdir(filepath.Join(root, "[work]"))
+	otherVolume := "Z:"
+	if strings.EqualFold(volume, otherVolume) {
+		otherVolume = "Y:"
+	}
+	base := InputRoot{Directory: root, WindowsVolumeDirectory: otherVolume + "/link"}
+	selection, err = base.Select(t.Context(), osvfs.FS(), []string{volume + "src/*/../*.ts"})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, selection.Files, []string{paths["[work]/src/c.ts"]})
+	for input, want := range map[string]string{
+		"src/a.ts":                paths["src/a.ts"],
+		"/src/a.ts":               otherVolume + "/src/a.ts",
+		otherVolume + "src/a.ts":  otherVolume + "/link/src/a.ts",
+		otherVolume + "/src/a.ts": otherVolume + "/src/a.ts",
+	} {
+		got, err := base.ResolvePath(input)
+		assert.NilError(t, err)
+		assert.Equal(t, got, want)
+	}
 	for _, test := range []struct{ cwd, input, want string }{
 		{"C:/project", "C:a.ts", "C:/project/a.ts"},
 		{"C:/project", "c:src/a.ts", "C:/project/src/a.ts"},
@@ -146,7 +167,7 @@ func TestSelectInputsWindowsPaths(t *testing.T) {
 		{"//server/share/repo", "../../a.ts", "//server/share/a.ts"},
 		{"C:/project", "//server/share/../../a.ts", "//server/share/a.ts"},
 	} {
-		got, err := resolveInputPath(test.cwd, test.input)
+		got, err := (InputRoot{Directory: test.cwd}).ResolvePath(test.input)
 		assert.NilError(t, err)
 		assert.Equal(t, got, test.want)
 	}
@@ -222,7 +243,7 @@ func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
 				t.Skip("backslash glob escapes are POSIX-only")
 			}
 			fsys := &globWalkRecorder{FS: osvfs.FS()}
-			expansions, err := expandGlobs(context.Background(), fsys, root, test.patterns)
+			expansions, err := (InputRoot{Directory: root}).expandGlobs(context.Background(), fsys, test.patterns)
 			assert.NilError(t, err)
 			assert.Equal(t, len(expansions), len(test.patterns))
 			var wantRoots []string
@@ -292,7 +313,7 @@ func TestExpandGlobsPreservesNegationContext(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := &globWalkRecorder{FS: fsys}
-			expansions, err := expandGlobs(context.Background(), recorder, test.cwd, test.patterns)
+			expansions, err := (InputRoot{Directory: test.cwd}).expandGlobs(context.Background(), recorder, test.patterns)
 			assert.NilError(t, err)
 			assert.DeepEqual(t, recorder.roots, []string{"/project/src"})
 			for index := range test.patterns {

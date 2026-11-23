@@ -1489,16 +1489,19 @@ in `internal/config/lint`, Program construction in `internal/program/loader`,
 the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
 
-The file CLI reads its optional bulk suppressions file in the calling working
-directory. After the final lint or fix observation, the CLI passes diagnostics
+The file CLI resolves relative targets, discovers configs, and keys its optional
+bulk suppressions file from the same physical working directory. After the final
+lint or fix observation, the CLI passes diagnostics
 and checked files to `internal/suppressions`, excluding files with syntax errors.
 The lint plan identifies rules skipped for lack of type information. The plugin
 dispatcher identifies the files and error-level rules affected by incomplete
 worker results. The CLI passes these exclusions to the package, which compares
 completed rule counts and owns baseline persistence. The discovery catalog
 records where an actual file or directory lookup fell back to an ancestor.
-Those targets keep their diagnostics and baseline entries. A failed plugin rule
-keeps its own count. An incomplete worker response prevents a baseline update.
+Those targets keep their diagnostics and baseline entries. Catalog failures also
+cover subtrees with no working owner. A failed plugin rule keeps its own count.
+An incomplete plugin file result limits updates for that file. A batch dispatch
+error in the final observation stops the update.
 The CLI supplies visible diagnostics and any baseline failure to report assembly.
 
 The Go API mode similarly prepares one request in

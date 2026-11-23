@@ -17,15 +17,13 @@ import (
 
 const DefaultFilename = "rslint-suppressions.json"
 
-// Open reads the file CLI's baseline. A check without a baseline returns nil.
-func Open(options Options) (*File, error) {
-	f := &File{options: options, path: DefaultFilename}
-	var cwd string
-	var err error
+// Open reads the baseline for the same physical cwd used to resolve lint inputs.
+func Open(cwd string, options Options) (*File, error) {
+	f := &File{options: options, cwd: cwd, path: filepath.Join(cwd, DefaultFilename)}
 	if location := options.Location; location != "" {
 		// Match Node's process.cwd(), including the stored case on Unix and
 		// the native drive and junction spelling on Windows.
-		cwd, err = syscall.Getwd()
+		nativeCWD, err := syscall.Getwd()
 		if err != nil {
 			return nil, err
 		}
@@ -37,14 +35,14 @@ func Open(options Options) (*File, error) {
 				return nil, err
 			}
 		} else {
-			path = filepath.Join(cwd, path)
+			path = filepath.Join(nativeCWD, path)
 		}
 		info, err := os.Stat(path)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
 		if os.IsPathSeparator(location[len(location)-1]) || (info != nil && info.IsDir()) {
-			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(cwd))
+			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(nativeCWD))
 		}
 		f.path = path
 	}
@@ -52,24 +50,9 @@ func Open(options Options) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(data) == 0 && options.Mode == Check {
+	if data == nil && options.Mode == Check {
 		return nil, nil //nolint:nilnil // No active baseline means the CLI can skip collecting linted files.
 	}
-	if cwd == "" {
-		cwd, err = syscall.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		f.path = filepath.Join(cwd, DefaultFilename)
-	}
-	if runtime.GOOS == "windows" {
-		// Windows Getwd can retain the name of a junction.
-		cwd, err = filepath.EvalSymlinks(cwd)
-		if err != nil {
-			return nil, err
-		}
-	}
-	f.cwd = cwd
 	f.entries = data
 	return f, nil
 }
@@ -120,23 +103,29 @@ func (f *File) fileMissing(key string) bool {
 		return false // Do not contact a network share to prune an unchecked file.
 	}
 	path := filepath.FromSlash(key)
-	volume := filepath.VolumeName(path)
-	if volume == "" && len(key) >= 3 && key[1:3] == ":/" && tspath.IsVolumeCharacter(key[0]) {
+	if filepath.VolumeName(path) == "" && len(key) >= 3 && key[1:3] == ":/" && tspath.IsVolumeCharacter(key[0]) {
 		return false // A Unix host cannot check a Windows drive.
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(f.cwd, path)
 	}
-	_, err := os.Stat(path)
-	if !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
-		return false
+	// A missing child under a dangling directory link or a detached drive
+	// may become reachable again. Find the nearest directory entry that exists.
+	for current := path; ; {
+		_, err := os.Lstat(current)
+		if err == nil {
+			if current == path {
+				return false
+			}
+			_, err = os.Stat(current) // Follow directory links and Windows junctions.
+			return err == nil
+		}
+		parent := filepath.Dir(current)
+		if parent == current || (!errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR)) {
+			return false
+		}
+		current = parent
 	}
-	if volume != "" {
-		// A detached drive can report all of its files as missing.
-		_, err := os.Stat(volume + string(filepath.Separator))
-		return err == nil
-	}
-	return true
 }
 
 func (f *File) read(path string) (entries, error) {

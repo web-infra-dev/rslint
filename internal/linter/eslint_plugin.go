@@ -917,9 +917,19 @@ func applyEslintPluginResults(
 			return p
 		}
 
+		unknownRule := false
+		reportUnknownRule := func(name string) {
+			unknownRule = true
+			if onNotice != nil {
+				onNotice(EslintPluginProtocolNotice{Kind: EslintPluginUnconfiguredDiagnostic, FilePath: f.Path, RuleName: name})
+			}
+		}
 		// Rule throws are authoritative — the editor never renders stderr,
 		// so surface each as a visible diagnostic.
 		for _, re := range fr.RuleErrors {
+			if _, known := sevByRule[re.Rule]; !known {
+				reportUnknownRule(re.Rule)
+			}
 			onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf, re.Rule,
 				"rule error: "+re.Message))
 		}
@@ -927,14 +937,8 @@ func applyEslintPluginResults(
 		for _, d := range fr.Diagnostics {
 			sev, known := sevByRule[d.RuleName]
 			if !known {
+				reportUnknownRule(d.RuleName)
 				sev = rule.SeverityError
-				if onNotice != nil {
-					onNotice(EslintPluginProtocolNotice{
-						Kind:     EslintPluginUnconfiguredDiagnostic,
-						FilePath: f.Path,
-						RuleName: d.RuleName,
-					})
-				}
 			}
 			start := clamp(d.StartPos)
 			end := clamp(d.EndPos)
@@ -954,6 +958,11 @@ func applyEslintPluginResults(
 			onDiagnostic(rd)
 		}
 		if onNotice != nil {
+			if unknownRule {
+				// A mislabeled finding leaves the configured plugin counts ambiguous.
+				reportUnverifiedPluginRules(f, onNotice)
+				continue
+			}
 			// Severity is fully projected. Consume each failed error rule once.
 			for _, failure := range fr.RuleErrors {
 				if severity, known := sevByRule[failure.Rule]; known && severity == rule.SeverityError {

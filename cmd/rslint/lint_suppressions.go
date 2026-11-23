@@ -18,23 +18,27 @@ func applyLintSuppressions(
 	plugin linter.PluginDispatchRecord,
 	args lintArgs,
 ) ([]rule.RuleDiagnostic, string) {
+	if plugin.DispatchError != nil && args.Suppressions.Mode != suppressions.Check {
+		return diagnostics, "Cannot update suppressions because plugin lint dispatch failed."
+	}
 	fallback := args.ConfigCatalog.FilesWithConfigFallback(targets)
+	incompleteFiles := make(map[string]bool)
 	failedRules := make(map[string][]string)
-	protocolFailure := plugin.DispatchError != nil
 	for _, notice := range plugin.Notices {
 		if notice.Kind != linter.EslintPluginUnverifiedRule {
-			protocolFailure = true
+			incompleteFiles[notice.FilePath] = true
 		}
 		if notice.RuleName != "" {
 			failedRules[notice.FilePath] = append(failedRules[notice.FilePath], notice.RuleName)
 		}
 	}
-	if protocolFailure && args.Suppressions.Mode != suppressions.Check {
-		return diagnostics, "Cannot update suppressions because plugin lint results are incomplete."
-	}
+	// A file-wide update needs a usable file result. Recording named rules
+	// can still use their individual counts, including completed native rules.
+	wholeFileUpdate := args.Suppressions.Mode == suppressions.Prune ||
+		(args.Suppressions.Mode == suppressions.Record && args.Suppressions.Rules == nil)
 	checked := make([]suppressions.FileResult, 0, len(files))
 	for _, file := range files {
-		if file.SyntaxError || fallback[file.Path] {
+		if file.SyntaxError || fallback[file.Path] || (wholeFileUpdate && incompleteFiles[file.Path]) {
 			continue
 		}
 		skipped := file.SkippedErrorRules
@@ -43,19 +47,22 @@ func applyLintSuppressions(
 		}
 		checked = append(checked, suppressions.FileResult{Path: file.Path, SkippedRules: skipped})
 	}
-	const configFailure = "A lint configuration failed to load. Files using a fallback configuration keep their original suppressions."
-	if len(fallback) > 0 && len(checked) == 0 {
-		return diagnostics, configFailure
+	var failure string
+	switch {
+	case len(args.ConfigCatalog.Failures) > 0:
+		failure = "A lint configuration failed to load. Files without their intended configuration keep their original suppressions."
+	case len(incompleteFiles) > 0 || plugin.DispatchError != nil:
+		failure = "Plugin lint results are incomplete."
+	}
+	if failure != "" && len(checked) == 0 {
+		return diagnostics, failure
 	}
 	visible, unused, err := baseline.Apply(ctx, checked, diagnostics)
 	if err != nil {
 		return diagnostics, err.Error()
 	}
-	if len(fallback) > 0 {
-		return visible, configFailure
-	}
-	if protocolFailure {
-		return visible, "Cannot verify suppressions because plugin lint results are incomplete."
+	if failure != "" {
+		return visible, failure
 	}
 	if unused && !args.PassOnUnpruned {
 		return visible, "Unused suppressions remain. Run with --prune-suppressions to remove them, or --pass-on-unpruned-suppressions to allow them."
