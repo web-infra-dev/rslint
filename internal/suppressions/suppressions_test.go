@@ -20,11 +20,19 @@ func TestScopedUpdate(t *testing.T) {
 	cwd := t.TempDir()
 	t.Chdir(cwd)
 	checked := filepath.ToSlash(filepath.Join(cwd, "a.ts"))
-	for _, name := range []string{"a.ts", "untouched.ts", "former-dir"} {
+	private := filepath.Join(cwd, "private")
+	if err := os.Mkdir(private, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"a.ts", "private/untouched.ts", "former-dir"} {
 		if err := os.WriteFile(filepath.Join(cwd, name), nil, 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
+	if err := os.Chmod(private, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(private, 0o755) })
 	path := filepath.Join(cwd, DefaultFilename)
 	driveKey := "D:/shared/file.ts"
 	if runtime.GOOS == "windows" {
@@ -32,7 +40,7 @@ func TestScopedUpdate(t *testing.T) {
 	}
 	initial := fmt.Sprintf(`{
 		"a.ts":{"x":{"count":3},"y":{"count":1},"typed":{"count":2}},
-		"untouched.ts":{"x":{"count":1}},
+		"private/untouched.ts":{"x":{"count":1}},
 		"gone.ts":{"x":{"count":1}},
 		"former-dir/old.ts":{"x":{"count":1}},
 		"^/old.ts":{"x":{"count":1}},
@@ -66,7 +74,7 @@ func TestScopedUpdate(t *testing.T) {
 	pruned := run(Options{Mode: Prune}, false)
 	want := entries{
 		"a.ts":                   {"x": {Count: 1}, "typed": {Count: 2}},
-		"untouched.ts":           {"x": {Count: 1}},
+		"private/untouched.ts":   {"x": {Count: 1}},
 		"//server/share/file.ts": {"x": {Count: 1}},
 	}
 	if runtime.GOOS != "windows" {
@@ -162,7 +170,7 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 	}
 }
 
-func TestFileKeyPreservesCase(t *testing.T) {
+func TestFileKeyUsesNativeRelativePaths(t *testing.T) {
 	check := func(cwd, path, want string) {
 		t.Helper()
 		f := File{cwd: cwd}
@@ -170,15 +178,16 @@ func TestFileKeyPreservesCase(t *testing.T) {
 			t.Errorf("fileKey(%q, %q) = %q, want %q", cwd, path, got, want)
 		}
 	}
-	check("/tree/pkg/", "/tree/Pkg/File.js", "../Pkg/File.js")
 	check("/tree/pkg/", "/tree/pkg-extra/File.js", "../pkg-extra/File.js")
 	check("/", "/File.js", "File.js")
 	if runtime.GOOS == "windows" {
-		check("C:/tree/pkg/", "c:/tree/Pkg/File.js", "../Pkg/File.js")
-		check("C:/tree/", "d:/Shared/File.js", "D:/Shared/File.js")
-		check("//server/share/pkg/", "//server/share/Pkg/File.js", "../Pkg/File.js")
-		check("//server/share/pkg/", "//SERVER/SHARE/Pkg/File.js", "//SERVER/SHARE/Pkg/File.js")
+		check("C:/tree/pkg/", "c:/tree/Pkg/File.js", "File.js")
+		check("C:/tree/", "d:/Shared/File.js", "d:/Shared/File.js")
+		check("//server/share/pkg/", "//server/share/Pkg/File.js", "File.js")
+		check("//server/share/pkg/", "//SERVER/SHARE/Pkg/File.js", "File.js")
 		check("//server/share/pkg/", "//server/other/File.js", "//server/other/File.js")
+	} else {
+		check("/tree/pkg/", "/tree/Pkg/File.js", "../Pkg/File.js")
 	}
 }
 
@@ -254,9 +263,9 @@ func TestUpdateThroughFileSymlink(t *testing.T) {
 	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "x"); err != nil {
 		t.Fatal(err)
 	}
-	real, err := Open(cwd, Options{})
-	if err != nil || real == nil || real.entries["test.js"]["x"].Count != 1 {
-		t.Fatalf("write via symlink: file=%v err=%v", real, err)
+	defaultFile, err := Open(cwd, Options{})
+	if err != nil || defaultFile == nil || defaultFile.entries["test.js"]["x"].Count != 1 {
+		t.Fatalf("write via symlink: file=%v err=%v", defaultFile, err)
 	}
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)

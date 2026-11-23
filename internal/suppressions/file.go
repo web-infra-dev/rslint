@@ -14,7 +14,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
@@ -71,63 +70,52 @@ func Open(workingDirectory string, options Options) (*File, error) {
 	}
 	f.cwd = tspath.EnsureTrailingDirectorySeparator(physical)
 	if selected != physical {
-		f.cwdAlias = tspath.EnsureTrailingDirectorySeparator(utils.NormalizeAbsoluteDrive(selected))
+		f.cwdAlias = selected
 	}
 	f.entries = data
 	return f, nil
 }
 
-// Lint paths under cwd already contain their slash-separated JSON key.
+// The working directory itself may have a caller-visible symlink spelling.
+// Keep the suffix as lint reported it, including symlinks below that directory.
 func (f *File) fileKey(path string) string {
-	// A target under the cwd used for selection has the same relative name
-	// when the caller enters through a symlink. Keep links below that cwd.
 	if f.cwdAlias != "" {
-		if relative, ok := strings.CutPrefix(utils.NormalizeAbsoluteDrive(path), f.cwdAlias); ok {
-			return relative
+		if relative, err := filepath.Rel(f.cwdAlias, path); err == nil && filepath.IsLocal(relative) {
+			return filepath.ToSlash(relative)
 		}
 	}
-	dir := f.cwd
-	if relative, ok := strings.CutPrefix(path, dir); ok {
+	if relative, ok := strings.CutPrefix(path, f.cwd); ok {
 		return relative
 	}
-	if runtime.GOOS == "windows" {
-		baseVolume, fileVolume := filepath.VolumeName(dir), filepath.VolumeName(path)
-		// Target identity preserves UNC server and share spelling.
-		if strings.HasPrefix(path, "//") && baseVolume != fileVolume {
-			return path
-		}
-		if !strings.EqualFold(baseVolume, fileVolume) {
-			return strings.ToUpper(fileVolume) + path[len(fileVolume):]
-		}
-		return tspath.GetRelativePathFromDirectory(dir, path, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+	relative, err := filepath.Rel(f.cwd, path)
+	if err != nil {
+		return path // A file on another Windows drive or share has no relative path.
 	}
-	relative, _ := filepath.Rel(dir, path) // Both absolute paths have the same Unix root.
-	return relative
+	return filepath.ToSlash(relative)
 }
 
-func (f *File) fileMissing(key string) (bool, error) {
+func (f *File) fileMissing(key string) bool {
 	if strings.HasPrefix(key, "//") {
-		return false, nil // Do not contact a network share to prune an unchecked file.
+		return false // Do not contact a network share to prune an unchecked file.
 	}
 	path := filepath.FromSlash(key)
 	volume := filepath.VolumeName(path)
 	if volume == "" && len(key) >= 3 && key[1:3] == ":/" && tspath.IsVolumeCharacter(key[0]) {
-		return false, nil // A Unix host cannot check a Windows drive.
+		return false // A Unix host cannot check a Windows drive.
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(f.cwd, path)
 	}
 	_, err := os.Stat(path)
-	if err != nil && volume != "" {
+	if !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
+		return false
+	}
+	if volume != "" {
 		// A detached drive can report all of its files as missing.
-		if root, _ := os.Stat(volume + string(filepath.Separator)); root == nil {
-			return false, nil
-		}
+		_, err := os.Stat(volume + string(filepath.Separator))
+		return err == nil
 	}
-	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
-		return true, nil
-	}
-	return false, err
+	return true
 }
 
 func (f *File) read(path string) (entries, error) {
@@ -200,8 +188,8 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	var changed bool
 	if f.options.Mode == Record {
 		changed = f.record(data, files)
-	} else if changed, err = f.prune(data, files); err != nil {
-		return err
+	} else {
+		changed = f.prune(data, files)
 	}
 	if !newFile && !changed {
 		f.entries = data

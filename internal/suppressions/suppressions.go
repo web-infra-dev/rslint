@@ -116,7 +116,7 @@ func (f *File) record(data entries, files map[string]*checkedFile) bool {
 	return changed
 }
 
-func (f *File) prune(data entries, files map[string]*checkedFile) (bool, error) {
+func (f *File) prune(data entries, files map[string]*checkedFile) bool {
 	changed := false
 	for _, file := range files {
 		rules := data[file.key]
@@ -138,14 +138,10 @@ func (f *File) prune(data entries, files map[string]*checkedFile) (bool, error) 
 		}
 	}
 	for key := range data {
-		missing, err := f.fileMissing(key)
-		if err != nil {
-			return false, err
-		}
-		if missing {
+		if f.fileMissing(key) {
 			delete(data, key)
 			changed = true
 		}
 	}
-	return changed, nil
+	return changed
 }

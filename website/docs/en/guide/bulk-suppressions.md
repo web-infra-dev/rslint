@@ -36,7 +36,7 @@ This baseline records two `no-debugger` errors in `src/app.js`.
 
 If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
 
-File keys use `/` as their separator. Entering the project through a symlink gives files inside the working directory the same relative keys. For files outside it, Rslint records the linted name relative to the physical working directory. A file on another Windows drive uses its absolute path.
+File keys use `/` as their separator. Entering the project through a symlink gives files inside the working directory the same relative keys. For files outside it, Rslint records the linted name relative to the physical working directory. A file on another Windows drive or UNC share uses its absolute path.
 
 Each count belongs to the name Rslint actually linted. For example, if `linked.js` points to `src/app.js`, checking `linked.js` alone updates its own entry. If a run selects both names, Rslint checks the file once and applies counts for the selected name.
 
@@ -52,7 +52,7 @@ If the count in `src/app.js` falls from two to one, Rslint suppresses the remain
 rslint --prune-suppressions
 ```
 
-Pruning lowers counts, removes entries that reach zero, and removes entries for deleted files. A partial run preserves entries for existing files outside its scope. A Windows drive must be accessible to verify a deletion. Entries with UNC paths such as `//server/share/file.ts` are updated only when Rslint checks those files.
+Pruning lowers counts, removes entries that reach zero, and removes entries for deleted files. A partial run keeps entries for unchecked files unless Rslint can verify their deletion. This includes keeping entries in inaccessible directories or on disconnected drives. Entries with UNC paths such as `//server/share/file.ts` are updated only when Rslint checks those files.
 
 Ignored files and files with syntax errors keep their entries. If a file moves outside its TypeScript project, Rslint keeps the counts for enabled rules that require type information. Other rules in that file can still be checked and pruned. If you turn a rule off or lower its severity to `"warn"`, pruning removes its old count the next time Rslint checks the file.
 
