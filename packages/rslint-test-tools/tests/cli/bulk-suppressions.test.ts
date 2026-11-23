@@ -355,6 +355,25 @@ describe('CLI bulk suppressions', () => {
         expect(result.exitCode, result.stderr).toBe(0);
       }
       expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
+
+      await fs.writeFile(
+        path.join(root, 'rslint.config.mjs'),
+        `export default [
+          {files:['work/**/*.js'],rules:{'no-debugger':'error'}},
+          {files:['nested/link/**/*.js'],rules:{'no-debugger':'off'}}
+        ];`,
+      );
+      const names = [
+        path.join(work, 'src/app.js'),
+        path.join(cwd, 'src/app.js'),
+      ];
+      for (const flag of ['--prune-suppressions', '--suppress-all']) {
+        const conflict = await fromAlias(flag, ...names);
+        expect(conflict.exitCode, conflict.stderr).toBe(2);
+        expect(conflict.stderr).toContain('/work/src/app.js');
+        expect(conflict.stderr).toContain('/nested/link/src/app.js');
+        expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
+      }
     } finally {
       await cleanupTempDir(temp);
     }

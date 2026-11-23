@@ -53,10 +53,7 @@ type File struct {
 // NoteTargetAlias records two selected filenames for which lint will run only once.
 // mayRecord reports whether either enables an error rule selected for recording.
 func (f *File) NoteTargetAlias(selected, other string, mayRecord bool) {
-	alias := targetAlias{selected: f.fileKey(selected), other: f.fileKey(other), mayRecord: mayRecord}
-	if alias.selected != alias.other {
-		f.targetAliases = append(f.targetAliases, alias)
-	}
+	f.targetAliases = append(f.targetAliases, targetAlias{selected: selected, other: other, mayRecord: mayRecord})
 }
 
 // CheckTargetAliases reports when recording or verifying counts requires both filenames.
@@ -75,8 +72,13 @@ func (f *File) PreserveCounts(path string, reason error) {
 
 func (f *File) checkTargetAliases(data entries) error {
 	for _, alias := range f.targetAliases {
-		if alias.mayRecord || len(data[alias.selected]) != 0 || len(data[alias.other]) != 0 {
-			return fmt.Errorf("cannot verify suppressions for %q and %q together because they refer to the same file. Run rslint on each path separately or exclude one path", alias.selected, alias.other)
+		selected, other := f.fileKey(alias.selected), f.fileKey(alias.other)
+		if alias.mayRecord || len(data[selected]) != 0 || len(data[other]) != 0 {
+			if selected == other {
+				// Two input names can share a cwd-relative key but match different rules.
+				selected, other = alias.selected, alias.other
+			}
+			return fmt.Errorf("cannot verify suppressions for %q and %q together because they refer to the same file. Run rslint on each path separately or exclude one path", selected, other)
 		}
 	}
 	return nil

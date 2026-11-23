@@ -36,7 +36,7 @@ This baseline records two `no-debugger` errors in `src/app.js`.
 
 If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
 
-Rslint records the filename it checked, relative to the working directory's physical path, using `/` as the separator. Entering the same directory through a symlink keeps this base stable. Relative CLI arguments such as `../app.js` still follow the working directory used for file selection. The same conventions apply with `--config`. On Windows, a file on another drive or network share uses its absolute path.
+Rslint records paths relative to the physical working directory, using `/` as the separator. Entering the same directory through a symlink gives `src/app.js` the same baseline key. Rslint selects files and matches config patterns using the requested path. For example, `../app.js` follows the working directory used for file selection, and a parent config can give a directory and its symlink different rules. The same conventions apply with `--config`. On Windows, a file on another drive or network share uses its absolute path.
 
 For example, if `linked.js` points to `src/app.js`, the two names can match different rules. Checking them in separate runs gives each name its own count. Pruning `linked.js` leaves the entry for `src/app.js` intact.
 
