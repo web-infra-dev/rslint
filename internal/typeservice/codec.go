@@ -7,9 +7,33 @@ import (
 	"errors"
 	"math"
 
+	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+// The encoder stores nodes and NodeLists in fixed-size records after a nil
+// sentinel. Fully synthetic trees have no source positions to translate.
+func convertGeneratedPositions(tree []byte, file *ast.SourceFile) {
+	first := int(binary.LittleEndian.Uint32(tree[encoder.HeaderOffsetNodes:])) + encoder.NodeSize
+	var positions *ast.PositionMap
+	for offset := first; offset < len(tree); offset += encoder.NodeSize {
+		for _, field := range [...]int{encoder.NodeOffsetPos, encoder.NodeOffsetEnd} {
+			data := tree[offset+field:]
+			pos := int32(binary.LittleEndian.Uint32(data))
+			if pos < 0 {
+				continue
+			}
+			if positions == nil {
+				positions = file.GetPositionMap()
+				if positions.IsAsciiOnly() {
+					return
+				}
+			}
+			binary.LittleEndian.PutUint32(data, uint32(positions.UTF8ToUTF16(int(pos))))
+		}
+	}
+}
 
 const (
 	packetHandle uint32 = iota + 1

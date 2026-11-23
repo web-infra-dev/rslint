@@ -10,6 +10,7 @@ import typedPlugin from '@typescript-eslint/eslint-plugin';
 import sonarPlugin from 'eslint-plugin-sonarjs';
 import effectorPlugin from 'eslint-plugin-effector';
 import ts from 'typescript';
+import { typeServiceCompilerData } from '../../../rslint/src/languages/js/type-service-compiler-data.js';
 import {
   TypeServiceClient,
   type TypeServiceDescriptor,
@@ -24,16 +25,7 @@ import type { ESTreeNode } from '../../../rslint/src/languages/js/types.js';
 import { VISITOR_KEYS } from '../../../rslint/src/languages/js/visitor-keys.js';
 
 const root = resolve(import.meta.dirname, '../../../..');
-const enums = {
-  SyntaxKind: ts.SyntaxKind,
-  TypeFlags: ts.TypeFlags,
-  ObjectFlags: ts.ObjectFlags,
-  SymbolFlags: ts.SymbolFlags,
-  NodeFlags: ts.NodeFlags,
-  JsxEmit: ts.JsxEmit,
-  ModuleDetectionKind: ts.ModuleDetectionKind,
-  ScriptTarget: ts.ScriptTarget,
-};
+const enums = typeServiceCompilerData(ts);
 let temp: string, binary: string;
 beforeAll(() => {
   temp = mkdtempSync(resolve(tmpdir(), 'rslint-types-'));
@@ -1596,7 +1588,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
     [
       "export enum Values { N = 3, S = 'three', C = id(3) }",
       'export type Pair = readonly [first: string, second?: number];',
-      'export function id<T>(input: T): T { return input; }',
+      'export function id<T extends { valueOf?(): number }>(input: T): T { return input; }',
       'export const result = id(42);',
       "export const incorrect: number = 'bad';",
       'export type Dictionary = { [name: string]: number };',
@@ -1648,6 +1640,8 @@ test('public checker, Program and source reads match TypeScript', async () => {
         0,
       )!;
       const generatedParameter = generatedSignature.parameters[0];
+      const constraint = generatedSignature.typeParameters![0]
+        .constraint as ts.TypeLiteralNode;
       const param = decl.parameters[0],
         symbol = c.getSymbolAtLocation(param.name)!;
       const call = (result as ts.VariableStatement).declarationList
@@ -1781,6 +1775,11 @@ test('public checker, Program and source reads match TypeScript', async () => {
               ) === c.getAnyType(),
               format(c.getTypeAtLocation(generatedParameter.name)),
               c.getSymbolAtLocation(generatedParameter.name)?.name,
+              ts.getParseTreeNode(generatedParameter.name) === param.name,
+              constraint
+                .getChildren(src)
+                .map((child) => [child.kind, child.pos, child.end]),
+              (constraint.members[0] as ts.MethodSignature).questionToken?.kind,
               c.isOptionalParameter(generatedParameter),
             ],
             modes: [
@@ -1837,6 +1836,8 @@ test('public checker, Program and source reads match TypeScript', async () => {
         parameters: c.getRootSymbols(symbol).map((s) => s.name),
         merged: c.getMergedSymbol(symbol) === symbol,
         flags: [
+          Object.hasOwn(decl, 'jsDoc'),
+          Object.hasOwn(src.endOfFileToken, 'jsDoc'),
           c.isArgumentsSymbol(symbol),
           c.isUndefinedSymbol(symbol),
           c.isOptionalParameter(param),

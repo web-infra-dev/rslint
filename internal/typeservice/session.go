@@ -1281,9 +1281,14 @@ func encodeGeneratedNode(node *ast.Node, builder *checker.NodeBuilder, enclosing
 	if node == nil {
 		return &EncodedTypeNode{}, nil
 	}
-	tree, table, err := encoder.EncodeNode(node, ast.GetSourceFileOfNode(enclosing))
+	// Passing a SourceFile makes the encoder reserve space for its entire AST.
+	// A generated subtree only needs that file's UTF-16 coordinate map.
+	tree, table, err := encoder.EncodeNode(node, nil)
 	if err != nil {
 		return nil, err
+	}
+	if file := ast.GetSourceFileOfNode(enclosing); file != nil {
+		convertGeneratedPositions(tree, file)
 	}
 	result := &EncodedTypeNode{tree: tree}
 	for index, generated := range table.Nodes {

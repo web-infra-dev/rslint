@@ -1,3 +1,4 @@
+import type { TypeServiceCompilerData } from './type-service-compiler-data.js';
 import type ts from 'typescript';
 import { SyntaxKind as nativeSyntaxKind } from '@rslint/api';
 import type { DecodedFrame } from './frame.js';
@@ -515,22 +516,11 @@ interface ObjectBrand {
   readonly id: number;
   knownName?: string;
 }
-type TypeScriptEnums = Pick<
-  typeof ts,
-  | 'SyntaxKind'
-  | 'TypeFlags'
-  | 'ObjectFlags'
-  | 'NodeFlags'
-  | 'JsxEmit'
-  | 'ModuleDetectionKind'
-  | 'ScriptTarget'
-> & { SymbolFlags: Pick<typeof ts.SymbolFlags, 'TypeLiteral'> };
-
 type TypePrototype = ReturnType<typeof makeTypePrototype>;
 
 function makeTypePrototype(
   checker: CheckerView,
-  typescript: TypeScriptEnums,
+  typescript: TypeServiceCompilerData,
   ensure: () => void,
 ) {
   const { TypeFlags: tf, ObjectFlags: of } = typescript;
@@ -625,7 +615,7 @@ function inheritTypePrototype<T extends object>(
 }
 
 function readCompilerOptions(
-  typescript: TypeScriptEnums,
+  typescript: TypeServiceCompilerData,
   input: Record<string, unknown>,
 ) {
   const compilerOptions = { ...input };
@@ -710,7 +700,7 @@ export class TypeServiceClient {
   readonly program: ProgramView;
   readonly checker: CheckerView;
   constructor(
-    private readonly typescript: TypeScriptEnums,
+    private readonly typescript: TypeServiceCompilerData,
     readonly descriptor: TypeServiceDescriptor,
     private transport: QueryTransport | undefined,
     syntax: SyntaxSource,

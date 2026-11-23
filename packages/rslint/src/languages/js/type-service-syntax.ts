@@ -9,6 +9,7 @@ import {
   type Node,
 } from '@rslint/api';
 import type ts from 'typescript';
+import type { TypeServiceCompilerData } from './type-service-compiler-data.js';
 import { WeakObjectCache } from './type-service-cache.js';
 import type {
   FileBinding,
@@ -77,11 +78,17 @@ const sourceProperties = [
   'isDeclarationFile',
   'text',
   'languageVersion',
+  'languageVariant',
+  'scriptKind',
   'hasNoDefaultLib',
   'impliedNodeFormat',
   'referencedFiles',
   'typeReferenceDirectives',
   'libReferenceDirectives',
+  'imports',
+  'moduleAugmentations',
+  'ambientModuleNames',
+  'externalModuleIndicator',
 ];
 function heritageNode(raw: Node): boolean {
   let current: Node | undefined = raw;
@@ -99,8 +106,7 @@ const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
   [SyntaxKind.Block]: ['multiLine'],
   [SyntaxKind.ArrayLiteralExpression]: ['multiLine'],
   [SyntaxKind.ObjectLiteralExpression]: ['multiLine'],
-  [SyntaxKind.HeritageClause]: ['token'],
-  [SyntaxKind.ImportAttributes]: ['token', 'multiLine'],
+  [SyntaxKind.ImportAttributes]: ['multiLine'],
   [SyntaxKind.ImportClause]: ['isTypeOnly', 'phaseModifier'],
   [SyntaxKind.ImportSpecifier]: ['isTypeOnly'],
   [SyntaxKind.ExportSpecifier]: ['isTypeOnly'],
@@ -108,10 +114,6 @@ const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
   [SyntaxKind.ImportEqualsDeclaration]: ['isTypeOnly'],
   [SyntaxKind.ExportAssignment]: ['isExportEquals'],
   [SyntaxKind.ImportType]: ['isTypeOf'],
-  [SyntaxKind.PrefixUnaryExpression]: ['operator'],
-  [SyntaxKind.PostfixUnaryExpression]: ['operator'],
-  [SyntaxKind.TypeOperator]: ['operator'],
-  [SyntaxKind.MetaProperty]: ['keywordToken'],
   [SyntaxKind.JsxText]: ['text', 'containsOnlyTriviaWhiteSpaces'],
   [SyntaxKind.JSDocText]: ['text'],
   [SyntaxKind.JSDocLink]: ['text'],
@@ -124,7 +126,9 @@ const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
   [SyntaxKind.SyntaxList]: ['children'],
 };
 
-function syntaxFields(raw: Node): string[] {
+type JsDocKinds = TypeServiceCompilerData['jsDocKinds'];
+
+function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
   const kind = raw.kind;
   const fields = [
     'pos',
@@ -140,6 +144,15 @@ function syntaxFields(raw: Node): string[] {
     heritageNode(raw);
   for (const key of childProperties[kind] ?? []) {
     if (key === undefined) continue;
+    if (key === 'postfixToken') {
+      fields.push('questionToken');
+      if (
+        kind !== SyntaxKind.MethodSignature &&
+        kind !== SyntaxKind.PropertySignature
+      )
+        fields.push('exclamationToken');
+      continue;
+    }
     if (heritage && (key === 'typeName' || key === 'left'))
       fields.push('expression');
     else if (heritage && key === 'right') fields.push('name');
@@ -160,6 +173,10 @@ function syntaxFields(raw: Node): string[] {
     kind <= SyntaxKind.LastTemplateToken
   )
     fields.push('rawText', 'templateFlags');
+  for (const key of ['operator', 'token', 'keywordToken'])
+    if (Reflect.get(raw, key) !== undefined) fields.push(key);
+  if (jsDocKinds[SyntaxKind[kind]] || raw.flags & NodeFlags.HasJSDoc)
+    fields.push('jsDoc');
   return fields;
 }
 
@@ -167,6 +184,7 @@ function syntaxView(
   load: () => Node,
   read: (key: string | symbol, proxy: object) => unknown,
   ensure: () => void,
+  jsDocKinds: JsDocKinds,
 ): object {
   const proxy: object = new Proxy(
     {},
@@ -179,23 +197,31 @@ function syntaxView(
           : read(key, proxy);
       },
       has(target, key) {
+        ensure();
         if (Reflect.has(target, key)) return true;
         const node = load();
         return (
-          syntaxFields(node).includes(String(key)) ||
+          syntaxFields(node, jsDocKinds).includes(String(key)) ||
           (key === 'text' &&
             (node.kind === SyntaxKind.Identifier ||
               node.kind === SyntaxKind.PrivateIdentifier)) ||
           typeof Reflect.get(node, key) === 'function'
         );
       },
-      ownKeys: (target) => [
-        ...new Set([...syntaxFields(load()), ...Reflect.ownKeys(target)]),
-      ],
+      ownKeys(target) {
+        ensure();
+        return [
+          ...new Set([
+            ...syntaxFields(load(), jsDocKinds),
+            ...Reflect.ownKeys(target),
+          ]),
+        ];
+      },
       getOwnPropertyDescriptor(target, key) {
+        ensure();
         return (
           Reflect.getOwnPropertyDescriptor(target, key) ??
-          (syntaxFields(load()).includes(String(key))
+          (syntaxFields(load(), jsDocKinds).includes(String(key))
             ? {
                 configurable: true,
                 enumerable: true,
@@ -218,7 +244,10 @@ function wrapList(
   for (const key of ['pos', 'end', 'hasTrailingComma'])
     if (key in value)
       Object.defineProperty(list, key, {
-        value: Reflect.get(value, key),
+        value:
+          key === 'hasTrailingComma'
+            ? Reflect.get(value, key)
+            : Number(Reflect.get(value, key)) | 0,
         enumerable: true,
         writable: true,
         configurable: true,
@@ -226,21 +255,15 @@ function wrapList(
   return list;
 }
 
-const sourcePositionMethods = new Set([
-  'getStart',
-  'getFullStart',
-  'getEnd',
-  'getWidth',
-  'getFullWidth',
-  'getLeadingTriviaWidth',
-  'getText',
-  'getFullText',
-  'getChildren',
-  'getChildCount',
-  'getChildAt',
-  'getFirstToken',
-  'getLastToken',
-]);
+// These literals use TypeScript's NodeObject methods, like non-token nodes.
+function needsRealPosition(kind: SyntaxKind): boolean {
+  return (
+    kind > SyntaxKind.LastToken ||
+    kind === SyntaxKind.StringLiteral ||
+    kind === SyntaxKind.NumericLiteral ||
+    kind === SyntaxKind.NoSubstitutionTemplateLiteral
+  );
+}
 
 /** A worker/generation owns stable native identities and a bounded decoded
  * source LRU. Proxies retain identities, never a dependency source buffer. */
@@ -272,8 +295,8 @@ export class GenerationSyntaxViews {
   private summaryBytes = 0;
   constructor(
     private readonly typescript: Pick<
-      typeof ts,
-      'SyntaxKind' | 'NodeFlags' | 'ScriptTarget'
+      TypeServiceCompilerData,
+      'SyntaxKind' | 'NodeFlags' | 'ScriptTarget' | 'jsDocKinds'
     >,
     private readonly descriptor: TypeServiceDescriptor,
     private lookup: SyntaxSource | undefined,
@@ -525,6 +548,7 @@ export class GenerationSyntaxViews {
       () => this.rawSyntax(identity),
       (key, proxy) => this.get(identity, key, proxy),
       this.ensure,
+      this.typescript.jsDocKinds,
     );
     this.identities.set(proxy, identity);
     this.wrapped.set(cacheKey, proxy);
@@ -804,6 +828,19 @@ export class GenerationSyntaxViews {
     return value;
   }
   private syntaxMember(raw: Node, key: string | symbol): unknown {
+    if (key === 'postfixToken') return undefined;
+    if (
+      (key === 'questionToken' || key === 'exclamationToken') &&
+      childProperties[raw.kind]?.includes('postfixToken')
+    ) {
+      const token = Reflect.get(raw, 'postfixToken') as Node | undefined;
+      return token?.kind ===
+        (key === 'questionToken'
+          ? SyntaxKind.QuestionToken
+          : SyntaxKind.ExclamationToken)
+        ? token
+        : undefined;
+    }
     if (
       key === 'kind' ||
       key === 'operator' ||
@@ -849,56 +886,145 @@ export class GenerationSyntaxViews {
       new Wtf8Decoder('utf-8', { ignoreBOM: true }),
     );
     const views = new WeakMap<object, object>();
+    const getSourceFile = () => {
+      this.ensure();
+      return undefined;
+    };
+    const copyListRange = (list: readonly unknown[]) => {
+      if (!('parent' in list) || !(list.parent instanceof RemoteNode)) return;
+      const owner = list.parent;
+      if (owner.pos < 0 || (Number(Reflect.get(list, 'pos')) | 0) >= 0) return;
+      const ref = origins?.[(owner as unknown as { index: number }).index];
+      if (!ref) return;
+      const field = childProperties[owner.kind]?.find(
+        (key) => key !== undefined && Reflect.get(owner, key) === list,
+      );
+      const source = this.rawNode(ref);
+      if (
+        !field ||
+        source.kind !== owner.kind ||
+        source.pos !== owner.pos ||
+        source.end !== owner.end
+      )
+        return;
+      const original = Reflect.get(source, field);
+      if (!Array.isArray(original)) return;
+      for (const key of ['pos', 'end', 'hasTrailingComma'])
+        Object.defineProperty(list, key, { value: Reflect.get(original, key) });
+    };
+    const childrenOf = (
+      node: Node,
+      file: Parameters<Node['getChildren']>[0],
+    ) => {
+      if (node instanceof RemoteNode && node.pos >= 0)
+        node.forEachChild(() => undefined, copyListRange);
+      return node.getChildren(file);
+    };
+    // The reader caches scanned tokens by span on the supplied file. Keep a
+    // generated tree's tokens with their own parents, even at the same span.
+    const scanSource = (arg: unknown) => {
+      if (typeof arg !== 'object' || arg === null) return arg;
+      let source = views.get(arg);
+      if (!source) {
+        source = Object.create(arg, {
+          tokenCache: { writable: true },
+          childrenCache: { writable: true },
+        }) as object;
+        views.set(arg, source);
+      }
+      return source;
+    };
     const wrap = (value: unknown): unknown => {
       if (typeof value !== 'object' || value === null) return value;
       const old = views.get(value);
       if (old) return old;
       if (Array.isArray(value)) {
+        copyListRange(value);
         const list = wrapList(value, wrap);
         views.set(value, list);
         return list;
       }
-      if (!(value instanceof RemoteNode)) return value;
-      const original = origins?.[(value as unknown as { index: number }).index];
+      if (!('kind' in value && 'getSourceFile' in value)) return value;
+      const node = value as Node;
+      // The packet uses a RemoteSourceFile as its decoder, not as a syntax parent.
+      Object.defineProperty(node, 'getSourceFile', { value: getSourceFile });
+      const encoded = node instanceof RemoteNode;
+      const original = encoded
+        ? origins?.[(node as unknown as { index: number }).index]
+        : undefined;
       const proxy = syntaxView(
-        () => value,
+        () => node,
         (key) => {
           if (key === 'original') return this.nodeRef(original);
-          if (key === 'parent') return undefined;
-          if (key === 'getSourceFile')
-            return () => {
-              this.ensure();
-              return undefined;
-            };
+          if (key === 'parent') return encoded ? undefined : wrap(node.parent);
+          if (key === 'flags') {
+            const flags = this.syntaxMember(node, key) as number;
+            return encoded
+              ? flags | this.typescript.NodeFlags.Synthesized
+              : flags;
+          }
+          if (key === 'getSourceFile') return getSourceFile;
           if (key === 'forEachChild')
             return (
               cb: (n: unknown) => unknown,
               cbNodes?: (nodes: unknown) => unknown,
             ) => {
               this.ensure();
-              return value.forEachChild(
+              return node.forEachChild(
                 (n) => cb(wrap(n)),
                 cbNodes ? (nodes) => cbNodes(wrap(nodes)) : undefined,
               );
             };
-          const member = this.syntaxMember(value, key);
+          const member = this.syntaxMember(node, key);
           if (typeof member === 'function')
             return (...args: unknown[]) => {
               this.ensure();
               if (
-                value.kind > SyntaxKind.LastToken &&
-                (value.pos < 0 || value.end < 0) &&
-                typeof key === 'string' &&
-                sourcePositionMethods.has(key)
+                needsRealPosition(node.kind) &&
+                (node.pos < 0 || node.end < 0)
               )
                 throw new Error(
                   'Node must have a real position for this operation',
                 );
-              return wrap(Reflect.apply(member, value, args));
+              if (
+                key === 'getChildren' ||
+                key === 'getChildAt' ||
+                key === 'getChildCount' ||
+                key === 'getFirstToken' ||
+                key === 'getLastToken'
+              ) {
+                const file = scanSource(
+                  args[key === 'getChildAt' ? 1 : 0],
+                ) as Parameters<Node['getChildren']>[0];
+                if (key === 'getFirstToken' || key === 'getLastToken') {
+                  let current = node;
+                  while (current.kind > SyntaxKind.LastToken) {
+                    const children = childrenOf(current, file);
+                    const edge =
+                      key === 'getLastToken'
+                        ? children.at(-1)
+                        : children.find(
+                            (child) =>
+                              child.kind < SyntaxKind.FirstJSDocNode ||
+                              child.kind > SyntaxKind.LastJSDocNode,
+                          );
+                    if (!edge) return undefined;
+                    current = edge;
+                  }
+                  return current === node ? undefined : wrap(current);
+                }
+                const children = childrenOf(node, file);
+                if (key === 'getChildCount') return children.length;
+                return wrap(
+                  key === 'getChildAt' ? children[args[0] as number] : children,
+                );
+              }
+              return wrap(Reflect.apply(member, node, args));
             };
           return wrap(member);
         },
         this.ensure,
+        this.typescript.jsDocKinds,
       );
       this.generatedOrigins.set(proxy, original ?? null);
       views.set(value, proxy);
