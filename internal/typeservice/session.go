@@ -750,9 +750,8 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return Handle(s.symbolID(c.GetSymbolAtLocation(native))), nil
 		case "signature":
 			if native.Kind == ast.KindJSDocSignature {
-				native = boundJSDocDeclaration(native)
-				if native == nil {
-					return Handle(0), nil
+				if bound := boundJSDocDeclaration(native); bound != nil {
+					native = bound
 				}
 			}
 			return Handle(s.signatureID(c.GetSignatureFromDeclaration(native))), nil
@@ -1120,7 +1119,8 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return Handle(s.typeID(c.GetTypeOfSymbol(s.symbolByID(r.ID)))), nil
 		case "symbolRecord":
 			sym := s.symbolByID(r.ID)
-			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: appendNodes(sym.Declarations), valueNode: sym.ValueDeclaration}, nil
+			declarations, value := symbolDeclarations(sym)
+			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: declarations, valueNode: value}, nil
 		}
 	case *SymbolDocsRequest:
 		if !r.WithChecker {
@@ -1128,20 +1128,30 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 		symbol := s.symbolByID(r.ID)
 		active := map[*ast.Symbol]bool{symbol: true}
-		if r.Op == "symbolDocumentation" {
-			return documentation(c, symbol.Declarations, active), nil
+		declarations := symbol.Declarations
+		if slices.ContainsFunc(declarations, func(decl *ast.Node) bool { return decl.Flags&ast.NodeFlagsReparsed != 0 }) {
+			declarations, _ = symbolDeclarations(symbol)
+			for i, decl := range declarations {
+				declarations[i] = s.documentationDeclaration(decl)
+			}
 		}
-		return jsDocTags(c, symbol.Declarations, active), nil
+		if r.Op == "symbolDocumentation" {
+			return documentation(c, declarations, active), nil
+		}
+		return jsDocTags(c, declarations, active), nil
 	case *SignatureRequest:
 		switch r.Op {
 		case "typeArgumentsForResolvedSignature":
 			return OptionalHandles(s.typeIDs(resolvedSignatureTypeArguments(c, s.signatureByID(r.ID)))), nil
 		case "returnType":
 			return Handle(s.typeID(c.GetReturnTypeOfSignature(s.signatureByID(r.ID)))), nil
-		case "signatureDocumentation":
-			return documentation(c, []*ast.Node{s.signatureByID(r.ID).Declaration()}, make(map[*ast.Symbol]bool)), nil
-		case "signatureJSDocTags":
-			return jsDocTags(c, []*ast.Node{s.signatureByID(r.ID).Declaration()}, make(map[*ast.Symbol]bool)), nil
+		case "signatureDocumentation", "signatureJSDocTags":
+			declarations := []*ast.Node{s.documentationDeclaration(s.signatureByID(r.ID).Declaration())}
+			active := make(map[*ast.Symbol]bool)
+			if r.Op == "signatureDocumentation" {
+				return documentation(c, declarations, active), nil
+			}
+			return jsDocTags(c, declarations, active), nil
 		case "typePredicate":
 			predicate := c.GetTypePredicateOfSignature(s.signatureByID(r.ID))
 			if predicate == nil {
@@ -1211,7 +1221,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	case *SymbolTypeRequest:
 		return Handle(s.typeID(c.GetTypeOfSymbolAtLocation(s.symbolByID(r.ID), native))), nil
 	case *ResolveNameRequest:
-		return Handle(s.symbolID(c.ResolveName(string(r.Name), native, ast.SymbolFlags(r.Kind), r.ExcludeGlobals))), nil
+		return Handle(s.symbolID(resolveName(c, string(r.Name), native, ast.SymbolFlags(r.Kind), r.ExcludeGlobals))), nil
 	case *AssignableRequest:
 		return Boolean(c.IsTypeAssignableTo(s.typeByID(r.Source), s.typeByID(r.Target))), nil
 	case *IndexInfoRequest:
@@ -1225,7 +1235,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 		return IndexInfos{s.indexInfo(info)}, nil
 	case *ScopeSymbolsRequest:
-		return s.namedSymbols(c.GetSymbolsInScope(native, ast.SymbolFlags(r.Meaning))), nil
+		return s.namedSymbols(symbolsInScope(c, native, ast.SymbolFlags(r.Meaning))), nil
 	case *ParameterTypeRequest:
 		return Handle(s.typeID(c.GetTypeParameterAtPosition(s.signatureByID(r.ID), r.Position))), nil
 	case *PrintRequest:
@@ -1399,9 +1409,33 @@ func diagnosticFacts(diagnostics []*ast.Diagnostic) SuggestionDiagnostics {
 	return result
 }
 
-func appendNodes(nodes []*ast.Node) []*ast.Node {
-	if nodes == nil {
-		return nil
+func (s *Session) documentationDeclaration(decl *ast.Node) *ast.Node {
+	if decl != nil && decl.Flags&ast.NodeFlagsReparsed != 0 {
+		_, decl = syntaxReference(s.program, decl)
 	}
-	return append(make([]*ast.Node, 0, len(nodes)), nodes...)
+	return decl
+}
+
+func symbolDeclarations(symbol *ast.Symbol) ([]*ast.Node, *ast.Node) {
+	value := symbol.ValueDeclaration
+	if symbol.Declarations == nil {
+		return nil, value
+	}
+	declarations := make([]*ast.Node, 0, len(symbol.Declarations))
+	useImplementation := false
+	for _, decl := range symbol.Declarations {
+		// The JS parser inserts @overload signatures immediately before their
+		// implementation. The symbol exposes the implementation, even when
+		// the checker picked one of its overloads as the value declaration.
+		if decl.Flags&ast.NodeFlagsReparsed != 0 && (ast.IsFunctionDeclaration(decl) || ast.IsMethodDeclaration(decl) || ast.IsConstructorDeclaration(decl)) {
+			useImplementation = useImplementation || decl == value
+			continue
+		}
+		if useImplementation {
+			value = decl
+			useImplementation = false
+		}
+		declarations = append(declarations, decl)
+	}
+	return declarations, value
 }

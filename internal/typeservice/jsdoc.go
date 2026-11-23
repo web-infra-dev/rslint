@@ -2,6 +2,8 @@ package typeservice
 
 import (
 	"cmp"
+	"iter"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -216,19 +218,31 @@ var jsDocIndicesKey = ast.NewSourceFileDataKey[*jsDocIndices]()
 func fileJSDocIndices(file *ast.SourceFile, table *encoder.NodeIndexTable) *jsDocIndices {
 	return ast.GetOrComputeSourceFileData(file, jsDocIndicesKey, func(*ast.SourceFile) *jsDocIndices {
 		var indices jsDocIndices
-		inDoc := false
+		// The encoder also visits a shared comment on generated aliases. Keep
+		// its handles only when the comment is visited on its actual parent.
+		pending := make(map[*ast.Node]bool)
+		inDoc, authored := false, false
 		for i, n := range table.Nodes {
 			if n == nil {
 				continue
 			}
+			if n.Flags&ast.NodeFlagsHasJSDoc != 0 {
+				for _, doc := range n.JSDoc(file) {
+					if doc.Parent == n && doc.Flags&ast.NodeFlagsReparsed == 0 {
+						pending[doc] = true
+					}
+				}
+			}
 			if n.Kind == ast.KindJSDoc {
 				inDoc = n.Flags&ast.NodeFlagsReparsed == 0
+				authored = pending[n]
+				delete(pending, n)
 			} else if n.Flags&ast.NodeFlagsJSDoc == 0 {
 				inDoc = false
 			}
-			if inDoc {
+			if inDoc && authored {
 				indices.source = append(indices.source, uint32(i))
-			} else if n.Flags&ast.NodeFlagsReparsed != 0 {
+			} else if !inDoc && n.Flags&ast.NodeFlagsReparsed != 0 {
 				indices.bound = append(indices.bound, uint32(i))
 			}
 		}
@@ -261,7 +275,6 @@ func jsDocNodeIndex(node *ast.Node, file *ast.SourceFile, table *encoder.NodeInd
 	indices := fileJSDocIndices(file, table)
 	candidates := jsDocAtPosition(indices.source, table, jsDocLookupPos(node))
 	var match uint32
-	// The encoder emits shared comments on reparsed declarations before their source owner.
 	for i := len(candidates) - 1; i >= 0; i-- {
 		idx := candidates[i]
 		source := table.Nodes[idx]
@@ -288,6 +301,55 @@ func boundJSDocDeclaration(source *ast.Node) *ast.Node {
 		}
 	}
 	return nil
+}
+
+// tsgo binds JSDoc parameters on generated declarations. The authored nodes
+// retain the enclosing JS scope, including locals of the documented function.
+func jsDocLocalScopes(location *ast.Node) iter.Seq2[*ast.Node, ast.SymbolTable] {
+	return func(yield func(*ast.Node, ast.SymbolTable) bool) {
+		for n := location; n != nil && n.Flags&ast.NodeFlagsJSDoc != 0; n = n.Parent {
+			switch n.Kind {
+			case ast.KindJSDocSignature, ast.KindJSDocCallbackTag, ast.KindJSDocTypedefTag:
+				if bound := boundJSDocDeclaration(n); bound != nil && !yield(n, bound.Locals()) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func resolveName(c *checker.Checker, name string, location *ast.Node, meaning ast.SymbolFlags, excludeGlobals bool) *ast.Symbol {
+	for source, locals := range jsDocLocalScopes(location) {
+		if local := locals[name]; local != nil && local.CombinedLocalAndExportSymbolFlags()&meaning != 0 {
+			// Name resolution inside a parameter or return annotation sees
+			// type parameters. Value parameters are visible on the signature itself.
+			if source.Kind == ast.KindJSDocSignature && source != location && local.Flags&ast.SymbolFlagsVariable != 0 {
+				continue
+			}
+			return local
+		}
+	}
+	return c.ResolveName(name, location, meaning, excludeGlobals)
+}
+
+func symbolsInScope(c *checker.Checker, location *ast.Node, meaning ast.SymbolFlags) []*ast.Symbol {
+	symbols := c.GetSymbolsInScope(location, meaning)
+	var inner ast.SymbolTable
+	for _, locals := range jsDocLocalScopes(location) {
+		for name, sym := range locals {
+			if name != ast.InternalSymbolNameThis && sym.CombinedLocalAndExportSymbolFlags()&meaning != 0 && inner[name] == nil {
+				if inner == nil {
+					inner = make(ast.SymbolTable)
+				}
+				inner[name] = sym
+			}
+		}
+	}
+	if len(inner) > 0 {
+		symbols = slices.DeleteFunc(symbols, func(sym *ast.Symbol) bool { return inner[sym.Name] != nil })
+		symbols = slices.AppendSeq(symbols, maps.Values(inner))
+	}
+	return symbols
 }
 
 func isSourceJSDocNode(source, node *ast.Node) bool {

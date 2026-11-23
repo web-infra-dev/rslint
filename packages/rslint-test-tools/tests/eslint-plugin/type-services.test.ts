@@ -181,6 +181,26 @@ const cases: Case[] = [
     reports: 2,
   },
   {
+    name: 'unbound JavaScript method with a JSDoc overload',
+    plugin: typedPlugin,
+    rule: 'unbound-method',
+    js: true,
+    code: `
+      class Counter {
+        value = 0;
+        /** @overload
+         * @param {number} step
+         * @returns {number}
+         */
+        add(step) { return this.value + step; }
+      }
+      const counter = new Counter();
+      counter.add(1);
+      const detached = counter.add;
+    `,
+    reports: 1,
+  },
+  {
     name: 'returning an alias of polymorphic this',
     plugin: typedPlugin,
     rule: 'prefer-return-this-type',
