@@ -481,7 +481,7 @@ func inheritedDeclarations[T ~[]E, E any](c *checker.Checker, declarations []*as
 				continue
 			}
 			seen[symbol] = true
-			baseDeclarations, _ := symbolDeclarations(symbol, false)
+			baseDeclarations := symbolDeclarations(symbol, false)
 			if !accessor && tags && len(baseDeclarations) != 1 {
 				continue
 			}
@@ -661,10 +661,7 @@ func linkTarget(c *checker.Checker, name *ast.Node) *DisplayPartTarget {
 		return nil
 	}
 	symbol = c.SkipAlias(symbol)
-	declarations, declaration := symbolDeclarations(symbol, false)
-	if declaration == nil && len(declarations) != 0 {
-		declaration = declarations[0]
-	}
+	declaration := symbolTargetDeclaration(symbol)
 	if declaration == nil {
 		return nil
 	}

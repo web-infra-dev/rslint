@@ -1126,7 +1126,11 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "symbolRecord":
 			sym := s.symbolByID(r.ID)
 			// The record outlives the checker lease.
-			declarations, value := symbolDeclarations(sym, true)
+			declarations := symbolDeclarations(sym, true)
+			var value *ast.Node
+			if sym.ValueDeclaration != nil {
+				value = symbolTargetDeclaration(sym)
+			}
 			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: declarations, valueNode: value}, nil
 		}
 	case *SymbolDocsRequest:
@@ -1135,7 +1139,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 		symbol := s.symbolByID(r.ID)
 		active := map[*ast.Symbol]bool{symbol: true}
-		declarations, _ := symbolDeclarations(symbol, false)
+		declarations := symbolDeclarations(symbol, false)
 		if r.Op == "symbolDocumentation" {
 			return documentation(c, declarations, active), nil
 		}
@@ -1414,12 +1418,28 @@ func isJSDocOverloadDeclaration(decl *ast.Node) bool {
 	return decl.Flags&ast.NodeFlagsReparsed != 0 && (ast.IsFunctionDeclaration(decl) || ast.IsMethodDeclaration(decl) || ast.IsConstructorDeclaration(decl))
 }
 
-func symbolDeclarations(symbol *ast.Symbol, snapshot bool) ([]*ast.Node, *ast.Node) {
-	nodes := symbol.Declarations
+// Choose the authored value, or the first declaration for a type-only link.
+func symbolTargetDeclaration(symbol *ast.Symbol) *ast.Node {
 	value := symbol.ValueDeclaration
+	if value != nil && !isJSDocOverloadDeclaration(value) {
+		return value
+	}
+	afterValue := value == nil
+	for _, decl := range symbol.Declarations {
+		if afterValue && !isJSDocOverloadDeclaration(decl) {
+			return decl
+		}
+		if decl == value {
+			afterValue = true
+		}
+	}
+	return value
+}
+
+func symbolDeclarations(symbol *ast.Symbol, snapshot bool) []*ast.Node {
+	nodes := symbol.Declarations
 	var kept []*ast.Node
 	start := 0
-	useImplementation := false
 	// The JS parser inserts generated overloads immediately before their
 	// implementation. Usually all authored declarations form a single suffix.
 	for i, decl := range nodes {
@@ -1428,18 +1448,14 @@ func symbolDeclarations(symbol *ast.Symbol, snapshot bool) ([]*ast.Node, *ast.No
 				kept = append(kept, nodes[start:i]...)
 			}
 			start = i + 1
-			useImplementation = useImplementation || decl == value
-		} else if useImplementation {
-			value = decl
-			useImplementation = false
 		}
 	}
 	if kept != nil {
-		return append(kept, nodes[start:]...), value
+		return append(kept, nodes[start:]...)
 	}
 	declarations := nodes[start:]
 	if snapshot {
 		declarations = slices.Clone(declarations)
 	}
-	return declarations, value
+	return declarations
 }
