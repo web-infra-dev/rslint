@@ -205,45 +205,89 @@ func docTags(node *ast.Node) []*ast.Node {
 	return nil
 }
 
-// The encoder may visit the same JSDoc on a reparsed declaration and then on
-// its source owner. Only source comments need indexing, once per queried JS file.
-var jsDocIndicesKey = ast.NewSourceFileDataKey[[]uint32]()
+// tsgo binds reparsed declarations and encodes their authored JSDoc separately.
+// Keep their indices in the existing node table. Only a queried JS file needs them.
+type jsDocIndices struct {
+	source, bound []uint32
+}
 
-func jsDocNodeIndex(node *ast.Node, file *ast.SourceFile, table *encoder.NodeIndexTable) uint32 {
-	docs := ast.GetOrComputeSourceFileData(file, jsDocIndicesKey, func(*ast.SourceFile) []uint32 {
-		var indices []uint32
+var jsDocIndicesKey = ast.NewSourceFileDataKey[*jsDocIndices]()
+
+func fileJSDocIndices(file *ast.SourceFile, table *encoder.NodeIndexTable) *jsDocIndices {
+	return ast.GetOrComputeSourceFileData(file, jsDocIndicesKey, func(*ast.SourceFile) *jsDocIndices {
+		var indices jsDocIndices
+		inDoc := false
 		for i, n := range table.Nodes {
-			if n != nil && n.Kind == ast.KindJSDoc && n.Flags&ast.NodeFlagsReparsed == 0 {
-				indices = append(indices, uint32(i))
+			if n == nil {
+				continue
+			}
+			if n.Kind == ast.KindJSDoc {
+				inDoc = n.Flags&ast.NodeFlagsReparsed == 0
+			} else if n.Flags&ast.NodeFlagsJSDoc == 0 {
+				inDoc = false
+			}
+			if inDoc {
+				indices.source = append(indices.source, uint32(i))
+			} else if n.Flags&ast.NodeFlagsReparsed != 0 {
+				indices.bound = append(indices.bound, uint32(i))
 			}
 		}
-		slices.SortStableFunc(indices, func(i, j uint32) int { return cmp.Compare(table.Nodes[i].Pos(), table.Nodes[j].Pos()) })
-		return indices
+		order := func(i, j uint32) int {
+			return cmp.Compare(jsDocLookupPos(table.Nodes[i]), jsDocLookupPos(table.Nodes[j]))
+		}
+		slices.SortStableFunc(indices.source, order)
+		slices.SortStableFunc(indices.bound, order)
+		return &indices
 	})
-	next := sort.Search(len(docs), func(i int) bool { return table.Nodes[docs[i]].Pos() > node.Pos() })
-	if next == 0 {
-		return 0
+}
+
+func jsDocLookupPos(node *ast.Node) int {
+	if node.Kind == ast.KindJSDocSignature && node.Parent.Kind == ast.KindJSDocOverloadTag {
+		return node.Parent.TagName().Pos()
 	}
-	start := docs[next-1]
-	if node.Pos() > table.Nodes[start].End() {
-		return 0
+	return node.Pos()
+}
+
+func jsDocAtPosition(indices []uint32, table *encoder.NodeIndexTable, pos int) []uint32 {
+	end := sort.Search(len(indices), func(i int) bool { return jsDocLookupPos(table.Nodes[indices[i]]) > pos })
+	start := end
+	for start > 0 && jsDocLookupPos(table.Nodes[indices[start-1]]) == pos {
+		start--
 	}
+	return indices[start:end]
+}
+
+func jsDocNodeIndex(node *ast.Node, file *ast.SourceFile, table *encoder.NodeIndexTable) uint32 {
+	indices := fileJSDocIndices(file, table)
+	candidates := jsDocAtPosition(indices.source, table, jsDocLookupPos(node))
 	var match uint32
-	for i, source := range table.Nodes[start:] {
-		if source == nil {
-			continue
+	// The encoder emits shared comments on reparsed declarations before their source owner.
+	for i := len(candidates) - 1; i >= 0; i-- {
+		idx := candidates[i]
+		source := table.Nodes[idx]
+		if source == node || node.Flags&ast.NodeFlagsReparsed != 0 && isSourceJSDocNode(source, node) {
+			return idx
 		}
-		if i > 0 && (source.Kind == ast.KindJSDoc || source.Flags&ast.NodeFlagsJSDoc == 0) {
-			break
-		}
-		if source == node {
-			return start + uint32(i)
-		}
-		if match == 0 && isSourceJSDocNode(source, node) {
-			match = start + uint32(i)
+		// Descendants of a deep clone keep their source flags.
+		if match == 0 && source.Kind == node.Kind && source.Loc == node.Loc {
+			match = idx
 		}
 	}
 	return match
+}
+
+func boundJSDocDeclaration(source *ast.Node) *ast.Node {
+	if source.Flags&ast.NodeFlagsJavaScriptFile != 0 {
+		file := ast.GetSourceFileOfNode(source)
+		table := encoder.GetNodeIndexTable(file)
+		indices := fileJSDocIndices(file, table)
+		for _, idx := range jsDocAtPosition(indices.bound, table, jsDocLookupPos(source)) {
+			if node := table.Nodes[idx]; isSourceJSDocNode(source, node) {
+				return node
+			}
+		}
+	}
+	return nil
 }
 
 func isSourceJSDocNode(source, node *ast.Node) bool {

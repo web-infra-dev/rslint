@@ -735,6 +735,12 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "isImplementationOfOverload":
 			return overloadImplementation(c, native), nil
 		case "type":
+			switch native.Kind {
+			case ast.KindJSDocPropertyTag, ast.KindJSDocTypedefTag, ast.KindJSDocCallbackTag:
+				if bound := boundJSDocDeclaration(native); bound != nil {
+					native = bound
+				}
+			}
 			return Handle(s.typeID(c.GetTypeAtLocation(native))), nil
 		case "fromTypeNode":
 			return Handle(s.typeID(c.GetTypeFromTypeNode(native))), nil
@@ -743,6 +749,12 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "symbol":
 			return Handle(s.symbolID(c.GetSymbolAtLocation(native))), nil
 		case "signature":
+			if native.Kind == ast.KindJSDocSignature {
+				native = boundJSDocDeclaration(native)
+				if native == nil {
+					return Handle(0), nil
+				}
+			}
 			return Handle(s.signatureID(c.GetSignatureFromDeclaration(native))), nil
 		case "resolvedSignature":
 			if !ast.IsCallLikeExpression(native) {
