@@ -238,9 +238,19 @@ function syntaxMethod(key: string | symbol): SyntaxMethod {
   if (!method) {
     method = function (...args) {
       const read = this[readSyntax];
-      return read
-        ? read(key, this, args)
-        : Reflect.apply(Reflect.get(RemoteNode.prototype, key), this, args);
+      if (read) return read(key, this, args);
+      if (key === 'update') return unsupported('SourceFile.update');
+      const prototype: object | null = Object.getPrototypeOf(this);
+      const native: unknown =
+        (prototype && Reflect.get(prototype, key, this)) ??
+        Reflect.get(this, key);
+      return Reflect.apply(
+        typeof native === 'function' && native !== method
+          ? native
+          : Reflect.get(RemoteNode.prototype, key),
+        this,
+        args,
+      );
     };
     syntaxMethods.set(key, method);
   }
@@ -267,65 +277,62 @@ function syntaxView(
   read: ReadSyntax,
   ensure: () => void,
   jsDocKinds: JsDocKinds,
-  extendedSourceFiles?: string[],
+  target: object = {},
 ): object {
-  const proxy: object = new Proxy(
-    extendedSourceFiles ? { extendedSourceFiles } : {},
-    {
-      get(target, key, receiver) {
-        ensure();
-        if (key === readSyntax) return read;
-        // TypeScript helpers write node-local caches, such as modifier flags.
-        return key === 'extendedSourceFiles' || Reflect.has(target, key)
-          ? Reflect.get(target, key, receiver)
-          : read(key, proxy);
-      },
-      set(target, key, value, receiver) {
-        ensure();
-        // A write to a projected field creates an ordinary writable property.
-        if (receiver === proxy && !Reflect.has(target, key))
-          return Reflect.set(target, key, value);
-        return Reflect.set(target, key, value, receiver);
-      },
-      has(target, key) {
-        ensure();
-        if (key === 'extendedSourceFiles') return Reflect.has(target, key);
-        if (Reflect.has(target, key)) return true;
-        const node = load();
-        return (
-          syntaxFields(node, jsDocKinds).includes(String(key)) ||
-          (key === 'text' &&
-            (node.kind === SyntaxKind.Identifier ||
-              node.kind === SyntaxKind.PrivateIdentifier)) ||
-          typeof Reflect.get(node, key) === 'function'
-        );
-      },
-      ownKeys(target) {
-        ensure();
-        return [
-          ...new Set([
-            ...syntaxFields(load(), jsDocKinds),
-            ...Reflect.ownKeys(target),
-          ]),
-        ];
-      },
-      getOwnPropertyDescriptor(target, key) {
-        ensure();
-        return (
-          Reflect.getOwnPropertyDescriptor(target, key) ??
-          (key !== 'extendedSourceFiles' &&
-          syntaxFields(load(), jsDocKinds).includes(String(key))
-            ? {
-                configurable: true,
-                enumerable: true,
-                writable: true,
-                value: read(key, proxy),
-              }
-            : undefined)
-        );
-      },
+  const proxy: object = new Proxy(target, {
+    get(target, key, receiver) {
+      ensure();
+      if (key === readSyntax) return read;
+      // TypeScript helpers write node-local caches, such as modifier flags.
+      return key === 'extendedSourceFiles' || Reflect.has(target, key)
+        ? Reflect.get(target, key, receiver)
+        : read(key, proxy);
     },
-  );
+    set(target, key, value, receiver) {
+      ensure();
+      // A write to a projected field creates an ordinary writable property.
+      if (receiver === proxy && !Reflect.has(target, key))
+        return Reflect.set(target, key, value);
+      return Reflect.set(target, key, value, receiver);
+    },
+    has(target, key) {
+      ensure();
+      if (key === 'extendedSourceFiles') return Reflect.has(target, key);
+      if (Reflect.has(target, key)) return true;
+      const node = load();
+      return (
+        syntaxFields(node, jsDocKinds).includes(String(key)) ||
+        (key === 'text' &&
+          (node.kind === SyntaxKind.Identifier ||
+            node.kind === SyntaxKind.PrivateIdentifier)) ||
+        typeof Reflect.get(node, key) === 'function'
+      );
+    },
+    ownKeys(target) {
+      ensure();
+      return [
+        ...new Set([
+          ...syntaxFields(load(), jsDocKinds),
+          ...Reflect.ownKeys(target),
+        ]),
+      ];
+    },
+    getOwnPropertyDescriptor(target, key) {
+      ensure();
+      return (
+        Reflect.getOwnPropertyDescriptor(target, key) ??
+        (key !== 'extendedSourceFiles' &&
+        syntaxFields(load(), jsDocKinds).includes(String(key))
+          ? {
+              configurable: true,
+              enumerable: true,
+              writable: true,
+              value: read(key, proxy),
+            }
+          : undefined)
+      );
+    },
+  });
   return proxy;
 }
 
@@ -770,14 +777,16 @@ export class GenerationSyntaxViews {
   private wrapRef(identity: SyntaxRef, cacheKey: string): object {
     const old = this.wrapped.get(cacheKey);
     if (old) return old;
+    const extendedSourceFiles =
+      !('owner' in identity) && identity.index === 1 && identity.config
+        ? this.configs.get(identity.config)?.extendedSourceFiles
+        : undefined;
     const proxy = syntaxView(
       () => this.rawSyntax(identity),
       (key, proxy, args) => this.get(identity, key, proxy, args),
       this.ensure,
       this.typescript.jsDocKinds,
-      !('owner' in identity) && identity.index === 1 && identity.config
-        ? this.configs.get(identity.config)?.extendedSourceFiles
-        : undefined,
+      extendedSourceFiles ? { extendedSourceFiles } : undefined,
     );
     this.identities.set(proxy, identity);
     this.wrapped.set(cacheKey, proxy);
@@ -870,9 +879,9 @@ export class GenerationSyntaxViews {
   ): unknown {
     const position = positionMethod(key);
     if (position) {
-      if (key === 'getFullStart' || key === 'getEnd' || key === 'getFullWidth')
-        return args ? Reflect.apply(position, proxy, args) : position;
       if (!args) return syntaxMethod(key);
+      if (key === 'getFullStart' || key === 'getEnd' || key === 'getFullWidth')
+        return Reflect.apply(position, proxy, args);
       if (!this.identities.has(proxy))
         return Reflect.apply(position, proxy, args);
       const source = this.identities.get(args[0] as object);
@@ -1184,9 +1193,9 @@ export class GenerationSyntaxViews {
     );
     reader.nodes[1] = root;
     const views = new WeakMap<object, object>();
-    const getSourceFile = () => {
-      this.ensure();
-      return undefined;
+    const getSourceFile = function (this: Node) {
+      const view = views.get(this) as ts.Node;
+      return view.parent?.getSourceFile();
     };
     // The reader uses these caches for recursive navigation. Generated tokens
     // need their own parents even when their spans match tokens in the file.
@@ -1213,8 +1222,13 @@ export class GenerationSyntaxViews {
       }
       if (!('kind' in value && 'getSourceFile' in value)) return value;
       const node = value as Node;
-      // The packet uses a RemoteSourceFile as its decoder, not as a syntax parent.
-      Object.defineProperty(node, 'getSourceFile', { value: getSourceFile });
+      // The reader and the projected node share the range written by ts.setTextRange.
+      const range = { pos: node.pos, end: node.end };
+      Object.defineProperties(node, {
+        pos: { get: () => range.pos },
+        end: { get: () => range.end },
+        getSourceFile: { value: getSourceFile },
+      });
       const encoded = node instanceof RemoteNode;
       const original = encoded
         ? origins?.[(node as unknown as { index: number }).index]
@@ -1238,17 +1252,19 @@ export class GenerationSyntaxViews {
               : flags;
           }
           if (key === 'getSourceFile')
-            return args ? undefined : syntaxMethod(key);
+            return args
+              ? (proxy as ts.Node).parent?.getSourceFile()
+              : syntaxMethod(key);
           if (key === 'forEachChild')
             return args
               ? forEachSyntaxChild(node, wrap, args)
               : syntaxMethod(key);
           const member = this.syntaxMember(node, key);
           if (typeof member === 'function') {
+            if (!args) return syntaxMethod(key);
             const position = positionMethod(key);
             if (position && !needsRealPosition(node.kind))
-              return args ? Reflect.apply(position, proxy, args) : position;
-            if (!args) return syntaxMethod(key);
+              return Reflect.apply(position, proxy, args);
             if (needsRealPosition(node.kind) && (node.pos < 0 || node.end < 0))
               throw new Error(
                 'Node must have a real position for this operation',
@@ -1264,6 +1280,7 @@ export class GenerationSyntaxViews {
         },
         this.ensure,
         this.typescript.jsDocKinds,
+        range,
       );
       this.generated.add(proxy);
       views.set(value, proxy);
@@ -1308,7 +1325,7 @@ export class FileSyntaxViews {
     ESTreeNode,
     number | { firstTokenOf: number }
   >();
-  private reverse = new Map<number, number>();
+  private reverse?: TypeServiceProjection['reverse'];
   private readonly aliases = new Map<
     number,
     | NonNullable<TypeServiceProjection['aliases']>[number]
@@ -1331,7 +1348,7 @@ export class FileSyntaxViews {
   close(): void {
     this.closed = true;
     this.forward = new WeakMap();
-    this.reverse.clear();
+    this.reverse = undefined;
     this.aliases.clear();
     this.materializedAliases.clear();
     this.sequenceMembers.clear();
@@ -1376,12 +1393,7 @@ export class FileSyntaxViews {
       projection.firstTokens ?? {},
     ))
       this.forward.set(frame.nodes[Number(id)]!, { firstTokenOf });
-    this.reverse = new Map(
-      Object.entries(projection.reverse).map(([index, id]) => [
-        Number(index),
-        id,
-      ]),
-    );
+    this.reverse = { ...projection.reverse };
     for (const alias of projection.aliases ?? []) {
       this.aliases.set(alias.index, alias);
       if (this.sequenceMembers.has(alias.sequence)) continue;
@@ -1418,7 +1430,7 @@ export class FileSyntaxViews {
       if (!ref || ref.config || ref.file !== this.binding.sourceFileName)
         return undefined;
       const index = ref.index;
-      const id = this.reverse.get(index);
+      const id = this.reverse?.[index];
       if (id) return this.nodes![id];
       const info = this.aliases.get(index);
       if (!info) return undefined;
@@ -1461,7 +1473,7 @@ export class FileSyntaxViews {
       if (!ref || ref.config || ref.file !== this.binding.sourceFileName)
         return false;
       const index = ref.index;
-      return this.reverse.has(index) || this.aliases.has(index);
+      return this.reverse?.[index] !== undefined || this.aliases.has(index);
     },
   };
 }

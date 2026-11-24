@@ -1240,7 +1240,7 @@ export class TypeServiceClient {
             }),
           ),
         getShorthandAssignmentValueSymbol: (n) =>
-          n && this.symbol(nodeHandle('shorthandValueSymbol', n)),
+          this.symbol(nodeHandle('shorthandValueSymbol', n)),
         getTypeOfSymbol: (s) =>
           this.type(
             this.query({

@@ -708,13 +708,13 @@ func (p *estreeProjector) convertStatement(node *ast.Node) uint32 {
 		return 0
 	}
 	id := p.convert(node, false)
-	if id == 0 || !p.hasModifier(node, ast.ModifierFlagsExport) {
+	if id == 0 || node.Kind == ast.KindModuleDeclaration || !p.hasModifier(node, ast.ModifierFlagsExport) {
 		return id
 	}
-	return p.wrapExport(node, id)
+	return p.wrapExport(node, node, id)
 }
 
-func (p *estreeProjector) wrapExport(node *ast.Node, declaration uint32) uint32 {
+func (p *estreeProjector) wrapExport(node, origin *ast.Node, declaration uint32) uint32 {
 	// The wrapper owns export/default; the declaration begins at its own syntax.
 	start := p.tokenStart(node)
 	if modifiers := node.Modifiers(); modifiers != nil {
@@ -733,9 +733,9 @@ func (p *estreeProjector) wrapExport(node *ast.Node, declaration uint32) uint32 
 	}
 	var result uint32
 	if p.hasModifier(node, ast.ModifierFlagsDefault) {
-		result = p.addNode("ExportDefaultDeclaration", node, nodeValue(declaration), p.stringValue("value"))
+		result = p.addNode("ExportDefaultDeclaration", origin, nodeValue(declaration), p.stringValue("value"))
 	} else {
-		result = p.addNode("ExportNamedDeclaration", node, p.listValue(nil), nodeValue(declaration), p.stringValue(kind), nullValue(), p.listValue(nil))
+		result = p.addNode("ExportNamedDeclaration", origin, p.listValue(nil), nodeValue(declaration), p.stringValue(kind), nullValue(), p.listValue(nil))
 	}
 	for _, modifier := range node.Modifiers().Nodes {
 		if modifier.Kind == ast.KindExportKeyword {
@@ -1615,17 +1615,22 @@ func (p *estreeProjector) convertModuleDeclaration(node *ast.Node) uint32 {
 	} else {
 		name = p.convert(n.Name(), false)
 	}
-	body := n.Body
+	inner := n
 	declare := p.hasModifier(node, ast.ModifierFlagsAmbient)
 	// Dotted namespaces have one ESTree declaration and a qualified id.
-	for body != nil && body.Kind == ast.KindModuleDeclaration {
-		nested := body.AsModuleDeclaration()
-		right := p.convertNode(nested.Name(), false)
-		name = p.addWithOrigin("TSQualifiedName", nested.Name(), p.nodes[name-1].start, p.nodes[right-1].end, nodeValue(name), nodeValue(right))
-		declare = declare || p.hasModifier(body, ast.ModifierFlagsAmbient)
-		body = nested.Body
+	for inner.Body != nil && inner.Body.Kind == ast.KindModuleDeclaration {
+		inner = inner.Body.AsModuleDeclaration()
+		right := p.convertNode(inner.Name(), false)
+		name = p.addWithOrigin("TSQualifiedName", inner.Name(), p.nodes[name-1].start, p.nodes[right-1].end, nodeValue(name), nodeValue(right))
+		declare = declare || p.hasModifier(inner.AsNode(), ast.ModifierFlagsAmbient)
 	}
-	return p.addNode("TSModuleDeclaration", node, nodeValue(p.convert(body, false)), boolValue(declare), boolValue(global), nodeValue(name), p.stringValue(kind))
+	declaration := p.addNode("TSModuleDeclaration", node, nodeValue(p.convert(inner.Body, false)), boolValue(declare), boolValue(global), nodeValue(name), p.stringValue(kind))
+	if p.hasModifier(node, ast.ModifierFlagsExport) {
+		// typescript-estree fixes exports on the last segment after building the declaration from the first.
+		p.registerReverse(inner.AsNode(), declaration)
+		return p.wrapExport(node, inner.AsNode(), declaration)
+	}
+	return declaration
 }
 
 func (p *estreeProjector) convertJsxName(node *ast.Node) uint32 {
