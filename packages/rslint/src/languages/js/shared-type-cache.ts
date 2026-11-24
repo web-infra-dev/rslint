@@ -8,15 +8,6 @@ const HEADER = 8,
   SLOT = 4;
 export const MIN_SHARED_TYPE_CACHE_BYTES = (HEADER + SLOT) * 4;
 const MAX_SHARED_TYPE_PROBES = 64;
-function keyBytes(key: string): Uint8Array {
-  const bytes = new Uint8Array(key.length * 2);
-  for (let i = 0; i < key.length; i++) {
-    const unit = key.charCodeAt(i);
-    bytes[i * 2] = unit & 255;
-    bytes[i * 2 + 1] = unit >>> 8;
-  }
-  return bytes;
-}
 function hash(bytes: Uint8Array): number {
   let value = 2166136261;
   for (const byte of bytes) value = Math.imul(value ^ byte, 16777619);
@@ -68,7 +59,7 @@ export class SharedTypeCacheReader {
   }
   get(key: string): Uint8Array | undefined {
     const { descriptor, control, bytes } = this.open();
-    const encoded = keyBytes(key),
+    const encoded = Buffer.from(key, 'utf16le'),
       value = hash(encoded);
     for (
       let step = 0;
@@ -144,7 +135,7 @@ export class SharedTypeCacheOwner {
   }
   publish(key: string, packet: Uint8Array): boolean {
     const { descriptor, control, bytes } = this.open();
-    const encoded = keyBytes(key),
+    const encoded = Buffer.from(key, 'utf16le'),
       value = hash(encoded);
     let available = -1;
     for (

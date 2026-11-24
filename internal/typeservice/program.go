@@ -193,7 +193,7 @@ func registerConfig(p *program.Program, source *ast.SourceFile) *configSourceInf
 
 type referenceConfig struct {
 	*configSourceInfo
-	Options             map[string]any        `json:"options"`
+	Options             compilerOptionsJSON   `json:"options"`
 	FileNames           []string              `json:"fileNames"`
 	ProjectReferences   []projectReference    `json:"projectReferences,omitempty"`
 	References          []int                 `json:"references,omitempty"`
@@ -225,11 +225,7 @@ func resolvedReferences(p *program.Program) (Result, error) {
 		if id := seen[c]; id != 0 {
 			return id, nil
 		}
-		options, err := compilerOptions(c)
-		if err != nil {
-			return 0, err
-		}
-		fact := &referenceConfig{configSourceInfo: configSource(p, c), Options: options, FileNames: slices.Concat([]string{}, c.FileNames()), ProjectReferences: projectReferences(c), Raw: c.Raw, CompileOnSave: c.CompileOnSave, WatchOptions: c.ParsedConfig.WatchOptions, TypeAcquisition: c.TypeAcquisition()}
+		fact := &referenceConfig{configSourceInfo: configSource(p, c), Options: compilerOptions(c), FileNames: slices.Concat([]string{}, c.FileNames()), ProjectReferences: projectReferences(c), Raw: c.Raw, CompileOnSave: c.CompileOnSave, WatchOptions: c.ParsedConfig.WatchOptions, TypeAcquisition: c.TypeAcquisition()}
 		dirs := c.WildcardDirectories()
 		fact.WildcardDirectories = make(map[string]uint8, len(dirs))
 		for path, recursive := range dirs {
@@ -244,10 +240,11 @@ func resolvedReferences(p *program.Program) (Result, error) {
 		id := len(graph.Configs)
 		seen[c] = id
 		if len(c.Errors) != 0 {
-			fact.Diagnostics, err = EncodePacket(diagnosticFacts(p, c.Errors))
+			data, err := EncodePacket(diagnosticFacts(p, c.Errors))
 			if err != nil {
 				return 0, err
 			}
+			fact.Diagnostics = data
 		}
 		for _, child := range c.ResolvedProjectReferencePaths() {
 			target := q.ResolvedProjectReference(tspath.ToPath(child, p.CurrentDirectory(), p.FS().UseCaseSensitiveFileNames()))

@@ -22,17 +22,15 @@ const invalid = (): never => {
 /** Offset-addressed fields stay lazy. Only this disposable reader owns bytes;
  * semantic wrappers may retain decoded values, never a reader or byte view. */
 export class TypePacketReader {
-  private bytes: Uint8Array | undefined;
-  private view: DataView | undefined;
+  private bytes: Buffer | undefined;
   private readonly strings = new Map<number, string>();
   readonly kind: number;
   constructor(bytes: Uint8Array) {
-    this.bytes = bytes;
-    this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    this.bytes = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
     this.kind = this.word(4);
     const words = [
-      0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 1, 1, 3, 1, 1, 21, 5,
+      0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 2, 1, 3, 1, 1, 21, 4,
     ][this.kind];
     if (!words || bytes.length < 8 + words * 4) invalid();
   }
@@ -41,35 +39,28 @@ export class TypePacketReader {
   }
   close(): void {
     this.bytes = undefined;
-    this.view = undefined;
     this.strings.clear();
   }
   private word(offset: number): number {
-    const view = this.view;
-    if (!view) throw new Error('type packet reader is closed');
-    if (offset < 0 || offset + 4 > view.byteLength) return invalid();
-    return view.getUint32(offset, true);
+    const bytes = this.bytes;
+    if (!bytes) throw new Error('type packet reader is closed');
+    if (offset < 0 || offset + 4 > bytes.length) return invalid();
+    return bytes.readUInt32LE(offset);
   }
   private text(offset: number): string {
     const old = this.strings.get(offset);
     if (old !== undefined) return old;
-    const size = this.word(offset),
-      view = this.view!;
-    if (offset + 4 + size * 2 > view.byteLength) return invalid();
-    const chunks: string[] = [];
-    for (let i = 0; i < size; i += 4096) {
-      const units: number[] = [];
-      for (let j = i; j < Math.min(size, i + 4096); j++)
-        units.push(view.getUint16(offset + 4 + j * 2, true));
-      chunks.push(String.fromCharCode(...units));
-    }
-    const value = chunks.join('');
+    const size = this.word(offset);
+    const start = offset + 4;
+    const end = start + size * 2;
+    if (end > this.bytes!.length) return invalid();
+    const value = this.bytes!.toString('utf16le', start, end);
     this.strings.set(offset, value);
     return value;
   }
   private ids(offset: number): number[] {
     const size = this.word(offset);
-    if (offset + 4 + size * 4 > this.view!.byteLength) return invalid();
+    if (offset + 4 + size * 4 > this.bytes!.length) return invalid();
     return Array.from({ length: size }, (_, i) =>
       this.word(offset + 4 + i * 4),
     );
@@ -90,7 +81,7 @@ export class TypePacketReader {
     if (this.kind !== 8) return invalid();
     const at = this.word(8),
       count = this.word(at);
-    if (at + 4 + count * 28 > this.view!.byteLength) return invalid();
+    if (at + 4 + count * 28 > this.bytes!.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
       const pos = at + 4 + i * 28,
         text = this.word(pos + 20);
@@ -163,8 +154,8 @@ export class TypePacketReader {
         if (tag === 0) value = undefined;
         else if (tag === 1) value = this.text(at);
         else if (tag === 2) {
-          if (at + 8 > this.view!.byteLength) return invalid();
-          value = this.view!.getFloat64(at, true);
+          if (at + 8 > this.bytes!.length) return invalid();
+          value = this.bytes!.readDoubleLE(at);
         } else if (tag === 3)
           value = {
             negative: this.word(at) !== 0,
@@ -213,7 +204,7 @@ export class TypePacketReader {
         if (!at) value = undefined;
         else {
           const size = this.word(at);
-          if (at + 4 + size * 8 > this.view!.byteLength) return invalid();
+          if (at + 4 + size * 8 > this.bytes!.length) return invalid();
           value = Array.from({ length: size }, (_, i) =>
             this.node(at + 4 + i * 8)!,
           );
@@ -247,22 +238,18 @@ export class TypePacketReader {
     }
     return value as SignatureFact[K];
   }
-  private indexInfos(at: number, idOffset: number): readonly IndexInfoFact[] {
+  private indexInfos(at: number): readonly IndexInfoFact[] {
     const count = this.word(at);
-    const ids = idOffset ? this.ids(idOffset) : undefined;
-    if (ids && ids.length !== count) return invalid();
-    if (at + 4 + count * 20 > this.view!.byteLength) return invalid();
+    if (at + 4 + count * 24 > this.bytes!.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
-      const pos = at + 4 + i * 20;
+      const pos = at + 4 + i * 24;
       return {
-        id: ids?.[i],
-        keyType: this.word(pos),
-        type: this.word(pos + 4),
-        isReadonly: this.word(pos + 8) !== 0,
-        declaration: this.node(this.word(pos + 12)),
-        components: this.word(pos + 16)
-          ? this.ids(this.word(pos + 16)).map((at) => this.node(at)!)
-          : undefined,
+        id: this.word(pos),
+        keyType: this.word(pos + 4),
+        type: this.word(pos + 8),
+        isReadonly: this.word(pos + 12) !== 0,
+        declaration: this.node(this.word(pos + 16)),
+        components: this.optionalIDs(pos + 20)?.map((at) => this.node(at)!),
       };
     });
   }
@@ -281,7 +268,7 @@ export class TypePacketReader {
   private namedSymbols(): readonly NamedSymbolFact[] {
     const at = this.word(8),
       count = this.word(at);
-    if (at + 4 + count * 8 > this.view!.byteLength) return invalid();
+    if (at + 4 + count * 8 > this.bytes!.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
       const pos = at + 4 + i * 8;
       return { id: this.word(pos), name: this.text(this.word(pos + 4)) };
@@ -290,7 +277,7 @@ export class TypePacketReader {
   private displayParts(at: number): SymbolDisplayPart[] {
     if (!at) return [];
     const count = this.word(at);
-    if (at + 4 + count * 12 > this.view!.byteLength) return invalid();
+    if (at + 4 + count * 12 > this.bytes!.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
       const pos = at + 4 + i * 12,
         part = {
@@ -315,7 +302,7 @@ export class TypePacketReader {
   private jsDocTags(): JSDocTagInfo[] {
     const at = this.word(8),
       count = this.word(at);
-    if (at + 4 + count * 8 > this.view!.byteLength) return invalid();
+    if (at + 4 + count * 8 > this.bytes!.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
       const pos = at + 4 + i * 8,
         text = this.word(pos + 4);
@@ -331,7 +318,7 @@ export class TypePacketReader {
   ): DiagnosticFact[] {
     if (!at) return [];
     const count = this.word(at);
-    if (at + 4 + count * 40 > this.view!.byteLength) return invalid();
+    if (at + 4 + count * 40 > this.bytes!.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
       const pos = at + 4 + i * 40;
       const file = this.word(pos),
@@ -385,11 +372,7 @@ export class TypePacketReader {
         value = this.ids(this.word(8));
         break;
       case 9:
-        // Earlier packets point straight past the single offset at byte 8.
-        value = this.indexInfos(
-          this.word(8),
-          this.word(8) === 12 ? 0 : this.word(12),
-        );
+        value = this.indexInfos(this.word(8));
         break;
       case 10:
         value = this.typePredicate();
@@ -423,7 +406,7 @@ export class TypePacketReader {
             value = this.text(this.word(12));
             break;
           case 2:
-            value = this.view!.getFloat64(12, true);
+            value = this.bytes!.readDoubleLE(12);
             break;
           default:
             return invalid();
@@ -435,7 +418,7 @@ export class TypePacketReader {
               properties: this.ids(this.word(8)),
               calls: this.ids(this.word(12)),
               constructs: this.ids(this.word(16)),
-              indices: this.indexInfos(this.word(20), this.word(24)),
+              indices: this.indexInfos(this.word(20)),
             }
           : undefined;
         break;

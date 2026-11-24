@@ -378,10 +378,8 @@ func resolveName(c *checker.Checker, name string, location *ast.Node, meaning as
 
 func symbolsInScope(c *checker.Checker, location *ast.Node, meaning ast.SymbolFlags) []*ast.Symbol {
 	symbols := c.GetSymbolsInScope(location, meaning)
-	var docScopes []ast.SymbolTable
 	var inner ast.SymbolTable
 	for _, locals := range jsDocLocalScopes(location, false) {
-		docScopes = append(docScopes, locals)
 		for name, sym := range locals {
 			if visibleJSDocLocal(sym, meaning) && inner[name] == nil {
 				if inner == nil {
@@ -395,14 +393,7 @@ func symbolsInScope(c *checker.Checker, location *ast.Node, meaning ast.SymbolFl
 		symbols = slices.DeleteFunc(symbols, func(sym *ast.Symbol) bool { return inner[sym.Name] != nil })
 		symbols = slices.AppendSeq(symbols, maps.Values(inner))
 	}
-	if len(symbols) > 1 {
-		order := newSymbolOrder(symbols)
-		for _, locals := range docScopes {
-			order.table(locals)
-		}
-		order.scopes(c, location, meaning)
-		order.sort(c, symbols)
-	}
+	slices.SortFunc(symbols, c.CompareSymbols)
 	return symbols
 }
 

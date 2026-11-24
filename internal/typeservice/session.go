@@ -81,7 +81,7 @@ type Descriptor struct {
 	Generation       uint32            `json:"generation"`
 	Checker          uint32            `json:"checker"`
 	CurrentDirectory string            `json:"currentDirectory"`
-	CompilerOptions  map[string]any    `json:"compilerOptions"`
+	CompilerOptions  json.RawMessage   `json:"compilerOptions"`
 	ConfigFile       *configSourceInfo `json:"configFile,omitempty"`
 	Sources          []Source          `json:"sources"`
 }
@@ -195,7 +195,7 @@ func (s *Session) SyntaxDescriptor(file *ast.SourceFile) (Descriptor, error) {
 	return d, nil
 }
 func (s *Session) syntaxDescriptor() Descriptor {
-	return Descriptor{SyntaxOnly: true, Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: map[string]any{}}
+	return Descriptor{SyntaxOnly: true, Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: json.RawMessage("{}")}
 }
 func syntaxSource(f *ast.SourceFile) Source {
 	return Source{FileName: f.FileName(), Path: string(f.Path()), IsDeclarationFile: f.IsDeclarationFile}
@@ -216,7 +216,7 @@ func (s *Session) Descriptor() (Descriptor, error) {
 		return d, nil
 	}
 	commandLine := s.program.CompilerQueries().CommandLine()
-	options, err := compilerOptions(commandLine)
+	options, err := json.Marshal(compilerOptions(commandLine))
 	if err != nil {
 		return Descriptor{}, err
 	}
@@ -226,31 +226,29 @@ func (s *Session) Descriptor() (Descriptor, error) {
 	}
 	return d, nil
 }
-func compilerOptions(c *tsoptions.ParsedCommandLine) (map[string]any, error) {
+
+// Embed the native options so nested maps such as paths retain their key order.
+type compilerOptionsJSON struct {
+	*core.CompilerOptions
+	JSX             string `json:"jsx,omitempty"`
+	ModuleDetection string `json:"moduleDetection,omitempty"`
+	NewLine         *int   `json:"newLine,omitempty"`
+	Plugins         []any  `json:"plugins,omitzero"`
+}
+
+func compilerOptions(c *tsoptions.ParsedCommandLine) compilerOptionsJSON {
 	opts := c.CompilerOptions()
-	// The compiler's JSON contract preserves explicit false and omitted values.
-	data, err := json.Marshal(opts)
-	if err != nil {
-		return nil, err
+	options := compilerOptionsJSON{
+		CompilerOptions: opts,
+		JSX:             map[core.JsxEmit]string{core.JsxEmitPreserve: "Preserve", core.JsxEmitReact: "React", core.JsxEmitReactNative: "ReactNative", core.JsxEmitReactJSX: "ReactJSX", core.JsxEmitReactJSXDev: "ReactJSXDev"}[opts.Jsx],
+		ModuleDetection: map[core.ModuleDetectionKind]string{core.ModuleDetectionKindAuto: "Auto", core.ModuleDetectionKindLegacy: "Legacy", core.ModuleDetectionKindForce: "Force"}[opts.ModuleDetection],
+		Plugins:         configPlugins(c.Raw),
 	}
-	options := map[string]any{}
-	if err = json.Unmarshal(data, &options); err != nil {
-		return nil, err
-	}
-	if plugins := configPlugins(c.Raw); plugins != nil {
-		options["plugins"] = plugins
-	}
-	// These compiler enums differ from TypeScript's JavaScript enum layout.
 	if opts.NewLine != core.NewLineKindNone {
-		options["newLine"] = int(opts.NewLine) - 1
+		value := int(opts.NewLine) - 1
+		options.NewLine = &value
 	}
-	if opts.Jsx != core.JsxEmitNone {
-		options["jsx"] = map[core.JsxEmit]string{core.JsxEmitPreserve: "Preserve", core.JsxEmitReact: "React", core.JsxEmitReactNative: "ReactNative", core.JsxEmitReactJSX: "ReactJSX", core.JsxEmitReactJSXDev: "ReactJSXDev"}[opts.Jsx]
-	}
-	if opts.ModuleDetection != core.ModuleDetectionKindNone {
-		options["moduleDetection"] = map[core.ModuleDetectionKind]string{core.ModuleDetectionKindAuto: "Auto", core.ModuleDetectionKindLegacy: "Legacy", core.ModuleDetectionKindForce: "Force"}[opts.ModuleDetection]
-	}
-	return options, nil
+	return options
 }
 
 type jsonObject = collections.OrderedMap[string, any]
@@ -374,7 +372,8 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 			continue
 		}
 		if queries[start].Request.operation() == "nodeRecord" {
-			results[start] = nodeFacts(p, natives[start].primary)
+			ref := requestNode(queries[start].Request)
+			results[start] = nodeFacts(sourceForNode(p, ref), ref.Config, natives[start].primary)
 			start++
 			continue
 		}
@@ -578,19 +577,22 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 
 // Only the requested declaration's ancestors and declaration names are copied.
 // Descendant syntax stays demand-loaded through the immutable source transport.
-func nodeFacts(p *program.Program, node *ast.Node) NodeFacts {
+func nodeFacts(file *ast.SourceFile, config string, node *ast.Node) NodeFacts {
 	facts := NodeFacts{}
 	seen := map[*ast.Node]bool{}
+	table := encoder.GetNodeIndexTable(file)
+	reference := func(n *ast.Node) *NodeRef { return indexedNodeReference(file, table, config, n) }
 	add := func(n *ast.Node) *ast.Node {
 		if n == nil {
 			return nil
 		}
-		ref, n := syntaxReference(p, n)
+		ref := reference(n)
+		n = table.Nodes[ref.Index]
 		if seen[n] {
 			return n
 		}
 		seen[n] = true
-		fact := NodeFact{Node: *ref, Kind: strings.TrimPrefix(n.Kind.String(), "Kind"), Flags: uint32(n.Flags), Parent: nodeReference(p, syntaxParent(n))}
+		fact := NodeFact{Node: *ref, Kind: strings.TrimPrefix(n.Kind.String(), "Kind"), Flags: uint32(n.Flags), Parent: reference(syntaxParent(n))}
 		if n.Flags&ast.NodeFlagsPossiblyContainsDeprecatedTag != 0 && ast.GetJSDocDeprecatedTag(n) == nil {
 			fact.Flags &^= uint32(ast.NodeFlagsPossiblyContainsDeprecatedTag)
 		}
@@ -604,7 +606,7 @@ func nodeFacts(p *program.Program, node *ast.Node) NodeFacts {
 			text := n.Text()
 			fact.Text = &text
 		}
-		fact.Name = nodeReference(p, syntaxName(n))
+		fact.Name = reference(syntaxName(n))
 		facts = append(facts, fact)
 		return n
 	}
@@ -640,13 +642,8 @@ func syntaxName(node *ast.Node) *ast.Node {
 }
 
 func nodeReference(p *program.Program, n *ast.Node) *NodeRef {
-	ref, _ := syntaxReference(p, n)
-	return ref
-}
-
-func syntaxReference(p *program.Program, n *ast.Node) (*NodeRef, *ast.Node) {
 	if n == nil {
-		return nil, nil
+		return nil
 	}
 	f := ast.GetSourceFileOfNode(n)
 	var config string
@@ -659,7 +656,13 @@ func syntaxReference(p *program.Program, n *ast.Node) (*NodeRef, *ast.Node) {
 			panic("declaration is outside Program")
 		}
 	}
-	table := encoder.GetNodeIndexTable(f)
+	return indexedNodeReference(f, encoder.GetNodeIndexTable(f), config, n)
+}
+
+func indexedNodeReference(f *ast.SourceFile, table *encoder.NodeIndexTable, config string, n *ast.Node) *NodeRef {
+	if n == nil {
+		return nil
+	}
 	index := uint32(0)
 	if n.Flags&ast.NodeFlagsJavaScriptFile != 0 && n.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0 {
 		index = jsDocNodeIndex(n, f, table)
@@ -670,7 +673,7 @@ func syntaxReference(p *program.Program, n *ast.Node) (*NodeRef, *ast.Node) {
 	if index == 0 {
 		panic("declaration has no compiler node handle")
 	}
-	return &NodeRef{File: f.FileName(), Index: index, Config: config}, table.Nodes[index]
+	return &NodeRef{File: f.FileName(), Index: index, Config: config}
 }
 func (s *Session) typeByID(id uint32) *checker.Type {
 	t := s.types[id]
@@ -869,8 +872,8 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 					late = append(late, member)
 				}
 			}
-			checker.Checker_sortSymbols(c, siblings)
-			checker.Checker_sortSymbols(c, late)
+			slices.SortFunc(siblings, c.CompareSymbols)
+			slices.SortFunc(late, c.CompareSymbols)
 			siblings = append(siblings, late...)
 		} else {
 			for _, id := range r.Siblings {
@@ -1150,7 +1153,9 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "isUnknownSymbol":
 			return Boolean(c.IsUnknownSymbol(s.symbolByID(r.ID))), nil
 		case "exportsOfModule":
-			return s.namedSymbols(moduleExports(c, s.symbolByID(r.ID))), nil
+			exports := c.GetExportsOfModule(s.symbolByID(r.ID))
+			slices.SortFunc(exports, c.CompareSymbols)
+			return s.namedSymbols(exports), nil
 		case "fullyQualifiedName":
 			return Text(c.GetFullyQualifiedName(s.symbolByID(r.ID))), nil
 		case "symbolLinkType":
@@ -1165,7 +1170,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				table = globalExports(symbol)
 			}
 			members := slices.Collect(maps.Values(table))
-			symbolOrder{}.sort(c, members)
+			slices.SortFunc(members, c.CompareSymbols)
 			result := make(NamedSymbols, len(members))
 			for i, member := range members {
 				result[i] = NamedSymbol{ID: s.symbolID(member), Name: ast.EscapeSymbolName(member.Name)}
@@ -1274,7 +1279,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return Handle(s.typeID(checker.Checker_regularFalseType(c))), nil
 		case "ambientModules":
 			modules := slices.Clone(c.GetAmbientModules())
-			checker.Checker_sortSymbols(c, modules)
+			slices.SortFunc(modules, c.CompareSymbols)
 			return s.namedSymbols(modules), nil
 		}
 	case *VoidRequest:

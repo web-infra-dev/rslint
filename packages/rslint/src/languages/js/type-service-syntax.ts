@@ -220,9 +220,51 @@ function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
   return fields;
 }
 
+type ReadSyntax = (
+  key: string | symbol,
+  proxy: object,
+  args?: unknown[],
+) => unknown;
+const readSyntax = Symbol();
+type SyntaxMethod = (
+  this: { [readSyntax]?: ReadSyntax },
+  ...args: unknown[]
+) => unknown;
+const syntaxMethods = new Map<PropertyKey, SyntaxMethod>();
+
+// Navigation uses the receiving view's source, including when a rule borrows a method.
+function syntaxMethod(key: string | symbol): SyntaxMethod {
+  let method = syntaxMethods.get(key);
+  if (!method) {
+    method = function (...args) {
+      const read = this[readSyntax];
+      return read
+        ? read(key, this, args)
+        : Reflect.apply(Reflect.get(RemoteNode.prototype, key), this, args);
+    };
+    syntaxMethods.set(key, method);
+  }
+  return method;
+}
+
+function positionMethod(key: string | symbol) {
+  switch (key) {
+    case 'getText':
+    case 'getFullText':
+    case 'getFullStart':
+    case 'getEnd':
+    case 'getWidth':
+    case 'getFullWidth':
+    case 'getLeadingTriviaWidth':
+      return Reflect.get(RemoteNode.prototype, key);
+    default:
+      return undefined;
+  }
+}
+
 function syntaxView(
   load: () => Node,
-  read: (key: string | symbol, proxy: object) => unknown,
+  read: ReadSyntax,
   ensure: () => void,
   jsDocKinds: JsDocKinds,
   extendedSourceFiles?: string[],
@@ -232,6 +274,7 @@ function syntaxView(
     {
       get(target, key, receiver) {
         ensure();
+        if (key === readSyntax) return read;
         // TypeScript helpers write node-local caches, such as modifier flags.
         return key === 'extendedSourceFiles' || Reflect.has(target, key)
           ? Reflect.get(target, key, receiver)
@@ -318,9 +361,12 @@ function jsDocComment(node: Node) {
 function forEachSyntaxChild(
   node: Node,
   wrap: (item: unknown) => unknown,
-  cb: (node: unknown) => unknown,
-  cbNodes?: (nodes: unknown) => unknown,
+  args: unknown[],
 ): unknown {
+  const [cb, cbNodes] = args as [
+    (node: unknown) => unknown,
+    ((nodes: unknown) => unknown)?,
+  ];
   const visit = (child: Node | readonly Node[], callback = cb) => {
     const visible = wrap(child);
     return visible === undefined ? undefined : callback(visible);
@@ -660,17 +706,17 @@ export class GenerationSyntaxViews {
       : child.getChildAt(ref.listChild);
   }
   private summary(ref: NodeRef): NodeFact {
-    const key = this.key(ref),
-      cached = this.summaries.get(key);
+    const requestedKey = this.key(ref),
+      cached = this.summaries.get(requestedKey);
     if (cached) {
-      this.summaries.delete(key);
-      this.summaries.set(key, cached);
+      this.summaries.delete(requestedKey);
+      this.summaries.set(requestedKey, cached);
       return cached.fact;
     }
     let result: NodeFact | undefined;
     for (const fact of this.readNodes(ref)) {
       const key = this.key(fact.node);
-      if (key === this.key(ref)) result = fact;
+      if (key === requestedKey) result = fact;
       if (this.summaries.has(key)) continue;
       const bytes =
         64 +
@@ -726,7 +772,7 @@ export class GenerationSyntaxViews {
     if (old) return old;
     const proxy = syntaxView(
       () => this.rawSyntax(identity),
-      (key, proxy) => this.get(identity, key, proxy),
+      (key, proxy, args) => this.get(identity, key, proxy, args),
       this.ensure,
       this.typescript.jsDocKinds,
       !('owner' in identity) && identity.index === 1 && identity.config
@@ -816,17 +862,32 @@ export class GenerationSyntaxViews {
       return this.wrapNode(value as Node);
     return value;
   }
-  private get(ref: SyntaxRef, key: string | symbol, proxy: object): unknown {
+  private get(
+    ref: SyntaxRef,
+    key: string | symbol,
+    proxy: object,
+    args?: unknown[],
+  ): unknown {
+    const position = positionMethod(key);
+    if (position) {
+      if (key === 'getFullStart' || key === 'getEnd' || key === 'getFullWidth')
+        return args ? Reflect.apply(position, proxy, args) : position;
+      if (!args) return syntaxMethod(key);
+      if (!this.identities.has(proxy))
+        return Reflect.apply(position, proxy, args);
+      const source = this.identities.get(args[0] as object);
+      if (source) args[0] = this.rawSyntax(source);
+      return Reflect.apply(position, this.rawSyntax(ref), args);
+    }
     const real = 'owner' in ref ? undefined : ref,
       owner = 'owner' in ref ? ref.owner : ref,
       { file, config } = owner;
-    if (key === 'getSourceFile')
-      return () => {
-        this.ensure();
-        return config
-          ? this.nodeRef({ file, index: 1, config })
-          : this.sourceView(file);
-      };
+    if (key === 'getSourceFile') {
+      if (!args) return syntaxMethod(key);
+      return config
+        ? this.nodeRef({ file, index: 1, config })
+        : this.sourceView(file);
+    }
     if (real?.index === 1) {
       const source = config
         ? this.configs.get(config)!
@@ -870,21 +931,23 @@ export class GenerationSyntaxViews {
           ? targets.LatestStandard
           : target;
       }
-      if (key === 'update') return () => unsupported('SourceFile.update');
-      if (key === 'getLineEndOfPosition')
-        return (position: number) => {
-          this.ensure();
-          const sourceFile = this.source(file, config)!;
-          const { line } = sourceFile.getLineAndCharacterOfPosition(position);
-          const starts = sourceFile.getLineStarts();
-          const end =
-            (line + 1 >= starts.length && sourceFile.getEnd()) ||
-            starts[line + 1] - 1;
-          return sourceFile.text[end] === '\n' &&
-            sourceFile.text[end - 1] === '\r'
-            ? end - 1
-            : end;
-        };
+      if (key === 'update')
+        return args ? unsupported('SourceFile.update') : syntaxMethod(key);
+      if (key === 'getLineEndOfPosition') {
+        if (!args) return syntaxMethod(key);
+        const sourceFile = this.source(file, config)!;
+        const { line } = sourceFile.getLineAndCharacterOfPosition(
+          args[0] as number,
+        );
+        const starts = sourceFile.getLineStarts();
+        const end =
+          (line + 1 >= starts.length && sourceFile.getEnd()) ||
+          starts[line + 1] - 1;
+        return sourceFile.text[end] === '\n' &&
+          sourceFile.text[end - 1] === '\r'
+          ? end - 1
+          : end;
+      }
       if (key === 'kind') return this.typescript.SyntaxKind.SourceFile;
       if (key === 'parent') return undefined;
     }
@@ -923,46 +986,39 @@ export class GenerationSyntaxViews {
       )
         return fact.text?.startsWith('__') ? `_${fact.text}` : fact.text;
     }
-    if (key === 'forEachChild')
-      return (
-        cb: (node: unknown) => unknown,
-        cbNodes?: (nodes: unknown) => unknown,
-      ) => {
-        this.ensure();
-        return forEachSyntaxChild(
-          this.rawSyntax(ref),
-          (item) => this.wrap(item),
-          cb,
-          cbNodes,
-        );
-      };
-    if (key === 'getChildren')
-      return (sourceFile?: object) => {
-        this.checkSource(file, sourceFile);
-        return this.childNodes(ref, proxy);
-      };
-    if (key === 'getChildAt')
-      return (index: number, sourceFile?: object) => {
-        this.checkSource(file, sourceFile);
+    if (key === 'forEachChild') {
+      if (!args) return syntaxMethod(key);
+      return forEachSyntaxChild(
+        this.rawSyntax(ref),
+        (item) => this.wrap(item),
+        args,
+      );
+    }
+    if (tokenNavigation.has(key)) {
+      if (!args) return syntaxMethod(key);
+      this.checkSource(
+        file,
+        args[key === 'getChildAt' ? 1 : 0] as object | undefined,
+      );
+      if (key === 'getChildren') return this.childNodes(ref, proxy);
+      if (key === 'getChildAt') {
+        const index = args[0] as number;
         const children = this.children.get(proxy);
         if (children) return children[index];
         const child = this.rawSyntax(ref).getChildAt(index);
         return child && this.wrapNode(child);
-      };
-    if (key === 'getChildCount')
-      return (sourceFile?: object) => {
-        this.checkSource(file, sourceFile);
+      }
+      if (key === 'getChildCount')
         return (
           this.children.get(proxy)?.length ??
           this.rawSyntax(ref).getChildCount()
         );
-      };
-    if (key === 'getFirstToken' || key === 'getLastToken')
-      return (sourceFile?: object) => {
-        this.checkSource(file, sourceFile);
-        const token = this.rawSyntax(ref)[key]();
-        return token && this.wrapNode(token);
-      };
+      const token =
+        key === 'getFirstToken'
+          ? this.rawSyntax(ref).getFirstToken()
+          : this.rawSyntax(ref).getLastToken();
+      return token && this.wrapNode(token);
+    }
     if ('owner' in ref) {
       if (key === 'parent') return this.nodeRef(ref.owner);
       if (key === 'flags') {
@@ -988,24 +1044,22 @@ export class GenerationSyntaxViews {
     if (key === 'children' && raw.kind === SyntaxKind.SyntaxList)
       return this.childNodes(ref, proxy);
     const member = this.syntaxMember(raw, key);
-    if (typeof member === 'function')
-      return (...args: unknown[]) => {
-        this.ensure();
-        const current = this.rawSyntax(ref);
-        return this.wrap(
-          Reflect.apply(
-            member,
-            current,
-            args.map((arg) => {
-              const identity =
-                typeof arg === 'object' && arg !== null
-                  ? this.identities.get(arg)
-                  : undefined;
-              return identity ? this.rawSyntax(identity) : arg;
-            }),
-          ),
-        );
-      };
+    if (typeof member === 'function') {
+      if (!args) return syntaxMethod(key);
+      return this.wrap(
+        Reflect.apply(
+          member,
+          raw,
+          args.map((arg) => {
+            const identity =
+              typeof arg === 'object' && arg !== null
+                ? this.identities.get(arg)
+                : undefined;
+            return identity ? this.rawSyntax(identity) : arg;
+          }),
+        ),
+      );
+    }
     const value = this.wrap(member);
     if (Array.isArray(value))
       Object.defineProperty(proxy, key, {
@@ -1167,7 +1221,7 @@ export class GenerationSyntaxViews {
         : undefined;
       const proxy = syntaxView(
         () => node,
-        (key) => {
+        (key, proxy, args) => {
           if (key === 'original') return this.nodeRef(original);
           if (
             key === 'hasExtendedUnicodeEscape' &&
@@ -1183,33 +1237,29 @@ export class GenerationSyntaxViews {
               ? flags | this.typescript.NodeFlags.Synthesized
               : flags;
           }
-          if (key === 'getSourceFile') return getSourceFile;
+          if (key === 'getSourceFile')
+            return args ? undefined : syntaxMethod(key);
           if (key === 'forEachChild')
-            return (
-              cb: (n: unknown) => unknown,
-              cbNodes?: (nodes: unknown) => unknown,
-            ) => {
-              this.ensure();
-              return forEachSyntaxChild(node, wrap, cb, cbNodes);
-            };
+            return args
+              ? forEachSyntaxChild(node, wrap, args)
+              : syntaxMethod(key);
           const member = this.syntaxMember(node, key);
-          if (typeof member === 'function')
-            return (...args: unknown[]) => {
-              this.ensure();
-              if (
-                needsRealPosition(node.kind) &&
-                (node.pos < 0 || node.end < 0)
-              )
-                throw new Error(
-                  'Node must have a real position for this operation',
-                );
-              if (tokenNavigation.has(key)) {
-                const index = key === 'getChildAt' ? 1 : 0;
-                if (args[index] !== undefined)
-                  args[index] = scanSource(args[index]);
-              }
-              return wrap(Reflect.apply(member, node, args));
-            };
+          if (typeof member === 'function') {
+            const position = positionMethod(key);
+            if (position && !needsRealPosition(node.kind))
+              return args ? Reflect.apply(position, proxy, args) : position;
+            if (!args) return syntaxMethod(key);
+            if (needsRealPosition(node.kind) && (node.pos < 0 || node.end < 0))
+              throw new Error(
+                'Node must have a real position for this operation',
+              );
+            if (tokenNavigation.has(key)) {
+              const index = key === 'getChildAt' ? 1 : 0;
+              if (args[index] !== undefined)
+                args[index] = scanSource(args[index]);
+            }
+            return wrap(Reflect.apply(member, node, args));
+          }
           return wrap(member);
         },
         this.ensure,
@@ -1232,7 +1282,6 @@ export class GenerationSyntaxViews {
     return children;
   }
   private checkSource(file: string, sourceFile: object | undefined): void {
-    this.ensure();
     if (sourceFile !== undefined) {
       const ref = this.locationOrUndefined(sourceFile);
       if (ref?.file !== file || ref.index !== 1)

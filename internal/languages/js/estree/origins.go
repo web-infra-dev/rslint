@@ -34,10 +34,8 @@ type ChainAlias struct {
 type originProjection struct {
 	OriginTables
 	table        *encoder.NodeIndexTable
-	nodes        []*ast.Node
-	reverse      map[*ast.Node]uint32
 	chainRecord  uint32
-	chainReverse []*ast.Node
+	chainReverse []uint32
 	originsOnly  bool
 }
 
@@ -56,23 +54,4 @@ func (b *Builder) ProjectOrigins(ctx context.Context, file *ast.SourceFile, opti
 		return OriginTables{}, err
 	}
 	return mapping.OriginTables, nil
-}
-
-func (m *originProjection) finish() {
-	// Projected IDs start at one. Synthetic nodes have no compiler index.
-	m.Origins = make([]uint32, len(m.nodes)+1)
-	for i, node := range m.nodes {
-		if node != nil {
-			m.Origins[i+1] = m.table.GetIndex(node)
-		}
-	}
-	m.Reverse = make(map[uint32]uint32, len(m.reverse))
-	for node, id := range m.reverse {
-		if id == detachedChainReverse {
-			continue
-		}
-		if index := m.table.GetIndex(node); index != 0 {
-			m.Reverse[index] = id
-		}
-	}
 }

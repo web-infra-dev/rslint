@@ -41,7 +41,6 @@
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",
       "getTemplateTypeFromMappedType",
-      "sortSymbols",
       "getNamedMembers",
       "getNodeBuilder",
       "getAugmentedPropertiesOfType",
@@ -117,11 +116,7 @@
     "ValueSymbolLinks": ["resolvedType"]
   },
   "ExtraFieldPointers": {
-    "Checker": [
-      "apparentArgumentCount",
-      "serializationLevel",
-      "valueSymbolLinks.store"
-    ],
+    "Checker": ["apparentArgumentCount", "valueSymbolLinks.store"],
     "CachedTypeKey": ["kind", "typeId"],
     "IndexInfo": ["keyType", "valueType", "isReadonly", "declaration"]
   }

@@ -448,6 +448,7 @@ objectbindingpattern
 objectliteralexpression
 Occitan
 omitempty
+omitzero
 onblur
 onchange
 onclick

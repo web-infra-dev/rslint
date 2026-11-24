@@ -664,8 +664,14 @@ function normResult(result: ReturnType<typeof lintFile>, code: string) {
 }
 
 describe('original npm typed rules over Go type services', () => {
+  let host: Host;
+  beforeAll(() => {
+    host = new Host();
+  });
+  afterAll(() => host.close());
+
   for (const c of cases)
-    test(c.name, async () => {
+    test(c.name, () => {
       // Keep fixtures below the workspace so both compilers resolve the exact
       // installed npm declarations, without copying or faking library types.
       const directory = mkdtempSync(
@@ -694,7 +700,6 @@ describe('original npm typed rules over Go type services', () => {
           include: [`*.${extension}`],
         }),
       );
-      const host = new Host();
       try {
         const descriptor = host.request({
           method: 'init',
@@ -760,7 +765,6 @@ describe('original npm typed rules over Go type services', () => {
           client.close();
         }
       } finally {
-        await host.close();
         rmSync(directory, { recursive: true, force: true });
       }
     });
@@ -1938,10 +1942,12 @@ test('public checker, Program and source reads match TypeScript', async () => {
               .map((s) => s.name),
             local: c.getExportSpecifierLocalTargetSymbol(exportSpec)?.name,
             exp: c.tryGetMemberInModuleExports('alias', fileSymbol)?.name,
-            rawExports: [...(fileSymbol.exports?.keys() ?? [])],
+            // The native checker and TypeScript 6 enumerate symbol tables in different orders.
+            rawExports: [...(fileSymbol.exports?.keys() ?? [])].sort(),
             exports: c
               .getExportsOfModule(fileSymbol)
-              .map((symbol) => symbol.name),
+              .map((symbol) => symbol.name)
+              .sort(),
             indices: c
               .getIndexInfosOfIndexSymbol(indexSymbol)
               .map((i) => format(i.type)),

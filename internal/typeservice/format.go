@@ -19,11 +19,6 @@ func typeToString(c *checker.Checker, typ *checker.Type, enclosing *ast.Node, fl
 	}
 	builder, release := checker.Checker_getNodeBuilder(c)
 	defer release()
-	// Building a node can report diagnostics that recursively format types.
-	// Count this outer call in the native checker's recursion guard.
-	level := checker.Checker_serializationLevelPtr(c)
-	*level++
-	defer func() { *level-- }()
 	node := builder.TypeToTypeNode(typ, enclosing, builderFlags, nodebuilder.InternalFlagsNone, nil)
 	writer := printer.NewTextWriter("", 0)
 	options := printer.PrinterOptions{RemoveComments: typ != checker.Checker_unresolvedType(c)}
@@ -91,12 +86,13 @@ func printDisplay(node, enclosing *ast.Node, flags checker.TypeFormatFlags, opti
 
 func (w *displayWriter) WriteStringLiteral(text string) {
 	if n := w.literal; n != nil {
+		annotation, returned := displayLiteralContext(w.context.ParseNode(n))
 		quote := printer.QuoteCharDoubleQuote
-		if w.bindingDepth == 0 && w.singleQuotes && n.AsStringLiteral().TokenFlags&ast.TokenFlagsSingleQuote != 0 {
+		if w.bindingDepth == 0 && !returned && w.singleQuotes && n.AsStringLiteral().TokenFlags&ast.TokenFlagsSingleQuote != 0 {
 			quote = printer.QuoteCharSingleQuote
 		}
 		escape := printer.EscapeNonAsciiString
-		if w.bindingDepth != 0 || (w.context.EmitFlags(n)&printer.EFNoAsciiEscaping != 0 && !reusedDisplayLiteral(w.context.ParseNode(n))) {
+		if w.bindingDepth != 0 || (w.context.EmitFlags(n)&printer.EFNoAsciiEscaping != 0 && !annotation && !returned) {
 			escape = printer.EscapeString
 		}
 		text = string(quote) + escape(n.Text(), quote) + string(quote)
@@ -107,16 +103,16 @@ func (w *displayWriter) WriteStringLiteral(text string) {
 // TypeScript reuses the spelling policy of annotations and expressions that
 // directly supply a return type. Literals inferred inside a composite type
 // are synthesized with NoAsciiEscaping.
-func reusedDisplayLiteral(source *ast.Node) bool {
+func displayLiteralContext(source *ast.Node) (annotation, returned bool) {
 	if source == nil || source.Parent == nil {
-		return false
+		return false, false
 	}
 	parent := source.Parent
 	if ast.IsLiteralTypeNode(parent) || ast.IsTypeElement(parent) {
-		return true
+		return true, false
 	}
 	for parent != nil && ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions) && parent.Expression() == source {
 		source, parent = parent, parent.Parent
 	}
-	return parent != nil && (ast.IsReturnStatement(parent) || ast.IsArrowFunction(parent) && parent.Body() == source)
+	return false, parent != nil && (ast.IsReturnStatement(parent) || ast.IsArrowFunction(parent) && parent.Body() == source)
 }

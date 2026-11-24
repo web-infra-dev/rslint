@@ -489,14 +489,7 @@ export function guarded<T extends object>(object: T, ensure: () => void): T {
   const proxy: T = new Proxy(object, {
     get(target, key, receiver) {
       ensure();
-      if (key === serviceView) return proxy;
-      const value: unknown = Reflect.get(target, key, receiver);
-      return typeof value === 'function'
-        ? (...args: unknown[]) => {
-            ensure();
-            return Reflect.apply(value, receiver, args);
-          }
-        : value;
+      return key === serviceView ? proxy : Reflect.get(target, key, receiver);
     },
   });
   return proxy;
@@ -739,6 +732,7 @@ export class TypeServiceClient {
       this.shared.descriptor.generation !== descriptor.generation
     )
       throw new Error('foreign shared type cache');
+    const ensure = this.ensure.bind(this);
     this.syntax = new GenerationSyntaxViews(
       typescript,
       descriptor,
@@ -747,9 +741,7 @@ export class TypeServiceClient {
         this.read({ op: 'nodeRecord', args: { node } }, (packet) =>
           packet.nodeFacts(),
         ),
-      () => {
-        this.ensure();
-      },
+      ensure,
       options.maxSyntaxBytes ?? 16 << 20,
       options.maxSyntaxFactsBytes ?? 1 << 20,
       (config) => this.query({ op: 'configSyntax', args: { config } }).tree,
@@ -1139,6 +1131,7 @@ export class TypeServiceClient {
           return diagnostics.map((d) => this.diagnostic(d));
         },
         runWithCancellationToken: (token, cb) => {
+          ensure();
           token.throwIfCancellationRequested();
           const previous = this.cancellation;
           this.cancellation = token;
@@ -1362,15 +1355,15 @@ export class TypeServiceClient {
             }),
           ),
       },
-      () => {
-        this.ensure();
-      },
+      ensure,
     );
-    const ensure = this.ensure.bind(this);
     this.typePrototype = makeTypePrototype(this.checker, typescript, ensure);
     this.program = guarded<ProgramView>(
       {
-        getTypeChecker: () => this.checker,
+        getTypeChecker: () => {
+          ensure();
+          return this.checker;
+        },
         getCompilerOptions: memo(ensure, () => {
           const config = descriptor.configFile;
           return readCompilerOptions(
@@ -1379,9 +1372,13 @@ export class TypeServiceClient {
             config && this.syntax.configSource(config),
           );
         }),
-        getCurrentDirectory: () => descriptor.currentDirectory,
+        getCurrentDirectory: () => {
+          ensure();
+          return descriptor.currentDirectory;
+        },
         emit: () => {
-          throw new Error('unsupported TypeScript operation: Program.emit');
+          ensure();
+          return unsupported('Program.emit');
         },
         getSourceFileByPath: (path) => this.syntax.sourceByPath(path),
         getConfigFileParsingDiagnostics: memo(ensure, () =>
@@ -1476,9 +1473,7 @@ export class TypeServiceClient {
         isSourceFileDefaultLibrary: (source) =>
           this.syntax.metadata(source).defaultLibrary,
       },
-      () => {
-        this.ensure();
-      },
+      ensure,
     );
   }
   private resolvedReferences():
@@ -1605,11 +1600,7 @@ export class TypeServiceClient {
         this.syntax.isStableNodeQuery(query.op, query.args.node)
       )
     ) {
-      const reader = this.ingest(
-        query,
-        this.transport!(query, key, false),
-        false,
-      );
+      const reader = this.ingest(query, this.transport!(query, key, false));
       try {
         return read(reader);
       } finally {
@@ -1622,7 +1613,11 @@ export class TypeServiceClient {
       this.facts.set(key, reader);
     } else {
       const shared = this.shared?.get(key);
-      reader = this.ingest(query, shared ?? this.transport!(query, key, true));
+      reader = this.ingest(
+        query,
+        shared ?? this.transport!(query, key, true),
+        key,
+      );
     }
     try {
       return read(reader);
@@ -1633,24 +1628,24 @@ export class TypeServiceClient {
   private store(key: string, bytes: Uint8Array): TypePacketReader {
     const existing = this.facts.get(key);
     if (existing) return existing;
+    if (bytes.byteLength > this.maxFactsBytes)
+      return new TypePacketReader(bytes);
     const reader = new TypePacketReader(Uint8Array.from(bytes));
-    if (reader.retainedBytes <= this.maxFactsBytes) {
-      while (this.factBytes + reader.retainedBytes > this.maxFactsBytes) {
-        const oldest = this.facts.keys().next().value!,
-          evicted = this.facts.get(oldest)!;
-        this.factBytes -= evicted.retainedBytes;
-        evicted.close();
-        this.facts.delete(oldest);
-      }
-      this.facts.set(key, reader);
-      this.factBytes += reader.retainedBytes;
+    while (this.factBytes + reader.retainedBytes > this.maxFactsBytes) {
+      const oldest = this.facts.keys().next().value!,
+        evicted = this.facts.get(oldest)!;
+      this.factBytes -= evicted.retainedBytes;
+      evicted.close();
+      this.facts.delete(oldest);
     }
+    this.facts.set(key, reader);
+    this.factBytes += reader.retainedBytes;
     return reader;
   }
   private ingest(
     query: TypeServiceQuery,
     bytes: Uint8Array,
-    retain = true,
+    cacheKey?: string,
   ): TypePacketReader {
     const reply = typeReplyPackets(bytes);
     for (const record of reply.records) {
@@ -1662,9 +1657,9 @@ export class TypeServiceClient {
       const reader = this.store(key, record.packet);
       if (this.facts.get(key) !== reader) reader.close();
     }
-    return retain
-      ? this.store(typeQueryKey(query), reply.packet)
-      : new TypePacketReader(reply.packet);
+    return cacheKey === undefined
+      ? new TypePacketReader(reply.packet)
+      : this.store(cacheKey, reply.packet);
   }
   /** Merge known misses only. Cache hits, including negative answers, never
    * cross the bridge. The scalar API remains the authoritative fallback. */
@@ -1683,7 +1678,7 @@ export class TypeServiceClient {
       if (this.facts.has(key) || missing.has(key)) continue;
       const shared = this.shared?.get(key);
       if (shared) {
-        const reader = this.ingest(query, shared);
+        const reader = this.ingest(query, shared, key);
         if (this.facts.get(key) !== reader) reader.close();
       } else missing.set(key, query);
     }
@@ -1696,7 +1691,7 @@ export class TypeServiceClient {
       if (packets.length !== batch.length)
         throw new Error('incomplete type service batch');
       packets.forEach((packet, index) => {
-        const reader = this.ingest(queries[index], packet);
+        const reader = this.ingest(queries[index], packet, keys[index]);
         if (this.facts.get(keys[index]) !== reader) reader.close();
       });
     }
@@ -2363,6 +2358,7 @@ export class TypeServiceClient {
         this.syntax.nodeRef(this.symbolField(id, 'valueDeclaration')),
       );
       const withChecker = (checker: CheckerView | undefined): boolean => {
+        ensure();
         if (checker !== undefined && checker !== this.checker)
           throw new Error('foreign type service checker');
         return checker !== undefined;

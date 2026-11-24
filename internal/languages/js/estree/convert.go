@@ -28,11 +28,17 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 }
 
 func (p *estreeProjector) registerReverse(node *ast.Node, id uint32) {
-	if p.mapping != nil && node != nil && id != 0 && p.mapping.reverse[node] == 0 {
-		p.mapping.reverse[node] = id
-		if id == p.mapping.chainRecord {
-			p.mapping.chainReverse = append(p.mapping.chainReverse, node)
-		}
+	m := p.mapping
+	if m == nil || node == nil || id == 0 {
+		return
+	}
+	index := m.table.GetIndex(node)
+	if index == 0 || m.Reverse[index] != 0 {
+		return
+	}
+	m.Reverse[index] = id
+	if id == m.chainRecord {
+		m.chainReverse = append(m.chainReverse, index)
 	}
 }
 
@@ -276,11 +282,10 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 		n := node.AsMetaProperty()
 		start, _ := p.rangeOf(node)
 		keyword := scanner.TokenToString(n.KeywordToken)
-		meta := p.add("Identifier", start, start+uint32(len(keyword)),
+		meta := p.addWithOrigin("Identifier", nil, start, start+uint32(len(keyword)),
 			p.listValue(nil), p.stringValue(keyword), boolValue(false), undefinedValue())
 		if p.mapping != nil {
 			// The parser maps this identifier to the MetaProperty's first token.
-			p.mapping.nodes[meta-1] = nil
 			if p.mapping.FirstTokens == nil {
 				p.mapping.FirstTokens = make(map[uint32]uint32)
 			}
@@ -413,11 +418,8 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 			nodeValue(p.convert(imported, false)), p.stringValue(kind), nodeValue(p.convert(n.Name(), false)))
 	case ast.KindImportClause:
 		name := node.AsImportClause().Name()
-		id := p.addNode("ImportDefaultSpecifier", name, nodeValue(p.convert(name, false)))
-		if p.mapping != nil {
-			p.mapping.nodes[id-1] = node
-		}
-		return id
+		start, end := p.rangeOf(name)
+		return p.addWithOrigin("ImportDefaultSpecifier", node, start, end, nodeValue(p.convert(name, false)))
 	case ast.KindImportAttribute:
 		n := node.AsImportAttribute()
 		return p.addNode("ImportAttribute", node,
@@ -1619,10 +1621,7 @@ func (p *estreeProjector) convertModuleDeclaration(node *ast.Node) uint32 {
 	for body != nil && body.Kind == ast.KindModuleDeclaration {
 		nested := body.AsModuleDeclaration()
 		right := p.convertNode(nested.Name(), false)
-		name = p.add("TSQualifiedName", p.nodes[name-1].start, p.nodes[right-1].end, nodeValue(name), nodeValue(right))
-		if p.mapping != nil {
-			p.mapping.nodes[name-1] = nested.Name()
-		}
+		name = p.addWithOrigin("TSQualifiedName", nested.Name(), p.nodes[name-1].start, p.nodes[right-1].end, nodeValue(name), nodeValue(right))
 		declare = declare || p.hasModifier(body, ast.ModifierFlagsAmbient)
 		body = nested.Body
 	}
@@ -1698,16 +1697,14 @@ func (p *estreeProjector) convertChainOperand(node *ast.Node) (uint32, bool) {
 	}
 	expression := p.values[record.valueStart] & payloadMask
 	if m := p.mapping; m != nil {
-		origin := m.nodes[id-1]
-		for _, node := range m.chainReverse {
-			m.reverse[node] = detachedChainReverse
-			if index := m.table.GetIndex(node); index != 0 {
-				m.ChainAliases = append(m.ChainAliases, ChainAlias{index, m.table.GetIndex(origin), expression, record.start, record.end})
-			}
+		origin := m.Origins[id]
+		for _, index := range m.chainReverse {
+			m.Reverse[index] = detachedChainReverse
+			m.ChainAliases = append(m.ChainAliases, ChainAlias{index, origin, expression, record.start, record.end})
 		}
 		m.chainRecord = 0
 		m.chainReverse = m.chainReverse[:0]
-		m.nodes = m.nodes[:id-1]
+		m.Origins = m.Origins[:id]
 	}
 	// The wrapper is the last record emitted by convert and has no users yet.
 	// Its parent consumes the inner expression, so reclaim it before proceeding.

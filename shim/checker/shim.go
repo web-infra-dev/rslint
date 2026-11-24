@@ -201,8 +201,6 @@ func Checker_getAugmentedPropertiesOfType(recv *checker.Checker, t *checker.Type
 func Checker_getTypeOfAssignmentPattern(recv *checker.Checker, expr *ast.Node) *checker.Type
 //go:linkname Checker_isOptionalParameter github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isOptionalParameter
 func Checker_isOptionalParameter(recv *checker.Checker, node *ast.Node) bool
-//go:linkname Checker_sortSymbols github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).sortSymbols
-func Checker_sortSymbols(recv *checker.Checker, symbols []*ast.Symbol)
 type extra_Checker struct {
   id uint32
   program checker.Program
@@ -567,9 +565,6 @@ func Checker_couldContainTypeVariables(v *checker.Checker) func(*checker.Type) b
 }
 func Checker_apparentArgumentCountPtr(v *checker.Checker) **int {
   return &((*extra_Checker)(unsafe.Pointer(v))).apparentArgumentCount
-}
-func Checker_serializationLevelPtr(v *checker.Checker) *int {
-  return &((*extra_Checker)(unsafe.Pointer(v))).serializationLevel
 }
 func Checker_valueSymbolLinks_storePtr(v *checker.Checker) *core.PagedLinkStore[*checker.ValueSymbolLinks] {
   return &((*extra_Checker)(unsafe.Pointer(v))).valueSymbolLinks.store
