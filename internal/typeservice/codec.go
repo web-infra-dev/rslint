@@ -335,7 +335,7 @@ func EncodePacket(result Result) ([]byte, error) {
 		w.data = append(w.data, fact.tree...)
 		w.put(12, w.nodeList(fact.origins))
 	case SuggestionDiagnostics:
-		w.put(8, w.diagnostics(fact))
+		w.put(8, w.diagnostics(fact, make(map[string]uint32)))
 	case NodeFacts:
 		offset := uint32(len(w.data))
 		w.data = append(w.data, make([]byte, 4+len(fact)*28)...)
@@ -424,7 +424,7 @@ func (w *packetWriter) indexInfos(field uint32, fact IndexInfos) {
 	w.put(field+4, w.ids(ids))
 }
 
-func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
+func (w *packetWriter) diagnostics(facts SuggestionDiagnostics, configs map[string]uint32) uint32 {
 	if len(facts) == 0 {
 		return 0
 	}
@@ -434,19 +434,12 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
 	for i, d := range facts {
 		pos := at + 4 + uint32(i)*40
 		if d.Config != nil {
-			config := uint32(len(w.data))
-			w.data = append(w.data, make([]byte, 16)...)
-			w.put(pos, config)
-			w.put(config, w.text(d.Config.Name))
-			w.put(config+4, w.text(string(d.Config.Path)))
-			w.put(config+12, w.text(d.Config.ID))
-			if len(d.Config.ExtendedSourceFiles) != 0 {
-				files := make([]uint32, len(d.Config.ExtendedSourceFiles))
-				for i, file := range d.Config.ExtendedSourceFiles {
-					files[i] = w.text(file)
-				}
-				w.put(config+8, w.ids(files))
+			offset := configs[d.Config.ID]
+			if offset == 0 {
+				offset = w.diagnosticConfig(d.Config)
+				configs[d.Config.ID] = offset
 			}
+			w.put(pos, offset)
 		} else if d.File != "" {
 			w.put(pos, w.text(d.File))
 		}
@@ -469,8 +462,24 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
 			flags |= 4
 		}
 		w.put(pos+28, flags)
-		w.put(pos+32, w.diagnostics(d.Chain))
-		w.put(pos+36, w.diagnostics(d.Related))
+		w.put(pos+32, w.diagnostics(d.Chain, configs))
+		w.put(pos+36, w.diagnostics(d.Related, configs))
+	}
+	return at
+}
+
+func (w *packetWriter) diagnosticConfig(info *configSourceInfo) uint32 {
+	at := uint32(len(w.data))
+	w.data = append(w.data, make([]byte, 16)...)
+	w.put(at, w.text(info.Name))
+	w.put(at+4, w.text(string(info.Path)))
+	w.put(at+12, w.text(info.ID))
+	if len(info.ExtendedSourceFiles) != 0 {
+		files := make([]uint32, len(info.ExtendedSourceFiles))
+		for i, file := range info.ExtendedSourceFiles {
+			files[i] = w.text(file)
+		}
+		w.put(at+8, w.ids(files))
 	}
 	return at
 }

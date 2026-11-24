@@ -94,6 +94,7 @@ func (order symbolOrder) sort(c *checker.Checker, symbols []*ast.Symbol) {
 	for i, symbol := range symbols {
 		bindings[i] = bindingOf(symbol, order.ranks[symbol])
 	}
+	unreachable := make(map[*ast.Node]bool)
 	slices.SortFunc(bindings, func(a, b symbolBinding) int {
 		if byTable := cmp.Compare(a.rank, b.rank); byTable != 0 {
 			return byTable
@@ -106,7 +107,7 @@ func (order symbolOrder) sort(c *checker.Checker, symbols []*ast.Symbol) {
 				if byPhase := cmp.Compare(a.filePhase, b.filePhase); byPhase != 0 {
 					return byPhase
 				}
-				if bySyntax := compareBindingNodes(a, b); bySyntax != 0 {
+				if bySyntax := compareBindingNodes(a, b, unreachable); bySyntax != 0 {
 					return bySyntax
 				}
 			}
@@ -118,7 +119,7 @@ func (order symbolOrder) sort(c *checker.Checker, symbols []*ast.Symbol) {
 	}
 }
 
-func compareBindingNodes(a, b symbolBinding) int {
+func compareBindingNodes(a, b symbolBinding, unreachable map[*ast.Node]bool) int {
 	left, right := a.decl, b.decl
 	for range a.depth - b.depth {
 		left = left.Parent
@@ -130,8 +131,15 @@ func compareBindingNodes(a, b symbolBinding) int {
 		for left.Parent != right.Parent {
 			left, right = left.Parent, right.Parent
 		}
-		if byChild := cmp.Compare(bindingChildPhase(left), bindingChildPhase(right)); byChild != 0 && !unreachableBinding(left.Parent) {
-			return byChild
+		if byChild := cmp.Compare(bindingChildPhase(left), bindingChildPhase(right)); byChild != 0 {
+			dead, known := unreachable[left.Parent]
+			if !known {
+				dead = unreachableBinding(left.Parent)
+				unreachable[left.Parent] = dead
+			}
+			if !dead {
+				return byChild
+			}
 		}
 	}
 	return cmp.Compare(a.decl.Pos(), b.decl.Pos())
@@ -155,13 +163,8 @@ func bindingChildPhase(child *ast.Node) int {
 			return -1
 		}
 	case ast.KindCallExpression:
-		if child == parent.Expression() && !ast.IsOptionalChain(parent) {
-			callee := ast.SkipParentheses(child)
-			if ast.IsFunctionExpressionOrArrowFunction(callee) {
-				if entry := callee.FlowNodeData().FlowNode; entry != nil && entry.Flags&ast.FlowFlagsUnreachable == 0 {
-					return 1
-				}
-			}
+		if child == parent.Expression() && !ast.IsOptionalChain(parent) && ast.IsFunctionExpressionOrArrowFunction(ast.SkipParentheses(child)) {
+			return 1
 		}
 	case ast.KindParameter, ast.KindBindingElement:
 		if child == parent.Name() {
@@ -177,17 +180,35 @@ func bindingChildPhase(child *ast.Node) int {
 	return 0
 }
 
+func hasReachableFlow(node *ast.Node) bool {
+	if data := node.FlowNodeData(); data != nil && data.FlowNode != nil {
+		return data.FlowNode.Flags&ast.FlowFlagsUnreachable == 0
+	}
+	// A nested function body starts its own flow.
+	return !ast.IsFunctionLike(node) && node.ForEachChild(hasReachableFlow)
+}
+
 // Unreachable statements bind children in syntax order, including their expressions.
 func unreachableBinding(node *ast.Node) bool {
 	for ; node != nil; node = node.Parent {
 		if node.Flags&ast.NodeFlagsUnreachable != 0 {
 			return true
 		}
+		if node.Kind == ast.KindCallExpression {
+			callee := ast.SkipParentheses(node.Expression())
+			if ast.IsFunctionExpressionOrArrowFunction(callee) {
+				// An argument can terminate flow before the binder visits the callee.
+				return !hasReachableFlow(callee) && !slices.ContainsFunc(node.AsCallExpression().Arguments.Nodes, hasReachableFlow)
+			}
+		}
 		if node.Kind == ast.KindBlock && !ast.IsFunctionLike(node.Parent) {
 			// Blocks have no entry flow of their own. The binder records it on
 			// their first statement, skipping hoisted declarations.
 			if first := firstFlowStatement(node); first != nil {
-				return first.FlowNodeData().FlowNode == nil
+				if ast.KindFirstStatement <= first.Kind && first.Kind <= ast.KindLastStatement {
+					return first.FlowNodeData().FlowNode == nil
+				}
+				return first.Flags&ast.NodeFlagsUnreachable != 0
 			}
 		}
 		if ast.IsFunctionExpressionOrArrowFunction(node) {
@@ -202,7 +223,7 @@ func unreachableBinding(node *ast.Node) bool {
 
 func firstFlowStatement(block *ast.Node) *ast.Node {
 	for _, stmt := range block.StatementList().Nodes {
-		if ast.KindFirstStatement <= stmt.Kind && stmt.Kind <= ast.KindLastStatement {
+		if ast.KindFirstStatement <= stmt.Kind && stmt.Kind <= ast.KindLastStatement || ast.IsPotentiallyExecutableNode(stmt) {
 			return stmt
 		}
 		if stmt.Kind == ast.KindBlock {

@@ -10,6 +10,7 @@ import type {
   IndexInfoFact,
   TypePredicateFact,
   NamedSymbolFact,
+  ConfigSourceInfo,
   DiagnosticFact,
   ScalarOperation,
   QueryResults,
@@ -324,7 +325,10 @@ export class TypePacketReader {
       };
     });
   }
-  private diagnostics(at: number): DiagnosticFact[] {
+  private diagnostics(
+    at: number,
+    configs: Map<number, ConfigSourceInfo>,
+  ): DiagnosticFact[] {
     if (!at) return [];
     const count = this.word(at);
     if (at + 4 + count * 40 > this.view!.byteLength) return invalid();
@@ -333,17 +337,21 @@ export class TypePacketReader {
       const file = this.word(pos),
         source = this.word(pos + 24),
         flags = this.word(pos + 28);
-      const config =
-        flags & 4
-          ? {
-              id: this.text(this.word(file + 12)),
-              name: this.text(this.word(file)),
-              path: this.text(this.word(file + 4)),
-              extendedSourceFiles: this.optionalIDs(file + 8)?.map((name) =>
-                this.text(name),
-              ),
-            }
-          : undefined;
+      let config: ConfigSourceInfo | undefined;
+      if (flags & 4) {
+        config = configs.get(file);
+        if (!config) {
+          config = {
+            id: this.text(this.word(file + 12)),
+            name: this.text(this.word(file)),
+            path: this.text(this.word(file + 4)),
+            extendedSourceFiles: this.optionalIDs(file + 8)?.map((name) =>
+              this.text(name),
+            ),
+          };
+          configs.set(file, config);
+        }
+      }
       return {
         fileName: config?.name ?? (file ? this.text(file) : undefined),
         start: this.word(pos + 4),
@@ -355,8 +363,8 @@ export class TypePacketReader {
         config,
         reportsDeprecated: flags & 1 ? true : undefined,
         reportsUnnecessary: flags & 2 ? true : undefined,
-        chain: this.diagnostics(this.word(pos + 32)),
-        related: this.diagnostics(this.word(pos + 36)),
+        chain: this.diagnostics(this.word(pos + 32), configs),
+        related: this.diagnostics(this.word(pos + 36), configs),
       };
     });
   }
@@ -465,7 +473,7 @@ export class TypePacketReader {
         value = this.word(8) ? this.ids(this.word(8)) : undefined;
         break;
       case 15:
-        value = this.diagnostics(this.word(8));
+        value = this.diagnostics(this.word(8), new Map());
         break;
       default:
         return invalid();

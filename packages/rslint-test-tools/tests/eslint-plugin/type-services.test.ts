@@ -2389,6 +2389,7 @@ test('resolved project references retain config syntax, nesting and missing entr
             ],
         ),
         nested: refs[0]!.references![0] === refs[1],
+        sameReferences: refs === p.getResolvedProjectReferences(),
         distinctBaseFiles:
           childBase !==
           p.getConfigFileParsingDiagnostics().find((d) => d.code === 5023)!

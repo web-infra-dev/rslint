@@ -1376,8 +1376,9 @@ export class TypeServiceClient {
           throw new Error('unsupported TypeScript operation: Program.emit');
         },
         getSourceFileByPath: (path) => this.syntax.sourceByPath(path),
-        getConfigFileParsingDiagnostics: () =>
+        getConfigFileParsingDiagnostics: memo(ensure, () =>
           this.diagnostics({ op: 'configFileParsingDiagnostics', args: {} }),
+        ),
         getOptionsDiagnostics: (cancellation) =>
           this.diagnostics(
             { op: 'optionsDiagnostics', args: {} },
@@ -1423,7 +1424,9 @@ export class TypeServiceClient {
           });
           return { assignable, identity, subtype, strictSubtype };
         },
-        getRootFileNames: () => this.query({ op: 'rootFileNames', args: {} }),
+        getRootFileNames: memo(ensure, () =>
+          this.query({ op: 'rootFileNames', args: {} }),
+        ),
         getModeForUsageLocation: (source, usage) =>
           this.query({
             op: 'modeForUsageLocation',
@@ -1437,20 +1440,23 @@ export class TypeServiceClient {
             op: 'modeForResolutionAtIndex',
             args: { node: this.syntax.location(source), index },
           }) || undefined,
-        getProjectReferences: () => {
+        getProjectReferences: memo(ensure, () => {
           const refs: ts.ProjectReference[] | null = JSON.parse(
             this.query({ op: 'projectReferences', args: {} }),
           );
           return refs ?? undefined;
-        },
-        getResolvedProjectReferences: () => this.resolvedReferences(),
+        }),
+        getResolvedProjectReferences: memo(ensure, () =>
+          this.resolvedReferences(),
+        ),
         getSourceFile: (name) => this.syntax.sourceView(name),
-        getSourceFiles: () =>
+        getSourceFiles: memo(ensure, () =>
           descriptor.sources.map((s) => {
             const source = this.syntax.sourceView(s.fileName);
             if (!source) throw new Error('Program source unavailable');
             return source;
           }),
+        ),
         sourceFileToPackageName: {
           get: (path) => {
             this.ensure();

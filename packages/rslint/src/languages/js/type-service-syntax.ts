@@ -233,7 +233,7 @@ function syntaxView(
       get(target, key, receiver) {
         ensure();
         // TypeScript helpers write node-local caches, such as modifier flags.
-        return Reflect.has(target, key)
+        return key === 'extendedSourceFiles' || Reflect.has(target, key)
           ? Reflect.get(target, key, receiver)
           : read(key, proxy);
       },
@@ -246,6 +246,7 @@ function syntaxView(
       },
       has(target, key) {
         ensure();
+        if (key === 'extendedSourceFiles') return Reflect.has(target, key);
         if (Reflect.has(target, key)) return true;
         const node = load();
         return (
@@ -269,7 +270,8 @@ function syntaxView(
         ensure();
         return (
           Reflect.getOwnPropertyDescriptor(target, key) ??
-          (syntaxFields(load(), jsDocKinds).includes(String(key))
+          (key !== 'extendedSourceFiles' &&
+          syntaxFields(load(), jsDocKinds).includes(String(key))
             ? {
                 configurable: true,
                 enumerable: true,
