@@ -34,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/suppressions"
 	"github.com/web-infra-dev/rslint/internal/testutil/estree"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -2738,8 +2739,8 @@ func TestReadPhysicalFileTextPreservesEncodingAndSourceBOM(t *testing.T) {
 }
 
 func TestParseLintFlagsSuppressRuleList(t *testing.T) {
-	const list = ` @scope/plugin/first(legacy), 'plugin/with,comma', "no-\u0076ar", `
-	want := []string{"@scope/plugin/first(legacy)", "plugin/with,comma", "no-var", "no-alert", "no-debugger"}
+	const list = ` @scope/plugin/first(legacy), p/first("a,b"), 'plugin/with,comma', "no-\u0076ar", `
+	want := []string{"@scope/plugin/first(legacy)", `p/first("a,b")`, "plugin/with,comma", "no-var", "no-alert", "no-debugger"}
 	for _, value := range []string{list, "[" + list + "]"} {
 		args, _, code := parseLintFlags([]string{
 			"--suppress-rule", value,
@@ -2752,6 +2753,19 @@ func TestParseLintFlagsSuppressRuleList(t *testing.T) {
 	}
 	if _, _, code := parseLintFlags([]string{"--suppress-rule", "[no-var,no-debugger"}); code != 2 {
 		t.Errorf("unterminated list returned %d, want exit code 2", code)
+	}
+}
+
+func TestParseLintFlagsNegatedSuppressions(t *testing.T) {
+	args, _, code := parseLintFlags([]string{
+		"--suppress-all", "--no-suppress-all", "--no-prune-suppressions=false",
+		"--pass-on-unpruned-suppressions", "--no-pass-on-unpruned-suppressions=true", "file.ts",
+	})
+	if code != 0 || args.Suppressions.Mode != suppressions.Prune || args.PassOnUnpruned || !slices.Equal(args.Positional, []string{"file.ts"}) {
+		t.Fatalf("expected only prune to be enabled for file.ts, got %+v and exit code %d", args, code)
+	}
+	if _, _, code := parseLintFlags([]string{"--no-suppress-all=1"}); code != 2 {
+		t.Errorf("invalid negated boolean returned %d, want exit code 2", code)
 	}
 }
 

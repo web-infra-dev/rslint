@@ -574,11 +574,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return abortRun(loadError.Error(), fmt.Sprintf("error: %v", loadError))
 	}
 
-	var finalPlugin linter.PluginDispatchRecord
 	for _, pluginRecord := range pipelineResult.PluginOutcomes() {
-		if pluginRecord.Observation == pipelineResult.Observation.Index {
-			finalPlugin = pluginRecord
-		}
 		reportEslintPluginDispatchOutcome(linter.EslintPluginDispatchOutcome{
 			Notices:       pluginRecord.Notices,
 			DispatchError: pluginRecord.DispatchError,
@@ -627,7 +623,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	case baselineErr != nil:
 		suppressionError = baselineErr.Error()
 	case baseline != nil:
-		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation.Native.Files, targetPlan, allDiags, finalPlugin, args)
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, targetPlan, allDiags, args)
 	}
 	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0

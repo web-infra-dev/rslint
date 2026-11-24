@@ -230,7 +230,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 	}
 	for _, seed := range explicitSeeds {
 		if seed.usingFallback && rslintconfig.IsSupportedLintFile(seed.path) {
-			coordinator.draft.addFallback(seed.path, seed.ownerDir)
+			coordinator.draft.addFallbackFile(seed.path)
 		}
 		if seed.ownerDir == "" {
 			continue

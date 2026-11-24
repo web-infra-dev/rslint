@@ -315,6 +315,9 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 		GetRulesForFile:          newRuleHandler(preparedCalls),
 		collectSkippedErrorRules: true,
 	})
+	if plan.programs[1].files[0].rules != nil {
+		t.Fatal("reporting skipped rules created an executable rule set for gap.ts")
+	}
 	files, err := projectGenerationTargets(t.Context(), Generation{}, plan, SourceSnapshot{}, ArtifactDemand{SkippedErrorRules: true})
 	if err != nil || len(files) != 3 {
 		t.Fatalf("projecting skipped rules: files=%v, err=%v", files, err)

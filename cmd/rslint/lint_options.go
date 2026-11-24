@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -82,9 +83,9 @@ type repeatedFlag []string
 func (f *repeatedFlag) String() string     { return strings.Join(*f, ", ") }
 func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
 
-// ESLint accepts bare IDs and single- or double-quoted strings in a flat list.
-// A comma or closing bracket inside a quoted rule ID belongs to the ID.
-var suppressRuleID = regexp.MustCompile(`(?s)^(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\[\]({,'"][^,\]]*)`)
+// ESLint's [String] option joins consecutive tokens into one rule ID. Quoted
+// strings and slash- or hash-delimited literals can contain list separators.
+var suppressRuleToken = regexp.MustCompile(`^(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|/(?:\\/|[^/])*/[a-zA-Z]*|#[^\r\n\x{2028}\x{2029}]*#|[\[\](){}:,]|[^\[\](){}:,]+)`)
 var quotedRuleEscape = regexp.MustCompile(`(?:\\u[0-9a-fA-F]{4})+|\\[^u]`)
 
 func decodeRuleEscape(escape string) string {
@@ -99,33 +100,57 @@ func appendSuppressRules(rules []string, value string) ([]string, error) {
 	if value == "" {
 		return nil, errors.New("expected a rule ID")
 	}
-	list, bracketed := strings.CutPrefix(ecmascript.StringTrim(value), "[")
-	if bracketed {
-		var closed bool
-		list, closed = strings.CutSuffix(list, "]")
-		if !closed {
-			return nil, errors.New("expected ']' after rule IDs")
+	var tokens []string
+	for list := ecmascript.StringTrim(value); list != ""; {
+		token := suppressRuleToken.FindString(list)
+		tokens = append(tokens, ecmascript.StringTrim(token))
+		list = ecmascript.StringTrim(list[len(token):])
+	}
+	end := slices.Index(tokens, "]")
+	if len(tokens) > 0 && tokens[0] == "[" {
+		if end < 0 || end != len(tokens)-1 {
+			return nil, errors.New("expected a single bracketed list of rule IDs")
 		}
+		tokens = tokens[1:end]
+	} else if end >= 0 {
+		tokens = tokens[:end] // ESLint parses a bare list up to its closing bracket.
 	}
 	if rules == nil {
 		rules = []string{} // An explicit empty selection records no rules.
 	}
-	for list = ecmascript.StringTrim(list); list != ""; list = ecmascript.StringTrim(list) {
-		id := suppressRuleID.FindString(list)
-		list = ecmascript.StringTrim(list[len(id):])
-		if list != "" {
-			if list[0] != ',' {
-				return nil, errors.New("expected a comma between rule IDs")
-			}
-			list = list[1:]
+	for len(tokens) > 0 {
+		switch tokens[0] {
+		case "[", "(", "{":
+			return nil, errors.New("expected a string rule ID")
 		}
-		id = ecmascript.StringTrim(id)
-		if id != "" && (id[0] == '\'' || id[0] == '"') {
+		comma := slices.Index(tokens, ",")
+		if comma < 0 {
+			comma = len(tokens)
+		}
+		id := strings.Join(tokens[:comma], "")
+		if len(id) >= 2 && (id[0] == '\'' || id[0] == '"') && id[len(id)-1] == id[0] {
 			id = quotedRuleEscape.ReplaceAllStringFunc(id[1:len(id)-1], decodeRuleEscape)
 		}
 		rules = append(rules, id)
+		tokens = tokens[min(comma+1, len(tokens)):]
 	}
 	return rules, nil
+}
+
+func suppressionBoolFlag(fs *flag.FlagSet, target *bool, name, usage string) {
+	for _, spelling := range []string{name, "no-" + name} {
+		fs.BoolFunc(spelling, usage, func(value string) error {
+			switch ecmascript.StringTrim(value) {
+			case "true":
+				*target = spelling == name
+			case "false":
+				*target = spelling != name
+			default:
+				return errors.New("expected true or false")
+			}
+			return nil
+		})
+	}
 }
 
 const usage = `🚀 Rslint - Rocket Speed Linter
@@ -205,9 +230,9 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.SingleThreaded, "singleThreaded", false, "run in single threaded mode")
 	fs.Int64Var(&args.StartTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
 	fs.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
-	fs.BoolVar(&suppressAll, "suppress-all", false, "record all lint errors")
-	fs.BoolVar(&prune, "prune-suppressions", false, "remove unused suppressions")
-	fs.BoolVar(&args.PassOnUnpruned, "pass-on-unpruned-suppressions", false, "allow unused suppressions")
+	suppressionBoolFlag(fs, &suppressAll, "suppress-all", "record all lint errors")
+	suppressionBoolFlag(fs, &prune, "prune-suppressions", "remove unused suppressions")
+	suppressionBoolFlag(fs, &args.PassOnUnpruned, "pass-on-unpruned-suppressions", "allow unused suppressions")
 	fs.Func("suppressions-location", "suppressions file or directory", func(value string) error {
 		if value == "" {
 			return errors.New("expected a file or directory")

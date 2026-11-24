@@ -1489,23 +1489,17 @@ in `internal/config/lint`, Program construction in `internal/program/loader`,
 the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
 
-The file CLI uses its usual working directory for target selection, config
-discovery, and autofix. After the final lint or fix observation, the CLI passes
-diagnostics and checked files to `internal/suppressions`, excluding files with syntax errors.
-The lint plan identifies rules skipped for lack of type information. The plugin
-dispatcher identifies the files and error-level rules affected by incomplete
-worker results. The CLI passes these exclusions to the package, which compares
-completed rule counts and owns baseline persistence. The package keys counts
-by the CLI target path in the final lint result, relative to the physical
-working directory. A rule can receive a different TypeScript Program filename
-for that target. The discovery catalog records selected files and directory
-scopes that needed a fallback config or had no working owner after a load
-failure. Those targets keep their diagnostics and baseline entries. A selected
-subproject with its own working config can still complete a baseline check.
-A failed plugin rule keeps its own count.
-An incomplete plugin file result limits updates for that file. A batch dispatch
-error in the final observation stops the update.
-The CLI supplies visible diagnostics and any baseline failure to report assembly.
+With an active bulk suppressions file, the CLI uses the final observation from
+the same lint or autofix run. Config discovery identifies inputs whose intended
+config failed to load. The native lint plan identifies syntax errors and rules
+skipped for lack of type information. Plugin dispatch identifies incomplete
+file or rule results. These facts let the CLI pass verified targets and their
+diagnostics to `internal/suppressions`, including clean files with zero errors.
+The package counts error-level lint findings by rule and by the selected
+target path relative to the physical working directory. It owns comparison,
+scoped updates and atomic file replacement. The CLI renders the remaining
+diagnostics and sets the exit code. See the [bulk suppressions guide](website/docs/en/guide/bulk-suppressions.md)
+for how recording and pruning handle incomplete checks.
 
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider

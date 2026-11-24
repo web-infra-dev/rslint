@@ -11,10 +11,9 @@ import (
 // ordered projections without selecting or copying rules again. File contexts,
 // checker instances, language defaults and plugin routing remain per-file.
 type preparedRuleSet struct {
-	all               []rule.ConfiguredRule
-	native            []rule.ConfiguredRule
-	plugins           []rule.ConfiguredRule
-	skippedErrorRules []string
+	all     []rule.ConfiguredRule
+	native  []rule.ConfiguredRule
+	plugins []rule.ConfiguredRule
 
 	environment           *rule.RuleEnvironment
 	pluginLanguageOptions rule.LanguageOptions
@@ -23,8 +22,7 @@ type preparedRuleSet struct {
 // ruleSetBuilder belongs only to plan preparation. Its identity table is
 // discarded after workers join; published plans retain only prepared sets.
 type ruleSetBuilder struct {
-	collectSkippedErrorRules bool
-	sets                     sync.Map // ruleSetKey -> *preparedRuleSet
+	sets sync.Map // ruleSetKey -> *preparedRuleSet
 }
 
 type ruleSetKey struct {
@@ -46,16 +44,6 @@ func (builder *ruleSetBuilder) prepare(rules []rule.ConfiguredRule, hasTypeCheck
 	// Preparation is pure. Concurrent misses may compute duplicate candidates,
 	// but every reader receives the same complete winning set.
 	prepared := prepareRuleSet(rules, hasTypeChecker)
-	if builder.collectSkippedErrorRules && !hasTypeChecker {
-		for _, configured := range rules {
-			if configured.RequiresTypeInfo && configured.Severity == rule.SeverityError {
-				if prepared == nil {
-					prepared = &preparedRuleSet{}
-				}
-				prepared.skippedErrorRules = append(prepared.skippedErrorRules, configured.Name)
-			}
-		}
-	}
 	actual, _ := builder.sets.LoadOrStore(key, prepared)
 	return actual.(*preparedRuleSet) //nolint:forcetypeassert // See the private table invariant above.
 }

@@ -1,6 +1,8 @@
 package linter
 
 import (
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -71,6 +73,34 @@ func (r ObservationResult) JoinedPluginOutcome() (EslintPluginDispatchOutcome, b
 		return EslintPluginDispatchOutcome{}, false
 	}
 	return clonePluginOutcome(r.pluginOutcome), true
+}
+
+// PluginFileFailure identifies incomplete counts in one file. FileIncomplete
+// means the worker returned no usable file-wide result. Individual rule
+// failures leave the other rules' counts usable.
+type PluginFileFailure struct {
+	FileIncomplete bool
+	Rules          []string
+}
+
+type pluginFileFailures map[string]PluginFileFailure
+
+func (files *pluginFileFailures) add(path string, failure PluginFileFailure) {
+	if *files == nil {
+		*files = make(pluginFileFailures)
+	}
+	if previous, ok := (*files)[path]; ok {
+		failure.FileIncomplete = failure.FileIncomplete || previous.FileIncomplete
+		failure.Rules = slices.Concat(previous.Rules, failure.Rules)
+	}
+	(*files)[path] = failure
+}
+
+// PluginFailures reports the dispatch error and, when SkippedErrorRules was
+// requested, the files and error-level rules with incomplete worker results.
+// The returned map and rule slices belong to the observation and are read-only.
+func (r ObservationResult) PluginFailures() (map[string]PluginFileFailure, error) {
+	return r.pluginOutcome.fileFailures, r.pluginOutcome.DispatchError
 }
 
 type fixResultKind uint8

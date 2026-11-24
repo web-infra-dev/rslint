@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // releaseLease gives every acquired generation exact-once release semantics,
@@ -53,8 +54,12 @@ func projectGenerationTargets(
 	if collectLintedFiles {
 		lintedFiles = make([]LintedFile, 0, fileCount)
 	}
+	var skippedByConfig map[ruleSetKey][]string
+	if demand.SkippedErrorRules {
+		skippedByConfig = make(map[ruleSetKey][]string)
+	}
 	for _, programPlan := range plan.programs {
-		for _, filePlan := range programPlan.files {
+		for index, filePlan := range programPlan.files {
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
@@ -72,8 +77,8 @@ func projectGenerationTargets(
 			sources[path] = source
 			if collectLintedFiles {
 				file := LintedFile{Path: path, SyntaxError: filePlan.syntaxError}
-				if demand.SkippedErrorRules && filePlan.rules != nil {
-					file.SkippedErrorRules = filePlan.rules.skippedErrorRules
+				if configs := programPlan.rulesBeforeFilter; skippedByConfig != nil && configs != nil && len(configs[index]) > 0 {
+					file.SkippedErrorRules = skippedErrorRules(skippedByConfig, configs[index])
 				}
 				if demand.SourceFiles {
 					file.SourceFile = source
@@ -105,6 +110,22 @@ func projectGenerationTargets(
 		}
 	}
 	return lintedFiles, ctx.Err()
+}
+
+// Files sharing an immutable config also share its excluded error-rule names.
+func skippedErrorRules(cache map[ruleSetKey][]string, rules []rule.ConfiguredRule) []string {
+	key := ruleSetKey{first: &rules[0], length: len(rules)}
+	if names, ok := cache[key]; ok {
+		return names
+	}
+	var names []string
+	for _, configured := range rules {
+		if configured.RequiresTypeInfo && configured.Severity == rule.SeverityError {
+			names = append(names, configured.Name)
+		}
+	}
+	cache[key] = names
+	return names
 }
 
 type sourceTextReader func(targetPath string, source ast.SourceFileLike) (string, error)

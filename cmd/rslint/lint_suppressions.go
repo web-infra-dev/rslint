@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"slices"
 
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -12,50 +13,40 @@ import (
 func applyLintSuppressions(
 	ctx context.Context,
 	baseline *suppressions.File,
-	files []linter.LintedFile,
+	observation linter.ObservationResult,
 	targets target.Plan,
 	diagnostics []rule.RuleDiagnostic,
-	plugin linter.PluginDispatchRecord,
 	args lintArgs,
 ) ([]rule.RuleDiagnostic, string) {
-	if plugin.DispatchError != nil && args.Suppressions.Mode != suppressions.Check {
+	pluginFailures, dispatchErr := observation.PluginFailures()
+	if dispatchErr != nil && args.Suppressions.Mode != suppressions.Check {
 		return diagnostics, "Cannot update suppressions because plugin lint dispatch failed."
 	}
 	fallback, configFailed := args.ConfigCatalog.FilesWithConfigFallback(targets)
-	incompleteFiles := make(map[string]bool)
-	failedRules := make(map[string][]string)
-	for _, notice := range plugin.Notices {
-		if notice.Kind != linter.EslintPluginUnverifiedRule {
-			incompleteFiles[notice.FilePath] = true
-		}
-		if notice.RuleName != "" {
-			failedRules[notice.FilePath] = append(failedRules[notice.FilePath], notice.RuleName)
-		}
-	}
-	// A file-wide update needs a usable file result. Recording named rules
-	// can still use their individual counts, including completed native rules.
-	wholeFileUpdate := args.Suppressions.Mode == suppressions.Prune ||
-		(args.Suppressions.Mode == suppressions.Record && args.Suppressions.Rules == nil)
+	pluginIncomplete := dispatchErr != nil
+	files := observation.Native.Files
 	checked := make([]suppressions.FileResult, 0, len(files))
 	for _, file := range files {
+		failure := pluginFailures[file.Path]
+		pluginIncomplete = pluginIncomplete || failure.FileIncomplete
 		if file.SyntaxError || fallback[file.Path] {
 			continue
 		}
 		skipped := file.SkippedErrorRules
-		if failed := failedRules[file.Path]; len(failed) > 0 {
-			skipped = append(failed, skipped...)
+		if len(failure.Rules) > 0 {
+			skipped = slices.Concat(skipped, failure.Rules)
 		}
 		checked = append(checked, suppressions.FileResult{
-			Path:            file.Path,
-			SkippedRules:    skipped,
-			PreserveEntries: wholeFileUpdate && incompleteFiles[file.Path],
+			Path:         file.Path,
+			SkippedRules: skipped,
+			Incomplete:   failure.FileIncomplete,
 		})
 	}
 	var failure string
 	switch {
 	case configFailed:
 		failure = "A lint configuration failed to load. Files without their intended configuration keep their original suppressions."
-	case len(incompleteFiles) > 0 || plugin.DispatchError != nil:
+	case pluginIncomplete:
 		failure = "Plugin lint results are incomplete."
 	}
 	if failure != "" && len(checked) == 0 {

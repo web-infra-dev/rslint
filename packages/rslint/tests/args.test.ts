@@ -221,6 +221,15 @@ describe('parseArgs positionals', () => {
 });
 
 describe('parseArgs rest ordering', () => {
+  test('preserves negated suppression flags and their inline values', () => {
+    const flags = [
+      '--no-suppress-all',
+      '--no-prune-suppressions=false',
+      '--no-pass-on-unpruned-suppressions=true',
+    ];
+    expect(parseArgs(['a.js', ...flags]).rest).toEqual([...flags, 'a.js']);
+  });
+
   test('distinguishes an empty suppression argument from a missing value', () => {
     expect(parseArgs(['--suppress-rule', '']).rest).toEqual([
       '--suppress-rule=[]',

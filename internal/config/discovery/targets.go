@@ -162,6 +162,21 @@ func (trie *discoveryTargetTrie) child(name string, useCaseSensitive bool) *disc
 	}
 	return trie.children[tspath.ToPath(name, "", useCaseSensitive)]
 }
+
+func (trie *discoveryTargetTrie) hasScannedLintFile() bool {
+	for _, file := range trie.files {
+		if !file.Explicit && rslintconfig.IsSupportedLintFile(file.Path) {
+			return true
+		}
+	}
+	for _, child := range trie.children {
+		if child.hasScannedLintFile() {
+			return true
+		}
+	}
+	return false
+}
+
 func splitDiscoveryPath(path string) []string {
 	path = strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 	var components []string

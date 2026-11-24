@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -42,7 +43,7 @@ func Open(options Options) (*File, error) {
 		}
 		f.path = path
 	}
-	data, err := f.read(f.path)
+	data, err := f.read(f.path, os.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}
@@ -118,14 +119,19 @@ func (f *File) fileMissing(key string) bool {
 	}
 }
 
-func (f *File) read(path string) (entries, error) {
-	content, err := os.ReadFile(path)
+func (f *File) read(path string, access int) (entries, error) {
+	file, err := os.OpenFile(path, access, 0)
 	if errors.Is(err, fs.ErrNotExist) {
 		if f.options.Location == "" || f.options.Mode == Record {
 			return nil, nil //nolint:nilnil // A missing optional or newly requested baseline has no entries.
 		}
 		return nil, fmt.Errorf("suppressions file %q does not exist: use --suppress-all or --suppress-rule to create it", path)
 	}
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	content, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +157,7 @@ func (f *File) read(path string) (entries, error) {
 
 // The exclusive staging file is also the writer lock. Read the latest counts
 // after creating it, then replace the destination with the completed JSON.
-func (f *File) update(ctx context.Context, files map[string]*checkedFile) error {
+func (f *File) update(ctx context.Context, change func(entries) bool) error {
 	path, err := filepath.EvalSymlinks(f.path)
 	if errors.Is(err, fs.ErrNotExist) {
 		path = f.path // A new baseline has no symlink target to resolve.
@@ -178,22 +184,13 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if info != nil {
-		// A dangling symlink also reports ErrNotExist during resolution.
-		if info.Mode()&fs.ModeSymlink != 0 {
-			return fmt.Errorf("cannot resolve suppressions destination %q", path)
-		}
-		// A rename can replace a read-only file on Unix. Recording and pruning
-		// require write access even when the counts are unchanged.
-		existing, err := os.OpenFile(path, os.O_WRONLY, 0)
-		if err != nil {
-			return err
-		}
-		if err := existing.Close(); err != nil {
-			return err
-		}
+	// A dangling symlink also reports ErrNotExist during resolution.
+	if info != nil && info.Mode()&fs.ModeSymlink != 0 {
+		return fmt.Errorf("cannot resolve suppressions destination %q", path)
 	}
-	data, err := f.read(path)
+	// Reload under the lock with write access. A rename alone could replace
+	// a read-only file on Unix.
+	data, err := f.read(path, os.O_RDWR)
 	if err != nil {
 		return err
 	}
@@ -201,13 +198,7 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	if newFile {
 		data = make(entries)
 	}
-	var changed bool
-	if f.options.Mode == Record {
-		changed = f.record(data, files)
-	} else {
-		changed = f.prune(data, files)
-	}
-	if !newFile && !changed {
+	if !change(data) && !newFile {
 		f.entries = data
 		return ctx.Err()
 	}

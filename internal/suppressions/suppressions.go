@@ -38,9 +38,9 @@ type File struct {
 // FileResult identifies a linted target. A completed rule with no diagnostics
 // has a count of zero.
 type FileResult struct {
-	Path            string // Absolute, slash-separated filename of the lint result.
-	SkippedRules    []string
-	PreserveEntries bool // Compare completed rules, but keep this file's baseline unchanged.
+	Path         string // Absolute, slash-separated filename of the lint result.
+	SkippedRules []string
+	Incomplete   bool // Some results for this file are unavailable.
 }
 
 type checkedFile struct {
@@ -54,6 +54,9 @@ type checkedFile struct {
 // record or prune mode. Clean files must be included in checked.
 func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []rule.RuleDiagnostic) ([]rule.RuleDiagnostic, bool, error) {
 	files := make(map[string]*checkedFile)
+	// Named recording needs only the selected rule's result. Updating the
+	// entire file requires a complete file result.
+	recordNamedRules := f.options.Mode == Record && f.options.Rules != nil
 	// An empty, successful target set can still create a baseline or prune deleted files.
 	canUpdate := len(checked) == 0
 	for _, result := range checked {
@@ -61,12 +64,13 @@ func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []ru
 		if f.options.Mode == Check && f.entries[key] == nil {
 			continue
 		}
+		preserve := result.Incomplete && !recordNamedRules
 		files[result.Path] = &checkedFile{
 			key:             key,
 			skippedRules:    result.SkippedRules,
-			preserveEntries: result.PreserveEntries,
+			preserveEntries: preserve,
 		}
-		canUpdate = canUpdate || !result.PreserveEntries
+		canUpdate = canUpdate || !preserve
 	}
 	for _, diagnostic := range diagnostics {
 		file := files[diagnostic.FilePath]
@@ -79,7 +83,13 @@ func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []ru
 		file.counts[diagnostic.RuleName]++
 	}
 	if f.options.Mode != Check && canUpdate {
-		if err := f.update(ctx, files); err != nil {
+		err := f.update(ctx, func(latest entries) bool {
+			if f.options.Mode == Record {
+				return f.record(latest, files)
+			}
+			return f.prune(latest, files)
+		})
+		if err != nil {
 			return diagnostics, false, err
 		}
 	}

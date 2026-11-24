@@ -362,7 +362,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		if filePlan.hasTypeChecker {
 			checkerFreeGeneration = false
 		}
-		if filePlan.rules == nil || len(filePlan.rules.all) == 0 {
+		if filePlan.rules == nil {
 			continue
 		}
 		rules := filePlan.rules

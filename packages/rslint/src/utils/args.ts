@@ -82,8 +82,11 @@ export function parseArgs(argv: string[]) {
       }
       switch (token.name) {
         case 'suppress-all':
+        case 'no-suppress-all':
         case 'prune-suppressions':
+        case 'no-prune-suppressions':
         case 'pass-on-unpruned-suppressions':
+        case 'no-pass-on-unpruned-suppressions':
           flags.push(argv[token.index]); // Preserve an explicit =false.
           continue;
         case 'suppress-rule':

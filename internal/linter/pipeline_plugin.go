@@ -21,6 +21,7 @@ type pluginTask struct {
 	targetPathByWire map[string]string
 	fixCandidates    []fixSourceCandidate
 	collectFixes     bool
+	collectFailures  bool
 	suggestionsMode  string
 	timing           *TimingCollector
 	failure          PluginFailurePolicy
@@ -82,20 +83,28 @@ func (t pluginTask) runRaw(ctx context.Context, dispatcher EslintPluginDispatche
 	}
 	var diagnostics []rule.RuleDiagnostic
 	var batches []pluginBatchRange
+	var failures pluginFileFailures
+	var onFailure pluginFileFailureHandler
+	if t.collectFailures {
+		var mu sync.Mutex
+		onFailure = func(path string, failure PluginFileFailure) {
+			if target, ok := t.targetPathByWire[path]; ok {
+				path = target
+			}
+			mu.Lock()
+			failures.add(path, failure)
+			mu.Unlock()
+		}
+	}
 	notices, err := t.resources.dispatch(ctx, dispatcher, t.inputs, t.collectFixes, t.suggestionsMode, t.timing,
 		func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
-		func(batch pluginBatchRange) { batches = append(batches, batch) })
+		func(batch pluginBatchRange) { batches = append(batches, batch) }, onFailure)
 	for index := range diagnostics {
 		if targetPath, ok := t.targetPathByWire[diagnostics[index].FilePath]; ok {
 			diagnostics[index].FilePath = targetPath
 		}
 	}
-	for index := range notices {
-		if targetPath, ok := t.targetPathByWire[notices[index].FilePath]; ok {
-			notices[index].FilePath = targetPath
-		}
-	}
-	return EslintPluginDispatchOutcome{Diagnostics: diagnostics, Notices: notices, DispatchError: err, failurePath: failurePath, batches: batches}
+	return EslintPluginDispatchOutcome{Diagnostics: diagnostics, Notices: notices, DispatchError: err, failurePath: failurePath, batches: batches, fileFailures: failures}
 }
 
 func applyPluginFailure(outcome EslintPluginDispatchOutcome, failure PluginFailurePolicy) EslintPluginDispatchOutcome {
@@ -216,6 +225,7 @@ func materializePluginTask(
 		targetPathByWire: targetPathByWire,
 		fixCandidates:    fixCandidates,
 		collectFixes:     collectFixes,
+		collectFailures:  policy.Demand.SkippedErrorRules,
 		suggestionsMode:  suggestionsMode,
 		timing:           timing,
 		failure:          policy.PluginFailure,
@@ -395,6 +405,9 @@ func mergePluginOutcomes(parts []EslintPluginDispatchOutcome) EslintPluginDispat
 	groups := make(map[string]EslintPluginDispatchOutcome)
 	var result EslintPluginDispatchOutcome
 	for _, part := range parts {
+		for path, failure := range part.fileFailures {
+			result.fileFailures.add(path, failure)
+		}
 		if result.failurePath == "" {
 			result.failurePath = part.failurePath
 		}

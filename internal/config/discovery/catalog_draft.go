@@ -22,17 +22,23 @@ type catalogDraft struct {
 	configs         map[string]rslintconfig.RslintConfig
 	selectedSources map[string]selectedConfigSource
 	scopes          map[string]target.OwnerScope
-	fallbacks       map[fallbackScope]bool
+	fallbacks       configFallbacks
 }
 
-func (draft *catalogDraft) addFallback(path, owner string) {
-	if draft.fallbacks == nil {
-		draft.fallbacks = make(map[fallbackScope]bool)
+func (draft *catalogDraft) addFallbackFile(path string) {
+	if draft.fallbacks.literals == nil {
+		draft.fallbacks.literals = make(map[string]bool)
 	}
-	// A requested directory may end with a separator. Use the same spelling
-	// as the ancestor paths returned for files under that directory.
+	draft.fallbacks.literals[path] = true
+}
+
+func (draft *catalogDraft) addFallbackDirectory(path, owner string) {
+	if draft.fallbacks.directories == nil {
+		draft.fallbacks.directories = make(map[fallbackDirectory]bool)
+	}
+	// The parent of a planned file has no trailing separator except at a root.
 	path = tspath.GetNormalizedAbsolutePath(path, "")
-	draft.fallbacks[fallbackScope{path, owner}] = true
+	draft.fallbacks.directories[fallbackDirectory{path, owner}] = true
 }
 
 func newCatalogDraft() catalogDraft {

@@ -36,9 +36,9 @@ This baseline records two `no-debugger` errors in `src/app.js`.
 
 If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
 
-File keys use the target filename in the CLI report, relative to the physical working directory, with `/` as the separator. If the CLI reports `real.ts`, its count stays under `real.ts` even when `tsconfig.json` loads it through a symlink with a different name. A file on another Windows drive or UNC share uses its absolute path.
+File keys use the target path selected by the CLI, relative to the physical working directory, with `/` as the separator. If the CLI selects `real.ts`, its count stays under `real.ts` even when `tsconfig.json` loads it through a symlink with a different name. A file on another Windows drive or UNC share uses its absolute path.
 
-Use the same directory spelling when recording and checking. If `checkout-link` points to `checkout`, launching Rslint from each directory can select different target paths for the same source. Each target path has its own counts. The same applies to a symlink such as `linked.js` pointing to `src/app.js`. If a run selects both names, Rslint checks the file once and uses the selected name.
+Use the physical checkout directory when sharing a baseline. From a sibling symlink `checkout-link` pointing to `checkout`, the CLI can display `src/app.js` and record `../checkout-link/src/app.js`. From `checkout`, the key is `src/app.js`. Rules can produce different findings for those paths. When the CLI deduplicates two inputs that name the same file, the baseline uses the path that was linted.
 
 To reuse an ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. Entries apply when the file path and rule ID match. On Windows, use consistent directory casing when importing an ESLint baseline. From `C:/repo`, ESLint records `C:/REPO/src/app.ts` as `src/app.ts`, while Rslint preserves its spelling as `../REPO/src/app.ts`.
 
@@ -54,7 +54,7 @@ rslint --prune-suppressions
 
 Pruning lowers counts, removes entries that reach zero, and removes paths that are missing from disk, including paths outside the selected targets. Run it from a full checkout. If a Git sparse checkout includes only `packages/a`, running `--prune-suppressions packages/a` can remove entries for `packages/b` even though Git still tracks those files.
 
-Pruning keeps entries for symlinks with unavailable targets, files in inaccessible directories, and files on disconnected drives. Entries with UNC paths such as `//server/share/file.ts` are updated only when Rslint checks those files.
+Pruning keeps entries for symlinks with unavailable targets, files in inaccessible directories, and Windows paths whose drive root is unavailable. Mount external volumes before pruning. If an unmounted volume leaves an accessible empty directory, Rslint treats the files below it as missing and removes their entries. Entries with UNC paths such as `//server/share/file.ts` are updated only when Rslint checks those files.
 
 On a case-insensitive filesystem, a rename from `file.js` to `File.js` can leave the old spelling accessible. Remove its JSON entry if you no longer lint that spelling.
 
@@ -62,6 +62,6 @@ Ignored files and files with syntax errors keep their entries. If a file moves o
 
 A plugin rule that throws reports its failure and any findings it emitted. An incomplete rule keeps its recorded count, while completed rules can still record and prune theirs. If plugin results are missing for an entire file, `--suppress-all` and `--prune-suppressions` preserve that file's entries and update other files normally. `--suppress-rule` can still record a completed native rule in the affected file. The CLI exits with code `2` for incomplete file results. If a plugin batch request fails during the final check, the CLI leaves the baseline untouched.
 
-When some configs load and others fail, a baseline check or update exits with code `2` if a selected file or directory loses its config or needs a fallback. Files affected by the failure keep their entries and report any findings from the fallback config. Files with a working config can still record and prune their counts. For example, if `sub/` has its own working config, checking just `sub/` can succeed even when the parent config fails to load.
+When some configs load and others fail, a baseline check or update exits with code `2` if a selected file or directory loses its config or needs a fallback. This also applies to an empty `{}` baseline. A file ignored by the fallback might have been linted under the failed config. Affected files keep their entries and report any findings from the fallback. Files with a working config can still record and prune their counts. For example, checking just `sub/` can succeed if it has its own working config and the parent config fails to load.
 
 To defer cleanup, run `rslint --pass-on-unpruned-suppressions`. Lint errors and the configured warning limit still determine the exit status.

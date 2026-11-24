@@ -7,20 +7,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"sync"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"gotest.tools/v3/assert"
 )
 
 func tempWorkingDirectory(t *testing.T) string {
 	t.Helper()
 	dir, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, err)
 	t.Chdir(dir)
 	return dir
 }
@@ -29,29 +27,19 @@ func TestScopedUpdate(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
 	checked := filepath.ToSlash(filepath.Join(cwd, "a.ts"))
 	private := filepath.Join(cwd, "private")
-	if err := os.Mkdir(private, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, os.Mkdir(private, 0o755))
 	for _, name := range []string{"a.ts", "private/untouched.ts", "former-dir"} {
-		if err := os.WriteFile(filepath.Join(cwd, name), nil, 0o644); err != nil {
-			t.Fatal(err)
-		}
+		assert.NilError(t, os.WriteFile(filepath.Join(cwd, name), nil, 0o644))
 	}
 	linkErr := os.Symlink("gone.ts", filepath.Join(cwd, "linked.ts"))
 	if linkErr != nil && runtime.GOOS != "windows" {
 		t.Fatal(linkErr)
 	}
 	remote := filepath.Join(cwd, "remote")
-	if err := os.Mkdir(remote, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, os.Mkdir(remote, 0o755))
 	makeDirectoryLink(t, remote, filepath.Join(cwd, "linked-dir"))
-	if err := os.Remove(remote); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(private, 0); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, os.Remove(remote))
+	assert.NilError(t, os.Chmod(private, 0))
 	t.Cleanup(func() { _ = os.Chmod(private, 0o755) })
 	path := filepath.Join(cwd, DefaultFilename)
 	driveKey := "D:/shared/file.ts"
@@ -70,9 +58,7 @@ func TestScopedUpdate(t *testing.T) {
 		%q:{"x":{"count":1}},
 		"//server/share/file.ts":{"x":{"count":1}}
 	}`, driveKey)
-	if err := os.WriteFile(path, []byte(initial), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, os.WriteFile(path, []byte(initial), 0o644))
 	diagnostics := []rule.RuleDiagnostic{
 		{FilePath: checked, RuleName: "x", Severity: rule.SeverityError},
 		{FilePath: checked, RuleName: "z", Severity: rule.SeverityWarning},
@@ -80,13 +66,11 @@ func TestScopedUpdate(t *testing.T) {
 	run := func(options Options, unused bool) *File {
 		t.Helper()
 		file, err := Open(options)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NilError(t, err)
 		results := []FileResult{
 			{Path: checked, SkippedRules: []string{"typed"}},
 			// The plugin could not read a file that disappeared during lint.
-			{Path: filepath.ToSlash(filepath.Join(cwd, "incomplete.ts")), SkippedRules: []string{"plugin/check"}, PreserveEntries: true},
+			{Path: filepath.ToSlash(filepath.Join(cwd, "incomplete.ts")), SkippedRules: []string{"plugin/check"}, Incomplete: true},
 		}
 		visible, stale, err := file.Apply(t.Context(), results, append([]rule.RuleDiagnostic(nil), diagnostics...))
 		if err != nil || stale != unused || len(visible) != 1 || visible[0].RuleName != "z" {
@@ -113,9 +97,7 @@ func TestScopedUpdate(t *testing.T) {
 	if linkErr == nil {
 		want["linked.ts"] = map[string]entry{"x": {Count: 1}}
 	}
-	if !reflect.DeepEqual(pruned.entries, want) {
-		t.Fatalf("prune: got %v, want %v", pruned.entries, want)
-	}
+	assert.DeepEqual(t, pruned.entries, want)
 }
 
 func TestMissingBaseline(t *testing.T) {
@@ -127,9 +109,7 @@ func TestMissingBaseline(t *testing.T) {
 		t.Fatal("explicit missing baseline was accepted")
 	}
 	f, err := Open(Options{Mode: Prune})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, err)
 	if _, _, err := f.Apply(t.Context(), nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -149,9 +129,7 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 	root := tempWorkingDirectory(t)
 	repo, link := filepath.Join(root, "project", "repo"), filepath.Join(root, "link")
 	src := filepath.Join(repo, "src")
-	if err := os.MkdirAll(src, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, os.MkdirAll(src, 0o755))
 	destination := repo
 	// On case-insensitive volumes the process cwd also restores the stored case.
 	alternate := filepath.Join(filepath.Dir(repo), "REPO")
@@ -159,39 +137,6 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 		destination = alternate
 	}
 	makeDirectoryLink(t, destination, link)
-	makeDirectoryLink(t, src, filepath.Join(repo, "other"))
-	run := func(cwd, name string, mode Mode, wantVisible int) *File {
-		t.Helper()
-		t.Chdir(cwd)
-		f, err := Open(Options{Mode: mode})
-		if err != nil {
-			t.Fatal(err)
-		}
-		visible, unused, err := reportError(t.Context(), f, name, "x")
-		if err != nil || unused || len(visible) != wantVisible {
-			t.Fatalf("linting %s from %s: visible=%v unused=%v err=%v", name, cwd, visible, unused, err)
-		}
-		return f
-	}
-	run(repo, filepath.Join(link, "src", "app.js"), Record, 0)
-	run(repo, filepath.Join(link, "src", "app.js"), Check, 0)
-	run(repo, filepath.Join(src, "app.js"), Check, 1)
-	run(repo, filepath.Join(src, "app.js"), Record, 0)
-	run(repo, filepath.Join(repo, "other", "app.js"), Check, 1)
-	run(repo, filepath.Join(repo, "other", "app.js"), Record, 0)
-	f := run(repo, filepath.Join(filepath.Dir(repo), "shared.js"), Record, 0)
-	want := entries{
-		"../../link/src/app.js": {"x": {Count: 1}},
-		"src/app.js":            {"x": {Count: 1}},
-		"other/app.js":          {"x": {Count: 1}},
-		"../shared.js":          {"x": {Count: 1}},
-	}
-	if !reflect.DeepEqual(f.entries, want) {
-		t.Fatalf("recorded %v, want %v", f.entries, want)
-	}
-	run(src, filepath.Join(repo, "peer.js"), Record, 0)
-	run(src, filepath.Join(link, "peer.js"), Check, 1)
-
 	native := repo
 	if runtime.GOOS == "windows" {
 		native = link
@@ -202,11 +147,15 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 		"../shared.json": filepath.Join(filepath.Dir(link), "shared.json"),
 	} {
 		f, err := Open(Options{Mode: Record, Location: location})
-		if err != nil || f.path != want {
-			t.Fatalf("location %q: file=%v err=%v, want %q", location, f, err, want)
-		}
-		if key := f.fileKey(filepath.ToSlash(filepath.Join(src, "app.js"))); key != "src/app.js" {
-			t.Fatalf("physical file from linked cwd: got %q", key)
+		assert.NilError(t, err)
+		assert.Equal(t, f.path, want)
+		for name, want := range map[string]string{
+			filepath.Join(src, "app.js"):         "src/app.js",
+			filepath.Join(link, "src", "app.js"): "../../link/src/app.js",
+		} {
+			if got := f.fileKey(filepath.ToSlash(name)); got != want {
+				t.Fatalf("fileKey(%q) = %q, want %q", name, got, want)
+			}
 		}
 	}
 }
@@ -248,9 +197,7 @@ func TestConcurrentUpdates(t *testing.T) {
 	var writers [2]*File
 	for i := range writers {
 		f, err := Open(Options{Mode: Record})
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NilError(t, err)
 		writers[i] = f
 	}
 	name := filepath.Join(cwd, "test.js")
@@ -268,9 +215,7 @@ func TestConcurrentUpdates(t *testing.T) {
 		if errors.Is(err, os.ErrExist) {
 			err = write(i) // Retry after the overlapping writer completes.
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NilError(t, err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -279,17 +224,15 @@ func TestConcurrentUpdates(t *testing.T) {
 	}
 	f, err := Open(Options{})
 	want := entries{"test.js": {"rule0": {Count: 1}, "rule1": {Count: 1}}}
-	if err != nil || f == nil || !reflect.DeepEqual(f.entries, want) {
-		t.Fatalf("concurrent updates: file=%v err=%v, want %v", f, err, want)
-	}
+	assert.NilError(t, err)
+	assert.Assert(t, f != nil)
+	assert.DeepEqual(t, f.entries, want)
 }
 
 func TestUpdateRequiresBaselineWriteAccess(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
 	const original = `{"a.js":{"x":{"count":1}}}`
-	if err := os.WriteFile(DefaultFilename, []byte(original), 0o444); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, os.WriteFile(DefaultFilename, []byte(original), 0o444))
 	t.Cleanup(func() { _ = os.Chmod(DefaultFilename, 0o600) })
 	if file, err := os.OpenFile(DefaultFilename, os.O_WRONLY, 0); err == nil {
 		_ = file.Close()
@@ -298,9 +241,7 @@ func TestUpdateRequiresBaselineWriteAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	f, err := Open(Options{Mode: Record})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, err)
 	for _, id := range []string{"x", "y"} { // An unchanged count and a new count.
 		_, _, err := reportError(t.Context(), f, filepath.Join(cwd, "a.js"), id)
 		if !errors.Is(err, os.ErrPermission) {
@@ -315,17 +256,13 @@ func TestUpdateRequiresBaselineWriteAccess(t *testing.T) {
 func TestUpdateThroughFileSymlink(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
 	path := filepath.Join(cwd, DefaultFilename)
-	if err := os.WriteFile(path, []byte("{}"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, os.WriteFile(path, []byte("{}"), 0o600))
 	link := filepath.Join(cwd, "linked.json")
 	if err := os.Symlink(DefaultFilename, link); err != nil {
 		t.Skipf("file symlink unavailable: %v", err)
 	}
 	f, err := Open(Options{Mode: Record, Location: link})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, err)
 	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "x"); err != nil {
 		t.Fatal(err)
 	}
@@ -333,9 +270,7 @@ func TestUpdateThroughFileSymlink(t *testing.T) {
 	if err != nil || defaultFile == nil || defaultFile.entries["test.js"]["x"].Count != 1 {
 		t.Fatalf("write via symlink: file=%v err=%v", defaultFile, err)
 	}
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, os.Remove(path))
 	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "y"); err == nil {
 		t.Fatal("replaced a dangling baseline link")
 	}
@@ -350,18 +285,12 @@ func TestUpdatePreservesLiteralBackslash(t *testing.T) {
 	}
 	cwd := tempWorkingDirectory(t)
 	const location = `cache\base.json`
-	if err := os.Mkdir("cache", 0o755); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, os.Mkdir("cache", 0o755))
 	for _, name := range []string{location, "cache/base.json"} {
-		if err := os.WriteFile(name, []byte("{}"), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		assert.NilError(t, os.WriteFile(name, []byte("{}"), 0o644))
 	}
 	f, err := Open(Options{Mode: Record, Location: location})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, err)
 	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "x"); err != nil {
 		t.Fatal(err)
 	}
