@@ -143,7 +143,6 @@ const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
   [SyntaxKind.JSDocParameterTag]: ['isNameFirst', 'isBracketed'],
   [SyntaxKind.JSDocPropertyTag]: ['isNameFirst', 'isBracketed'],
   [SyntaxKind.SourceFile]: sourceProperties,
-  [SyntaxKind.SyntaxList]: ['children'],
 };
 
 type JsDocKinds = TypeServiceCompilerData['jsDocKinds'];
@@ -153,6 +152,7 @@ type JsDocKinds = TypeServiceCompilerData['jsDocKinds'];
 const fieldAliases: Partial<
   Record<SyntaxKind, Readonly<Record<string, string | false>>>
 > = {
+  [SyntaxKind.SyntaxList]: { _children: 'children', children: false },
   [SyntaxKind.TypeParameter]: { default: 'defaultType', defaultType: false },
   [SyntaxKind.BinaryExpression]: { type: false, modifiers: false },
   [SyntaxKind.PropertyAssignment]: { type: false },
@@ -284,9 +284,13 @@ function syntaxView(
       ensure();
       if (key === readSyntax) return read;
       // TypeScript helpers write node-local caches, such as modifier flags.
-      return key === 'extendedSourceFiles' || Reflect.has(target, key)
-        ? Reflect.get(target, key, receiver)
-        : read(key, proxy);
+      if (key === 'extendedSourceFiles' || Reflect.has(target, key))
+        return Reflect.get(target, key, receiver);
+      if (key === 'assertHasRealPosition')
+        return needsRealPosition(load().kind)
+          ? assertHasRealPosition
+          : undefined;
+      return read(key, proxy);
     },
     set(target, key, value, receiver) {
       ensure();
@@ -300,6 +304,7 @@ function syntaxView(
       if (key === 'extendedSourceFiles') return Reflect.has(target, key);
       if (Reflect.has(target, key)) return true;
       const node = load();
+      if (key === 'assertHasRealPosition') return needsRealPosition(node.kind);
       return (
         syntaxFields(node, jsDocKinds).includes(String(key)) ||
         (key === 'text' &&
@@ -439,6 +444,13 @@ function needsRealPosition(kind: SyntaxKind): boolean {
     kind === SyntaxKind.NumericLiteral ||
     kind === SyntaxKind.NoSubstitutionTemplateLiteral
   );
+}
+
+function assertHasRealPosition(this: ts.TextRange, message?: string): void {
+  if (!(this.pos >= 0 && this.end >= 0))
+    throw new Error(
+      message || 'Node must have a real position for this operation',
+    );
 }
 
 type SourceMetadata = TypeServiceDescriptor['sources'][number];
@@ -1050,7 +1062,7 @@ export class GenerationSyntaxViews {
         fact.moduleKeyword,
       );
     }
-    if (key === 'children' && raw.kind === SyntaxKind.SyntaxList)
+    if (key === '_children' && raw.kind === SyntaxKind.SyntaxList)
       return this.childNodes(ref, proxy);
     const member = this.syntaxMember(raw, key);
     if (typeof member === 'function') {
@@ -1265,14 +1277,10 @@ export class GenerationSyntaxViews {
             const position = positionMethod(key);
             if (position && !needsRealPosition(node.kind))
               return Reflect.apply(position, proxy, args);
-            if (needsRealPosition(node.kind) && (node.pos < 0 || node.end < 0))
-              throw new Error(
-                'Node must have a real position for this operation',
-              );
+            if (needsRealPosition(node.kind)) assertHasRealPosition.call(node);
             if (tokenNavigation.has(key)) {
               const index = key === 'getChildAt' ? 1 : 0;
-              if (args[index] !== undefined)
-                args[index] = scanSource(args[index]);
+              args[index] = scanSource(args[index] ?? node.getSourceFile());
             }
             return wrap(Reflect.apply(member, node, args));
           }
