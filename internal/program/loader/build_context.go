@@ -181,11 +181,9 @@ func (c *buildContext) registerTSConfig(fileName string) {
 	}
 }
 
-// extendedConfigCacheInterface avoids converting a nil concrete pointer into a
-// non-nil interface when the diagnostic escape hatch disables metadata caches.
 func (c *buildContext) extendedConfigCacheInterface() tsoptions.ExtendedConfigCache {
 	if c.extendedConfigCache == nil {
-		return nil
+		return utils.UncachedExtendedConfigs{}
 	}
 	return c.extendedConfigCache
 }
@@ -238,7 +236,7 @@ func (c *programExtendedConfigCache) GetExtendedConfig(
 		return mustExtendedConfigCacheEntry(cached)
 	}
 
-	candidate := tsoptions.ParseExtendedConfig(fileName, path, resolutionStack, host, c)
+	candidate := utils.ParseExtendedConfig(fileName, path, resolutionStack, host, c)
 	actual, _ := generation.entries.LoadOrStore(fileName, candidate)
 	return mustExtendedConfigCacheEntry(actual)
 }

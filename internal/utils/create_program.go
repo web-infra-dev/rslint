@@ -29,7 +29,31 @@ func (e *SyntacticError) Error() string {
 
 func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
 	defaultLibraryPath := bundled.LibPath()
-	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, nil, nil, nil)
+	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, UncachedExtendedConfigs{}, nil, nil)
+}
+
+var configAncestorsKey = ast.NewSourceFileDataKey[[]string]()
+
+// A config diagnostic retains only the source AST. Keep the ancestry computed
+// by tsgo on that same AST before the parser releases its config wrapper.
+func ParseExtendedConfig(name string, path tspath.Path, stack []tspath.Path, host tsoptions.ParseConfigHost, cache tsoptions.ExtendedConfigCache) *tsoptions.ExtendedConfigCacheEntry {
+	entry := tsoptions.ParseExtendedConfig(name, path, stack, host, cache)
+	if files := entry.ExtendedFileNames(); len(files) != 0 && len(tsoptions.ExtendedConfigCacheEntry_errors(entry)) != 0 {
+		source := tsoptions.ExtendedConfigCacheEntry_extendedResult(entry).SourceFile
+		ast.GetOrComputeSourceFileData(source, configAncestorsKey, func(*ast.SourceFile) []string { return files })
+	}
+	return entry
+}
+
+// UncachedExtendedConfigs preserves the parser's per-project source identity.
+type UncachedExtendedConfigs struct{}
+
+func (parser UncachedExtendedConfigs) GetExtendedConfig(name string, path tspath.Path, stack []tspath.Path, host tsoptions.ParseConfigHost) *tsoptions.ExtendedConfigCacheEntry {
+	return ParseExtendedConfig(name, path, stack, host, parser)
+}
+
+func ConfigAncestors(source *ast.SourceFile) []string {
+	return ast.GetOrComputeSourceFileData(source, configAncestorsKey, func(*ast.SourceFile) []string { return nil })
 }
 
 func configNotFoundError(resolvedConfigPath string) error {
@@ -53,7 +77,7 @@ func createProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 		return nil, configNotFoundError(resolvedConfigPath)
 	}
 
-	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
+	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, UncachedExtendedConfigs{})
 
 	return createProgramFromConfig(singleThreaded, configParseResult, host, useSourceOfProjectReference)
 }
@@ -67,7 +91,7 @@ func CreateProgramLenient(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPa
 		return nil, configNotFoundError(resolvedConfigPath)
 	}
 
-	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
+	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, UncachedExtendedConfigs{})
 
 	return CreateProgramFromParsedConfigLenient(singleThreaded, configParseResult, host)
 }

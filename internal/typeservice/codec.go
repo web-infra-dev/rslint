@@ -435,10 +435,11 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
 		pos := at + 4 + uint32(i)*40
 		if d.Config != nil {
 			config := uint32(len(w.data))
-			w.data = append(w.data, make([]byte, 12)...)
+			w.data = append(w.data, make([]byte, 16)...)
 			w.put(pos, config)
 			w.put(config, w.text(d.Config.Name))
 			w.put(config+4, w.text(string(d.Config.Path)))
+			w.put(config+12, w.text(d.Config.ID))
 			if len(d.Config.ExtendedSourceFiles) != 0 {
 				files := make([]uint32, len(d.Config.ExtendedSourceFiles))
 				for i, file := range d.Config.ExtendedSourceFiles {
@@ -537,12 +538,14 @@ func (w *packetWriter) node(node *NodeRef) uint32 {
 	}
 	offset := uint32(len(w.data))
 	w.data = append(w.data, make([]byte, 8)...)
-	w.put(offset, w.text(node.File))
-	// A negative index addresses the config parse tree of the same filename.
+	// Config nodes carry the identity of the parse after the signed index.
 	index := int32(node.Index)
-	if node.Config {
+	if node.Config != "" {
+		w.data = append(w.data, make([]byte, 4)...)
+		w.put(offset+8, w.text(node.Config))
 		index = -index
 	}
+	w.put(offset, w.text(node.File))
 	w.put(offset+4, uint32(index))
 	return offset
 }

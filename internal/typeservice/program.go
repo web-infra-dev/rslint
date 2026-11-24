@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
@@ -15,11 +16,21 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 )
 
-type diagnosticFilesKey struct{}
+type configFilesKey struct{}
 
-// An inherited config can appear only as the source of a compiler diagnostic.
-func diagnosticFiles(p *program.Program) *sync.Map {
-	return program.Cached(p, diagnosticFilesKey{}, func() *sync.Map { return new(sync.Map) })
+// Separate parses of the same config can appear in different project references.
+func configFiles(p *program.Program) *sync.Map {
+	return program.Cached(p, configFilesKey{}, func() *sync.Map { return new(sync.Map) })
+}
+
+func configID(file *ast.SourceFile) string {
+	return strconv.FormatUint(uint64(ast.GetNodeId(file.AsNode())), 10)
+}
+
+func configFile(p *program.Program, id string) *ast.SourceFile {
+	value, _ := configFiles(p).Load(id)
+	file, _ := value.(*ast.SourceFile)
+	return file
 }
 
 func parsedConfig(q program.CompilerQueries, path tspath.Path) *tsoptions.ParsedCommandLine {
@@ -28,20 +39,6 @@ func parsedConfig(q program.CompilerQueries, path tspath.Path) *tsoptions.Parsed
 		return c
 	}
 	return q.ResolvedProjectReference(path)
-}
-
-func configFile(p *program.Program, name string) *ast.SourceFile {
-	q := p.CompilerQueries()
-	if q == nil {
-		return nil
-	}
-	path := tspath.ToPath(name, p.CurrentDirectory(), p.FS().UseCaseSensitiveFileNames())
-	if c := parsedConfig(q, path); c != nil && c.ConfigFile != nil {
-		return c.ConfigFile.SourceFile
-	}
-	value, _ := diagnosticFiles(p).Load(path)
-	file, _ := value.(*ast.SourceFile)
-	return file
 }
 
 func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, node *ast.Node) (Result, error) {
@@ -100,7 +97,7 @@ func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, no
 		}
 		return nil, errors.New("invalid module resolution index")
 	case "configSyntax":
-		source := configFile(p, r.File)
+		source := configFile(p, r.Config)
 		if source == nil {
 			return nil, errors.New("unknown project config")
 		}
@@ -164,17 +161,27 @@ func projectReferences(c *tsoptions.ParsedCommandLine) []projectReference {
 }
 
 type configSourceInfo struct {
+	ID                  string      `json:"id"`
 	Name                string      `json:"name"`
 	Path                tspath.Path `json:"path"`
 	ExtendedSourceFiles []string    `json:"extendedSourceFiles,omitempty"`
 }
 
-func configSource(c *tsoptions.ParsedCommandLine) *configSourceInfo {
+func configSource(p *program.Program, c *tsoptions.ParsedCommandLine) *configSourceInfo {
 	if c.ConfigFile == nil {
 		return nil
 	}
 	source := c.ConfigFile.SourceFile
-	return &configSourceInfo{Name: source.FileName(), Path: source.Path(), ExtendedSourceFiles: c.ExtendedSourceFiles()}
+	info := registerConfig(p, source)
+	info.Path = source.Path()
+	info.ExtendedSourceFiles = c.ExtendedSourceFiles()
+	return info
+}
+
+func registerConfig(p *program.Program, source *ast.SourceFile) *configSourceInfo {
+	id := configID(source)
+	configFiles(p).LoadOrStore(id, source)
+	return &configSourceInfo{ID: id, Name: source.FileName()}
 }
 
 type referenceConfig struct {
@@ -215,7 +222,7 @@ func resolvedReferences(p *program.Program) (Result, error) {
 		if err != nil {
 			return 0, err
 		}
-		fact := &referenceConfig{configSourceInfo: configSource(c), Options: options, FileNames: slices.Concat([]string{}, c.FileNames()), ProjectReferences: projectReferences(c), Raw: c.Raw, CompileOnSave: c.CompileOnSave, WatchOptions: c.ParsedConfig.WatchOptions, TypeAcquisition: c.TypeAcquisition()}
+		fact := &referenceConfig{configSourceInfo: configSource(p, c), Options: options, FileNames: slices.Concat([]string{}, c.FileNames()), ProjectReferences: projectReferences(c), Raw: c.Raw, CompileOnSave: c.CompileOnSave, WatchOptions: c.ParsedConfig.WatchOptions, TypeAcquisition: c.TypeAcquisition()}
 		dirs := c.WildcardDirectories()
 		fact.WildcardDirectories = make(map[string]uint8, len(dirs))
 		for path, recursive := range dirs {

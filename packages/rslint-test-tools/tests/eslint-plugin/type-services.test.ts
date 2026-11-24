@@ -2282,7 +2282,7 @@ test('resolved project references retain config syntax, nesting and missing entr
   };
   writeFileSync(
     resolve(dir, 'base.json'),
-    '{"compilerOptions":{"unknownOption":true}}',
+    '{"extends":"./nested.json","compilerOptions":{"unknownOption":true}}',
   );
   writeFileSync(
     nested,
@@ -2333,6 +2333,7 @@ test('resolved project references retain config syntax, nesting and missing entr
     const tsProgram = ts.createProgram({
       ...parsed,
       rootNames: parsed.fileNames,
+      configFileParsingDiagnostics: parsed.errors,
     });
     const inspect = (p: ts.Program) => {
       const source = p.getOptionsDiagnostics().find((d) => d.code === 5052)!
@@ -2342,6 +2343,9 @@ test('resolved project references retain config syntax, nesting and missing entr
         source.extendedSourceFiles,
       ];
       const refs = p.getResolvedProjectReferences()!;
+      const childBase = refs[0]!.commandLine.errors.find(
+        (d) => d.code === 5023,
+      )!.file as ts.TsConfigSourceFile;
       const options = p.getCompilerOptions();
       const configFile = options.configFile as ts.SourceFile;
       return {
@@ -2385,6 +2389,11 @@ test('resolved project references retain config syntax, nesting and missing entr
             ],
         ),
         nested: refs[0]!.references![0] === refs[1],
+        distinctBaseFiles:
+          childBase !==
+          p.getConfigFileParsingDiagnostics().find((d) => d.code === 5023)!
+            .file,
+        baseAncestors: childBase.extendedSourceFiles,
         excluded: !p.getSourceFiles().some((f) => f.fileName === child),
       };
     };

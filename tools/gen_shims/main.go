@@ -402,7 +402,7 @@ func main() {
 											string
 											*types.Struct
 										}{n, structType})
-										shimBuilder.WriteString("extra_")
+										shimBuilder.WriteString("*extra_")
 										shimBuilder.WriteString(n)
 										continue
 									}

@@ -744,7 +744,7 @@ export class TypeServiceClient {
       },
       options.maxSyntaxBytes ?? 16 << 20,
       options.maxSyntaxFactsBytes ?? 1 << 20,
-      (file) => this.query({ op: 'configSyntax', args: { file } }).tree,
+      (config) => this.query({ op: 'configSyntax', args: { config } }).tree,
     );
     const errorType = () => this.query({ op: 'errorType', args: {} });
     const atParseTreeNode = <T>(
@@ -1474,6 +1474,7 @@ export class TypeServiceClient {
     if (!graph) return undefined;
     const configs: ResolvedReferenceView[] = graph.configs.map((config) => {
       const {
+        id,
         name,
         path,
         options,
@@ -1488,6 +1489,7 @@ export class TypeServiceClient {
             .map((d) => this.diagnostic(d))
         : [];
       const sourceFile = this.syntax.configSource({
+        id,
         name,
         path,
         extendedSourceFiles,

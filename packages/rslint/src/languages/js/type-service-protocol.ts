@@ -7,7 +7,7 @@ export interface Scope {
 }
 export interface NodeRef {
   file: string;
-  config?: boolean;
+  config?: string;
   index: number;
   token?: { kind: number; pos: number; end: number };
 }
@@ -19,6 +19,7 @@ export interface FileBinding extends Scope {
   sourceFileName: string;
 }
 export interface ConfigSourceInfo {
+  id: string;
   name: string;
   path: string;
   extendedSourceFiles?: string[];
@@ -208,7 +209,7 @@ export interface QueryArguments {
   modeForResolutionAtIndex: NodeArgs & { index: number };
   projectReferences: Record<string, never>;
   resolvedProjectReferences: Record<string, never>;
-  configSyntax: { file: string };
+  configSyntax: { config: string };
   stringLiteralType: { name: readonly number[] };
   numberLiteralType: { value: string };
   bigintLiteralType: { negative: boolean; digits: string };
@@ -677,7 +678,9 @@ const operationIDs = new Map<Operation, number>(
 export function typeQueryKey(q: TypeServiceQuery): string {
   const nodeKey = (node: NodeRef | undefined): string => {
     if (!node) return '-';
-    const key = `${node.file.length}:${node.file}:${node.config ? -node.index : node.index}`;
+    const key = node.config
+      ? `c${node.config}:${node.index}`
+      : `${node.file.length}:${node.file}:${node.index}`;
     return node.token
       ? `${key}:${node.token.kind}:${node.token.pos}:${node.token.end}`
       : key;

@@ -63,11 +63,7 @@ func bindingOf(symbol *ast.Symbol, rank int) symbolBinding {
 		b.owner = symbol.Parent // The binder inserts prototype when it enters the class.
 	}
 	if len(b.owner.Declarations) != 0 {
-		b.decl = b.owner.Declarations[0]
-		switch b.decl.Kind {
-		case ast.KindJSTypeAliasDeclaration, ast.KindJSImportDeclaration:
-			b.decl = sourceJSDocDeclaration(b.decl)
-		}
+		b.decl = sourceJSDocDeclaration(b.owner.Declarations[0])
 		for n := b.decl; n != nil; n = n.Parent {
 			b.depth++
 			b.file = n
@@ -159,8 +155,13 @@ func bindingChildPhase(child *ast.Node) int {
 			return -1
 		}
 	case ast.KindCallExpression:
-		if child == parent.Expression() && !ast.IsOptionalChain(parent) && ast.IsFunctionExpressionOrArrowFunction(ast.SkipParentheses(child)) {
-			return 1
+		if child == parent.Expression() && !ast.IsOptionalChain(parent) {
+			callee := ast.SkipParentheses(child)
+			if ast.IsFunctionExpressionOrArrowFunction(callee) {
+				if entry := callee.FlowNodeData().FlowNode; entry != nil && entry.Flags&ast.FlowFlagsUnreachable == 0 {
+					return 1
+				}
+			}
 		}
 	case ast.KindParameter, ast.KindBindingElement:
 		if child == parent.Name() {
@@ -182,11 +183,35 @@ func unreachableBinding(node *ast.Node) bool {
 		if node.Flags&ast.NodeFlagsUnreachable != 0 {
 			return true
 		}
+		if node.Kind == ast.KindBlock && !ast.IsFunctionLike(node.Parent) {
+			// Blocks have no entry flow of their own. The binder records it on
+			// their first statement, skipping hoisted declarations.
+			if first := firstFlowStatement(node); first != nil {
+				return first.FlowNodeData().FlowNode == nil
+			}
+		}
+		if ast.IsFunctionExpressionOrArrowFunction(node) {
+			return node.FlowNodeData().FlowNode == nil
+		}
 		if ast.IsPotentiallyExecutableNode(node) || ast.IsFunctionLikeOrClassStaticBlockDeclaration(node) {
 			break
 		}
 	}
 	return false
+}
+
+func firstFlowStatement(block *ast.Node) *ast.Node {
+	for _, stmt := range block.StatementList().Nodes {
+		if ast.KindFirstStatement <= stmt.Kind && stmt.Kind <= ast.KindLastStatement {
+			return stmt
+		}
+		if stmt.Kind == ast.KindBlock {
+			if first := firstFlowStatement(stmt); first != nil {
+				return first
+			}
+		}
+	}
+	return nil
 }
 
 func moduleExports(c *checker.Checker, module *ast.Symbol) []*ast.Symbol {

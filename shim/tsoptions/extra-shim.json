@@ -1,4 +1,5 @@
 {
+  "ExtraFields": { "ExtendedConfigCacheEntry": ["extendedResult", "errors"] },
   "IgnoreFunctions": [
     "ParseJsonConfigFileContent",
     "ParseJsonSourceFileConfigFileContent"

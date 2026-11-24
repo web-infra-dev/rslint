@@ -81,7 +81,9 @@ export class TypePacketReader {
     if (!offset) return undefined;
     const file = this.text(this.word(offset)),
       index = this.word(offset + 4) | 0;
-    return index < 0 ? { file, index: -index, config: true } : { file, index };
+    return index < 0
+      ? { file, index: -index, config: this.text(this.word(offset + 8)) }
+      : { file, index };
   }
   nodeFacts(): readonly NodeFact[] {
     if (this.kind !== 8) return invalid();
@@ -334,6 +336,7 @@ export class TypePacketReader {
       const config =
         flags & 4
           ? {
+              id: this.text(this.word(file + 12)),
               name: this.text(this.word(file)),
               path: this.text(this.word(file + 4)),
               extendedSourceFiles: this.optionalIDs(file + 8)?.map((name) =>

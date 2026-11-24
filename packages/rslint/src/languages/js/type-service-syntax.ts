@@ -225,9 +225,10 @@ function syntaxView(
   read: (key: string | symbol, proxy: object) => unknown,
   ensure: () => void,
   jsDocKinds: JsDocKinds,
+  extendedSourceFiles?: string[],
 ): object {
   const proxy: object = new Proxy(
-    {},
+    extendedSourceFiles ? { extendedSourceFiles } : {},
     {
       get(target, key, receiver) {
         ensure();
@@ -386,7 +387,10 @@ function needsRealPosition(kind: SyntaxKind): boolean {
 }
 
 type SourceMetadata = TypeServiceDescriptor['sources'][number];
-type ConfigMetadata = SourceMetadata & { ordinal: number };
+type ConfigMetadata = SourceMetadata & {
+  ordinal: number;
+  extendedSourceFiles?: string[];
+};
 
 /** A worker/generation owns stable native identities and a bounded decoded
  * source LRU. Proxies retain identities, never a dependency source buffer. */
@@ -408,7 +412,7 @@ export class GenerationSyntaxViews {
     key: string | ConfigMetadata;
     source: WeakRef<RemoteSourceFile>;
   };
-  private configTrees?: WeakSet<Node>;
+  private configTrees?: WeakMap<Node, string>;
   private readonly configs = new Map<string, ConfigMetadata>();
   private readonly summaries = new Map<
     string,
@@ -433,7 +437,7 @@ export class GenerationSyntaxViews {
     private readonly ensure: () => void,
     private readonly maxSourceBytes: number,
     private readonly maxSummaryBytes: number,
-    private readonly readConfig: (file: string) => Uint8Array,
+    private readonly readConfig: (id: string) => Uint8Array,
   ) {
     for (const [index, source] of descriptor.sources.entries()) {
       this.sourceOrdinals.set(source.fileName, index + 1);
@@ -443,7 +447,7 @@ export class GenerationSyntaxViews {
   }
   private ordinal(ref: NodeRef) {
     return ref.config
-      ? this.configMetadata(ref.file).ordinal
+      ? this.configs.get(ref.config)?.ordinal
       : this.sourceOrdinals.get(ref.file);
   }
   private key(ref: NodeRef): string {
@@ -509,7 +513,7 @@ export class GenerationSyntaxViews {
   metadata(node: object) {
     const ref = this.location(node);
     const metadata = ref.config
-      ? this.configMetadata(ref.file)
+      ? this.configs.get(ref.config)
       : this.metadataByName.get(ref.file);
     if (!metadata) throw new Error('foreign source');
     return metadata;
@@ -525,34 +529,24 @@ export class GenerationSyntaxViews {
       ? this.nodeRef({ file: source.fileName, index: 1 })
       : undefined;
   }
-  private configMetadata(file: string): ConfigMetadata {
-    let metadata = this.configs.get(file);
-    if (!metadata) {
-      metadata = {
-        fileName: file,
-        path: file,
-        external: false,
-        defaultLibrary: false,
-        isDeclarationFile: false,
-        ordinal: this.sourceOrdinals.size + this.configs.size + 1,
-      };
-      this.configs.set(file, metadata);
-    }
-    return metadata;
-  }
   configSource({
+    id,
     name: file,
     path,
     extendedSourceFiles,
   }: ConfigSourceInfo): object {
-    this.configMetadata(file).path = path;
-    const sourceFile = this.nodeRef({ file, index: 1, config: true })!;
-    if (
-      extendedSourceFiles &&
-      !Object.hasOwn(sourceFile, 'extendedSourceFiles')
-    )
-      Object.assign(sourceFile, { extendedSourceFiles });
-    return sourceFile;
+    if (!this.configs.has(id)) {
+      this.configs.set(id, {
+        fileName: file,
+        path,
+        extendedSourceFiles,
+        external: false,
+        defaultLibrary: false,
+        isDeclarationFile: false,
+        ordinal: this.sourceOrdinals.size + this.configs.size + 1,
+      });
+    }
+    return this.nodeRef({ file, index: 1, config: id })!;
   }
   sourceView(file: string): object | undefined {
     this.ensure();
@@ -568,11 +562,11 @@ export class GenerationSyntaxViews {
   }
   private cachedSource(
     file: string,
-    config?: boolean,
+    config?: string,
   ): RemoteSourceFile | undefined {
     const active = !config && this.activeSources.get(file);
     if (active) return active.source;
-    const key = config ? this.configMetadata(file) : file;
+    const key = config ? this.configs.get(config)! : file;
     const entry = this.sources.get(key);
     if (entry) {
       this.sources.delete(key);
@@ -585,9 +579,9 @@ export class GenerationSyntaxViews {
   private retain(
     source: RemoteSourceFile,
     bytes: number,
-    config: boolean,
+    config?: string,
   ): void {
-    const key = config ? this.configMetadata(source.fileName) : source.fileName;
+    const key = config ? this.configs.get(config)! : source.fileName;
     if (bytes > this.maxSourceBytes) {
       // Reuse consecutive reads of a large dependency without pinning its buffer.
       this.oversizedSource = { key, source: new WeakRef(source) };
@@ -604,7 +598,7 @@ export class GenerationSyntaxViews {
   attach(
     tree: Uint8Array,
     expected?: { file: string; text: string },
-    config = false,
+    config?: string,
   ): RemoteSourceFile {
     const source = new RemoteSourceFile(
       Uint8Array.from(tree),
@@ -615,7 +609,7 @@ export class GenerationSyntaxViews {
       (source.fileName !== expected.file || source.text !== expected.text)
     )
       throw new Error('type service projection belongs to a different source');
-    if (config) (this.configTrees ??= new WeakSet()).add(source);
+    if (config) (this.configTrees ??= new WeakMap()).set(source, config);
     const previous = this.cachedSource(source.fileName, config);
     if (!previous) this.retain(source, tree.byteLength, config);
     const shared = previous ?? source;
@@ -630,12 +624,12 @@ export class GenerationSyntaxViews {
     const active = this.activeSources.get(file);
     if (active && --active.users === 0) this.activeSources.delete(file);
   }
-  source(file: string, config?: boolean): RemoteSourceFile | undefined {
+  source(file: string, config?: string): RemoteSourceFile | undefined {
     this.ensure();
     if (config)
       return (
-        this.cachedSource(file, true) ??
-        this.attach(this.readConfig(file), undefined, true)
+        this.cachedSource(file, config) ??
+        this.attach(this.readConfig(config), undefined, config)
       );
     const metadata = this.metadataByName.get(file);
     if (!metadata) return undefined;
@@ -717,7 +711,7 @@ export class GenerationSyntaxViews {
     this.ensure();
     if (!ref) return undefined;
     const metadata = ref.config
-      ? this.configMetadata(ref.file)
+      ? this.configs.get(ref.config)
       : this.metadataByName.get(ref.file);
     if (!metadata) throw new Error('foreign source');
     const identity = ref.config
@@ -733,6 +727,9 @@ export class GenerationSyntaxViews {
       (key, proxy) => this.get(identity, key, proxy),
       this.ensure,
       this.typescript.jsDocKinds,
+      !('owner' in identity) && identity.index === 1 && identity.config
+        ? this.configs.get(identity.config)?.extendedSourceFiles
+        : undefined,
     );
     this.identities.set(proxy, identity);
     this.wrapped.set(cacheKey, proxy);
@@ -743,8 +740,9 @@ export class GenerationSyntaxViews {
     index = (value as unknown as { index: number }).index,
   ): NodeRef {
     const source = value.getSourceFile();
-    return this.configTrees?.has(source)
-      ? { file: source.fileName, index, config: true }
+    const config = this.configTrees?.get(source);
+    return config
+      ? { file: source.fileName, index, config }
       : { file: source.fileName, index };
   }
   private wrapNode(value: Node): object {
@@ -824,12 +822,12 @@ export class GenerationSyntaxViews {
       return () => {
         this.ensure();
         return config
-          ? this.nodeRef({ file, index: 1, config: true })
+          ? this.nodeRef({ file, index: 1, config })
           : this.sourceView(file);
       };
     if (real?.index === 1) {
       const source = config
-        ? this.configMetadata(file)
+        ? this.configs.get(config)!
         : this.metadataByName.get(file)!;
       if (key === 'fileName' || key === 'path' || key === 'isDeclarationFile')
         return source[key];

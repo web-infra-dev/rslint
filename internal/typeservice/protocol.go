@@ -18,7 +18,7 @@ type Scope struct {
 type NodeRef struct {
 	File   string       `json:"file"`
 	Index  uint32       `json:"index"`
-	Config bool         `json:"config,omitempty"`
+	Config string       `json:"config,omitempty"`
 	Token  *SyntaxToken `json:"token,omitempty"`
 }
 
@@ -75,10 +75,11 @@ type SignatureRequest struct {
 	ID uint32    `json:"id"`
 }
 type ProgramRequest struct {
-	Op    Operation `json:"-"`
-	Node  *NodeRef  `json:"node"`
-	File  string    `json:"file"`
-	Index int       `json:"index"`
+	Config string    `json:"config,omitempty"`
+	Op     Operation `json:"-"`
+	Node   *NodeRef  `json:"node"`
+	File   string    `json:"file"`
+	Index  int       `json:"index"`
 }
 
 func (r *ProgramRequest) operation() Operation { return r.Op }

@@ -315,7 +315,8 @@ func boundJSDocDeclaration(source *ast.Node) *ast.Node {
 }
 
 func sourceJSDocDeclaration(node *ast.Node) *ast.Node {
-	if node.Flags&ast.NodeFlagsReparsed != 0 {
+	// Children cloned under a generated import can keep only the JSDoc flag.
+	if node.Flags&ast.NodeFlagsReparsed != 0 || node.Flags&ast.NodeFlagsJSDoc != 0 && node.Flags&ast.NodeFlagsJavaScriptFile != 0 {
 		file := ast.GetSourceFileOfNode(node)
 		table := encoder.GetNodeIndexTable(file)
 		if index := jsDocNodeIndex(node, file, table); index != 0 {

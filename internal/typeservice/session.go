@@ -127,7 +127,10 @@ func (s *Session) Source(generation uint32, name string) (*ast.SourceFile, error
 	}
 	file := s.program.GetSourceFile(name)
 	if file == nil && !s.syntaxOnly {
-		file = configFile(s.program, name)
+		path := tspath.ToPath(name, s.program.CurrentDirectory(), s.program.FS().UseCaseSensitiveFileNames())
+		if c := parsedConfig(s.program.CompilerQueries(), path); c != nil && c.ConfigFile != nil {
+			file = c.ConfigFile.SourceFile
+		}
 	}
 	if s.syntaxOnly && !s.eligible[file] {
 		return nil, errors.New("foreign syntax service source")
@@ -217,7 +220,7 @@ func (s *Session) Descriptor() (Descriptor, error) {
 	if err != nil {
 		return Descriptor{}, err
 	}
-	d := Descriptor{Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: options, ConfigFile: configSource(commandLine)}
+	d := Descriptor{Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: options, ConfigFile: configSource(s.program, commandLine)}
 	for _, f := range s.program.SourceFiles() {
 		d.Sources = append(d.Sources, s.source(f))
 	}
@@ -645,9 +648,15 @@ func syntaxReference(p *program.Program, n *ast.Node) (*NodeRef, *ast.Node) {
 		return nil, nil
 	}
 	f := ast.GetSourceFileOfNode(n)
-	config := !p.OwnsSourceFile(f)
-	if config && (f == nil || configFile(p, f.FileName()) != f) {
-		panic("declaration is outside Program")
+	var config string
+	if !p.OwnsSourceFile(f) {
+		if f == nil {
+			panic("declaration is outside Program")
+		}
+		config = configID(f)
+		if configFile(p, config) != f {
+			panic("declaration is outside Program")
+		}
 	}
 	table := encoder.GetNodeIndexTable(f)
 	index := uint32(0)
@@ -1369,8 +1378,8 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 }
 
 func sourceForNode(p *program.Program, ref *NodeRef) *ast.SourceFile {
-	if ref.Config {
-		return configFile(p, ref.File)
+	if ref.Config != "" {
+		return configFile(p, ref.Config)
 	}
 	return p.GetSourceFile(ref.File)
 }
@@ -1468,10 +1477,10 @@ func diagnosticFacts(p *program.Program, diagnostics []*ast.Diagnostic) Suggesti
 			d.File = f.FileName()
 			if !p.OwnsSourceFile(f) {
 				if c := parsedConfig(p.CompilerQueries(), f.Path()); c != nil && c.ConfigFile != nil && c.ConfigFile.SourceFile == f {
-					d.Config = configSource(c)
+					d.Config = configSource(p, c)
 				} else {
-					diagnosticFiles(p).Store(f.Path(), f)
-					d.Config = &configSourceInfo{Name: f.FileName(), Path: f.Path()}
+					d.Config = registerConfig(p, f)
+					d.Config.ExtendedSourceFiles = utils.ConfigAncestors(f)
 				}
 			}
 			positions := f.GetPositionMap()
