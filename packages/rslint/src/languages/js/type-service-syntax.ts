@@ -584,7 +584,12 @@ export class GenerationSyntaxViews {
             child = list?.getChildren().find(matches);
           }
           if (child) return this.sourceLocation(this.wrapNode(child));
-        } else if (this.generated.has(token.parent)) return undefined;
+        } else if (
+          token.parent &&
+          (token.parent.flags & this.typescript.NodeFlags.Synthesized ||
+            this.generated.has(token.parent))
+        )
+          return undefined;
       }
       throw new Error('foreign compiler node handle');
     }
