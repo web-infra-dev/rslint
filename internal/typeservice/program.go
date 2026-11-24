@@ -125,7 +125,14 @@ var diagnosticKinds = map[Operation]program.DiagnosticKind{
 	"declarationDiagnostics":       program.DeclarationDiagnostics,
 }
 
-func projectReferences(c *tsoptions.ParsedCommandLine) []map[string]any {
+type projectReference struct {
+	Circular     *any   `json:"circular,omitempty"`
+	OriginalPath string `json:"originalPath"`
+	Path         string `json:"path"`
+	Prepend      *any   `json:"prepend,omitempty"`
+}
+
+func projectReferences(c *tsoptions.ParsedCommandLine) []projectReference {
 	refs := c.ProjectReferences()
 	if len(refs) == 0 {
 		return nil
@@ -134,12 +141,9 @@ func projectReferences(c *tsoptions.ParsedCommandLine) []map[string]any {
 	if config, ok := c.Raw.(*jsonObject); ok {
 		inputs, _ = config.GetOrZero("references").([]any)
 	}
-	result := make([]map[string]any, len(refs))
+	result := make([]projectReference, len(refs))
 	for i, r := range refs {
-		ref := map[string]any{"path": r.Path, "originalPath": r.OriginalPath}
-		if r.Circular {
-			ref["circular"] = true
-		}
+		ref := projectReference{Path: r.Path, OriginalPath: r.OriginalPath}
 		// The parser skips invalid entries and preserves duplicate paths in order.
 		for len(inputs) != 0 {
 			input, _ := inputs[0].(*jsonObject)
@@ -147,12 +151,16 @@ func projectReferences(c *tsoptions.ParsedCommandLine) []map[string]any {
 			if input == nil || input.GetOrZero("path") != r.OriginalPath {
 				continue
 			}
-			for _, key := range [...]string{"prepend", "circular"} {
-				if value, ok := input.Get(key); ok {
-					ref[key] = value
-				}
+			if value, ok := input.Get("prepend"); ok {
+				ref.Prepend = &value
+			}
+			if value, ok := input.Get("circular"); ok {
+				ref.Circular = &value
 			}
 			break
+		}
+		if r.Circular && ref.Circular == nil {
+			ref.Circular = new(any(true))
 		}
 		result[i] = ref
 	}
@@ -187,7 +195,7 @@ type referenceConfig struct {
 	*configSourceInfo
 	Options             map[string]any        `json:"options"`
 	FileNames           []string              `json:"fileNames"`
-	ProjectReferences   []map[string]any      `json:"projectReferences,omitempty"`
+	ProjectReferences   []projectReference    `json:"projectReferences,omitempty"`
 	References          []int                 `json:"references,omitempty"`
 	WildcardDirectories map[string]uint8      `json:"wildcardDirectories"`
 	Raw                 any                   `json:"raw,omitempty"`

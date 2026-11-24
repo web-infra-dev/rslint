@@ -183,42 +183,88 @@ func immediateCallee(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// Cache binder entry reachability for this sort, including nested calls in arguments.
-type bindingFlow map[*ast.Node]bool
+type entryFlow uint8
+
+const (
+	noFlow entryFlow = iota
+	deadFlow
+	liveFlow
+)
+
+// Cache the binder's flow at each reordering site for this sort.
+type bindingFlow map[*ast.Node]entryFlow
 
 func (flow bindingFlow) unreachable(node *ast.Node) bool {
-	if dead, ok := flow[node]; ok {
-		return dead
+	if state := flow.entry(node); state != noFlow {
+		return state == deadFlow
 	}
-	dead := flow.unreachableBinding(node)
-	flow[node] = dead
-	return dead
+	// An empty pattern containing only class field initializers may have no
+	// observation in its own flow. Its surrounding expression supplies the entry.
+	return flow.enclosingUnreachable(node, true)
 }
 
-func (flow bindingFlow) hasReachableFlow(node *ast.Node) bool {
+func (flow bindingFlow) entry(node *ast.Node) entryFlow {
+	if state, ok := flow[node]; ok {
+		return state
+	}
+	state := liveFlow
+	if callee := immediateCallee(node); callee != nil {
+		// An argument can terminate flow before the binder visits the callee.
+		if flow.observed(callee) != liveFlow && !slices.ContainsFunc(node.AsCallExpression().Arguments.Nodes, func(arg *ast.Node) bool {
+			return flow.observed(arg) == liveFlow
+		}) {
+			state = deadFlow
+		}
+	} else if ast.IsDestructuringAssignment(node) {
+		state = flow.children(node)
+	} else if flow.enclosingUnreachable(node, false) {
+		state = deadFlow
+	}
+	flow[node] = state
+	return state
+}
+
+func (flow bindingFlow) children(node *ast.Node) entryFlow {
+	state := noFlow
+	node.ForEachChild(func(child *ast.Node) bool {
+		state = max(state, flow.observed(child))
+		return state == liveFlow
+	})
+	return state
+}
+
+func (flow bindingFlow) observed(node *ast.Node) entryFlow {
 	if data := node.FlowNodeData(); data != nil && data.FlowNode != nil {
-		return data.FlowNode.Flags&ast.FlowFlagsUnreachable == 0
+		if data.FlowNode.Flags&ast.FlowFlagsUnreachable != 0 {
+			return deadFlow
+		}
+		return liveFlow
 	}
 	// A class static block runs in the surrounding flow. A field initializer
 	// or nested function gets its own flow even in an unreachable argument.
 	if binder.GetContainerFlags(node)&binder.ContainerFlagsIsControlFlowContainer != 0 && !ast.IsClassStaticBlockDeclaration(node) {
-		return false
+		return noFlow
 	}
-	if immediateCallee(node) != nil {
-		return !flow.unreachable(node)
+	if immediateCallee(node) != nil || ast.IsDestructuringAssignment(node) {
+		return flow.entry(node)
 	}
-	return node.ForEachChild(flow.hasReachableFlow)
+	return flow.children(node)
 }
 
 // Unreachable statements bind children in syntax order, including their expressions.
-func (flow bindingFlow) unreachableBinding(node *ast.Node) bool {
-	for ; node != nil; node = node.Parent {
+func (flow bindingFlow) enclosingUnreachable(node *ast.Node, missingEntry bool) bool {
+	var child *ast.Node
+	for ; node != nil; child, node = node, node.Parent {
 		if node.Flags&ast.NodeFlagsUnreachable != 0 {
 			return true
 		}
-		if callee := immediateCallee(node); callee != nil {
-			// An argument can terminate flow before the binder visits the callee.
-			return !flow.hasReachableFlow(callee) && !slices.ContainsFunc(node.AsCallExpression().Arguments.Nodes, flow.hasReachableFlow)
+		if missingEntry && child != nil {
+			if skippedBindingChild(node, child) {
+				return true
+			}
+		}
+		if immediateCallee(node) != nil {
+			return flow.entry(node) == deadFlow
 		}
 		if node.Kind == ast.KindBlock && !ast.IsFunctionLike(node.Parent) {
 			// Blocks have no entry flow of their own. The binder records it on
@@ -231,13 +277,73 @@ func (flow bindingFlow) unreachableBinding(node *ast.Node) bool {
 			}
 		}
 		if ast.IsFunctionExpressionOrArrowFunction(node) {
-			return node.FlowNodeData().FlowNode == nil
+			return ast.GetFunctionFlags(node) == ast.FunctionFlagsNormal && ast.GetImmediatelyInvokedFunctionExpression(node) != nil && flow.observed(node) != liveFlow
 		}
-		if ast.IsPotentiallyExecutableNode(node) || ast.IsFunctionLikeOrClassStaticBlockDeclaration(node) {
+		if ast.IsPotentiallyExecutableNode(node) || binder.GetContainerFlags(node)&binder.ContainerFlagsIsControlFlowContainer != 0 {
 			break
 		}
 	}
 	return false
+}
+
+// With no flow-bearing reference in a pattern, only its evaluation context
+// can tell whether the binder reached it.
+func skippedBindingChild(parent, child *ast.Node) bool {
+	switch parent.Kind {
+	case ast.KindBinaryExpression:
+		b := parent.AsBinaryExpression()
+		if child == b.Right {
+			switch b.OperatorToken.Kind {
+			case ast.KindAmpersandAmpersandToken:
+				return impossibleBindingCondition(b.Left, true)
+			case ast.KindBarBarToken:
+				return impossibleBindingCondition(b.Left, false)
+			case ast.KindCommaToken:
+				return endsBindingFlow(b.Left)
+			}
+		}
+	case ast.KindConditionalExpression:
+		c := parent.AsConditionalExpression()
+		return child != c.Condition && impossibleBindingCondition(c.Condition, child == c.WhenTrue)
+	case ast.KindCallExpression:
+		args := parent.AsCallExpression().Arguments.Nodes
+		if i := slices.Index(args, child); i >= 0 {
+			return slices.ContainsFunc(args[:i], endsBindingFlow)
+		}
+	}
+	return false
+}
+
+func impossibleBindingCondition(node *ast.Node, truth bool) bool {
+	if ast.IsBooleanLiteral(node) {
+		return (node.Kind == ast.KindTrueKeyword) != truth
+	}
+	if !ast.IsLogicalExpression(node) {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	if node.Kind == ast.KindPrefixUnaryExpression {
+		return impossibleBindingCondition(node.AsPrefixUnaryExpression().Operand, !truth)
+	}
+	b := node.AsBinaryExpression()
+	if b.OperatorToken.Kind != ast.KindAmpersandAmpersandToken && b.OperatorToken.Kind != ast.KindBarBarToken {
+		return false
+	}
+	if (b.OperatorToken.Kind == ast.KindAmpersandAmpersandToken) == truth {
+		return impossibleBindingCondition(b.Left, truth) || impossibleBindingCondition(b.Right, truth)
+	}
+	return impossibleBindingCondition(b.Left, truth) && impossibleBindingCondition(b.Right, truth)
+}
+
+func endsBindingFlow(node *ast.Node) bool {
+	callee := immediateCallee(ast.SkipParentheses(node))
+	if callee == nil || ast.GetFunctionFlags(callee) != ast.FunctionFlagsNormal || callee.Flags&ast.NodeFlagsHasImplicitReturn != 0 || callee.Body().Kind != ast.KindBlock {
+		return false
+	}
+	return !ast.ForEachReturnStatement(callee.Body(), func(stmt *ast.Node) bool {
+		data := stmt.FlowNodeData().FlowNode
+		return data != nil && data.Flags&ast.FlowFlagsUnreachable == 0
+	})
 }
 
 func firstFlowStatement(block *ast.Node) *ast.Node {
