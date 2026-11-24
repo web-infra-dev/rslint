@@ -331,15 +331,25 @@ export class TypePacketReader {
       const file = this.word(pos),
         source = this.word(pos + 24),
         flags = this.word(pos + 28);
+      const config =
+        flags & 4
+          ? {
+              name: this.text(this.word(file)),
+              path: this.text(this.word(file + 4)),
+              extendedSourceFiles: this.optionalIDs(file + 8)?.map((name) =>
+                this.text(name),
+              ),
+            }
+          : undefined;
       return {
-        fileName: file ? this.text(file) : undefined,
+        fileName: config?.name ?? (file ? this.text(file) : undefined),
         start: this.word(pos + 4),
         length: this.word(pos + 8),
         category: this.word(pos + 12),
         code: this.word(pos + 16),
         text: this.text(this.word(pos + 20)),
         source: source ? this.text(source) : undefined,
-        config: !!(flags & 4),
+        config,
         reportsDeprecated: flags & 1 ? true : undefined,
         reportsUnnecessary: flags & 2 ? true : undefined,
         chain: this.diagnostics(this.word(pos + 32)),

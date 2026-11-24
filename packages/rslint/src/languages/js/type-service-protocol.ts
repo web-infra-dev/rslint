@@ -132,7 +132,7 @@ export interface SymbolFact {
   readonly valueDeclaration: NodeRef | undefined;
 }
 export interface DiagnosticFact {
-  config?: boolean;
+  config?: ConfigSourceInfo;
   fileName?: string;
   start: number;
   length: number;

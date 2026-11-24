@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -14,20 +15,33 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 )
 
+type diagnosticFilesKey struct{}
+
+// An inherited config can appear only as the source of a compiler diagnostic.
+func diagnosticFiles(p *program.Program) *sync.Map {
+	return program.Cached(p, diagnosticFilesKey{}, func() *sync.Map { return new(sync.Map) })
+}
+
+func parsedConfig(q program.CompilerQueries, path tspath.Path) *tsoptions.ParsedCommandLine {
+	c := q.CommandLine()
+	if c.ConfigFile != nil && c.ConfigFile.SourceFile.Path() == path {
+		return c
+	}
+	return q.ResolvedProjectReference(path)
+}
+
 func configFile(p *program.Program, name string) *ast.SourceFile {
 	q := p.CompilerQueries()
 	if q == nil {
 		return nil
 	}
 	path := tspath.ToPath(name, p.CurrentDirectory(), p.FS().UseCaseSensitiveFileNames())
-	config := q.CommandLine()
-	if config.ConfigFile == nil || config.ConfigFile.SourceFile.Path() != path {
-		config = q.ResolvedProjectReference(path)
+	if c := parsedConfig(q, path); c != nil && c.ConfigFile != nil {
+		return c.ConfigFile.SourceFile
 	}
-	if config != nil && config.ConfigFile != nil {
-		return config.ConfigFile.SourceFile
-	}
-	return nil
+	value, _ := diagnosticFiles(p).Load(path)
+	file, _ := value.(*ast.SourceFile)
+	return file
 }
 
 func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, node *ast.Node) (Result, error) {

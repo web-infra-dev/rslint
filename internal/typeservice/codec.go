@@ -433,7 +433,20 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
 	w.put(at, uint32(len(facts)))
 	for i, d := range facts {
 		pos := at + 4 + uint32(i)*40
-		if d.File != "" {
+		if d.Config != nil {
+			config := uint32(len(w.data))
+			w.data = append(w.data, make([]byte, 12)...)
+			w.put(pos, config)
+			w.put(config, w.text(d.Config.Name))
+			w.put(config+4, w.text(string(d.Config.Path)))
+			if len(d.Config.ExtendedSourceFiles) != 0 {
+				files := make([]uint32, len(d.Config.ExtendedSourceFiles))
+				for i, file := range d.Config.ExtendedSourceFiles {
+					files[i] = w.text(file)
+				}
+				w.put(config+8, w.ids(files))
+			}
+		} else if d.File != "" {
 			w.put(pos, w.text(d.File))
 		}
 		w.put(pos+4, d.Start)
@@ -451,7 +464,7 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
 		if d.Unnecessary {
 			flags |= 2
 		}
-		if d.Config {
+		if d.Config != nil {
 			flags |= 4
 		}
 		w.put(pos+28, flags)

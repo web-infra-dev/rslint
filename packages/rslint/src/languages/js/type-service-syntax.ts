@@ -13,6 +13,7 @@ import type ts from 'typescript';
 import type { TypeServiceCompilerData } from './type-service-compiler-data.js';
 import { WeakObjectCache } from './type-service-cache.js';
 import type {
+  ConfigSourceInfo,
   FileBinding,
   GeneratedSyntax,
   Operation,
@@ -539,12 +540,12 @@ export class GenerationSyntaxViews {
     }
     return metadata;
   }
-  configSource(
-    file: string,
-    path?: string,
-    extendedSourceFiles?: string[],
-  ): object {
-    if (path) this.configMetadata(file).path = path;
+  configSource({
+    name: file,
+    path,
+    extendedSourceFiles,
+  }: ConfigSourceInfo): object {
+    this.configMetadata(file).path = path;
     const sourceFile = this.nodeRef({ file, index: 1, config: true })!;
     if (
       extendedSourceFiles &&
@@ -822,7 +823,9 @@ export class GenerationSyntaxViews {
     if (key === 'getSourceFile')
       return () => {
         this.ensure();
-        return config ? this.configSource(file) : this.sourceView(file);
+        return config
+          ? this.nodeRef({ file, index: 1, config: true })
+          : this.sourceView(file);
       };
     if (real?.index === 1) {
       const source = config

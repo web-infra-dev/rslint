@@ -2280,7 +2280,10 @@ test('resolved project references retain config syntax, nesting and missing entr
     target: 'esnext',
     plugins: [{ name: 'language-plugin', settings: { mode: 'local' } }],
   };
-  writeFileSync(resolve(dir, 'base.json'), '{}');
+  writeFileSync(
+    resolve(dir, 'base.json'),
+    '{"compilerOptions":{"unknownOption":true}}',
+  );
   writeFileSync(
     nested,
     JSON.stringify({ compilerOptions, files: ['nested.ts'] }),
@@ -2298,7 +2301,12 @@ test('resolved project references retain config syntax, nesting and missing entr
   writeFileSync(
     config,
     JSON.stringify({
-      compilerOptions,
+      extends: './base.json',
+      compilerOptions: {
+        ...compilerOptions,
+        exactOptionalPropertyTypes: true,
+        strictNullChecks: false,
+      },
       files: ['input.ts'],
       references: [
         { path: './child.json' },
@@ -2327,10 +2335,17 @@ test('resolved project references retain config syntax, nesting and missing entr
       rootNames: parsed.fileNames,
     });
     const inspect = (p: ts.Program) => {
+      const source = p.getOptionsDiagnostics().find((d) => d.code === 5052)!
+        .file as ts.TsConfigSourceFile;
+      const diagnosticSource = [
+        Reflect.get(source, 'path'),
+        source.extendedSourceFiles,
+      ];
       const refs = p.getResolvedProjectReferences()!;
       const options = p.getCompilerOptions();
       const configFile = options.configFile as ts.SourceFile;
       return {
+        diagnosticSource,
         options: [
           options.plugins,
           configFile.fileName,
@@ -2358,6 +2373,12 @@ test('resolved project references retain config syntax, nesting and missing entr
               ref.commandLine.options.target,
               ref.commandLine.options.plugins,
               ref.commandLine.options.configFile === ref.sourceFile,
+              ref.commandLine.errors
+                .filter((d) => d.code === 5023)
+                .map((d) => [
+                  d.file?.fileName,
+                  d.file?.text.slice(d.start!, d.start! + d.length!),
+                ]),
               ref.commandLine.raw.compilerOptions.target,
               ref.commandLine.wildcardDirectories,
               (ref.sourceFile as ts.TsConfigSourceFile).extendedSourceFiles,

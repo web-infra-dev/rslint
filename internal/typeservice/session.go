@@ -1466,7 +1466,14 @@ func diagnosticFacts(p *program.Program, diagnostics []*ast.Diagnostic) Suggesti
 		}
 		if f := diagnostic.File(); f != nil {
 			d.File = f.FileName()
-			d.Config = !p.OwnsSourceFile(f) && configFile(p, d.File) == f
+			if !p.OwnsSourceFile(f) {
+				if c := parsedConfig(p.CompilerQueries(), f.Path()); c != nil && c.ConfigFile != nil && c.ConfigFile.SourceFile == f {
+					d.Config = configSource(c)
+				} else {
+					diagnosticFiles(p).Store(f.Path(), f)
+					d.Config = &configSourceInfo{Name: f.FileName(), Path: f.Path()}
+				}
+			}
 			positions := f.GetPositionMap()
 			start := positions.UTF8ToUTF16(diagnostic.Pos())
 			d.Start = uint32(start)

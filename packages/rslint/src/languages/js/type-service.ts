@@ -1368,12 +1368,7 @@ export class TypeServiceClient {
           return readCompilerOptions(
             typescript,
             descriptor.compilerOptions,
-            config &&
-              this.syntax.configSource(
-                config.name,
-                config.path,
-                config.extendedSourceFiles,
-              ),
+            config && this.syntax.configSource(config),
           );
         }),
         getCurrentDirectory: () => descriptor.currentDirectory,
@@ -1492,11 +1487,11 @@ export class TypeServiceClient {
             .scalar('configFileParsingDiagnostics')
             .map((d) => this.diagnostic(d))
         : [];
-      const sourceFile = this.syntax.configSource(
+      const sourceFile = this.syntax.configSource({
         name,
         path,
         extendedSourceFiles,
-      );
+      });
       return {
         sourceFile,
         commandLine: {
@@ -1534,7 +1529,7 @@ export class TypeServiceClient {
     return {
       file: d.fileName
         ? d.config
-          ? this.syntax.configSource(d.fileName)
+          ? this.syntax.configSource(d.config)
           : this.syntax.sourceView(d.fileName)
         : undefined,
       start: d.fileName ? d.start : undefined,

@@ -402,10 +402,11 @@ type EncodedTypeNode struct {
 }
 type SuggestionDiagnostics []DiagnosticFact
 type DiagnosticFact struct {
-	File, Message, Source           string
-	Start, Length, Category, Code   uint32
-	Deprecated, Unnecessary, Config bool
-	Chain, Related                  SuggestionDiagnostics
+	File, Message, Source         string
+	Start, Length, Category, Code uint32
+	Deprecated, Unnecessary       bool
+	Config                        *configSourceInfo
+	Chain, Related                SuggestionDiagnostics
 }
 
 func (EncodedTypeNode) result()       {}

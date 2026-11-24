@@ -7,7 +7,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // A JS SymbolTable retains insertion order. Keep the checker's choice of
@@ -54,7 +53,7 @@ type symbolBinding struct {
 	symbol, owner *ast.Symbol
 	decl, file    *ast.Node
 	rank, depth   int
-	augmentation  bool
+	mergePhase    uint8
 	filePhase     uint8
 }
 
@@ -65,21 +64,26 @@ func bindingOf(symbol *ast.Symbol, rank int) symbolBinding {
 	}
 	if len(b.owner.Declarations) != 0 {
 		b.decl = b.owner.Declarations[0]
-		// The binder finishes a JS file before binding its JSDoc aliases, then its JSDoc imports.
 		switch b.decl.Kind {
-		case ast.KindJSTypeAliasDeclaration:
-			b.filePhase = 1
-		case ast.KindJSImportDeclaration:
-			b.filePhase = 2
-		}
-		if b.filePhase != 0 {
+		case ast.KindJSTypeAliasDeclaration, ast.KindJSImportDeclaration:
 			b.decl = sourceJSDocDeclaration(b.decl)
 		}
 		for n := b.decl; n != nil; n = n.Parent {
 			b.depth++
 			b.file = n
-			if n.Kind == ast.KindModuleDeclaration && (ast.IsGlobalScopeAugmentation(n) || ast.IsExternalModuleAugmentation(n)) {
-				b.augmentation = true
+			switch n.Kind {
+			// The JS binder finishes the file, then binds JSDoc aliases, then JSDoc imports.
+			case ast.KindJSDocTypedefTag, ast.KindJSDocCallbackTag, ast.KindJSTypeAliasDeclaration:
+				b.filePhase = 1
+			case ast.KindJSDocImportTag, ast.KindJSImportDeclaration:
+				b.filePhase = 2
+			case ast.KindModuleDeclaration:
+				// The checker merges global augmentations before external module augmentations.
+				if ast.IsGlobalScopeAugmentation(n) {
+					b.mergePhase = 1
+				} else if ast.IsExternalModuleAugmentation(n) {
+					b.mergePhase = 2
+				}
 			}
 		}
 	}
@@ -99,8 +103,7 @@ func (order symbolOrder) sort(c *checker.Checker, symbols []*ast.Symbol) {
 			return byTable
 		}
 		if a.decl != nil && b.decl != nil {
-			// The checker merges global and external module augmentations after the original tables.
-			if byMerge := core.CompareBooleans(a.augmentation, b.augmentation); byMerge != 0 {
+			if byMerge := cmp.Compare(a.mergePhase, b.mergePhase); byMerge != 0 {
 				return byMerge
 			}
 			if a.file == b.file {
@@ -131,15 +134,59 @@ func compareBindingNodes(a, b symbolBinding) int {
 		for left.Parent != right.Parent {
 			left, right = left.Parent, right.Parent
 		}
-		// Functions and their entire bodies bind first only in these statement lists.
-		switch left.Parent.Kind {
-		case ast.KindSourceFile, ast.KindBlock, ast.KindModuleBlock:
-			if hoisted := core.CompareBooleans(right.Kind == ast.KindFunctionDeclaration, left.Kind == ast.KindFunctionDeclaration); hoisted != 0 {
-				return hoisted
-			}
+		if byChild := cmp.Compare(bindingChildPhase(left), bindingChildPhase(right)); byChild != 0 && !unreachableBinding(left.Parent) {
+			return byChild
 		}
 	}
 	return cmp.Compare(a.decl.Pos(), b.decl.Pos())
+}
+
+// The binder visits most siblings in source order. These children run earlier
+// or later than their position in the syntax tree.
+func bindingChildPhase(child *ast.Node) int {
+	parent := child.Parent
+	switch parent.Kind {
+	case ast.KindSourceFile, ast.KindBlock, ast.KindModuleBlock:
+		if child.Kind == ast.KindFunctionDeclaration {
+			return -1
+		}
+	case ast.KindForStatement:
+		if child == parent.AsForStatement().Incrementor {
+			return 1
+		}
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		if child == parent.AsForInOrOfStatement().Expression {
+			return -1
+		}
+	case ast.KindCallExpression:
+		if child == parent.Expression() && !ast.IsOptionalChain(parent) && ast.IsFunctionExpressionOrArrowFunction(ast.SkipParentheses(child)) {
+			return 1
+		}
+	case ast.KindParameter, ast.KindBindingElement:
+		if child == parent.Name() {
+			return 1
+		}
+	case ast.KindBinaryExpression:
+		if child == parent.AsBinaryExpression().Left && ast.IsDestructuringAssignment(parent) {
+			if target := ast.GetAssignmentTarget(parent); target != nil && ast.IsDestructuringAssignment(target) {
+				return 1 // A nested pattern binds its default value before its target.
+			}
+		}
+	}
+	return 0
+}
+
+// Unreachable statements bind children in syntax order, including their expressions.
+func unreachableBinding(node *ast.Node) bool {
+	for ; node != nil; node = node.Parent {
+		if node.Flags&ast.NodeFlagsUnreachable != 0 {
+			return true
+		}
+		if ast.IsPotentiallyExecutableNode(node) || ast.IsFunctionLikeOrClassStaticBlockDeclaration(node) {
+			break
+		}
+	}
+	return false
 }
 
 func moduleExports(c *checker.Checker, module *ast.Symbol) []*ast.Symbol {
