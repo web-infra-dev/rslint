@@ -235,6 +235,13 @@ function syntaxView(
           ? Reflect.get(target, key, receiver)
           : read(key, proxy);
       },
+      set(target, key, value, receiver) {
+        ensure();
+        // A write to a projected field creates an ordinary writable property.
+        if (receiver === proxy && !Reflect.has(target, key))
+          return Reflect.set(target, key, value);
+        return Reflect.set(target, key, value, receiver);
+      },
       has(target, key) {
         ensure();
         if (Reflect.has(target, key)) return true;

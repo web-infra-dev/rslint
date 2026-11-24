@@ -1121,11 +1121,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				table = globalExports(symbol)
 			}
 			members := slices.Collect(maps.Values(table))
-			if r.Op == "symbolExports" {
-				symbolOrder(nil).sort(c, members)
-			} else {
-				checker.Checker_sortSymbols(c, members)
-			}
+			symbolOrder{}.sort(c, members)
 			result := make(NamedSymbols, len(members))
 			for i, member := range members {
 				result[i] = NamedSymbol{ID: s.symbolID(member), Name: ast.EscapeSymbolName(member.Name)}
@@ -1141,7 +1137,20 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			sym := s.symbolByID(r.ID)
 			// The record outlives the checker lease.
 			declarations, value := symbolDeclarations(sym, true)
-			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: declarations, valueNode: value}, nil
+			// The JS binder creates these tables even for declarations with no entries.
+			var declared ast.SymbolFlags
+			if len(sym.Declarations) != 0 {
+				bound := sym.Declarations[0].Symbol()
+				if bound == sym || c.GetMergedSymbol(bound) == sym {
+					declared = sym.Flags
+				}
+			}
+			return &SymbolFact{
+				Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags),
+				HasMembers:       sym.Members != nil || declared&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface|ast.SymbolFlagsTypeLiteral|ast.SymbolFlagsObjectLiteral) != 0,
+				HasExports:       sym.Exports != nil || declared&(ast.SymbolFlagsClass|ast.SymbolFlagsEnum|ast.SymbolFlagsModule|ast.SymbolFlagsVariable) != 0,
+				HasGlobalExports: globalExports(sym) != nil, nodes: declarations, valueNode: value,
+			}, nil
 		}
 	case *SymbolDocsRequest:
 		if !r.WithChecker {

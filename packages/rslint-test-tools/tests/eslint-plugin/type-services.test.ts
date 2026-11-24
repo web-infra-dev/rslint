@@ -1845,6 +1845,12 @@ test('public checker, Program and source reads match TypeScript', async () => {
               (detachedConstraint.members[0] as ts.MethodSignature)
                 .typeParameters?.hasTrailingComma,
               c.isOptionalParameter(generatedParameter),
+              c.getSymbolAtLocation(
+                ts.setOriginalNode(generatedParameter.name, decl.name),
+              )?.name,
+              c.getSymbolAtLocation(
+                ts.setOriginalNode(generatedParameter.name, undefined),
+              )?.name,
             ],
             modes: [
               imp.attributes?.elements[0].value.getText(src),
