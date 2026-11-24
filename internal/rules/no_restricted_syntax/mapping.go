@@ -62,6 +62,12 @@ var estreeKindMap = map[string][]ast.Kind{
 	"TSEnumBody":                    {ast.KindEnumDeclaration},
 	"TSEnumMember":                  {ast.KindEnumMember},
 
+	// TypeScript expressions
+	"TSAsExpression":        {ast.KindAsExpression},
+	"TSSatisfiesExpression": {ast.KindSatisfiesExpression},
+	"TSNonNullExpression":   {ast.KindNonNullExpression},
+	"TSTypeAssertion":       {ast.KindTypeAssertionExpression},
+
 	// Classes
 	"ClassDeclaration": {ast.KindClassDeclaration},
 	"ClassExpression":  {ast.KindClassExpression},
