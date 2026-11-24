@@ -1498,10 +1498,11 @@ worker results. The CLI passes these exclusions to the package, which compares
 completed rule counts and owns baseline persistence. The package keys counts
 by the CLI target path in the final lint result, relative to the physical
 working directory. A rule can receive a different TypeScript Program filename
-for that target. The discovery catalog records where an actual file or
-directory lookup fell back to an ancestor.
-Those targets keep their diagnostics and baseline entries. Catalog failures also
-cover subtrees with no working owner. A failed plugin rule keeps its own count.
+for that target. The discovery catalog records selected files and directory
+scopes that needed a fallback config or had no working owner after a load
+failure. Those targets keep their diagnostics and baseline entries. A selected
+subproject with its own working config can still complete a baseline check.
+A failed plugin rule keeps its own count.
 An incomplete plugin file result limits updates for that file. A batch dispatch
 error in the final observation stops the update.
 The CLI supplies visible diagnostics and any baseline failure to report assembly.

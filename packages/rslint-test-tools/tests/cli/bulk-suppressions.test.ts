@@ -152,7 +152,8 @@ describe('CLI bulk suppressions', () => {
       'shared.js': 'debugger;',
       'work/src/app.js': 'debugger;',
       'sibling.js': 'var physical = 1;',
-      'nested/sibling.js': 'var logical = 1;',
+      'nested/sibling.js': 'var logical = 1; debugger;',
+      'base.json': '{}',
     });
     const root = await fs.realpath(temp);
     const work = path.join(root, 'work');
@@ -167,17 +168,27 @@ describe('CLI bulk suppressions', () => {
         cwd,
         env: { ...process.env, PWD: cwd },
       });
-    const fixSibling = async () => {
-      const result = await fromAlias('--fix', '../sibling.js');
-      expect(result.exitCode, result.stderr).toBe(0);
-      expect(await fs.readFile(path.join(nested, 'sibling.js'), 'utf8')).toBe(
-        'let logical = 1;',
-      );
-      expect(await fs.readFile(path.join(root, 'sibling.js'), 'utf8')).toBe(
-        'var physical = 1;',
-      );
-    };
-    await fixSibling();
+    const fixed = await fromAlias('--fix', '../sibling.js');
+    expect(fixed.exitCode, fixed.stderr).toBe(1);
+    expect(await fs.readFile(path.join(nested, 'sibling.js'), 'utf8')).toBe(
+      'let logical = 1; debugger;',
+    );
+    expect(await fs.readFile(path.join(root, 'sibling.js'), 'utf8')).toBe(
+      'var physical = 1;',
+    );
+    const custom = await fromAlias(
+      '--suppress-all',
+      '--suppressions-location',
+      '../base.json',
+      '../sibling.js',
+    );
+    expect(custom.exitCode, custom.stderr).toBe(0);
+    expect(
+      JSON.parse(await fs.readFile(path.join(nested, 'base.json'), 'utf8')),
+    ).toEqual({
+      '../nested/sibling.js': { 'no-debugger': { count: 1 } },
+    });
+    expect(await fs.readFile(path.join(root, 'base.json'), 'utf8')).toBe('{}');
     expect((await fromAlias('src/app.js')).exitCode).toBe(0);
     const recorded = await runRslint(
       ['--suppress-all', shared, 'src/app.js'],
@@ -190,8 +201,6 @@ describe('CLI bulk suppressions', () => {
       'src/app.js': { 'no-debugger': { count: 1 } },
     });
 
-    await fs.writeFile(path.join(nested, 'sibling.js'), 'var logical = 1;');
-    await fixSibling();
     const pruned = await fromAlias('--prune-suppressions', 'src/app.js');
     expect(pruned.exitCode, pruned.stderr).toBe(0);
     expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
@@ -406,6 +415,22 @@ describe('CLI bulk suppressions', () => {
     await fs.writeFile(path.join(cwd, 'nested/ok/b.js'), 'console.log(1);');
     expect((await check('--suppress-all')).exitCode).toBe(2);
     expect(await readBaseline(cwd)).toEqual({ 'nested/ok/b.js': count });
+
+    // The healthy child supplies the full config for these three selections.
+    for (const input of ['nested/ok/b.js', 'nested/ok/', '**/b.js']) {
+      expect((await runRslint([input], cwd)).exitCode).toBe(0);
+    }
+    for (const [healthy, missing] of [
+      ['nested/ok/b.js', 'nested/missing.js'],
+      ['nested/ok/', 'nested/**/missing.ts'],
+    ]) {
+      const result = await runRslint([healthy, missing], cwd);
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stderr).toContain(`${missing} was not found, skipping`);
+    }
+    for (const inputs of [['nested/a.js', 'nested/ok/b.js'], ['**/*.js']]) {
+      expect((await runRslint(inputs, cwd)).exitCode).toBe(2);
+    }
   });
 
   test('keeps directory-scan counts when a literal file tries a different config', async () => {

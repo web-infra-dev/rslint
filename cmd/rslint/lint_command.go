@@ -627,7 +627,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	case baselineErr != nil:
 		suppressionError = baselineErr.Error()
 	case baseline != nil:
-		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation.Native.Files, targetPlan.Files, allDiags, finalPlugin, args)
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation.Native.Files, targetPlan, allDiags, finalPlugin, args)
 	}
 	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0

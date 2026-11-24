@@ -199,7 +199,7 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 	t.Chdir(link)
 	for location, want := range map[string]string{
 		root:             filepath.Join(root, "rslint-suppressions_"+cwdHash(native)),
-		"../shared.json": filepath.Join(filepath.Dir(native), "shared.json"),
+		"../shared.json": filepath.Join(filepath.Dir(link), "shared.json"),
 	} {
 		f, err := Open(Options{Mode: Record, Location: location})
 		if err != nil || f.path != want {
@@ -281,6 +281,34 @@ func TestConcurrentUpdates(t *testing.T) {
 	want := entries{"test.js": {"rule0": {Count: 1}, "rule1": {Count: 1}}}
 	if err != nil || f == nil || !reflect.DeepEqual(f.entries, want) {
 		t.Fatalf("concurrent updates: file=%v err=%v, want %v", f, err, want)
+	}
+}
+
+func TestUpdateRequiresBaselineWriteAccess(t *testing.T) {
+	cwd := tempWorkingDirectory(t)
+	const original = `{"a.js":{"x":{"count":1}}}`
+	if err := os.WriteFile(DefaultFilename, []byte(original), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(DefaultFilename, 0o600) })
+	if file, err := os.OpenFile(DefaultFilename, os.O_WRONLY, 0); err == nil {
+		_ = file.Close()
+		t.Skip("current user can write a read-only file")
+	} else if !errors.Is(err, os.ErrPermission) {
+		t.Fatal(err)
+	}
+	f, err := Open(Options{Mode: Record})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"x", "y"} { // An unchanged count and a new count.
+		_, _, err := reportError(t.Context(), f, filepath.Join(cwd, "a.js"), id)
+		if !errors.Is(err, os.ErrPermission) {
+			t.Fatalf("record %s: expected a permission error, got %v", id, err)
+		}
+	}
+	if content, err := os.ReadFile(DefaultFilename); err != nil || string(content) != original {
+		t.Fatalf("read-only baseline: %q, %v", content, err)
 	}
 }
 

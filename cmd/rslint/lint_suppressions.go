@@ -13,7 +13,7 @@ func applyLintSuppressions(
 	ctx context.Context,
 	baseline *suppressions.File,
 	files []linter.LintedFile,
-	targets []target.File,
+	targets target.Plan,
 	diagnostics []rule.RuleDiagnostic,
 	plugin linter.PluginDispatchRecord,
 	args lintArgs,
@@ -21,7 +21,7 @@ func applyLintSuppressions(
 	if plugin.DispatchError != nil && args.Suppressions.Mode != suppressions.Check {
 		return diagnostics, "Cannot update suppressions because plugin lint dispatch failed."
 	}
-	fallback := args.ConfigCatalog.FilesWithConfigFallback(targets)
+	fallback, configFailed := args.ConfigCatalog.FilesWithConfigFallback(targets)
 	incompleteFiles := make(map[string]bool)
 	failedRules := make(map[string][]string)
 	for _, notice := range plugin.Notices {
@@ -53,7 +53,7 @@ func applyLintSuppressions(
 	}
 	var failure string
 	switch {
-	case len(args.ConfigCatalog.Failures) > 0:
+	case configFailed:
 		failure = "A lint configuration failed to load. Files without their intended configuration keep their original suppressions."
 	case len(incompleteFiles) > 0 || plugin.DispatchError != nil:
 		failure = "Plugin lint results are incomplete."

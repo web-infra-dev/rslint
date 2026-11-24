@@ -14,13 +14,13 @@ import (
 // leaf still visits that directory so its sources can govern files within it.
 type discoveryTargetTrie struct {
 	children map[tspath.Path]*discoveryTargetTrie
-	files    []*rslintconfig.PathIdentity
+	files    []*DiscoveryFile
 }
 
 func addDiscoveryTarget(
 	root *discoveryTargetTrie,
 	configDir string,
-	file *rslintconfig.PathIdentity,
+	file *DiscoveryFile,
 	useCaseSensitive bool,
 ) bool {
 	relative, within := rslintconfig.RelativePathWithinConfigRoot(
@@ -148,7 +148,7 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 			if trie == nil {
 				trie = &discoveryTargetTrie{}
 			}
-			if addDiscoveryTarget(trie, root, &file.PathIdentity, useCaseSensitive) {
+			if addDiscoveryTarget(trie, root, file, useCaseSensitive) {
 				tries[root] = trie
 			}
 		}

@@ -23,29 +23,21 @@ const DefaultFilename = "rslint-suppressions.json"
 func Open(options Options) (*File, error) {
 	f := &File{options: options, path: DefaultFilename}
 	var cwd string
-	var err error
 	if location := options.Location; location != "" {
-		// Match Node's process.cwd(), including the stored case on Unix and
-		// the native drive and junction spelling on Windows.
-		cwd, err = syscall.Getwd()
+		path, err := filepath.Abs(location)
 		if err != nil {
 			return nil, err
-		}
-		path := location
-		if filepath.VolumeName(path) != "" || os.IsPathSeparator(path[0]) {
-			// Let Windows resolve drive-relative and current-drive-rooted paths.
-			path, err = filepath.Abs(path)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			path = filepath.Join(cwd, path)
 		}
 		info, err := os.Stat(path)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
 		if os.IsPathSeparator(location[len(location)-1]) || (info != nil && info.IsDir()) {
+			// ESLint hashes Node's native process.cwd() for directory locations.
+			cwd, err = syscall.Getwd()
+			if err != nil {
+				return nil, err
+			}
 			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(cwd))
 		}
 		f.path = path
@@ -186,9 +178,20 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	// A dangling symlink also reports ErrNotExist during resolution.
-	if info != nil && info.Mode()&fs.ModeSymlink != 0 {
-		return fmt.Errorf("cannot resolve suppressions destination %q", path)
+	if info != nil {
+		// A dangling symlink also reports ErrNotExist during resolution.
+		if info.Mode()&fs.ModeSymlink != 0 {
+			return fmt.Errorf("cannot resolve suppressions destination %q", path)
+		}
+		// A rename can replace a read-only file on Unix. Recording and pruning
+		// require write access even when the counts are unchanged.
+		existing, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			return err
+		}
+		if err := existing.Close(); err != nil {
+			return err
+		}
 	}
 	data, err := f.read(path)
 	if err != nil {

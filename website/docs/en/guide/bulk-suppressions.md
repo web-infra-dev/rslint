@@ -42,7 +42,7 @@ Use the same directory spelling when recording and checking. If `checkout-link` 
 
 To reuse an ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. Entries apply when the file path and rule ID match. On Windows, use consistent directory casing when importing an ESLint baseline. From `C:/repo`, ESLint records `C:/REPO/src/app.ts` as `src/app.ts`, while Rslint preserves its spelling as `../REPO/src/app.ts`.
 
-Pass `--suppressions-location` on every run that uses a custom location. An existing directory or a path ending in a directory separator selects `rslint-suppressions_<hash>` inside that directory. Create the directory first. The hash comes from the absolute working directory. To reuse a file ESLint generated in that directory, pass its full filename.
+Pass `--suppressions-location` on every run that uses a custom location. Relative locations resolve from the same working directory as CLI file arguments. An existing directory or a path ending in a directory separator selects `rslint-suppressions_<hash>` inside that directory. Create the directory first. Rslint uses the same working-directory hash as ESLint. To reuse a file ESLint generated in that directory, pass its full filename.
 
 ## Remove unused suppressions
 
@@ -62,6 +62,6 @@ Ignored files and files with syntax errors keep their entries. If a file moves o
 
 A plugin rule that throws reports its failure and any findings it emitted. An incomplete rule keeps its recorded count, while completed rules can still record and prune theirs. If plugin results are missing for an entire file, `--suppress-all` and `--prune-suppressions` preserve that file's entries and update other files normally. `--suppress-rule` can still record a completed native rule in the affected file. The CLI exits with code `2` for incomplete file results. If a plugin batch request fails during the final check, the CLI leaves the baseline untouched.
 
-A plain lint run can warn about a failed child config and exit successfully if the files it checked pass. When checking or updating a baseline, a config failure leaves some counts unverified, so a partial run exits with code `2` even with an empty `{}` baseline. Files that lost their config keep their entries. Files linted with a fallback config report their findings, and files with a working config can still record and prune their counts.
+When some configs load and others fail, a baseline check or update exits with code `2` if a selected file or directory loses its config or needs a fallback. Files affected by the failure keep their entries and report any findings from the fallback config. Files with a working config can still record and prune their counts. For example, if `sub/` has its own working config, checking just `sub/` can succeed even when the parent config fails to load.
 
 To defer cleanup, run `rslint --pass-on-unpruned-suppressions`. Lint errors and the configured warning limit still determine the exit status.

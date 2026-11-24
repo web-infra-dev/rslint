@@ -215,9 +215,6 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		if seed.ownerDir == "" {
 			continue
 		}
-		if seed.usingFallback {
-			coordinator.draft.addFallback(seed.path, seed.ownerDir)
-		}
 		state := coordinator.modules.state(seed.ownerPath)
 		if state == nil {
 			continue
@@ -232,6 +229,9 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		}
 	}
 	for _, seed := range explicitSeeds {
+		if seed.usingFallback && rslintconfig.IsSupportedLintFile(seed.path) {
+			coordinator.draft.addFallback(seed.path, seed.ownerDir)
+		}
 		if seed.ownerDir == "" {
 			continue
 		}
@@ -252,6 +252,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			canonicalDirectory: seed.physicalDirectory,
 			ownerDir:           seed.ownerDir,
 			ownerPath:          seed.ownerPath,
+			usingFallback:      seed.usingFallback,
 			ignoreMatcher:      ignoreMatcher,
 			configReachable:    true,
 			gitCursor:          seed.gitCursor,

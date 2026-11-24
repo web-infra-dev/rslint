@@ -110,7 +110,7 @@ type ConfigFailure struct {
 
 type fallbackScope struct {
 	path  string // Literal input or directory scanned with a fallback config.
-	owner string // The successful owner used for that input.
+	owner string // The successful owner used for that input, or empty if none loaded.
 }
 
 type ConfigDiscoveryStats struct {
@@ -141,14 +141,15 @@ type ConfigCatalog struct {
 	Explicit bool
 }
 
-// FilesWithConfigFallback identifies targets whose actual discovery route
-// skipped a failed config. Literal files have their own config lookup.
-func (catalog *ConfigCatalog) FilesWithConfigFallback(files []target.File) map[string]bool {
+// FilesWithConfigFallback identifies planned files whose selected route used
+// a fallback. The boolean includes selected inputs left without a config owner,
+// which have no planned files. Literal files have their own config lookup.
+func (catalog *ConfigCatalog) FilesWithConfigFallback(plan target.Plan) (map[string]bool, bool) {
 	if len(catalog.fallbacks) == 0 {
-		return nil
+		return nil, false
 	}
 	result := make(map[string]bool)
-	for _, file := range files {
+	for _, file := range plan.Files {
 		_, literal := slices.BinarySearch(catalog.Scopes[file.ConfigDirectory].ExplicitFiles, file.Path)
 		for path := file.Path; path != ""; path = configDiscoveryParent(path) {
 			if catalog.fallbacks[fallbackScope{path, file.ConfigDirectory}] {
@@ -160,7 +161,20 @@ func (catalog *ConfigCatalog) FilesWithConfigFallback(files []target.File) map[s
 			}
 		}
 	}
-	return result
+	// Unmatched CLI inputs still take part in discovery for skip warnings.
+	// The target plan already knows which of those inputs actually exist.
+	missing := make(map[string]bool)
+	for _, input := range plan.ExplicitFileOutcomes {
+		if !input.Exists {
+			missing[input.Path] = true
+		}
+	}
+	for scope := range catalog.fallbacks {
+		if !missing[scope.path] {
+			return result, true
+		}
+	}
+	return nil, false
 }
 
 func (catalog *ConfigCatalog) ConfigDirectories() []string {
