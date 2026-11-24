@@ -23,13 +23,12 @@ import (
 )
 
 type request struct {
-	MetadataOnly bool                `json:"metadataOnly"`
-	Method       string              `json:"method"`
-	Config       string              `json:"config"`
-	File         string              `json:"file"`
-	Query        typeservice.Query   `json:"query"`
-	Queries      []typeservice.Query `json:"queries"`
-	Generation   uint32              `json:"generation"`
+	MetadataOnly bool              `json:"metadataOnly"`
+	Method       string            `json:"method"`
+	Config       string            `json:"config"`
+	File         string            `json:"file"`
+	Query        typeservice.Query `json:"query"`
+	Generation   uint32            `json:"generation"`
 }
 
 func main() {
@@ -145,12 +144,6 @@ func main() {
 						Tree     []byte `json:"tree"`
 					}{f.FileName(), tree}
 				}
-			case "batch":
-				if session == nil {
-					err = errors.New("session not initialized")
-					return
-				}
-				value, err = session.QueryBatch(context.Background(), req.Queries)
 			case "query":
 				if session == nil {
 					err = errors.New("session not initialized")

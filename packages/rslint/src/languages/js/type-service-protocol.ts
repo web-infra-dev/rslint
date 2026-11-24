@@ -803,11 +803,6 @@ const operationIDs = new Map(
   ].map((op, index) => [op, index + 1] as const),
 );
 
-export type BatchTransport = (
-  queries: readonly TypeServiceQuery[],
-  keys: readonly string[],
-) => readonly Uint8Array[];
-
 export type ServiceRequest<K extends Operation = Operation> = {
   [P in K]: { op: P; args: QueryArguments[P] };
 }[K];

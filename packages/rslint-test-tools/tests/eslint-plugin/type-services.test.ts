@@ -812,14 +812,7 @@ test('type and declaration identity survive closing one file', async () => {
         if (!metadataOnly) syntaxReads++;
         return host.source(scope, file, metadataOnly);
       },
-      {
-        maxFactsBytes: 1 << 20,
-        maxSyntaxBytes: 0,
-        batchTransport: (queries) =>
-          host
-            .request({ method: 'batch', queries })
-            .map((packet: string) => Buffer.from(packet, 'base64')),
-      },
+      { maxFactsBytes: 1 << 20, maxSyntaxBytes: 0 },
     );
     const open = (name: string) => {
       const file = resolve(directory, name),
@@ -833,7 +826,7 @@ test('type and declaration identity survive closing one file', async () => {
       const services = handle.parserServices(frame, projection, file);
       if (services.program === null)
         throw new Error('expected project-backed parser services');
-      return { file, frame, projection, handle, services };
+      return { file, frame, handle, services };
     };
     try {
       const first = open('first.ts');
@@ -866,20 +859,6 @@ test('type and declaration identity survive closing one file', async () => {
       const second = open('second.ts');
       const secondDeclarations = (second.frame.ast.body as any[])[1]
         .declarations as { id: ESTreeNode }[];
-      owner.prefetch(
-        secondDeclarations.map((declaration) => ({
-          op: 'nodeRecord',
-          args: {
-            node: {
-              file: second.projection.sourceFileName,
-              index:
-                second.projection.origins[
-                  second.frame.nodes.indexOf(declaration.id)
-                ],
-            },
-          },
-        })),
-      );
       for (const node of secondDeclarations) {
         const identifier = second.services.esTreeNodeToTSNodeMap.get(
           node.id,

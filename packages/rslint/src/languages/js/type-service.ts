@@ -32,7 +32,6 @@ import {
   type NamedSymbolFact,
   type ServiceRequest,
   type ScalarRequest,
-  type BatchTransport,
 } from './type-service-protocol.js';
 export { typeQueryKey } from './type-service-protocol.js';
 export type {
@@ -610,13 +609,6 @@ function makeTypePrototype(
   return prototype;
 }
 
-function inheritTypePrototype<T extends object>(
-  fields: T,
-  prototype: TypePrototype,
-): asserts fields is T & TypePrototype {
-  Object.setPrototypeOf(fields, prototype);
-}
-
 function readCompilerOptions(
   typescript: TypeServiceCompilerData,
   input: Record<string, unknown>,
@@ -680,7 +672,6 @@ export interface TypeServiceClientOptions {
   maxSyntaxBytes?: number;
   maxSyntaxFactsBytes?: number;
   shared?: SharedTypeCacheReader;
-  batchTransport?: BatchTransport;
 }
 /** One worker owns this client for one Program generation. File handles own
  * ESTree mappings; immutable semantic and native identities survive file close. */
@@ -701,7 +692,6 @@ export class TypeServiceClient {
   private readonly syntax: GenerationSyntaxViews;
   private readonly typePrototype: TypePrototype;
   private readonly files = new Set<TypeServiceFile>();
-  private batchTransport: BatchTransport | undefined;
   private factBytes = 0;
   readonly program: ProgramView;
   readonly checker: CheckerView;
@@ -726,7 +716,6 @@ export class TypeServiceClient {
       throw new Error('invalid syntax fact budget');
     this.maxFactsBytes = options.maxFactsBytes;
     this.shared = options.shared;
-    this.batchTransport = options.batchTransport;
     if (
       this.shared &&
       this.shared.descriptor.generation !== descriptor.generation
@@ -1580,7 +1569,6 @@ export class TypeServiceClient {
     this.shared?.close();
     this.shared = undefined;
     this.transport = undefined;
-    this.batchTransport = undefined;
   }
   private read<K>(
     request: ServiceRequest,
@@ -1661,41 +1649,6 @@ export class TypeServiceClient {
       ? new TypePacketReader(reply.packet)
       : this.store(cacheKey, reply.packet);
   }
-  /** Merge known misses only. Cache hits, including negative answers, never
-   * cross the bridge. The scalar API remains the authoritative fallback. */
-  prefetch(requests: readonly ServiceRequest[]): void {
-    this.ensure();
-    if (!this.batchTransport) return;
-    const missing = new Map<string, TypeServiceQuery>();
-    for (const request of requests) {
-      const query = {
-        generation: this.descriptor.generation,
-        checker: this.descriptor.checker,
-        ...request,
-      };
-      if (!isCacheableTypeQuery(query)) continue;
-      const key = typeQueryKey(query);
-      if (this.facts.has(key) || missing.has(key)) continue;
-      const shared = this.shared?.get(key);
-      if (shared) {
-        const reader = this.ingest(query, shared, key);
-        if (this.facts.get(key) !== reader) reader.close();
-      } else missing.set(key, query);
-    }
-    const all = [...missing.entries()];
-    for (let offset = 0; offset < all.length; offset += 256) {
-      const batch = all.slice(offset, offset + 256),
-        queries = batch.map(([, query]) => query),
-        keys = batch.map(([key]) => key);
-      const packets = this.batchTransport(queries, keys);
-      if (packets.length !== batch.length)
-        throw new Error('incomplete type service batch');
-      packets.forEach((packet, index) => {
-        const reader = this.ingest(queries[index], packet, keys[index]);
-        if (this.facts.get(keys[index]) !== reader) reader.close();
-      });
-    }
-  }
   private query<Q extends ScalarRequest>(request: Q): QueryResults[Q['op']] {
     return this.read(request, (packet) => packet.scalar<Q['op']>(request.op));
   }
@@ -1765,7 +1718,7 @@ export class TypeServiceClient {
     return ids.map((id) => this.signature(id)!);
   }
   private indexInfo(fact: IndexInfoFact): IndexInfoView {
-    const old = fact.id && this.indexInfos.get(fact.id);
+    const old = this.indexInfos.get(fact.id);
     if (old) return old;
     const info = readonlyDataFields({
       components:
@@ -1776,11 +1729,11 @@ export class TypeServiceClient {
       isReadonly: fact.isReadonly,
       declaration: this.syntax.nodeRef(fact.declaration),
     });
-    if (fact.id) this.indexInfos.set(fact.id, info);
+    this.indexInfos.set(fact.id, info);
     return info;
   }
   private wrapType(
-    fields: TypeView,
+    fields: Omit<TypeView, keyof TypePrototype>,
     hasField: (
       key: PropertyKey,
       includePending?: boolean,
@@ -2314,7 +2267,6 @@ export class TypeServiceClient {
           return tuple()?.readonly;
         },
       };
-      inheritTypePrototype(fields, client.typePrototype);
       return this.wrapType(fields, hasField, mappedFields, () => !!declared());
     };
     return this.intern(this.types, 'type', id, create);
