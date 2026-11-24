@@ -633,6 +633,14 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			}
 
 			isComputed := ast.IsElementAccessExpression(node)
+			// Match upstream's `isIdentifier(node.property)` guard: a computed
+			// access is only attributed to its object when the key is an
+			// identifier (`a[k]`). For literal keys (`a[0]`, `a['x']`) the element
+			// type, e.g. `T | undefined` under noUncheckedIndexedAccess, is the
+			// access's own nullability and must not be blamed on the object.
+			if isComputed && !ast.IsIdentifier(node.AsElementAccessExpression().ArgumentExpression) {
+				return false
+			}
 			propName := ""
 			if !isComputed {
 				// Use Checker_getAccessedPropertyName for correct handling of
