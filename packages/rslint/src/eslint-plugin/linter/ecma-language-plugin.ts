@@ -213,12 +213,15 @@ export function lintFile(
     cancelled: false,
   };
 
-  let parsed: ReturnType<typeof decodeFrame>;
+  let parsed: ReturnType<typeof decodeFrame> | undefined;
+  let parserServices: Record<string, unknown> | undefined;
   try {
     parsed = readFrame(req);
+    parserServices = services?.(parsed);
   } catch (err) {
     if (err instanceof FrameCancelled) result.cancelled = true;
-    else result.parseError = `frame: ${(err as Error)?.message ?? String(err)}`;
+    else
+      result.parseError = `${parsed ? 'parser services' : 'frame'}: ${(err as Error)?.message ?? String(err)}`;
     return result;
   }
   const sourceText = parsed.text,
@@ -292,7 +295,7 @@ export function lintFile(
       ends: parsed.tokenEnds,
     },
   });
-  if (services) sharedSourceCode.parserServices = services(parsed);
+  if (parserServices) sharedSourceCode.parserServices = parserServices;
 
   // ESLint v10's espree attaches `Program.tokens` (and `Program.comments`)
   // to the AST root directly. the frame decoder doesn't, so plugin rules that

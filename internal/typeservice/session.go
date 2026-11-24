@@ -15,11 +15,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/collections"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/nodebuilder"
 	"github.com/microsoft/TypeScript/tsc/shim/printer"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -75,12 +77,13 @@ type Session struct {
 }
 
 type Descriptor struct {
-	SyntaxOnly       bool           `json:"syntaxOnly,omitempty"`
-	Generation       uint32         `json:"generation"`
-	Checker          uint32         `json:"checker"`
-	CurrentDirectory string         `json:"currentDirectory"`
-	CompilerOptions  map[string]any `json:"compilerOptions"`
-	Sources          []Source       `json:"sources"`
+	SyntaxOnly       bool              `json:"syntaxOnly,omitempty"`
+	Generation       uint32            `json:"generation"`
+	Checker          uint32            `json:"checker"`
+	CurrentDirectory string            `json:"currentDirectory"`
+	CompilerOptions  map[string]any    `json:"compilerOptions"`
+	ConfigFile       *configSourceInfo `json:"configFile,omitempty"`
+	Sources          []Source          `json:"sources"`
 }
 type Source struct {
 	ImpliedNodeFormat core.ResolutionMode `json:"impliedNodeFormat,omitempty"`
@@ -209,17 +212,19 @@ func (s *Session) Descriptor() (Descriptor, error) {
 		}
 		return d, nil
 	}
-	options, err := compilerOptions(s.program.Options())
+	commandLine := s.program.CompilerQueries().CommandLine()
+	options, err := compilerOptions(commandLine)
 	if err != nil {
 		return Descriptor{}, err
 	}
-	d := Descriptor{Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: options}
+	d := Descriptor{Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: options, ConfigFile: configSource(commandLine)}
 	for _, f := range s.program.SourceFiles() {
 		d.Sources = append(d.Sources, s.source(f))
 	}
 	return d, nil
 }
-func compilerOptions(opts *core.CompilerOptions) (map[string]any, error) {
+func compilerOptions(c *tsoptions.ParsedCommandLine) (map[string]any, error) {
+	opts := c.CompilerOptions()
 	// The compiler's JSON contract preserves explicit false and omitted values.
 	data, err := json.Marshal(opts)
 	if err != nil {
@@ -228,6 +233,9 @@ func compilerOptions(opts *core.CompilerOptions) (map[string]any, error) {
 	options := map[string]any{}
 	if err = json.Unmarshal(data, &options); err != nil {
 		return nil, err
+	}
+	if plugins := configPlugins(c.Raw); plugins != nil {
+		options["plugins"] = plugins
 	}
 	// These compiler enums differ from TypeScript's JavaScript enum layout.
 	if opts.NewLine != core.NewLineKindNone {
@@ -240,6 +248,31 @@ func compilerOptions(opts *core.CompilerOptions) (map[string]any, error) {
 		options["moduleDetection"] = map[core.ModuleDetectionKind]string{core.ModuleDetectionKindAuto: "Auto", core.ModuleDetectionKindLegacy: "Legacy", core.ModuleDetectionKindForce: "Force"}[opts.ModuleDetection]
 	}
 	return options, nil
+}
+
+// tsgo keeps language-service plugins only in the config file's raw options.
+func configPlugins(raw any) []any {
+	type jsonObject = collections.OrderedMap[string, any]
+	config, _ := raw.(*jsonObject)
+	if config == nil {
+		return nil
+	}
+	opts, _ := config.GetOrZero("compilerOptions").(*jsonObject)
+	if opts == nil {
+		return nil
+	}
+	values, _ := opts.GetOrZero("plugins").([]any)
+	if values == nil {
+		return nil
+	}
+	plugins := make([]any, 0, len(values))
+	for _, value := range values {
+		switch value.(type) {
+		case *jsonObject, []any:
+			plugins = append(plugins, value)
+		}
+	}
+	return plugins
 }
 
 var formatExtensions = []string{tspath.ExtensionMts, tspath.ExtensionMjs, tspath.ExtensionCts, tspath.ExtensionCjs}
@@ -307,7 +340,7 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	natives := make([]queryNodes, len(queries))
 	for i, q := range queries {
 		if ref := requestNode(q.Request); ref != nil {
-			f := p.GetSourceFile(ref.File)
+			f := sourceForNode(p, ref)
 			if s.syntaxOnly && !eligible[f] {
 				return nil, errors.New("foreign syntax service source")
 			}
@@ -317,7 +350,7 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 			}
 		}
 		if r, ok := q.Request.(*IndexDeclarationRequest); ok && r.Declaration != nil {
-			natives[i].declaration, err = resolveNode(p.GetSourceFile(r.Declaration.File), *r.Declaration)
+			natives[i].declaration, err = resolveNode(sourceForNode(p, r.Declaration), *r.Declaration)
 			if err != nil {
 				return nil, err
 			}
@@ -612,7 +645,8 @@ func syntaxReference(p *program.Program, n *ast.Node) (*NodeRef, *ast.Node) {
 		return nil, nil
 	}
 	f := ast.GetSourceFileOfNode(n)
-	if !p.OwnsSourceFile(f) {
+	config := !p.OwnsSourceFile(f)
+	if config && (f == nil || configFile(p, f.FileName()) != f) {
 		panic("declaration is outside Program")
 	}
 	table := encoder.GetNodeIndexTable(f)
@@ -626,7 +660,7 @@ func syntaxReference(p *program.Program, n *ast.Node) (*NodeRef, *ast.Node) {
 	if index == 0 {
 		panic("declaration has no compiler node handle")
 	}
-	return &NodeRef{File: f.FileName(), Index: index}, table.Nodes[index]
+	return &NodeRef{File: f.FileName(), Index: index, Config: config}, table.Nodes[index]
 }
 func (s *Session) typeByID(id uint32) *checker.Type {
 	t := s.types[id]
@@ -779,7 +813,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			if native.Kind != ast.KindSourceFile {
 				return nil, errors.New("expected a source file for suggestion diagnostics")
 			}
-			return diagnosticFacts(c.GetSuggestionDiagnostics(ctx, native.AsSourceFile())), ctx.Err()
+			return diagnosticFacts(s.program, c.GetSuggestionDiagnostics(ctx, native.AsSourceFile())), ctx.Err()
 		}
 	case *StringLiteralRequest:
 		return Handle(s.typeID(checker.Checker_getStringLiteralType(c, string(r.Name)))), nil
@@ -1334,6 +1368,13 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	return nil, fmt.Errorf("unsupported type service operation %q", request.operation())
 }
 
+func sourceForNode(p *program.Program, ref *NodeRef) *ast.SourceFile {
+	if ref.Config {
+		return configFile(p, ref.File)
+	}
+	return p.GetSourceFile(ref.File)
+}
+
 func resolveNode(f *ast.SourceFile, node NodeRef) (*ast.Node, error) {
 	if f == nil {
 		return nil, errors.New("foreign source handle")
@@ -1414,17 +1455,18 @@ func jsCheckFlags(flags ast.CheckFlags) uint32 {
 	return uint32(flags&low | (flags&high)>>3)
 }
 
-func diagnosticFacts(diagnostics []*ast.Diagnostic) SuggestionDiagnostics {
+func diagnosticFacts(p *program.Program, diagnostics []*ast.Diagnostic) SuggestionDiagnostics {
 	var result SuggestionDiagnostics
 	for _, diagnostic := range diagnostics {
 		d := DiagnosticFact{
 			Code: uint32(diagnostic.Code()), Category: uint32(diagnostic.Category()),
 			Message: diagnostic.Localize(locale.Default), Source: diagnostic.Source(),
 			Deprecated: diagnostic.ReportsDeprecated(), Unnecessary: diagnostic.ReportsUnnecessary(),
-			Chain: diagnosticFacts(diagnostic.MessageChain()), Related: diagnosticFacts(diagnostic.RelatedInformation()),
+			Chain: diagnosticFacts(p, diagnostic.MessageChain()), Related: diagnosticFacts(p, diagnostic.RelatedInformation()),
 		}
 		if f := diagnostic.File(); f != nil {
 			d.File = f.FileName()
+			d.Config = !p.OwnsSourceFile(f) && configFile(p, d.File) == f
 			positions := f.GetPositionMap()
 			start := positions.UTF8ToUTF16(diagnostic.Pos())
 			d.Start = uint32(start)

@@ -7,6 +7,7 @@ export interface Scope {
 }
 export interface NodeRef {
   file: string;
+  config?: boolean;
   index: number;
   token?: { kind: number; pos: number; end: number };
 }
@@ -17,10 +18,16 @@ export interface GeneratedSyntax {
 export interface FileBinding extends Scope {
   sourceFileName: string;
 }
+export interface ConfigSourceInfo {
+  name: string;
+  path: string;
+  extendedSourceFiles?: string[];
+}
 export interface TypeServiceDescriptor extends Scope {
   syntaxOnly?: boolean;
   currentDirectory: string;
   compilerOptions: Record<string, unknown>;
+  configFile?: ConfigSourceInfo;
   sources: Array<{
     fileName: string;
     path: string;
@@ -125,6 +132,7 @@ export interface SymbolFact {
   readonly valueDeclaration: NodeRef | undefined;
 }
 export interface DiagnosticFact {
+  config?: boolean;
   fileName?: string;
   start: number;
   length: number;
@@ -200,6 +208,7 @@ export interface QueryArguments {
   modeForResolutionAtIndex: NodeArgs & { index: number };
   projectReferences: Record<string, never>;
   resolvedProjectReferences: Record<string, never>;
+  configSyntax: { file: string };
   stringLiteralType: { name: readonly number[] };
   numberLiteralType: { value: string };
   bigintLiteralType: { negative: boolean; digits: string };
@@ -364,6 +373,7 @@ export interface QueryResults {
   modeForResolutionAtIndex: number;
   projectReferences: string;
   resolvedProjectReferences: string;
+  configSyntax: GeneratedSyntax;
   stringLiteralType: number;
   numberLiteralType: number;
   bigintLiteralType: number;
@@ -511,6 +521,7 @@ export function isCacheableTypeQuery(query: TypeServiceQuery): boolean {
     case 'resolvedTrueType':
     case 'resolvedFalseType':
     case 'mappedFields':
+    case 'configSyntax':
       return false;
     default:
       // A node can depend on a re-resolved call elsewhere in the expression.
@@ -658,6 +669,7 @@ const operations = [
   'typeParameterConstraint',
   'declaredMembers',
   'errorType',
+  'configSyntax',
 ] as const;
 const operationIDs = new Map<Operation, number>(
   operations.map((op, index) => [op, index + 1]),
@@ -665,7 +677,7 @@ const operationIDs = new Map<Operation, number>(
 export function typeQueryKey(q: TypeServiceQuery): string {
   const nodeKey = (node: NodeRef | undefined): string => {
     if (!node) return '-';
-    const key = `${node.file.length}:${node.file}:${node.index}`;
+    const key = `${node.file.length}:${node.file}:${node.config ? -node.index : node.index}`;
     return node.token
       ? `${key}:${node.token.kind}:${node.token.pos}:${node.token.end}`
       : key;
@@ -689,6 +701,7 @@ export function typeQueryKey(q: TypeServiceQuery): string {
     case 'modeForResolutionAtIndex':
     case 'projectReferences':
     case 'resolvedProjectReferences':
+    case 'configSyntax':
       return prefix + JSON.stringify(q.args);
     case 'stringLiteralType':
     case 'numberLiteralType':
@@ -814,6 +827,7 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   modeForResolutionAtIndex: 1,
   projectReferences: 3,
   resolvedProjectReferences: 3,
+  configSyntax: 14,
   stringLiteralType: 1,
   numberLiteralType: 1,
   bigintLiteralType: 1,

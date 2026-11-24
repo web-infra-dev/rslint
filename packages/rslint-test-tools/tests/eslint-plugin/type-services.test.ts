@@ -908,10 +908,7 @@ test('type and declaration identity survive closing one file', async () => {
   }
 });
 
-test('node maps and type queries match TypeScript', async () => {
-  const directory = mkdtempSync(
-    resolve(root, 'packages/rslint-test-tools/.type-services-'),
-  );
+function readMapping(host: Host, directory: string) {
   const file = resolve(directory, 'mapping.tsx'),
     config = resolve(directory, 'tsconfig.json');
   const longTypeName = '例'.repeat(110);
@@ -992,41 +989,112 @@ await Promise.resolve(1);
       include: ['*.tsx'],
     }),
   );
-  const host = new Host();
-  try {
-    const descriptor = host.request({
-      method: 'init',
-      config,
-    }) as TypeServiceDescriptor;
-    const encoded = host.request({ method: 'project', file });
-    const projection = {
-      ...encoded,
-      tree: Buffer.from(encoded.tree, 'base64'),
-    };
-    const sourceFileName: string = projection.binding.sourceFileName;
-    const frame = decodeFrame(Buffer.from(encoded.frame, 'base64'));
-    const client = new TypeServiceClient(
-      enums,
-      descriptor,
-      (query) =>
-        Buffer.from(host.request({ method: 'query', query }), 'base64'),
-      host.source,
-      { maxFactsBytes: 1 << 16 },
+  const descriptor = host.request({
+    method: 'init',
+    config,
+  }) as TypeServiceDescriptor;
+  const encoded = host.request({ method: 'project', file });
+  const projection = {
+    ...encoded,
+    tree: Buffer.from(encoded.tree, 'base64'),
+  };
+  const sourceFileName: string = projection.binding.sourceFileName;
+  const bytes = Buffer.from(encoded.frame, 'base64');
+  const frame = decodeFrame(bytes);
+  const client = new TypeServiceClient(
+    enums,
+    descriptor,
+    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
+    host.source,
+    { maxFactsBytes: 1 << 16 },
+  );
+  const program = client.program as unknown as ts.Program;
+  const beforeSource = program.getSourceFile(file);
+  if (!beforeSource) throw new Error(`missing project source: ${file}`);
+  const services = client
+    .file(projection.binding)
+    .parserServices(frame, projection, sourceFileName) as any;
+  const upstream = tsParser.parseForESLint(code, {
+    filePath: file,
+    project: config,
+    tsconfigRootDir: directory,
+    range: true,
+    loc: true,
+  });
+  const body = frame.ast.body as any[];
+  const variable = (name: string) =>
+    body
+      .flatMap((node) => node.declarations ?? [])
+      .find((declaration) => declaration.id.name === name);
+  const expression = (type: string) =>
+    body.find(
+      (node) =>
+        node.type === 'ExpressionStatement' && node.expression.type === type,
+    ).expression;
+  const fn = body.find(
+    (node) => node.type === 'ExportNamedDeclaration',
+  ).declaration;
+  const nativeFn = services.esTreeNodeToTSNodeMap.get(fn);
+  const referenceChecker = upstream.services.program!.getTypeChecker();
+  const referenceBody = upstream.ast.body as any[];
+  const referenceVariable = (name: string) =>
+    referenceBody
+      .flatMap((node) => node.declarations ?? [])
+      .find((entry) => entry.id.name === name);
+  const referenceNodes = upstream.services.esTreeNodeToTSNodeMap!;
+  const referenceFn = referenceNodes.get(
+    referenceBody.find((node) => node.type === 'ExportNamedDeclaration')
+      .declaration,
+  ) as ts.FunctionDeclaration;
+  return {
+    client,
+    file,
+    bytes,
+    directory,
+    longTypeName,
+    beforeSource,
+    frame,
+    services,
+    upstream,
+    body,
+    variable,
+    expression,
+    fn,
+    nativeFn,
+    referenceChecker,
+    referenceVariable,
+    referenceNodes,
+    referenceFn,
+    checker: services.program.getTypeChecker(),
+  };
+}
+
+describe('TypeScript node maps and type queries', () => {
+  let directory: string, host: Host, mapping: ReturnType<typeof readMapping>;
+  beforeAll(() => {
+    directory = mkdtempSync(
+      resolve(root, 'packages/rslint-test-tools/.type-services-'),
     );
-    const program = client.program as unknown as ts.Program;
-    const beforeSource = program.getSourceFile(file);
-    if (!beforeSource) throw new Error(`missing project source: ${file}`);
-    const services = client
-      .file(projection.binding)
-      .parserServices(frame, projection, sourceFileName) as any;
+    host = new Host();
+    mapping = readMapping(host, directory);
+  });
+  afterAll(async () => {
+    mapping?.client.close();
+    await host.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  test('node maps, tokens and aliases match TypeScript', () => {
+    const {
+      beforeSource,
+      frame,
+      services,
+      upstream,
+      expression,
+      fn,
+      nativeFn,
+    } = mapping;
     expect(services.esTreeNodeToTSNodeMap.has(frame.ast)).toBe(true);
-    const upstream = tsParser.parseForESLint(code, {
-      filePath: file,
-      project: config,
-      tsconfigRootDir: directory,
-      range: true,
-      loc: true,
-    });
     const collect = (ast: any, maps: any) => {
       const entries: any[] = [];
       const walk = (node: any, path: string) => {
@@ -1063,16 +1131,6 @@ await Promise.resolve(1);
     expect(collect(frame.ast, services)).toEqual(
       collect(upstream.ast, upstream.services),
     );
-    const body = frame.ast.body as any[];
-    const variable = (name: string) =>
-      body
-        .flatMap((node) => node.declarations ?? [])
-        .find((declaration) => declaration.id.name === name);
-    const expression = (type: string) =>
-      body.find(
-        (node) =>
-          node.type === 'ExpressionStatement' && node.expression.type === type,
-      ).expression;
     const nativeAwait = services.esTreeNodeToTSNodeMap.get(
       expression('AwaitExpression'),
     );
@@ -1093,10 +1151,6 @@ await Promise.resolve(1);
     expect(call.getLastToken()).toBe(call.getChildAt(3));
     expect(call.getLastToken().getSourceFile()).toBe(beforeSource);
     expect(services.tsNodeToESTreeNodeMap.has(argumentsList)).toBe(false);
-    const fn = body.find(
-      (node) => node.type === 'ExportNamedDeclaration',
-    ).declaration;
-    const nativeFn = services.esTreeNodeToTSNodeMap.get(fn);
     for (let i = 0; i < fn.params.length; i++)
       expect(services.tsNodeToESTreeNodeMap.get(nativeFn.parameters[i])).toBe(
         fn.params[i],
@@ -1142,6 +1196,10 @@ await Promise.resolve(1);
     detached.expressions = [members[0]];
     expect(detached.expressions).toEqual([members[0]]);
     canonical.expressions = members;
+  });
+
+  test('parser services expose compiler options and unmapped type annotations', () => {
+    const { directory, file, services, upstream, fn, nativeFn } = mapping;
     const options = services.program.getCompilerOptions();
     const referenceOptions = upstream.services.program!.getCompilerOptions();
     for (const key of [
@@ -1161,6 +1219,41 @@ await Promise.resolve(1);
       services.program.getSourceFile(resolve(directory, 'missing.ts')),
     ).toBeUndefined();
     expect(services.program.getSourceFile(file)).toBe(nativeFn.getSourceFile());
+    const annotation = fn.params[0].typeAnnotation;
+    expect(services.esTreeNodeToTSNodeMap.has(annotation)).toBe(false);
+    expect(services.getSymbolAtLocation(annotation)).toBeUndefined();
+    expect(services.getTypeAtLocation(annotation).flags).toBe(ts.TypeFlags.Any);
+  });
+
+  test('lintFile returns a file error when parser services fail to initialize', () => {
+    const { file, bytes } = mapping;
+    const result = lintFile(
+      {
+        filePath: file,
+        frame: bytes,
+        rules: {},
+        collectFixes: false,
+        suggestionsMode: 'off',
+      },
+      { plugins: [], rules: new Map() },
+      () => {
+        throw new Error('stale file binding');
+      },
+    );
+    expect(result.parseError).toBe('parser services: stale file binding');
+  });
+
+  test('literal types and symbol lookup match TypeScript', () => {
+    const {
+      body,
+      expression,
+      variable,
+      services,
+      checker,
+      referenceChecker,
+      referenceNodes,
+      referenceVariable,
+    } = mapping;
     const declaration = variable('__name');
     const stringType = services.getTypeAtLocation(declaration.id);
     expect(stringType.value).toBe('\uD800');
@@ -1184,7 +1277,6 @@ await Promise.resolve(1);
     expect(booleanType.value).toBeUndefined();
     const keyDeclaration = variable('surrogateKeys');
     const keyType = services.getTypeAtLocation(keyDeclaration.id);
-    const checker = services.program.getTypeChecker();
     const keyLocation = services.esTreeNodeToTSNodeMap.get(keyDeclaration.id);
     expect(
       ['\uD800', '\uD801', '\uFFFD'].map((name) =>
@@ -1197,17 +1289,88 @@ await Promise.resolve(1);
       ),
     ).toEqual(['1', '"two"', 'true']);
 
-    const referenceChecker = upstream.services.program!.getTypeChecker();
-    const referenceBody = upstream.ast.body as any[];
-    const referenceVariable = (name: string) =>
-      referenceBody
-        .flatMap((node) => node.declarations ?? [])
-        .find((entry) => entry.id.name === name);
-    const referenceNodes = upstream.services.esTreeNodeToTSNodeMap!;
-    const referenceFn = referenceNodes.get(
-      referenceBody.find((node) => node.type === 'ExportNamedDeclaration')
-        .declaration,
-    ) as ts.FunctionDeclaration;
+    const referenceSpreadType = referenceChecker.getTypeAtLocation(
+      referenceNodes.get(referenceVariable('spreadKeys').init),
+    ) as ts.ObjectType;
+    expect(
+      referenceSpreadType.objectFlags & ts.ObjectFlags.ContainsSpread,
+    ).toBe(ts.ObjectFlags.ContainsSpread);
+    expect(
+      services.getTypeAtLocation(variable('spreadKeys').init).objectFlags &
+        ts.ObjectFlags.ContainsSpread,
+    ).toBe(referenceSpreadType.objectFlags & ts.ObjectFlags.ContainsSpread);
+    const truthLocation = services.esTreeNodeToTSNodeMap.get(
+      variable('truth').id,
+    );
+    const referenceTruthLocation = referenceNodes.get(
+      referenceVariable('truth').id,
+    );
+    for (const meaning of [
+      ts.SymbolFlags.Value,
+      ts.SymbolFlags.Type,
+      ts.SymbolFlags.All,
+    ]) {
+      const actual = checker.resolveName(
+        'truth',
+        truthLocation,
+        meaning,
+        false,
+      );
+      const expected = referenceChecker.resolveName(
+        'truth',
+        referenceTruthLocation,
+        meaning,
+        false,
+      );
+      expect([actual?.name, actual?.flags]).toEqual([
+        expected?.name,
+        expected?.flags,
+      ]);
+    }
+    const promise = checker.resolveName(
+      'Promise',
+      undefined,
+      ts.SymbolFlags.All,
+      false,
+    );
+    const referencePromise = referenceChecker.resolveName(
+      'Promise',
+      undefined,
+      ts.SymbolFlags.All,
+      false,
+    );
+    expect(referencePromise).toBeDefined();
+    expect([promise?.name, promise?.flags]).toEqual([
+      referencePromise?.name,
+      referencePromise?.flags,
+    ]);
+
+    expect(
+      services.getSymbolAtLocation(expression('Identifier')).declarations,
+    ).toBeUndefined();
+    const privateKey = body
+      .find((node) => node.type === 'ClassDeclaration' && node.id.name === 'C')
+      .body.body.find((node: any) => node.key.type === 'PrivateIdentifier').key;
+    expect(services.esTreeNodeToTSNodeMap.get(privateKey).escapedText).toBe(
+      '#value',
+    );
+    expect(services.getSymbolAtLocation(privateKey).name).toBe('#value');
+  });
+
+  test('generated type syntax and compiler node flags match TypeScript', () => {
+    const {
+      beforeSource,
+      variable,
+      services,
+      checker,
+      referenceChecker,
+      referenceVariable,
+      referenceNodes,
+      referenceFn,
+    } = mapping;
+    const id = variable('surrogateKeys').id;
+    const keyType = services.getTypeAtLocation(id);
+    const keyLocation = services.esTreeNodeToTSNodeMap.get(id);
     // The node builder returns detached syntax. Its public kinds, child fields
     // and visitation must agree even when the compiler enums differ.
     const generatedShape = (n: ts.Node): unknown => {
@@ -1277,6 +1440,22 @@ await Promise.resolve(1);
     expect(flagsAndModifiers(beforeSource)).toEqual(
       flagsAndModifiers(referenceFn.getSourceFile()),
     );
+  });
+
+  test('type and signature formatting matches TypeScript', () => {
+    const {
+      beforeSource,
+      variable,
+      services,
+      checker,
+      nativeFn,
+      referenceChecker,
+      referenceNodes,
+      referenceVariable,
+      referenceFn,
+      longTypeName,
+    } = mapping;
+    const uniqueType = services.getTypeAtLocation(variable('unique').id);
     const formatted = (
       typeChecker: ts.TypeChecker,
       declaration: ts.FunctionDeclaration,
@@ -1383,6 +1562,19 @@ await Promise.resolve(1);
         referenceNodes.get(referenceVariable('multiline').id),
       ),
     );
+  });
+
+  test('symbol and signature documentation matches TypeScript', () => {
+    const {
+      beforeSource,
+      variable,
+      services,
+      checker,
+      referenceChecker,
+      referenceNodes,
+      referenceVariable,
+      referenceFn,
+    } = mapping;
     const readDocumentation = (
       typeChecker: ts.TypeChecker,
       source: ts.SourceFile,
@@ -1422,78 +1614,7 @@ await Promise.resolve(1);
         referenceNodes.get(referenceVariable('docAssertion').id),
       ),
     );
-
-    const referenceSpreadType = referenceChecker.getTypeAtLocation(
-      referenceNodes.get(referenceVariable('spreadKeys').init),
-    ) as ts.ObjectType;
-    expect(
-      referenceSpreadType.objectFlags & ts.ObjectFlags.ContainsSpread,
-    ).toBe(ts.ObjectFlags.ContainsSpread);
-    expect(
-      services.getTypeAtLocation(variable('spreadKeys').init).objectFlags &
-        ts.ObjectFlags.ContainsSpread,
-    ).toBe(referenceSpreadType.objectFlags & ts.ObjectFlags.ContainsSpread);
-    const truthLocation = services.esTreeNodeToTSNodeMap.get(
-      variable('truth').id,
-    );
-    const referenceTruthLocation = referenceNodes.get(
-      referenceVariable('truth').id,
-    );
-    for (const meaning of [
-      ts.SymbolFlags.Value,
-      ts.SymbolFlags.Type,
-      ts.SymbolFlags.All,
-    ]) {
-      const actual = checker.resolveName(
-        'truth',
-        truthLocation,
-        meaning,
-        false,
-      );
-      const expected = referenceChecker.resolveName(
-        'truth',
-        referenceTruthLocation,
-        meaning,
-        false,
-      );
-      expect([actual?.name, actual?.flags]).toEqual([
-        expected?.name,
-        expected?.flags,
-      ]);
-    }
-    const promise = checker.resolveName(
-      'Promise',
-      undefined,
-      ts.SymbolFlags.All,
-      false,
-    );
-    const referencePromise = referenceChecker.resolveName(
-      'Promise',
-      undefined,
-      ts.SymbolFlags.All,
-      false,
-    );
-    expect(referencePromise).toBeDefined();
-    expect([promise?.name, promise?.flags]).toEqual([
-      referencePromise?.name,
-      referencePromise?.flags,
-    ]);
-
-    expect(
-      services.getSymbolAtLocation(expression('Identifier')).declarations,
-    ).toBeUndefined();
-    const privateKey = body
-      .find((node) => node.type === 'ClassDeclaration' && node.id.name === 'C')
-      .body.body.find((node: any) => node.key.type === 'PrivateIdentifier').key;
-    expect(services.esTreeNodeToTSNodeMap.get(privateKey).escapedText).toBe(
-      '#value',
-    );
-    expect(services.getSymbolAtLocation(privateKey).name).toBe('#value');
-    client.close();
-  } finally {
-    await host.close();
-    rmSync(directory, { recursive: true, force: true });
-  }
+  });
 });
 
 test('signature options preserve TypeScript query order across clients', async () => {
@@ -2150,10 +2271,15 @@ test('resolved project references retain config syntax, nesting and missing entr
     config = resolve(dir, 'tsconfig.json');
   const child = resolve(dir, 'child.json'),
     nested = resolve(dir, 'nested.json');
-  writeFileSync(file, 'export const n = 1;');
+  writeFileSync(file, 'import "./tsconfig.json"; export const n = 1;');
   writeFileSync(resolve(dir, 'nested.ts'), 'export const nested = 1;');
   writeFileSync(resolve(dir, 'child.ts'), 'export const child = 2;');
-  const compilerOptions = { composite: true, target: 'esnext' };
+  const compilerOptions = {
+    composite: true,
+    resolveJsonModule: true,
+    target: 'esnext',
+    plugins: [{ name: 'language-plugin', settings: { mode: 'local' } }],
+  };
   writeFileSync(resolve(dir, 'base.json'), '{}');
   writeFileSync(
     nested,
@@ -2202,7 +2328,18 @@ test('resolved project references retain config syntax, nesting and missing entr
     });
     const inspect = (p: ts.Program) => {
       const refs = p.getResolvedProjectReferences()!;
+      const options = p.getCompilerOptions();
+      const configFile = options.configFile as ts.SourceFile;
       return {
+        options: [
+          options.plugins,
+          configFile.fileName,
+          configFile.text,
+          configFile === p.getSourceFile(config),
+          configFile.statements[0].getText(configFile),
+          configFile.statements[0] === p.getSourceFile(config)!.statements[0],
+          Object.keys(options).includes('configFile'),
+        ],
         direct: p.getProjectReferences(),
         configs: refs.map(
           (ref) =>
@@ -2219,6 +2356,8 @@ test('resolved project references retain config syntax, nesting and missing entr
               ref.sourceFile.getSourceFile() === ref.sourceFile,
               ref.commandLine.fileNames,
               ref.commandLine.options.target,
+              ref.commandLine.options.plugins,
+              ref.commandLine.options.configFile === ref.sourceFile,
               ref.commandLine.raw.compilerOptions.target,
               ref.commandLine.wildcardDirectories,
               (ref.sourceFile as ts.TsConfigSourceFile).extendedSourceFiles,

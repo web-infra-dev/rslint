@@ -78,9 +78,10 @@ export class TypePacketReader {
     return offset ? this.ids(offset) : undefined;
   }
   private node(offset: number): NodeRef | undefined {
-    return offset
-      ? { file: this.text(this.word(offset)), index: this.word(offset + 4) }
-      : undefined;
+    if (!offset) return undefined;
+    const file = this.text(this.word(offset)),
+      index = this.word(offset + 4) | 0;
+    return index < 0 ? { file, index: -index, config: true } : { file, index };
   }
   nodeFacts(): readonly NodeFact[] {
     if (this.kind !== 8) return invalid();
@@ -338,6 +339,7 @@ export class TypePacketReader {
         code: this.word(pos + 16),
         text: this.text(this.word(pos + 20)),
         source: source ? this.text(source) : undefined,
+        config: !!(flags & 4),
         reportsDeprecated: flags & 1 ? true : undefined,
         reportsUnnecessary: flags & 2 ? true : undefined,
         chain: this.diagnostics(this.word(pos + 32)),

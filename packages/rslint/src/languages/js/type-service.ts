@@ -14,6 +14,7 @@ import {
   typeQueryKey,
   isCacheableTypeQuery,
   nameToUnits,
+  type ConfigSourceInfo,
   type FileBinding,
   type NodeRef,
   type Operation,
@@ -283,9 +284,9 @@ export interface CheckerView {
   getTypeArgumentsForResolvedSignature(
     s: object,
   ): readonly TypeView[] | undefined;
-  getTypeAtLocation(n: object): TypeView | undefined;
-  getTypeFromTypeNode(n: object): TypeView | undefined;
-  getContextualType(n: object): TypeView | undefined;
+  getTypeAtLocation(n: object | undefined): TypeView | undefined;
+  getTypeFromTypeNode(n: object | undefined): TypeView | undefined;
+  getContextualType(n: object | undefined): TypeView | undefined;
   getContextualTypeForArgumentAtIndex(
     n: object,
     index: number,
@@ -321,7 +322,7 @@ export interface CheckerView {
     flags?: number,
     kind?: number,
   ): string;
-  getSymbolAtLocation(n: object): SymbolView | undefined;
+  getSymbolAtLocation(n: object | undefined): SymbolView | undefined;
   getSymbolsInScope(n: object, meaning: number): readonly SymbolView[];
   resolveName(
     name: string,
@@ -338,7 +339,10 @@ export interface CheckerView {
     n: object | undefined,
   ): SymbolView | undefined;
   getTypeOfSymbol(s: object): TypeView | undefined;
-  getTypeOfSymbolAtLocation(s: object, n: object): TypeView | undefined;
+  getTypeOfSymbolAtLocation(
+    s: object,
+    n: object | undefined,
+  ): TypeView | undefined;
   getDeclaredTypeOfSymbol(s: object): TypeView | undefined;
   getPropertiesOfType(t: object): readonly SymbolView[];
   getPropertyOfType(t: object, name: string): SymbolView | undefined;
@@ -352,7 +356,7 @@ export interface CheckerView {
   isTupleType(t: object): boolean;
   getSignatureFromDeclaration(n: object): SignatureView | undefined;
   getResolvedSignature(
-    n: object,
+    n: object | undefined,
     candidates?: SignatureView[],
     argumentCount?: number,
   ): SignatureView | undefined;
@@ -419,14 +423,11 @@ interface ResolvedReferenceView {
   sourceFile: object;
   references?: readonly (ResolvedReferenceView | undefined)[];
 }
-type ReferenceConfig = {
-  name: string;
-  path: string;
+type ReferenceConfig = ConfigSourceInfo & {
   options: Record<string, unknown>;
   fileNames: string[];
   projectReferences?: ts.ProjectReference[];
   wildcardDirectories: ts.MapLike<ts.WatchDirectoryFlags>;
-  extendedSourceFiles?: string[];
   references?: number[];
   raw?: unknown;
   compileOnSave?: boolean;
@@ -618,8 +619,11 @@ function inheritTypePrototype<T extends object>(
 function readCompilerOptions(
   typescript: TypeServiceCompilerData,
   input: Record<string, unknown>,
+  configFile?: object,
 ) {
   const compilerOptions = { ...input };
+  if (configFile)
+    Object.defineProperty(compilerOptions, 'configFile', { value: configFile });
   for (const [key, group] of [
     ['jsx', typescript.JsxEmit],
     ['moduleDetection', typescript.ModuleDetectionKind],
@@ -740,6 +744,7 @@ export class TypeServiceClient {
       },
       options.maxSyntaxBytes ?? 16 << 20,
       options.maxSyntaxFactsBytes ?? 1 << 20,
+      (file) => this.query({ op: 'configSyntax', args: { file } }).tree,
     );
     const errorType = () => this.query({ op: 'errorType', args: {} });
     const atParseTreeNode = <T>(
@@ -761,7 +766,7 @@ export class TypeServiceClient {
         | 'exportSpecifierLocalTargetSymbol'
         | 'propertySymbolOfDestructuringAssignment'
         | 'shorthandValueSymbol',
-      n: object,
+      n: object | undefined,
     ) => {
       const node = this.syntax.parseTreeLocation(n, op);
       if (node) return this.query({ op, args: { node } });
@@ -1353,16 +1358,24 @@ export class TypeServiceClient {
         this.ensure();
       },
     );
-    const compilerOptions = readCompilerOptions(
-      typescript,
-      descriptor.compilerOptions,
-    );
     const ensure = this.ensure.bind(this);
     this.typePrototype = makeTypePrototype(this.checker, typescript, ensure);
     this.program = guarded<ProgramView>(
       {
         getTypeChecker: () => this.checker,
-        getCompilerOptions: () => ({ ...compilerOptions }),
+        getCompilerOptions: memo(ensure, () => {
+          const config = descriptor.configFile;
+          return readCompilerOptions(
+            typescript,
+            descriptor.compilerOptions,
+            config &&
+              this.syntax.configSource(
+                config.name,
+                config.path,
+                config.extendedSourceFiles,
+              ),
+          );
+        }),
         getCurrentDirectory: () => descriptor.currentDirectory,
         emit: () => {
           throw new Error('unsupported TypeScript operation: Program.emit');
@@ -1479,18 +1492,17 @@ export class TypeServiceClient {
             .scalar('configFileParsingDiagnostics')
             .map((d) => this.diagnostic(d))
         : [];
-      const sourceFile = this.syntax.configSource(name, path);
-      if (
-        extendedSourceFiles &&
-        !Object.hasOwn(sourceFile, 'extendedSourceFiles')
-      )
-        Object.assign(sourceFile, { extendedSourceFiles });
+      const sourceFile = this.syntax.configSource(
+        name,
+        path,
+        extendedSourceFiles,
+      );
       return {
         sourceFile,
         commandLine: {
           ...commandLine,
           fileNames: commandLine.fileNames ?? [],
-          options: readCompilerOptions(this.typescript, options),
+          options: readCompilerOptions(this.typescript, options, sourceFile),
           errors,
         },
       };
@@ -1520,7 +1532,11 @@ export class TypeServiceClient {
   }
   private diagnostic(d: DiagnosticFact): DiagnosticView {
     return {
-      file: d.fileName ? this.syntax.diagnosticSource(d.fileName) : undefined,
+      file: d.fileName
+        ? d.config
+          ? this.syntax.configSource(d.fileName)
+          : this.syntax.sourceView(d.fileName)
+        : undefined,
       start: d.fileName ? d.start : undefined,
       length: d.fileName ? d.length : undefined,
       code: d.code,
@@ -2532,12 +2548,7 @@ export class TypeServiceFile {
         esTreeNodeToTSNodeMap: this.syntax.esTreeNodeToTSNodeMap,
         tsNodeToESTreeNodeMap: this.syntax.tsNodeToESTreeNodeMap,
       });
-    const toTS = (node: ESTreeNode): object => {
-      const native = this.syntax.esTreeNodeToTSNodeMap.get(node);
-      if (!native)
-        throw new Error(`ESTree node has no compiler origin: ${node.type}`);
-      return native;
-    };
+    const toTS = this.syntax.esTreeNodeToTSNodeMap.get;
     const options = this.owner.descriptor.compilerOptions;
     return {
       program: this.owner.program,

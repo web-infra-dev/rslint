@@ -6,6 +6,7 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
@@ -84,6 +85,13 @@ func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, no
 			}
 		}
 		return nil, errors.New("invalid module resolution index")
+	case "configSyntax":
+		source := configFile(p, r.File)
+		if source == nil {
+			return nil, errors.New("unknown project config")
+		}
+		tree, _, err := encoder.EncodeSourceFile(source)
+		return &EncodedTypeNode{tree: tree}, err
 	case "projectReferences":
 		data, err := json.Marshal(projectReferences(q.CommandLine()))
 		return Text(data), err
@@ -94,7 +102,7 @@ func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, no
 	if !ok {
 		return nil, errors.New("unknown Program query")
 	}
-	return diagnosticFacts(q.Diagnostics(ctx, kind, file)), ctx.Err()
+	return diagnosticFacts(p, q.Diagnostics(ctx, kind, file)), ctx.Err()
 }
 
 var diagnosticKinds = map[Operation]program.DiagnosticKind{
@@ -141,14 +149,26 @@ func projectReferences(c *tsoptions.ParsedCommandLine) []projectReference {
 	return result
 }
 
+type configSourceInfo struct {
+	Name                string      `json:"name"`
+	Path                tspath.Path `json:"path"`
+	ExtendedSourceFiles []string    `json:"extendedSourceFiles,omitempty"`
+}
+
+func configSource(c *tsoptions.ParsedCommandLine) *configSourceInfo {
+	if c.ConfigFile == nil {
+		return nil
+	}
+	source := c.ConfigFile.SourceFile
+	return &configSourceInfo{Name: source.FileName(), Path: source.Path(), ExtendedSourceFiles: c.ExtendedSourceFiles()}
+}
+
 type referenceConfig struct {
-	Name                string                `json:"name"`
-	Path                tspath.Path           `json:"path"`
+	*configSourceInfo
 	Options             map[string]any        `json:"options"`
 	FileNames           []string              `json:"fileNames"`
 	ProjectReferences   []projectReference    `json:"projectReferences,omitempty"`
 	References          []int                 `json:"references,omitempty"`
-	ExtendedSourceFiles []string              `json:"extendedSourceFiles,omitempty"`
 	WildcardDirectories map[string]uint8      `json:"wildcardDirectories"`
 	Raw                 any                   `json:"raw,omitempty"`
 	CompileOnSave       *bool                 `json:"compileOnSave,omitempty"`
@@ -177,13 +197,11 @@ func resolvedReferences(p *program.Program) (Result, error) {
 		if id := seen[c]; id != 0 {
 			return id, nil
 		}
-		source := c.ConfigFile.SourceFile
-		options, err := compilerOptions(c.CompilerOptions())
+		options, err := compilerOptions(c)
 		if err != nil {
 			return 0, err
 		}
-		fact := &referenceConfig{Name: source.FileName(), Path: source.Path(), Options: options, FileNames: slices.Concat([]string{}, c.FileNames()), ProjectReferences: projectReferences(c), Raw: c.Raw, CompileOnSave: c.CompileOnSave, WatchOptions: c.ParsedConfig.WatchOptions, TypeAcquisition: c.TypeAcquisition()}
-		fact.ExtendedSourceFiles = c.ExtendedSourceFiles()
+		fact := &referenceConfig{configSourceInfo: configSource(c), Options: options, FileNames: slices.Concat([]string{}, c.FileNames()), ProjectReferences: projectReferences(c), Raw: c.Raw, CompileOnSave: c.CompileOnSave, WatchOptions: c.ParsedConfig.WatchOptions, TypeAcquisition: c.TypeAcquisition()}
 		dirs := c.WildcardDirectories()
 		fact.WildcardDirectories = make(map[string]uint8, len(dirs))
 		for path, recursive := range dirs {
@@ -198,7 +216,7 @@ func resolvedReferences(p *program.Program) (Result, error) {
 		id := len(graph.Configs)
 		seen[c] = id
 		if len(c.Errors) != 0 {
-			fact.Diagnostics, err = EncodePacket(diagnosticFacts(c.Errors))
+			fact.Diagnostics, err = EncodePacket(diagnosticFacts(p, c.Errors))
 			if err != nil {
 				return 0, err
 			}

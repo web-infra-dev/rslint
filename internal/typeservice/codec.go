@@ -451,6 +451,9 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
 		if d.Unnecessary {
 			flags |= 2
 		}
+		if d.Config {
+			flags |= 4
+		}
 		w.put(pos+28, flags)
 		w.put(pos+32, w.diagnostics(d.Chain))
 		w.put(pos+36, w.diagnostics(d.Related))
@@ -522,7 +525,12 @@ func (w *packetWriter) node(node *NodeRef) uint32 {
 	offset := uint32(len(w.data))
 	w.data = append(w.data, make([]byte, 8)...)
 	w.put(offset, w.text(node.File))
-	w.put(offset+4, node.Index)
+	// A negative index addresses the config parse tree of the same filename.
+	index := int32(node.Index)
+	if node.Config {
+		index = -index
+	}
+	w.put(offset+4, uint32(index))
 	return offset
 }
 

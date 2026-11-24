@@ -16,9 +16,10 @@ type Scope struct {
 	Checker    uint32 `json:"checker"`
 }
 type NodeRef struct {
-	File  string       `json:"file"`
-	Index uint32       `json:"index"`
-	Token *SyntaxToken `json:"token,omitempty"`
+	File   string       `json:"file"`
+	Index  uint32       `json:"index"`
+	Config bool         `json:"config,omitempty"`
+	Token  *SyntaxToken `json:"token,omitempty"`
 }
 
 // The binary compiler tree stores punctuation and some keywords on their parent.
@@ -268,7 +269,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 		request = &TypeRequest{Op: wire.Op}
 	case "symbolExports", "symbolGlobalExports":
 		request = &SymbolRequest{Op: wire.Op}
-	case "configFileParsingDiagnostics", "optionsDiagnostics", "globalDiagnostics", "syntacticDiagnostics", "semanticDiagnostics", "declarationDiagnostics", "nodeCount", "identifierCount", "symbolCount", "typeCount", "instantiationCount", "relationCacheSizes", "rootFileNames", "modeForUsageLocation", "modeForResolutionAtIndex", "projectReferences", "resolvedProjectReferences":
+	case "configFileParsingDiagnostics", "optionsDiagnostics", "globalDiagnostics", "syntacticDiagnostics", "semanticDiagnostics", "declarationDiagnostics", "nodeCount", "identifierCount", "symbolCount", "typeCount", "instantiationCount", "relationCacheSizes", "rootFileNames", "modeForUsageLocation", "modeForResolutionAtIndex", "projectReferences", "resolvedProjectReferences", "configSyntax":
 		request = &ProgramRequest{Op: wire.Op}
 	case "stringLiteralType":
 		request = &StringLiteralRequest{Op: wire.Op}
@@ -401,10 +402,10 @@ type EncodedTypeNode struct {
 }
 type SuggestionDiagnostics []DiagnosticFact
 type DiagnosticFact struct {
-	File, Message, Source         string
-	Start, Length, Category, Code uint32
-	Deprecated, Unnecessary       bool
-	Chain, Related                SuggestionDiagnostics
+	File, Message, Source           string
+	Start, Length, Category, Code   uint32
+	Deprecated, Unnecessary, Config bool
+	Chain, Related                  SuggestionDiagnostics
 }
 
 func (EncodedTypeNode) result()       {}
