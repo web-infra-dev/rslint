@@ -287,9 +287,7 @@ function syntaxView(
       if (key === 'extendedSourceFiles' || Reflect.has(target, key))
         return Reflect.get(target, key, receiver);
       if (key === 'assertHasRealPosition')
-        return needsRealPosition(load().kind)
-          ? assertHasRealPosition
-          : undefined;
+        return needsRealPosition(load()) ? assertHasRealPosition : undefined;
       return read(key, proxy);
     },
     set(target, key, value, receiver) {
@@ -304,7 +302,7 @@ function syntaxView(
       if (key === 'extendedSourceFiles') return Reflect.has(target, key);
       if (Reflect.has(target, key)) return true;
       const node = load();
-      if (key === 'assertHasRealPosition') return needsRealPosition(node.kind);
+      if (key === 'assertHasRealPosition') return needsRealPosition(node);
       return (
         syntaxFields(node, jsDocKinds).includes(String(key)) ||
         (key === 'text' &&
@@ -344,7 +342,7 @@ function syntaxView(
 function wrapList(
   value: unknown[],
   wrap: (item: unknown) => unknown,
-): unknown[] {
+): unknown[] & Partial<ts.TextRange> {
   const list: unknown[] = [];
   for (const item of value) {
     const visible = wrap(item);
@@ -360,6 +358,17 @@ function wrapList(
       );
     }
   return list;
+}
+
+// The reader's scanner must see the range that a rule writes with ts.setTextRange.
+function shareGeneratedRange(
+  value: object,
+  range: Partial<ts.ReadonlyTextRange>,
+): void {
+  Object.defineProperties(value, {
+    pos: { get: () => range.pos },
+    end: { get: () => range.end },
+  });
 }
 
 function jsDocComment(node: Node) {
@@ -436,13 +445,17 @@ function isJSDocCast(node: Node | undefined): boolean {
   );
 }
 
-// These literals use TypeScript's NodeObject methods, like non-token nodes.
-function needsRealPosition(kind: SyntaxKind): boolean {
+// The factory builds these four token kinds as NodeObjects. Tokens scanned
+// between children use TokenObjects, including scanned literals.
+function needsRealPosition(node: Pick<Node, 'kind'>): boolean {
+  const { kind } = node;
   return (
     kind > SyntaxKind.LastToken ||
-    kind === SyntaxKind.StringLiteral ||
-    kind === SyntaxKind.NumericLiteral ||
-    kind === SyntaxKind.NoSubstitutionTemplateLiteral
+    ((kind === SyntaxKind.StringLiteral ||
+      kind === SyntaxKind.NumericLiteral ||
+      kind === SyntaxKind.JsxText ||
+      kind === SyntaxKind.NoSubstitutionTemplateLiteral) &&
+      node instanceof RemoteNode)
   );
 }
 
@@ -543,11 +556,36 @@ export class GenerationSyntaxViews {
     this.ensure();
     const ref = this.identities.get(node);
     if (!ref) {
+      const token = node as ts.Node;
       if (
         this.generated.has(node) ||
-        (node as ts.Node).flags & this.typescript.NodeFlags.Synthesized
+        token.flags & this.typescript.NodeFlags.Synthesized
       )
         return undefined;
+      // TypeScript can scan its own tokens when a rule borrows getChildren.
+      const jsKind = this.typescript.SyntaxKind;
+      if (token.kind <= jsKind.LastToken || token.kind === jsKind.SyntaxList) {
+        const parent = this.locationOrUndefined(token.parent);
+        if (parent) {
+          const children = this.rawNode(parent).getChildren();
+          const matches = (child: Node) =>
+            child.pos === token.pos &&
+            child.end === token.end &&
+            this.translateKind(SyntaxKind[child.kind]) === token.kind;
+          let child = children.find(matches);
+          if (!child) {
+            // List punctuation has the enclosing declaration as its parent.
+            const list = children.find(
+              (n) =>
+                n.kind === SyntaxKind.SyntaxList &&
+                n.pos <= token.pos &&
+                token.end <= n.end,
+            );
+            child = list?.getChildren().find(matches);
+          }
+          if (child) return this.sourceLocation(this.wrapNode(child));
+        } else if (this.generated.has(token.parent)) return undefined;
+      }
       throw new Error('foreign compiler node handle');
     }
     if (!('owner' in ref)) return ref;
@@ -766,7 +804,7 @@ export class GenerationSyntaxViews {
       this.summary(fact.parent).kind === 'HeritageClause',
     );
   }
-  private translateKind(name: string): number {
+  private translateKind(name: string): ts.SyntaxKind {
     if (name === 'EndOfFile') name = 'EndOfFileToken';
     if (name === 'JSDocUnknownTag') name = 'JSDocTag';
     const result =
@@ -1229,18 +1267,15 @@ export class GenerationSyntaxViews {
       if (old) return old;
       if (Array.isArray(value)) {
         const list = wrapList(value, wrap);
+        if ('pos' in list && 'end' in list) shareGeneratedRange(value, list);
         views.set(value, list);
         return list;
       }
       if (!('kind' in value && 'getSourceFile' in value)) return value;
       const node = value as Node;
-      // The reader and the projected node share the range written by ts.setTextRange.
       const range = { pos: node.pos, end: node.end };
-      Object.defineProperties(node, {
-        pos: { get: () => range.pos },
-        end: { get: () => range.end },
-        getSourceFile: { value: getSourceFile },
-      });
+      shareGeneratedRange(node, range);
+      Object.defineProperty(node, 'getSourceFile', { value: getSourceFile });
       const encoded = node instanceof RemoteNode;
       const original = encoded
         ? origins?.[(node as unknown as { index: number }).index]
@@ -1274,10 +1309,12 @@ export class GenerationSyntaxViews {
           const member = this.syntaxMember(node, key);
           if (typeof member === 'function') {
             if (!args) return syntaxMethod(key);
-            const position = positionMethod(key);
-            if (position && !needsRealPosition(node.kind))
-              return Reflect.apply(position, proxy, args);
-            if (needsRealPosition(node.kind)) assertHasRealPosition.call(node);
+            if (needsRealPosition(node)) {
+              assertHasRealPosition.call(node);
+            } else {
+              const position = positionMethod(key);
+              if (position) return Reflect.apply(position, proxy, args);
+            }
             if (tokenNavigation.has(key)) {
               const index = key === 'getChildAt' ? 1 : 0;
               args[index] = scanSource(args[index] ?? node.getSourceFile());
