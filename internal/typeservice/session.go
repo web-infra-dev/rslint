@@ -77,22 +77,31 @@ type Session struct {
 }
 
 type Descriptor struct {
-	SyntaxOnly       bool              `json:"syntaxOnly,omitempty"`
-	Generation       uint32            `json:"generation"`
-	Checker          uint32            `json:"checker"`
-	CurrentDirectory string            `json:"currentDirectory"`
-	CompilerOptions  json.RawMessage   `json:"compilerOptions"`
-	ConfigFile       *configSourceInfo `json:"configFile,omitempty"`
-	Sources          []Source          `json:"sources"`
+	SyntaxOnly          bool              `json:"syntaxOnly,omitempty"`
+	Generation          uint32            `json:"generation"`
+	Checker             uint32            `json:"checker"`
+	CurrentDirectory    string            `json:"currentDirectory"`
+	CompilerOptions     json.RawMessage   `json:"compilerOptions"`
+	ConfigFile          *configSourceInfo `json:"configFile,omitempty"`
+	ImplicitImportTrees map[string][]byte `json:"implicitImportTrees,omitempty"`
+	Sources             []Source          `json:"sources"`
 }
 type Source struct {
 	ImpliedNodeFormat core.ResolutionMode `json:"impliedNodeFormat,omitempty"`
+	CheckJSDirective  *checkJSDirective   `json:"checkJsDirective,omitempty"`
 	FileName          string              `json:"fileName"`
 	Path              string              `json:"path"`
 	Packages          []string            `json:"packages"`
+	ImplicitImports   []string            `json:"implicitImports,omitempty"`
 	External          bool                `json:"external"`
 	DefaultLibrary    bool                `json:"defaultLibrary"`
 	IsDeclarationFile bool                `json:"isDeclarationFile"`
+}
+
+type checkJSDirective struct {
+	Enabled bool `json:"enabled"`
+	End     int  `json:"end"`
+	Pos     int  `json:"pos"`
 }
 
 // Binding authorizes one eligible lint target. Dependency nodes remain valid
@@ -198,7 +207,16 @@ func (s *Session) syntaxDescriptor() Descriptor {
 	return Descriptor{SyntaxOnly: true, Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: json.RawMessage("{}")}
 }
 func syntaxSource(f *ast.SourceFile) Source {
-	return Source{FileName: f.FileName(), Path: string(f.Path()), IsDeclarationFile: f.IsDeclarationFile}
+	source := Source{FileName: f.FileName(), Path: string(f.Path()), IsDeclarationFile: f.IsDeclarationFile}
+	if directive := f.CheckJsDirective; directive != nil {
+		positions := f.GetPositionMap()
+		source.CheckJSDirective = &checkJSDirective{
+			Enabled: directive.Enabled,
+			End:     positions.UTF8ToUTF16(directive.Range.End()),
+			Pos:     positions.UTF8ToUTF16(directive.Range.Pos()),
+		}
+	}
+	return source
 }
 func (s *Session) Descriptor() (Descriptor, error) {
 	s.mu.Lock()
@@ -215,14 +233,30 @@ func (s *Session) Descriptor() (Descriptor, error) {
 		}
 		return d, nil
 	}
-	commandLine := s.program.CompilerQueries().CommandLine()
+	compiler := s.program.CompilerQueries()
+	commandLine := compiler.CommandLine()
 	options, err := json.Marshal(compilerOptions(commandLine))
 	if err != nil {
 		return Descriptor{}, err
 	}
 	d := Descriptor{Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: options, ConfigFile: configSource(s.program, commandLine)}
 	for _, f := range s.program.SourceFiles() {
-		d.Sources = append(d.Sources, s.source(f))
+		source := s.source(f)
+		for _, specifier := range compiler.ImplicitImports(f.Path()) {
+			name := specifier.Text()
+			source.ImplicitImports = append(source.ImplicitImports, name)
+			if d.ImplicitImportTrees[name] == nil {
+				tree, _, err := encoder.EncodeNode(specifier.Parent, nil)
+				if err != nil {
+					return Descriptor{}, err
+				}
+				if d.ImplicitImportTrees == nil {
+					d.ImplicitImportTrees = make(map[string][]byte)
+				}
+				d.ImplicitImportTrees[name] = tree
+			}
+		}
+		d.Sources = append(d.Sources, source)
 	}
 	return d, nil
 }
@@ -346,13 +380,13 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 			if s.syntaxOnly && !eligible[f] {
 				return nil, errors.New("foreign syntax service source")
 			}
-			natives[i].primary, err = resolveNode(f, *ref)
+			natives[i].primary, err = resolveNode(p, f, *ref)
 			if err != nil {
 				return nil, err
 			}
 		}
 		if r, ok := q.Request.(*IndexDeclarationRequest); ok && r.Declaration != nil {
-			natives[i].declaration, err = resolveNode(sourceForNode(p, r.Declaration), *r.Declaration)
+			natives[i].declaration, err = resolveNode(p, sourceForNode(p, r.Declaration), *r.Declaration)
 			if err != nil {
 				return nil, err
 			}
@@ -360,7 +394,7 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	}
 	results := make([]Result, len(queries))
 	records := make([][]Record, len(queries))
-	// Program diagnostics and statistics may acquire all checker shards.
+	// Program diagnostics may acquire all checker shards.
 	// Preserve request order, releasing the file checker before these reads.
 	for start := 0; start < len(queries); {
 		if r, ok := queries[start].Request.(*ProgramRequest); ok {
@@ -373,7 +407,7 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 		}
 		if queries[start].Request.operation() == "nodeRecord" {
 			ref := requestNode(queries[start].Request)
-			results[start] = nodeFacts(sourceForNode(p, ref), ref.Config, natives[start].primary)
+			results[start] = nodeFacts(p, sourceForNode(p, ref), ref.Config, natives[start].primary)
 			start++
 			continue
 		}
@@ -577,17 +611,19 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 
 // Only the requested declaration's ancestors and declaration names are copied.
 // Descendant syntax stays demand-loaded through the immutable source transport.
-func nodeFacts(file *ast.SourceFile, config string, node *ast.Node) NodeFacts {
+func nodeFacts(p *program.Program, file *ast.SourceFile, config string, node *ast.Node) NodeFacts {
 	facts := NodeFacts{}
 	seen := map[*ast.Node]bool{}
 	table := encoder.GetNodeIndexTable(file)
-	reference := func(n *ast.Node) *NodeRef { return indexedNodeReference(file, table, config, n) }
+	reference := func(n *ast.Node) *NodeRef { return indexedNodeReference(p, file, table, config, n) }
 	add := func(n *ast.Node) *ast.Node {
 		if n == nil {
 			return nil
 		}
 		ref := reference(n)
-		n = table.Nodes[ref.Index]
+		if int(ref.Index) < len(table.Nodes) {
+			n = table.Nodes[ref.Index]
+		}
 		if seen[n] {
 			return n
 		}
@@ -656,10 +692,10 @@ func nodeReference(p *program.Program, n *ast.Node) *NodeRef {
 			panic("declaration is outside Program")
 		}
 	}
-	return indexedNodeReference(f, encoder.GetNodeIndexTable(f), config, n)
+	return indexedNodeReference(p, f, encoder.GetNodeIndexTable(f), config, n)
 }
 
-func indexedNodeReference(f *ast.SourceFile, table *encoder.NodeIndexTable, config string, n *ast.Node) *NodeRef {
+func indexedNodeReference(p *program.Program, f *ast.SourceFile, table *encoder.NodeIndexTable, config string, n *ast.Node) *NodeRef {
 	if n == nil {
 		return nil
 	}
@@ -669,6 +705,16 @@ func indexedNodeReference(f *ast.SourceFile, table *encoder.NodeIndexTable, conf
 	}
 	if index == 0 {
 		index = table.GetIndex(n)
+	}
+	if index == 0 && config == "" && p.CompilerQueries() != nil {
+		for i, specifier := range p.CompilerQueries().ImplicitImports(f.Path()) {
+			switch n {
+			case specifier.Parent:
+				index = uint32(len(table.Nodes) + 2*i)
+			case specifier:
+				index = uint32(len(table.Nodes) + 2*i + 1)
+			}
+		}
 	}
 	if index == 0 {
 		panic("declaration has no compiler node handle")
@@ -1247,8 +1293,25 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				node:             sig.Declaration(),
 			}, nil
 		}
-	case *IntrinsicRequest:
+	case *CheckerRequest:
 		switch r.Op {
+		case "typeCount":
+			return Handle(c.TypeCount), nil
+		case "symbolCount":
+			count := c.SymbolCount
+			for _, file := range s.program.SourceFiles() {
+				count += uint32(file.SymbolCount)
+			}
+			return Handle(count), nil
+		case "instantiationCount":
+			return Handle(c.TotalInstantiationCount), nil
+		case "relationCacheSizes":
+			return Handles{
+				uint32(len(checker.Relation_results(checker.Checker_assignableRelation(c)))),
+				uint32(len(checker.Relation_results(checker.Checker_identityRelation(c)))),
+				uint32(len(checker.Relation_results(checker.Checker_subtypeRelation(c)))),
+				uint32(len(checker.Relation_results(checker.Checker_strictSubtypeRelation(c)))),
+			}, nil
 		case "errorType":
 			return Handle(s.typeID(c.GetErrorType())), nil
 		case "anyType":
@@ -1390,15 +1453,29 @@ func sourceForNode(p *program.Program, ref *NodeRef) *ast.SourceFile {
 	return p.GetSourceFile(ref.File)
 }
 
-func resolveNode(f *ast.SourceFile, node NodeRef) (*ast.Node, error) {
+func resolveNode(p *program.Program, f *ast.SourceFile, node NodeRef) (*ast.Node, error) {
 	if f == nil {
 		return nil, errors.New("foreign source handle")
 	}
 	table := encoder.GetNodeIndexTable(f)
-	if node.Index == 0 || int(node.Index) >= len(table.Nodes) || table.Nodes[node.Index] == nil {
+	var parent *ast.Node
+	if node.Index < uint32(len(table.Nodes)) {
+		parent = table.Nodes[node.Index]
+	} else if node.Config == "" && p.CompilerQueries() != nil {
+		// The parser's node table excludes Program-owned implicit imports.
+		// The source reader appends each native declaration followed by its literal.
+		offset := node.Index - uint32(len(table.Nodes))
+		imports := p.CompilerQueries().ImplicitImports(f.Path())
+		if offset/2 < uint32(len(imports)) {
+			parent = imports[offset/2]
+			if offset%2 == 0 {
+				parent = parent.Parent
+			}
+		}
+	}
+	if parent == nil {
 		return nil, errors.New("invalid compiler node handle")
 	}
-	parent := table.Nodes[node.Index]
 	if node.Token == nil {
 		return parent, nil
 	}
@@ -1430,8 +1507,25 @@ func encodeGeneratedNode(node *ast.Node, builder *checker.NodeBuilder, enclosing
 		return nil, err
 	}
 	result := &EncodedTypeNode{tree: tree}
+	emit := builder.EmitContext()
 	for index, generated := range table.Nodes {
-		origin := builder.EmitContext().ParseNode(generated)
+		// Only these three flags are set by the node builder. Their positions
+		// in the printer's EmitFlags differ between tsgo and TypeScript.
+		if flags := emit.EmitFlags(generated); flags != 0 {
+			if result.emitFlags == nil {
+				result.emitFlags = make([]uint32, len(table.Nodes))
+			}
+			if flags&printer.EFSingleLine != 0 {
+				result.emitFlags[index] |= 1
+			}
+			if flags&printer.EFNoIndentation != 0 {
+				result.emitFlags[index] |= 2
+			}
+			if flags&printer.EFNoAsciiEscaping != 0 {
+				result.emitFlags[index] |= 4
+			}
+		}
+		origin := emit.ParseNode(generated)
 		if origin != nil && ast.GetSourceFileOfNode(origin) != nil {
 			if result.parseNodes == nil {
 				result.parseNodes = make([]*ast.Node, len(table.Nodes))

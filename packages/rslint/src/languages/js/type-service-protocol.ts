@@ -1,4 +1,8 @@
-import type { JSDocTagInfo, SymbolDisplayPart } from 'typescript';
+import type {
+  CheckJsDirective,
+  JSDocTagInfo,
+  SymbolDisplayPart,
+} from 'typescript';
 
 /** Finite semantic protocol shared by the checker client and injected host. */
 export interface Scope {
@@ -14,6 +18,7 @@ export interface NodeRef {
 export interface GeneratedSyntax {
   tree: Uint8Array;
   origins?: readonly (NodeRef | undefined)[];
+  emitFlags?: readonly number[];
 }
 export interface FileBinding extends Scope {
   sourceFileName: string;
@@ -29,11 +34,14 @@ export interface TypeServiceDescriptor extends Scope {
   currentDirectory: string;
   compilerOptions: Record<string, unknown>;
   configFile?: ConfigSourceInfo;
+  implicitImportTrees?: Record<string, string>;
   sources: Array<{
     fileName: string;
     path: string;
     packages?: string[];
+    implicitImports?: string[];
     impliedNodeFormat?: number;
+    checkJsDirective?: CheckJsDirective;
     external: boolean;
     defaultLibrary: boolean;
     isDeclarationFile: boolean;

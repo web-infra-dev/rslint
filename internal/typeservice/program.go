@@ -64,15 +64,6 @@ func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, no
 		return Handle(count), nil
 	case "identifierCount":
 		return Handle(q.IdentifierCount()), nil
-	case "typeCount":
-		return Handle(q.TypeCount()), nil
-	case "symbolCount":
-		return Handle(q.SymbolCount()), nil
-	case "instantiationCount":
-		return Handle(q.InstantiationCount()), nil
-	case "relationCacheSizes":
-		sizes := q.RelationCacheSizes()
-		return Handles(sizes[:]), nil
 	case "modeForUsageLocation":
 		source := p.GetSourceFile(r.File)
 		if source == nil || node == nil {
@@ -81,17 +72,22 @@ func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, no
 		return Handle(p.GetModeForUsageLocation(source, node)), nil
 	case "modeForResolutionAtIndex":
 		if file != nil && r.Index >= 0 {
-			imports := file.Imports()
-			if r.Index < len(imports) {
-				return Handle(p.GetModeForUsageLocation(file, imports[r.Index])), nil
+			implicit := q.ImplicitImports(file.Path())
+			if r.Index < len(implicit) {
+				return Handle(p.GetModeForUsageLocation(file, implicit[r.Index])), nil
 			}
-			index := len(imports)
+			imports := file.Imports()
+			index := r.Index - len(implicit)
+			if index < len(imports) {
+				return Handle(p.GetModeForUsageLocation(file, imports[index])), nil
+			}
+			index -= len(imports)
 			for _, name := range file.ModuleAugmentations {
 				if name.Kind == ast.KindStringLiteral {
-					if index == r.Index {
+					if index == 0 {
 						return Handle(p.GetModeForUsageLocation(file, name)), nil
 					}
-					index++
+					index--
 				}
 			}
 		}

@@ -88,11 +88,11 @@ type Strings []string
 
 func (Strings) result() {}
 
-type IntrinsicRequest struct {
+type CheckerRequest struct {
 	Op Operation `json:"-"`
 }
 
-func (r *IntrinsicRequest) operation() Operation { return r.Op }
+func (r *CheckerRequest) operation() Operation { return r.Op }
 
 type VoidRequest struct{}
 type PropertyRequest struct {
@@ -270,7 +270,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 		request = &TypeRequest{Op: wire.Op}
 	case "symbolExports", "symbolGlobalExports":
 		request = &SymbolRequest{Op: wire.Op}
-	case "configFileParsingDiagnostics", "optionsDiagnostics", "globalDiagnostics", "syntacticDiagnostics", "semanticDiagnostics", "declarationDiagnostics", "nodeCount", "identifierCount", "symbolCount", "typeCount", "instantiationCount", "relationCacheSizes", "rootFileNames", "modeForUsageLocation", "modeForResolutionAtIndex", "projectReferences", "resolvedProjectReferences", "configSyntax":
+	case "configFileParsingDiagnostics", "optionsDiagnostics", "globalDiagnostics", "syntacticDiagnostics", "semanticDiagnostics", "declarationDiagnostics", "nodeCount", "identifierCount", "rootFileNames", "modeForUsageLocation", "modeForResolutionAtIndex", "projectReferences", "resolvedProjectReferences", "configSyntax":
 		request = &ProgramRequest{Op: wire.Op}
 	case "stringLiteralType":
 		request = &StringLiteralRequest{Op: wire.Op}
@@ -296,8 +296,9 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 		request = &PredicateStringRequest{Op: wire.Op}
 	case "indexDeclaration":
 		request = &IndexDeclarationRequest{Op: wire.Op}
-	case "errorType", "anyType", "unknownType", "stringType", "numberType", "booleanType", "bigIntType", "eSSymbolType", "nonPrimitiveType", "neverType", "nullType", "undefinedType", "trueType", "falseType", "ambientModules":
-		request = &IntrinsicRequest{Op: wire.Op}
+	case "errorType", "anyType", "unknownType", "stringType", "numberType", "booleanType", "bigIntType", "eSSymbolType", "nonPrimitiveType", "neverType", "nullType", "undefinedType", "trueType", "falseType", "ambientModules",
+		"symbolCount", "typeCount", "instantiationCount", "relationCacheSizes":
+		request = &CheckerRequest{Op: wire.Op}
 	case "augmentedPropertiesOfType":
 		request = &TypeRequest{Op: wire.Op}
 	case "rootSymbols", "mergedSymbol", "isArgumentsSymbol", "isUndefinedSymbol":
@@ -400,6 +401,7 @@ type EncodedTypeNode struct {
 	tree       []byte
 	parseNodes []*ast.Node
 	origins    []*NodeRef
+	emitFlags  []uint32
 }
 type SuggestionDiagnostics []DiagnosticFact
 type DiagnosticFact struct {

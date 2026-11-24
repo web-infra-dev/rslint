@@ -30,7 +30,7 @@ export class TypePacketReader {
     if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
     this.kind = this.word(4);
     const words = [
-      0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 2, 1, 3, 1, 1, 21, 4,
+      0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 3, 1, 3, 1, 1, 21, 4,
     ][this.kind];
     if (!words || bytes.length < 8 + words * 4) invalid();
   }
@@ -388,11 +388,12 @@ export class TypePacketReader {
         break;
       case 14: {
         const len = this.word(8);
-        if (16 + len > this.bytes!.length) return invalid();
+        if (20 + len > this.bytes!.length) return invalid();
         value = len
           ? {
-              tree: Uint8Array.from(this.bytes!.subarray(16, 16 + len)),
+              tree: Uint8Array.from(this.bytes!.subarray(20, 20 + len)),
               origins: this.optionalIDs(12)?.map((offset) => this.node(offset)),
+              emitFlags: this.optionalIDs(16),
             }
           : undefined;
         break;

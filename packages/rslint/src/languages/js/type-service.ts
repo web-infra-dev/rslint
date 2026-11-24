@@ -1616,18 +1616,17 @@ export class TypeServiceClient {
   private store(key: string, bytes: Uint8Array): TypePacketReader {
     const existing = this.facts.get(key);
     if (existing) return existing;
-    if (bytes.byteLength > this.maxFactsBytes)
-      return new TypePacketReader(bytes);
+    const size = key.length * 2 + bytes.byteLength;
+    if (size > this.maxFactsBytes) return new TypePacketReader(bytes);
     const reader = new TypePacketReader(Uint8Array.from(bytes));
-    while (this.factBytes + reader.retainedBytes > this.maxFactsBytes) {
-      const oldest = this.facts.keys().next().value!,
-        evicted = this.facts.get(oldest)!;
-      this.factBytes -= evicted.retainedBytes;
+    while (this.factBytes + size > this.maxFactsBytes) {
+      const [oldest, evicted] = this.facts.entries().next().value!;
+      this.factBytes -= oldest.length * 2 + evicted.retainedBytes;
       evicted.close();
       this.facts.delete(oldest);
     }
     this.facts.set(key, reader);
-    this.factBytes += reader.retainedBytes;
+    this.factBytes += size;
     return reader;
   }
   private ingest(

@@ -63,6 +63,13 @@ export function typeServiceCompilerData(ts: typeof TypeScript) {
     JsxEmit: ts.JsxEmit,
     ModuleDetectionKind: ts.ModuleDetectionKind,
     ScriptTarget: ts.ScriptTarget,
+    builderEmitFlags: Array.from(
+      { length: 8 },
+      (_, mask) =>
+        (mask & 1 ? ts.EmitFlags.SingleLine : 0) |
+        (mask & 2 ? ts.EmitFlags.NoIndentation : 0) |
+        (mask & 4 ? ts.EmitFlags.NoAsciiEscaping : 0),
+    ),
     jsDocKinds,
     originalKinds,
   } as const;

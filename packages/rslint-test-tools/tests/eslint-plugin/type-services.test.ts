@@ -2,7 +2,7 @@ import { beforeAll, afterAll, describe, expect, test } from 'rstack/test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve, relative } from 'node:path';
+import { resolve, relative, sep } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
@@ -1878,7 +1878,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
             .getSymbol()!
             .members!.get('__index' as ts.__String)!;
           const computed = c.getSymbolAtLocation(box.members[3].name!)!;
-          const imp = src.statements[12] as ts.ImportDeclaration;
           const grow = (src.statements[14] as ts.VariableStatement)
             .declarationList.declarations[0].initializer!;
           return {
@@ -1958,14 +1957,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
                 ts.setOriginalNode(generatedParameter.name, undefined),
               )?.name,
             ],
-            modes: [
-              imp.attributes?.elements[0].value.getText(src),
-              p.getModeForUsageLocation(
-                src,
-                imp.moduleSpecifier as ts.StringLiteral,
-              ),
-              p.getModeForResolutionAtIndex(src, 0),
-            ],
           };
         })(),
         shape: [
@@ -2026,6 +2017,9 @@ test('public checker, Program and source reads match TypeScript', async () => {
         printed: [
           c.symbolToString(symbol, decl),
           c.typePredicateToString(predicate, guard),
+          ts
+            .createPrinter()
+            .printNode(ts.EmitHint.Unspecified, detachedConstraint, src),
         ],
         tuple: [
           tuple.minLength,
@@ -2048,23 +2042,10 @@ test('public checker, Program and source reads match TypeScript', async () => {
         lines: [0, code.indexOf('\n'), code.length].map((pos) =>
           src.getLineEndOfPosition(pos),
         ),
-        diagnostics: p
-          .getSemanticDiagnostics(src)
-          .map((d) => [d.code, d.start, d.length, d.file === src]),
-        other: [
-          p.getSyntacticDiagnostics(src).length,
-          p.getOptionsDiagnostics().length,
-          p.getConfigFileParsingDiagnostics().length,
+        references: [
           p.getProjectReferences(),
           p.getResolvedProjectReferences(),
         ],
-        counts: [
-          p.getNodeCount(),
-          p.getIdentifierCount(),
-          p.getSymbolCount(),
-          p.getTypeCount(),
-        ].map((n) => n > 0),
-        relationKeys: Object.keys(p.getRelationCacheSizes()).sort(),
         cancel: c.runWithCancellationToken(
           {
             isCancellationRequested: () => false,
@@ -2074,9 +2055,48 @@ test('public checker, Program and source reads match TypeScript', async () => {
         ),
       };
     };
-    expect(exercise(owner.program as unknown as ts.Program)).toEqual(
-      exercise(reference),
+    const actual = owner.program as unknown as ts.Program;
+    const { shape: actualShape, ...actualReads } = exercise(actual);
+    const { shape: expectedShape, ...expectedReads } = exercise(reference);
+    expect(actualReads).toEqual(expectedReads);
+    expect(actualShape).toEqual(expectedShape);
+
+    const moduleModes = (p: ts.Program) => {
+      const src = p.getSourceFile(file)!;
+      const imp = src.statements[12] as ts.ImportDeclaration;
+      return [
+        imp.attributes?.elements[0].value.getText(src),
+        p.getModeForUsageLocation(src, imp.moduleSpecifier as ts.StringLiteral),
+        p.getModeForResolutionAtIndex(src, 0),
+      ];
+    };
+    expect(moduleModes(actual)).toEqual(moduleModes(reference));
+
+    const diagnostics = (p: ts.Program) => {
+      const src = p.getSourceFile(file)!;
+      return {
+        semantic: p
+          .getSemanticDiagnostics(src)
+          .map((d) => [d.code, d.start, d.length, d.file === src]),
+        syntactic: p.getSyntacticDiagnostics(src).length,
+        options: p.getOptionsDiagnostics().length,
+        config: p.getConfigFileParsingDiagnostics().length,
+      };
+    };
+    expect(diagnostics(actual)).toEqual(diagnostics(reference));
+
+    for (const method of [
+      'getNodeCount',
+      'getIdentifierCount',
+      'getSymbolCount',
+      'getTypeCount',
+    ] as const) {
+      expect(actual[method]() > 0, method).toBe(reference[method]() > 0);
+    }
+    expect(Object.keys(actual.getRelationCacheSizes()).sort()).toEqual(
+      Object.keys(reference.getRelationCacheSizes()).sort(),
     );
+
     const checker = owner.program.getTypeChecker();
     const literal = checker.getStringLiteralType('abc');
     expect(Reflect.set(literal, 'value', 'changed')).toBe(false);
@@ -2105,6 +2125,7 @@ test('declared members and source metadata follow TypeScript query order', async
     file,
     [
       '// 😀',
+      '// @ts-check',
       '/// <reference no-default-lib="true" />',
       '/// <reference path="./esm.mts" />',
       '/// <reference path="./cjs.cts" preserve="true" />',
@@ -2186,17 +2207,17 @@ test('declared members and source metadata follow TypeScript query order', async
         ),
       };
     };
+    const esm = program.getSourceFile(resolve(dir, 'esm.mts'))!;
+    const imports = Reflect.get(esm, 'imports') as readonly ts.StringLiteral[];
     return {
       child: inspect(declared(1), true),
       empty: inspect(declared(2)),
       generic: inspect(declared(3)),
       instantiated: inspect(declared(4)),
       tuple: inspect((declared(5) as ts.TypeReference).target),
-      modes: [0, 1].map((i) =>
-        program.getModeForResolutionAtIndex(
-          program.getSourceFile(resolve(dir, 'esm.mts'))!,
-          i,
-        ),
+      imports: imports.map((specifier) => specifier.text),
+      modes: Array.from({ length: imports.length + 1 }, (_, i) =>
+        program.getModeForResolutionAtIndex(esm, i),
       ),
       sources: names.map((name) => {
         const src = program.getSourceFile(resolve(dir, name))!;
@@ -2204,6 +2225,7 @@ test('declared members and source metadata follow TypeScript query order', async
           src.languageVersion,
           src.hasNoDefaultLib,
           src.impliedNodeFormat,
+          Reflect.get(src, 'checkJsDirective'),
           src.referencedFiles,
           src.typeReferenceDirectives,
           src.libReferenceDirectives,
@@ -2214,7 +2236,7 @@ test('declared members and source metadata follow TypeScript query order', async
   };
   for (const compilerOptions of [
     { target: 'es2020', module: 'esnext', moduleResolution: 'bundler' },
-    { module: 'nodenext' },
+    { module: 'nodenext', importHelpers: true },
   ]) {
     const raw = {
       compilerOptions: { ...compilerOptions, resolveJsonModule: true },
@@ -2321,6 +2343,13 @@ test('resolved project references retain config syntax, nesting and missing entr
       rootNames: parsed.fileNames,
       configFileParsingDiagnostics: parsed.errors,
     });
+    // tsgo normalizes the root config name. TypeScript preserves the caller's spelling.
+    expect(
+      (owner.program.getCompilerOptions().configFile as ts.SourceFile).fileName,
+    ).toBe(config.split(sep).join('/'));
+    expect(
+      (tsProgram.getCompilerOptions().configFile as ts.SourceFile).fileName,
+    ).toBe(config);
     const inspect = (p: ts.Program) => {
       const source = p.getOptionsDiagnostics().find((d) => d.code === 5052)!
         .file as ts.TsConfigSourceFile;
@@ -2338,8 +2367,8 @@ test('resolved project references retain config syntax, nesting and missing entr
         diagnosticSource,
         options: [
           options.plugins,
-          configFile.fileName,
           configFile.text,
+          Reflect.get(configFile, 'imports'),
           configFile === p.getSourceFile(config),
           configFile.statements[0].getText(configFile),
           configFile.statements[0] === p.getSourceFile(config)!.statements[0],

@@ -91,6 +91,7 @@ const sourceProperties = [
   'languageVariant',
   'scriptKind',
   'hasNoDefaultLib',
+  'checkJsDirective',
   'impliedNodeFormat',
   'referencedFiles',
   'typeReferenceDirectives',
@@ -466,6 +467,22 @@ function assertHasRealPosition(this: ts.TextRange, message?: string): void {
     );
 }
 
+// An encoded subtree has a real node in slot 1 instead of a SourceFile.
+function readSubtree(tree: Uint8Array, parent?: RemoteSourceFile): RemoteNode {
+  const reader = new RemoteSourceFile(
+    tree,
+    parent?._decoder ?? new Wtf8Decoder('utf-8', { ignoreBOM: true }),
+  );
+  const root = new RemoteNode(
+    reader.view,
+    1,
+    parent ?? reader,
+    reader,
+    reader._offsetNodes,
+  );
+  reader.nodes[1] = root;
+  return root;
+}
 type SourceMetadata = TypeServiceDescriptor['sources'][number];
 type ConfigMetadata = SourceMetadata & {
   ordinal: number;
@@ -508,6 +525,7 @@ export class GenerationSyntaxViews {
       | 'SyntaxKind'
       | 'NodeFlags'
       | 'ScriptTarget'
+      | 'builderEmitFlags'
       | 'jsDocKinds'
       | 'originalKinds'
     >,
@@ -539,10 +557,11 @@ export class GenerationSyntaxViews {
   }
   isStableNodeQuery(op: 'type' | 'constantValue', ref: NodeRef): boolean {
     if (ref.token) return false;
-    const node = this.cachedSource(
-      ref.file,
-      ref.config,
-    )?.getOrCreateNodeAtIndex(ref.index);
+    const source = this.cachedSource(ref.file, ref.config);
+    const node =
+      source && ref.index < source.nodes.length
+        ? source.getOrCreateNodeAtIndex(ref.index)
+        : undefined;
     // Enum declarations have fixed values. Other constant-value queries can
     // depend on a property access. Identifier uses can likewise have flow types.
     if (op === 'constantValue') return node?.kind === SyntaxKind.EnumMember;
@@ -759,10 +778,37 @@ export class GenerationSyntaxViews {
   private rawNode(ref: NodeRef): RemoteNode {
     const source = this.source(ref.file, ref.config);
     if (!source) throw new Error('foreign source');
+    if (ref.index >= source.nodes.length) this.imports(source);
     const raw = source.getOrCreateNodeAtIndex(ref.index);
     if (!(raw instanceof RemoteNode))
       throw new Error('invalid compiler node handle');
     return raw;
+  }
+  private imports(source: RemoteSourceFile): readonly Node[] | undefined {
+    // The config AST is parsed separately even when the program imports the same JSON file.
+    if (this.configTrees?.has(source)) return undefined;
+    const names = this.metadataByName.get(source.fileName)?.implicitImports;
+    if (!names || Object.hasOwn(source, 'imports')) return source.imports;
+    const imports: Node[] = [];
+    for (const name of names) {
+      const declaration = readSubtree(
+        Buffer.from(this.descriptor.implicitImportTrees![name], 'base64'),
+        source,
+      );
+      const specifier = declaration.moduleSpecifier!;
+      // These native nodes belong to the Program, outside the parser's table.
+      for (const node of [declaration, specifier]) {
+        this.identities.set(node, {
+          file: source.fileName,
+          index: source.nodes.length,
+        });
+        source.nodes.push(node);
+      }
+      imports.push(specifier);
+    }
+    const all = imports.concat(source.imports);
+    Object.defineProperty(source, 'imports', { value: all });
+    return all;
   }
   private rawSyntax(ref: SyntaxRef): Node {
     if (!('owner' in ref)) return this.rawNode(ref);
@@ -770,6 +816,12 @@ export class GenerationSyntaxViews {
     return ref.listChild === undefined
       ? child
       : child.getChildAt(ref.listChild);
+  }
+  private positionedNode(ref: SyntaxRef): Node {
+    const node = this.rawSyntax(ref);
+    if (node.pos < 0 && needsRealPosition(node))
+      assertHasRealPosition.call(node);
+    return node;
   }
   private summary(ref: NodeRef): NodeFact {
     const requestedKey = this.key(ref),
@@ -855,6 +907,10 @@ export class GenerationSyntaxViews {
     value: RemoteNode,
     index = (value as unknown as { index: number }).index,
   ): NodeRef {
+    if (value.pos < 0) {
+      const implicit = this.locationOrUndefined(value);
+      if (implicit) return implicit;
+    }
     const source = value.getSourceFile();
     const config = this.configTrees?.get(source);
     return config
@@ -939,13 +995,25 @@ export class GenerationSyntaxViews {
     const position = positionMethod(key);
     if (position) {
       if (!args) return syntaxMethod(key);
-      if (key === 'getFullStart' || key === 'getEnd' || key === 'getFullWidth')
-        return Reflect.apply(position, proxy, args);
       if (!this.identities.has(proxy))
         return Reflect.apply(position, proxy, args);
+      if (
+        key === 'getFullStart' ||
+        key === 'getEnd' ||
+        key === 'getFullWidth'
+      ) {
+        const value = Reflect.apply(position, proxy, args) as number;
+        // An implicit import has start and end -1, so its full width is zero.
+        if (
+          value < 0 ||
+          (key === 'getFullWidth' && value === 0 && (proxy as Node).pos < 0)
+        )
+          this.positionedNode(ref);
+        return value;
+      }
       const source = this.identities.get(args[0] as object);
       if (source) args[0] = this.rawSyntax(source);
-      return Reflect.apply(position, this.rawSyntax(ref), args);
+      return Reflect.apply(position, this.positionedNode(ref), args);
     }
     const real = 'owner' in ref ? undefined : ref,
       owner = 'owner' in ref ? ref.owner : ref,
@@ -962,7 +1030,8 @@ export class GenerationSyntaxViews {
         : this.metadataByName.get(file)!;
       if (key === 'fileName' || key === 'path' || key === 'isDeclarationFile')
         return source[key];
-      if (key === 'impliedNodeFormat') return source.impliedNodeFormat;
+      if (key === 'impliedNodeFormat' || key === 'checkJsDirective')
+        return source[key];
       if (
         key === 'referencedFiles' ||
         key === 'typeReferenceDirectives' ||
@@ -1073,18 +1142,17 @@ export class GenerationSyntaxViews {
         const index = args[0] as number;
         const children = this.children.get(proxy);
         if (children) return children[index];
-        const child = this.rawSyntax(ref).getChildAt(index);
+        const child = this.positionedNode(ref).getChildAt(index);
         return child && this.wrapNode(child);
       }
       if (key === 'getChildCount')
         return (
           this.children.get(proxy)?.length ??
-          this.rawSyntax(ref).getChildCount()
+          this.positionedNode(ref).getChildCount()
         );
+      const node = this.positionedNode(ref);
       const token =
-        key === 'getFirstToken'
-          ? this.rawSyntax(ref).getFirstToken()
-          : this.rawSyntax(ref).getLastToken();
+        key === 'getFirstToken' ? node.getFirstToken() : node.getLastToken();
       return token && this.wrapNode(token);
     }
     if ('owner' in ref) {
@@ -1094,7 +1162,10 @@ export class GenerationSyntaxViews {
         return flags & this.typescript.NodeFlags.ContextFlags;
       }
     }
-    const raw = this.rawSyntax(ref);
+    const raw =
+      key === 'getStart' && args
+        ? this.positionedNode(ref)
+        : this.rawSyntax(ref);
     if (
       key === 'flags' &&
       real &&
@@ -1139,6 +1210,8 @@ export class GenerationSyntaxViews {
     return value;
   }
   private syntaxMember(raw: Node, key: string | symbol): unknown {
+    if (key === 'imports' && raw instanceof RemoteSourceFile)
+      return this.imports(raw);
     if (key === 'parent') {
       let parent = raw.parent;
       while (parent && isJSDocCast(parent)) parent = parent.parent;
@@ -1172,10 +1245,12 @@ export class GenerationSyntaxViews {
       return jsDocComment(raw);
     }
     if (key === 'hasExtendedUnicodeEscape' && kind === SyntaxKind.StringLiteral)
-      return !!(
-        (Reflect.get(raw, 'tokenFlags') as number) &
-        TokenFlags.ExtendedUnicodeEscape
-      );
+      return raw.pos < 0
+        ? undefined
+        : !!(
+            (Reflect.get(raw, 'tokenFlags') as number) &
+            TokenFlags.ExtendedUnicodeEscape
+          );
     const alias =
       typeof key === 'string' ? fieldAliases[kind]?.[key] : undefined;
     if (alias === false) return undefined;
@@ -1237,20 +1312,8 @@ export class GenerationSyntaxViews {
 
   // Generated nodes keep their own syntax identity. Checker queries can follow
   // an original parse node when the compiler supplies one.
-  generatedTypeNode({ tree, origins }: GeneratedSyntax): object {
-    const reader = new RemoteSourceFile(
-      tree,
-      new Wtf8Decoder('utf-8', { ignoreBOM: true }),
-    );
-    // The decoder's first slot holds a generated node, with no SourceFile fields.
-    const root = new RemoteNode(
-      reader.view,
-      1,
-      reader,
-      reader,
-      reader._offsetNodes,
-    );
-    reader.nodes[1] = root;
+  generatedTypeNode({ tree, origins, emitFlags }: GeneratedSyntax): object {
+    const root = readSubtree(tree);
     const views = new WeakMap<object, object>();
     const getSourceFile = function (this: Node) {
       const view = views.get(this) as ts.Node;
@@ -1282,13 +1345,19 @@ export class GenerationSyntaxViews {
       }
       if (!('kind' in value && 'getSourceFile' in value)) return value;
       const node = value as Node;
-      const range = { pos: node.pos, end: node.end };
-      shareGeneratedRange(node, range);
-      Object.defineProperty(node, 'getSourceFile', { value: getSourceFile });
       const encoded = node instanceof RemoteNode;
-      const original = encoded
-        ? origins?.[(node as unknown as { index: number }).index]
-        : undefined;
+      const index = encoded ? (node as unknown as { index: number }).index : 0;
+      const flags = emitFlags?.[index];
+      const fields = {
+        pos: node.pos,
+        end: node.end,
+        emitNode: flags
+          ? { flags: this.typescript.builderEmitFlags[flags] }
+          : undefined,
+      };
+      shareGeneratedRange(node, fields);
+      Object.defineProperty(node, 'getSourceFile', { value: getSourceFile });
+      const original = origins?.[index];
       const proxy = syntaxView(
         () => node,
         (key, proxy, args) => {
@@ -1334,7 +1403,7 @@ export class GenerationSyntaxViews {
         },
         this.ensure,
         this.typescript.jsDocKinds,
-        range,
+        fields,
       );
       this.generated.add(proxy);
       views.set(value, proxy);
@@ -1345,7 +1414,7 @@ export class GenerationSyntaxViews {
   private childNodes(ref: SyntaxRef, proxy: object): object[] {
     let children = this.children.get(proxy);
     if (!children) {
-      children = this.rawSyntax(ref)
+      children = this.positionedNode(ref)
         .getChildren()
         .map((child) => this.wrapNode(child));
       this.children.set(proxy, children);
