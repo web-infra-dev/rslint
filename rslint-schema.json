@@ -136,6 +136,11 @@
       "type": "object",
       "description": "Parser-specific configuration options",
       "properties": {
+        "lib": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "TypeScript library names used for scope analysis"
+        },
         "jsxPragma": {
           "type": ["string", "null"],
           "description": "Binding used by JSX elements in community rule scope analysis"
@@ -144,6 +149,9 @@
           "type": ["string", "null"],
           "description": "Binding used by JSX fragments in community rule scope analysis"
         },
+        "experimentalDecorators": { "type": "boolean" },
+        "emitDecoratorMetadata": { "type": "boolean" },
+        "isolatedDeclarations": { "type": "boolean" },
         "projectService": {
           "type": "boolean",
           "description": "Enable project service for typed linting (runs TypeScript language service behind the scene)",

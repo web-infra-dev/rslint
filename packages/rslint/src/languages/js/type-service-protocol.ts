@@ -3,7 +3,6 @@ import type { JSDocTagInfo, SymbolDisplayPart } from 'typescript';
 /** Finite semantic protocol shared by the checker client and injected host. */
 export interface Scope {
   generation: number;
-  checker: number;
 }
 export interface NodeRef {
   file: string;
@@ -544,7 +543,7 @@ export function typeQueryKey(q: TypeServiceQuery): string {
       ? `${key}:${node.token.kind}:${node.token.pos}:${node.token.end}`
       : key;
   };
-  const prefix = `${q.generation}:${q.checker}:${operationIDs.get(q.op)}:`;
+  const prefix = `${q.generation}:${operationIDs.get(q.op)}:`;
   switch (q.op) {
     case 'configFileParsingDiagnostics':
     case 'optionsDiagnostics':

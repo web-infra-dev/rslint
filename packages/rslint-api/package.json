@@ -2,6 +2,7 @@
   "name": "@rslint/api",
   "version": "0.10.1",
   "description": "Rslint AST library",
+  "sideEffects": false,
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {

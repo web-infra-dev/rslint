@@ -1489,7 +1489,6 @@ export class FileSyntaxViews {
     if (this.attached) throw new Error('file type services already attached');
     if (
       projection.binding.generation !== this.binding.generation ||
-      projection.binding.checker !== this.binding.checker ||
       projection.origins.length !== frame.nodes.length
     )
       throw new Error('stale or incompatible projection origins');

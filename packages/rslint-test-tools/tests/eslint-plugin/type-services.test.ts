@@ -106,6 +106,22 @@ interface Case {
 // their actual npm implementations, including real type-utils dependencies.
 const cases: Case[] = [
   {
+    name: 'JavaScript scope tracks self-references without JSX',
+    plugin: typedPlugin,
+    rule: 'no-use-before-define',
+    extension: 'js',
+    code: 'export const item = item;',
+    reports: 1,
+  },
+  {
+    name: 'a local type shadows a project library type',
+    plugin: typedPlugin,
+    rule: 'no-shadow',
+    options: [{ builtinGlobals: true, ignoreTypeValueShadow: false }],
+    code: 'export function f() { type RequestInit = string; let item: RequestInit; }',
+    reports: 1,
+  },
+  {
     name: 'JSX factories count as uses of their imports',
     plugin: typedPlugin,
     rule: 'no-unused-vars',

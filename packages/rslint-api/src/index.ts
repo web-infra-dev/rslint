@@ -21,5 +21,6 @@ export {
   NodeFlags,
   TokenFlags,
 } from '../../../typescript-go/packages/typescript/src/ast/index.ts';
+export { ScriptTarget } from '../../../typescript-go/packages/typescript/src/enums/scriptTarget.enum.ts';
 export type { Node } from '../../../typescript-go/packages/typescript/src/ast/index.ts';
 export { Wtf8Decoder } from '../../../typescript-go/packages/typescript/src/api/node/wtf8.ts';

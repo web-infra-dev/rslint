@@ -81,13 +81,7 @@ export interface SourceCode {
    * the runner doesn't yet support custom parsers, so this is static.
    */
   visitorKeys: Record<string, readonly string[]>;
-  /**
-   * Parser-supplied services. Empty `{}` in plain JS (matches v10).
-   * Real ESLint would populate this with the TS parser's `program`,
-   * `esTreeNodeToTSNodeMap`, etc.; the runner doesn't proxy ts-go
-   * type info through, so plugin rules that need TS types should
-   * guard via `if (!services.program) return {}`.
-   */
+  /** Services supplied by the file's parser, or an empty record. */
   parserServices: Record<string, unknown>;
 
   getText(node?: ESTreeNode, beforeCount?: number, afterCount?: number): string;
@@ -687,9 +681,6 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     },
     // Share canonical language traversal metadata with plugin queries.
     visitorKeys: RUNNER_VISITOR_KEYS,
-    // Empty in plain JS (matches ESLint v10's default). Type-aware
-    // plugins that probe `parserServices.program` correctly skip
-    // type-aware checks under rslint.
     parserServices: {},
 
     getText(node?: ESTreeNode, beforeCount = 0, afterCount = 0): string {

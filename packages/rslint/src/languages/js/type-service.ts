@@ -1577,7 +1577,6 @@ export class TypeServiceClient {
     this.ensure();
     const query: TypeServiceQuery = {
       generation: this.descriptor.generation,
-      checker: this.descriptor.checker,
       ...request,
     };
     const key = typeQueryKey(query);
@@ -2449,10 +2448,7 @@ export class TypeServiceClient {
   }
   file(binding: FileBinding): TypeServiceFile {
     this.ensure();
-    if (
-      binding.generation !== this.descriptor.generation ||
-      binding.checker !== this.descriptor.checker
-    )
+    if (binding.generation !== this.descriptor.generation)
       throw new Error('foreign file binding');
     const file = new TypeServiceFile(
       this,

@@ -41,6 +41,7 @@ import {
 import { mergeListeners, visit } from './listener-merge.js';
 import {
   createRuleContext,
+  type LanguageOptions,
   type ListenerFn,
   type RuleContext,
 } from './context.js';
@@ -52,7 +53,6 @@ import {
   type FixTextPart,
   type SuggestionsMode,
 } from './diagnostic-builder.js';
-import type { GlobalsConfig } from '../../languages/js/types.js';
 import type { LoadedPlugins } from '../plugin/plugin-loader.js';
 import type { Fix } from './fixer.js';
 import { applyDisableDirectives } from './apply-disable-directives.js';
@@ -100,35 +100,7 @@ export interface LintFileRequest {
   filePath: string;
   /** Workers materialize ordinary objects from owned bytes after the last native read. */
   frame: Uint8Array | SharedBytes;
-  /**
-   * Forwarded subset of user `languageOptions`. Only the fields the
-   * runner actually consumes are typed here; the rest of the user's
-   * `languageOptions` (parser custom hooks, plugin-specific extensions)
-   * is intentionally dropped at the IPC boundary because the worker
-   * doesn't reproduce ESLint's full language plugin pipeline.
-   *
-   * Per ESLint v10's flat-config spec
-   * (https://eslint.org/docs/v10.x/use/configure/language-options),
-   * `ecmaVersion` / `sourceType` / `globals` are TOP-LEVEL properties
-   * of `languageOptions`. `parserOptions` is reserved for parser-
-   * specific extras (`ecmaFeatures`, `allowReserved`). The v8-era
-   * positions (`parserOptions.ecmaVersion` / `parserOptions.sourceType`)
-   * are NOT accepted — rslint targets v10 cleanly.
-   */
-  languageOptions?: {
-    ecmaVersion?: number | 'latest';
-    sourceType?: 'module' | 'script' | 'commonjs';
-    globals?: GlobalsConfig;
-    parserOptions?: {
-      jsxPragma?: string | null;
-      jsxFragmentName?: string | null;
-      ecmaFeatures?: {
-        jsx?: boolean;
-        globalReturn?: boolean;
-        impliedStrict?: boolean;
-      };
-    };
-  };
+  languageOptions?: LanguageOptions;
   /** Merged flat-config `settings` for plugin consumption (e.g. `react.version`). */
   settings?: Record<string, unknown>;
   /** Map of fully-qualified rule name → config. Already enabled-filtered. */
@@ -199,8 +171,8 @@ function readFrame(req: LintFileRequest): ReturnType<typeof decodeFrame> {
   );
 }
 
-type ParserServices = Record<string, unknown> &
-  NonNullable<ScopeFactoryOptions['jsxServices']>;
+type ParserServices = object &
+  NonNullable<ScopeFactoryOptions['parserServices']>;
 
 /**
  * Lint a single file. Stateless — `loadedPlugins` is owned by the
@@ -258,11 +230,10 @@ export function lintFile(
     // are filled in by `scope-factory` to match ESLint v10.
     impliedStrict: ecmaFeatures?.impliedStrict,
     globalReturn: ecmaFeatures?.globalReturn,
-    ...(parsed.hasJSX && {
-      jsxServices: parserServices,
-      jsxPragma: languageOptions?.parserOptions?.jsxPragma,
-      jsxFragmentName: languageOptions?.parserOptions?.jsxFragmentName,
-    }),
+    parserServices,
+    lib: languageOptions?.parserOptions?.lib,
+    jsxPragma: languageOptions?.parserOptions?.jsxPragma,
+    jsxFragmentName: languageOptions?.parserOptions?.jsxFragmentName,
   });
   const scopeManagerFactory = () => {
     const sm = createScopeManager();
@@ -306,7 +277,25 @@ export function lintFile(
       ends: parsed.tokenEnds,
     },
   });
-  if (parserServices) sharedSourceCode.parserServices = parserServices;
+  if (parserServices) {
+    const supplied: Record<string, unknown> = parserServices;
+    const flags = [
+      'emitDecoratorMetadata',
+      'experimentalDecorators',
+      'isolatedDeclarations',
+    ] as const;
+    if (
+      'esTreeNodeToTSNodeMap' in supplied &&
+      flags.some((key) => supplied[key] === undefined)
+    ) {
+      const resolved = { ...supplied };
+      for (const key of flags)
+        resolved[key] ??= languageOptions?.parserOptions?.[key] === true;
+      sharedSourceCode.parserServices = resolved;
+    } else {
+      sharedSourceCode.parserServices = supplied;
+    }
+  }
 
   // ESLint v10's espree attaches `Program.tokens` (and `Program.comments`)
   // to the AST root directly. the frame decoder doesn't, so plugin rules that

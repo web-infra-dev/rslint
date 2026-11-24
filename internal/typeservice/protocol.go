@@ -13,7 +13,6 @@ import (
 type Operation string
 type Scope struct {
 	Generation uint32 `json:"generation"`
-	Checker    uint32 `json:"checker"`
 }
 type NodeRef struct {
 	File   string       `json:"file"`

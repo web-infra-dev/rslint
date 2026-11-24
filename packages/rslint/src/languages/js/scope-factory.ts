@@ -14,7 +14,7 @@
  * eslint-scope on `.ts` files would silently miscount `Variable.references`
  * for the TS-only constructs.
  *
- * JSX with TypeScript parser services uses the TS analyzer even in JS files.
+ * TypeScript parser services select the TS analyzer even in JS files.
  * Otherwise selection is by file extension. languageOptions can override globals
  * (forwarded per-file in the wire request's `languageOptions`, which Go
  * computes via `GetConfigForFile`).
@@ -30,6 +30,7 @@ import type { ScopeManager as EslintScopeManager } from 'eslint-scope';
 // (reading 'analyze')") while .js (eslint-scope) silently kept working.
 import * as tsScopeManagerPkg from '@typescript-eslint/scope-manager';
 import * as eslintScopePkg from 'eslint-scope';
+import { ScriptTarget } from '@rslint/api';
 
 import { getVisitorKeys, VISITOR_KEYS } from './visitor-keys.js';
 import {
@@ -74,11 +75,14 @@ export interface ScopeFactoryOptions {
   globalReturn?: boolean;
   jsxPragma?: string | null;
   jsxFragmentName?: string | null;
-  jsxServices?: {
+  lib?: readonly string[];
+  parserServices?: {
     program?: {
       getCompilerOptions(): {
         jsxFactory?: string;
         jsxFragmentFactory?: string;
+        lib?: readonly string[];
+        target?: number;
       };
     } | null;
   };
@@ -121,14 +125,19 @@ export function makeScopeManagerFactory(
 
 function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
   const ecmaVersion = normalizeEcmaVersion(opts.ecmaVersion);
-  const program = opts.jsxServices?.program;
+  const { jsxPragma, jsxFragmentName } = opts;
   if (
     shouldUseTsScopeManager(opts.filePath) ||
-    program !== undefined ||
-    opts.jsxPragma !== undefined ||
-    opts.jsxFragmentName !== undefined
+    (opts.parserServices && 'program' in opts.parserServices) ||
+    jsxPragma !== undefined ||
+    jsxFragmentName !== undefined
   ) {
-    const compiler = program?.getCompilerOptions();
+    const compiler =
+      opts.lib === undefined ||
+      jsxPragma === undefined ||
+      jsxFragmentName === undefined
+        ? opts.parserServices?.program?.getCompilerOptions()
+        : undefined;
     const tsScope = tsScopeManagerPkg as unknown as {
       analyze: (ast: object, options?: object) => unknown;
     };
@@ -154,18 +163,14 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
       impliedStrict: opts.impliedStrict ?? false,
       // A factory such as preact.h references the binding named preact.
       jsxPragma:
-        opts.jsxPragma === undefined
+        jsxPragma === undefined
           ? compiler?.jsxFactory?.split('.')[0].trim()
-          : opts.jsxPragma,
+          : jsxPragma,
       jsxFragmentName:
-        opts.jsxFragmentName === undefined
+        jsxFragmentName === undefined
           ? compiler?.jsxFragmentFactory?.split('.')[0].trim()
-          : opts.jsxFragmentName,
-      // Keep scope-manager's established esnext *type* catalog, but never let
-      // it independently decide runtime globals. seedEcmaGlobals reconciles
-      // every value binding with the same ecmaVersion table used by native
-      // rules while retaining type-only bindings.
-      lib: ['esnext'],
+          : jsxFragmentName,
+      lib: opts.lib ?? (compiler && scopeLibs(compiler.lib, compiler.target)),
     });
     return scopeManager;
   }
@@ -194,6 +199,26 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
     // nor the TS analyzer takes globals at construct time, so both paths seed
     // them post-analysis via seedGlobals below.
   });
+}
+
+function scopeLibs(
+  files: readonly string[] | undefined,
+  target = ScriptTarget.ES2025,
+): string[] {
+  if (files)
+    return files.flatMap(
+      (file) =>
+        /lib\.(.+)\.d\.[cm]?ts$/.exec(file.toLowerCase())?.slice(1) ?? [],
+    );
+  if (target === ScriptTarget.ES2015) return ['es6'];
+  if (target === ScriptTarget.ESNext) return ['esnext.full'];
+  return [
+    target >= ScriptTarget.ES2016 &&
+    target < ScriptTarget.ESNext &&
+    ScriptTarget[target]
+      ? `${ScriptTarget[target].toLowerCase()}.full`
+      : 'lib',
+  ];
 }
 
 // Minimal shape of an eslint-scope Variable that the
@@ -327,6 +352,13 @@ function demoteTypeScriptValueGlobal(
   gs: GlobalScopeLike,
   variable: SyntheticGlobal,
 ): void {
+  // A pure library type keeps its builtin identity when runtime globals change.
+  if (
+    variable.isTypeVariable &&
+    !variable.isValueVariable &&
+    variable.defs.length === 0
+  )
+    return;
   if (promotedTypeOnlyGlobals.has(variable)) {
     Reflect.deleteProperty(variable, 'isValueVariable');
     promotedTypeOnlyGlobals.delete(variable);

@@ -28,6 +28,7 @@
  */
 
 import { makeFixer } from './fixer.js';
+import type { ParserOptions } from '../../config/define-config.js';
 import { applyOptionDefaults, type RuleSchema } from './options-defaults.js';
 import type { SourceCode } from '../source-code/source-code.js';
 import type { ESTreeNode, GlobalsConfig } from '../../languages/js/types.js';
@@ -44,21 +45,7 @@ import {
 // Public types
 // ─────────────────────────────────────────────────────────────────────
 
-/**
- * The forwarded subset of ESLint flat-config `languageOptions` exposed
- * to plugin rules as `context.languageOptions`. Plugin rules read it
- * to branch on `languageOptions.parserOptions.ecmaFeatures.jsx`,
- * `languageOptions.sourceType`, or `languageOptions.globals`.
- *
- * Field set matches what the wire payload from Go carries in each file's
- * `languageOptions` (computed by Go via `GetConfigForFile`); out-of-band
- * fields the runner doesn't reproduce (custom `parser`,
- * `parserOptions.project`, `parserOptions.tsconfigRootDir`) are
- * intentionally absent. This is the contract the linter package and the
- * plugin runtime share — any change here must update both
- * `ecma-language-plugin.ts:LintFileRequest` and Go's
- * `EslintPluginLintFile.LanguageOptions`.
- */
+/** Per-file language options shared by the rule context and the worker request. */
 export interface LanguageOptions {
   /**
    * ECMAScript version target — top-level in ESLint v10. Plugin rules
@@ -71,14 +58,7 @@ export interface LanguageOptions {
   /** Module / script / commonjs — top-level in ESLint v10. Same rationale as `ecmaVersion`. */
   sourceType?: 'module' | 'script' | 'commonjs';
   globals?: GlobalsConfig;
-  /**
-   * Parser-specific extras. Only `ecmaFeatures` lives here in v10
-   * (rules that gate on `jsx` / `globalReturn` / `impliedStrict` read
-   * via `ctx.languageOptions.parserOptions.ecmaFeatures.*`). Custom
-   * `parser` instances aren't supported by the runner, so we don't
-   * include that field.
-   */
-  parserOptions?: {
+  parserOptions?: ParserOptions & {
     ecmaFeatures?: {
       jsx?: boolean;
       globalReturn?: boolean;

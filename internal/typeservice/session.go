@@ -79,7 +79,6 @@ type Session struct {
 type Descriptor struct {
 	SyntaxOnly          bool              `json:"syntaxOnly,omitempty"`
 	Generation          uint32            `json:"generation"`
-	Checker             uint32            `json:"checker"`
 	CurrentDirectory    string            `json:"currentDirectory"`
 	CompilerOptions     json.RawMessage   `json:"compilerOptions"`
 	ConfigFile          *configSourceInfo `json:"configFile,omitempty"`
@@ -120,7 +119,7 @@ func (s *Session) BindTarget(file *ast.SourceFile) (Binding, error) {
 	if !s.eligible[file] {
 		return Binding{}, errors.New("source is not eligible for typed rules")
 	}
-	return Binding{Scope{s.generation, 1}, file.FileName()}, nil
+	return Binding{Scope{Generation: s.generation}, file.FileName()}, nil
 }
 
 // Source captures an exact immutable source under a brief generation check.
@@ -204,7 +203,7 @@ func (s *Session) SyntaxDescriptor(file *ast.SourceFile) (Descriptor, error) {
 	return d, nil
 }
 func (s *Session) syntaxDescriptor() Descriptor {
-	return Descriptor{SyntaxOnly: true, Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: json.RawMessage("{}")}
+	return Descriptor{SyntaxOnly: true, Generation: s.generation, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: json.RawMessage("{}")}
 }
 func syntaxSource(f *ast.SourceFile) Source {
 	source := Source{FileName: f.FileName(), Path: string(f.Path()), IsDeclarationFile: f.IsDeclarationFile}
@@ -239,7 +238,7 @@ func (s *Session) Descriptor() (Descriptor, error) {
 	if err != nil {
 		return Descriptor{}, err
 	}
-	d := Descriptor{Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: options, ConfigFile: configSource(s.program, commandLine)}
+	d := Descriptor{Generation: s.generation, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: options, ConfigFile: configSource(s.program, commandLine)}
 	for _, f := range s.program.SourceFiles() {
 		source := s.source(f)
 		for _, specifier := range compiler.ImplicitImports(f.Path()) {
@@ -359,7 +358,7 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	p := s.program
 	eligible := s.eligible // immutable after construction
 	for _, q := range queries {
-		if q.Generation != s.generation || q.Checker != 1 {
+		if q.Generation != s.generation {
 			s.mu.Unlock()
 			return nil, errors.New("stale or foreign type service handle")
 		}
