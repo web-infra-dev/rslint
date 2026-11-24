@@ -1,8 +1,4 @@
-import type {
-  CheckJsDirective,
-  JSDocTagInfo,
-  SymbolDisplayPart,
-} from 'typescript';
+import type { JSDocTagInfo, SymbolDisplayPart } from 'typescript';
 
 /** Finite semantic protocol shared by the checker client and injected host. */
 export interface Scope {
@@ -41,7 +37,7 @@ export interface TypeServiceDescriptor extends Scope {
     packages?: string[];
     implicitImports?: string[];
     impliedNodeFormat?: number;
-    checkJsDirective?: CheckJsDirective;
+    checkJsDirective?: { pos: number; end: number; enabled: boolean };
     external: boolean;
     defaultLibrary: boolean;
     isDeclarationFile: boolean;
