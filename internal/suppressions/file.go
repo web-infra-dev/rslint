@@ -1,6 +1,7 @@
 package suppressions
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,17 +14,20 @@ import (
 	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
 
-// Open reads the baseline for the same physical cwd used to resolve lint inputs.
-func Open(cwd string, options Options) (*File, error) {
-	f := &File{options: options, cwd: cwd, path: filepath.Join(cwd, DefaultFilename)}
+// Open reads the file CLI's baseline. A check without a baseline returns nil.
+func Open(options Options) (*File, error) {
+	f := &File{options: options, path: DefaultFilename}
+	var cwd string
+	var err error
 	if location := options.Location; location != "" {
 		// Match Node's process.cwd(), including the stored case on Unix and
 		// the native drive and junction spelling on Windows.
-		nativeCWD, err := syscall.Getwd()
+		cwd, err = syscall.Getwd()
 		if err != nil {
 			return nil, err
 		}
@@ -35,14 +39,14 @@ func Open(cwd string, options Options) (*File, error) {
 				return nil, err
 			}
 		} else {
-			path = filepath.Join(nativeCWD, path)
+			path = filepath.Join(cwd, path)
 		}
 		info, err := os.Stat(path)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
 		if os.IsPathSeparator(location[len(location)-1]) || (info != nil && info.IsDir()) {
-			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(nativeCWD))
+			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(cwd))
 		}
 		f.path = path
 	}
@@ -53,49 +57,43 @@ func Open(cwd string, options Options) (*File, error) {
 	if data == nil && options.Mode == Check {
 		return nil, nil //nolint:nilnil // No active baseline means the CLI can skip collecting linted files.
 	}
+	if cwd == "" {
+		cwd, err = syscall.Getwd()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if runtime.GOOS == "windows" {
+		// Resolve directory junctions with the same native filesystem used by target selection.
+		cwd = filepath.FromSlash(osvfs.FS().Realpath(filepath.ToSlash(cwd)))
+	}
+	if options.Location == "" {
+		f.path = filepath.Join(cwd, DefaultFilename)
+	}
+	f.cwd = cwd
 	f.entries = data
 	return f, nil
 }
 
 // Keep the linted spelling: different paths to one file can activate different rules.
 func (f *File) fileKey(path string) string {
+	if runtime.GOOS == "windows" {
+		from, to := filepath.VolumeName(f.cwd), filepath.VolumeName(path)
+		if !strings.EqualFold(from, to) {
+			return path // Files on another drive or share have no relative path.
+		}
+		// Windows volumes are case-insensitive. Inside a volume, preserve the
+		// file and directory spellings that the rule actually received.
+		return tspath.GetRelativePathFromDirectory(
+			cmp.Or(filepath.ToSlash(f.cwd[len(from):]), "/"), cmp.Or(path[len(to):], "/"),
+			tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true},
+		)
+	}
 	relative, err := filepath.Rel(f.cwd, path)
 	if err != nil {
-		return path // A file on another Windows drive or share has no relative path.
+		return path
 	}
-	if runtime.GOOS == "windows" {
-		return windowsRelativeKey(f.cwd, path, relative)
-	}
-	return filepath.ToSlash(relative)
-}
-
-// Rel folds every Windows directory name, but a case-sensitive directory can contain
-// both pkg and Pkg. Verify only spellings that Rel actually folded.
-func windowsRelativeKey(cwd, target, relative string) string {
-	cwd, target = filepath.Clean(cwd), filepath.Clean(target)
-	resolved := filepath.Join(cwd, relative)
-	baseVolume, targetVolume := filepath.VolumeName(cwd), filepath.VolumeName(target)
-	if resolved[len(baseVolume):] == target[len(targetVolume):] {
-		return filepath.ToSlash(relative)
-	}
-	sep := string(filepath.Separator)
-	from := strings.Split(strings.TrimPrefix(cwd[len(baseVolume):], sep), sep)
-	to := strings.Split(strings.TrimPrefix(target[len(targetVolume):], sep), sep)
-	for i := range min(len(from), len(to)) {
-		if from[i] == to[i] {
-			continue
-		}
-		if !strings.EqualFold(from[i], to[i]) {
-			break
-		}
-		// Compare the entries themselves to distinguish junctions to the same target.
-		left, leftErr := os.Lstat(baseVolume + sep + strings.Join(from[:i+1], sep))
-		right, rightErr := os.Lstat(targetVolume + sep + strings.Join(to[:i+1], sep))
-		if leftErr != nil || rightErr != nil || !os.SameFile(left, right) {
-			return strings.Repeat("../", len(from)-i) + strings.Join(to[i:], "/")
-		}
-	}
-	return filepath.ToSlash(relative)
+	return relative
 }
 
 func (f *File) fileMissing(key string) bool {

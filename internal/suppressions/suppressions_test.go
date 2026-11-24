@@ -62,6 +62,7 @@ func TestScopedUpdate(t *testing.T) {
 		"a.ts":{"x":{"count":3},"y":{"count":1},"typed":{"count":2}},
 		"private/untouched.ts":{"x":{"count":1}},
 		"gone.ts":{"x":{"count":1}},
+		"incomplete.ts":{"plugin/check":{"count":1}},
 		"linked.ts":{"x":{"count":1}},
 		"linked-dir/src/file.ts":{"x":{"count":1}},
 		"former-dir/old.ts":{"x":{"count":1}},
@@ -78,11 +79,16 @@ func TestScopedUpdate(t *testing.T) {
 	}
 	run := func(options Options, unused bool) *File {
 		t.Helper()
-		file, err := Open(cwd, options)
+		file, err := Open(options)
 		if err != nil {
 			t.Fatal(err)
 		}
-		visible, stale, err := file.Apply(t.Context(), []FileResult{{Path: checked, SkippedRules: []string{"typed"}}}, append([]rule.RuleDiagnostic(nil), diagnostics...))
+		results := []FileResult{
+			{Path: checked, SkippedRules: []string{"typed"}},
+			// The plugin could not read a file that disappeared during lint.
+			{Path: filepath.ToSlash(filepath.Join(cwd, "incomplete.ts")), SkippedRules: []string{"plugin/check"}, PreserveEntries: true},
+		}
+		visible, stale, err := file.Apply(t.Context(), results, append([]rule.RuleDiagnostic(nil), diagnostics...))
 		if err != nil || stale != unused || len(visible) != 1 || visible[0].RuleName != "z" {
 			t.Fatalf("apply: %v, stale %v, error %v", visible, stale, err)
 		}
@@ -96,6 +102,7 @@ func TestScopedUpdate(t *testing.T) {
 	pruned := run(Options{Mode: Prune}, false)
 	want := entries{
 		"a.ts":                   {"x": {Count: 1}, "typed": {Count: 2}},
+		"incomplete.ts":          {"plugin/check": {Count: 1}},
 		"private/untouched.ts":   {"x": {Count: 1}},
 		"linked-dir/src/file.ts": {"x": {Count: 1}},
 		"//server/share/file.ts": {"x": {Count: 1}},
@@ -113,13 +120,13 @@ func TestScopedUpdate(t *testing.T) {
 
 func TestMissingBaseline(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
-	if file, err := Open(cwd, Options{}); err != nil || file != nil {
+	if file, err := Open(Options{}); err != nil || file != nil {
 		t.Fatalf("plain check: file=%v, err=%v", file, err)
 	}
-	if _, err := Open(cwd, Options{Location: "missing.json"}); err == nil {
+	if _, err := Open(Options{Location: "missing.json"}); err == nil {
 		t.Fatal("explicit missing baseline was accepted")
 	}
-	f, err := Open(cwd, Options{Mode: Prune})
+	f, err := Open(Options{Mode: Prune})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +162,8 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 	makeDirectoryLink(t, src, filepath.Join(repo, "other"))
 	run := func(cwd, name string, mode Mode, wantVisible int) *File {
 		t.Helper()
-		f, err := Open(cwd, Options{Mode: mode})
+		t.Chdir(cwd)
+		f, err := Open(Options{Mode: mode})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,9 +201,12 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 		root:             filepath.Join(root, "rslint-suppressions_"+cwdHash(native)),
 		"../shared.json": filepath.Join(filepath.Dir(native), "shared.json"),
 	} {
-		f, err := Open(repo, Options{Mode: Record, Location: location})
+		f, err := Open(Options{Mode: Record, Location: location})
 		if err != nil || f.path != want {
 			t.Fatalf("location %q: file=%v err=%v, want %q", location, f, err, want)
+		}
+		if key := f.fileKey(filepath.ToSlash(filepath.Join(src, "app.js"))); key != "src/app.js" {
+			t.Fatalf("physical file from linked cwd: got %q", key)
 		}
 	}
 }
@@ -210,52 +221,13 @@ func TestFileKeyUsesNativeRelativePaths(t *testing.T) {
 	}
 	check("/tree/pkg/", "/tree/pkg-extra/File.js", "../pkg-extra/File.js")
 	check("/", "/File.js", "File.js")
+	check("/tree/pkg/", "/tree/Pkg/File.js", "../Pkg/File.js")
 	if runtime.GOOS == "windows" {
 		check("C:/tree/pkg/", "c:/tree/pkg/File.js", "File.js")
 		check("C:/tree/", "d:/Shared/File.js", "d:/Shared/File.js")
 		check("//server/share/pkg/", "//SERVER/SHARE/pkg/File.js", "File.js")
 		check("//server/share/pkg/", "//server/other/File.js", "//server/other/File.js")
-	} else {
-		check("/tree/pkg/", "/tree/Pkg/File.js", "../Pkg/File.js")
-	}
-}
-
-func TestWindowsFileKeyDirectoryCase(t *testing.T) {
-	for _, tc := range []struct{ name, want string }{
-		{"insensitive", "File.js"},
-		{"sensitive", "../Pkg/File.js"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			root := t.TempDir()
-			lower, upper := filepath.Join(root, "pkg"), filepath.Join(root, "Pkg")
-			if tc.name == "sensitive" && runtime.GOOS == "windows" {
-				// cspell:ignore fsutil
-				if out, err := exec.Command("fsutil.exe", "file", "setCaseSensitiveInfo", root, "enable").CombinedOutput(); err != nil {
-					t.Skipf("case-sensitive directories unavailable: %v: %s", err, out)
-				}
-			}
-			if err := os.Mkdir(lower, 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if tc.name == "sensitive" {
-				if err := os.Mkdir(upper, 0o755); errors.Is(err, os.ErrExist) && runtime.GOOS != "windows" {
-					t.Skip("temporary directory is case insensitive")
-				} else if err != nil {
-					t.Fatal(err)
-				}
-			} else if _, err := os.Stat(upper); err != nil {
-				t.Skipf("temporary directory is case sensitive: %v", err)
-			}
-			// Supply the relative path Windows computes, on either kind of host filesystem.
-			path := filepath.Join(upper, "File.js")
-			got := windowsRelativeKey(lower, path, "File.js")
-			if runtime.GOOS == "windows" {
-				got = (&File{cwd: lower}).fileKey(filepath.ToSlash(path))
-			}
-			if got != tc.want {
-				t.Errorf("file key = %q, want %q", got, tc.want)
-			}
-		})
+		check("//server/share", "//SERVER/SHARE/File.js", "File.js")
 	}
 }
 
@@ -275,7 +247,7 @@ func TestConcurrentUpdates(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
 	var writers [2]*File
 	for i := range writers {
-		f, err := Open(cwd, Options{Mode: Record})
+		f, err := Open(Options{Mode: Record})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -305,7 +277,7 @@ func TestConcurrentUpdates(t *testing.T) {
 	if _, _, err := reportError(ctx, writers[0], name, "cancelled"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled write returned %v", err)
 	}
-	f, err := Open(cwd, Options{})
+	f, err := Open(Options{})
 	want := entries{"test.js": {"rule0": {Count: 1}, "rule1": {Count: 1}}}
 	if err != nil || f == nil || !reflect.DeepEqual(f.entries, want) {
 		t.Fatalf("concurrent updates: file=%v err=%v, want %v", f, err, want)
@@ -322,14 +294,14 @@ func TestUpdateThroughFileSymlink(t *testing.T) {
 	if err := os.Symlink(DefaultFilename, link); err != nil {
 		t.Skipf("file symlink unavailable: %v", err)
 	}
-	f, err := Open(cwd, Options{Mode: Record, Location: link})
+	f, err := Open(Options{Mode: Record, Location: link})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "x"); err != nil {
 		t.Fatal(err)
 	}
-	defaultFile, err := Open(cwd, Options{})
+	defaultFile, err := Open(Options{})
 	if err != nil || defaultFile == nil || defaultFile.entries["test.js"]["x"].Count != 1 {
 		t.Fatalf("write via symlink: file=%v err=%v", defaultFile, err)
 	}
@@ -358,14 +330,14 @@ func TestUpdatePreservesLiteralBackslash(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	f, err := Open(cwd, Options{Mode: Record, Location: location})
+	f, err := Open(Options{Mode: Record, Location: location})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "x"); err != nil {
 		t.Fatal(err)
 	}
-	f, err = Open(cwd, Options{Location: location})
+	f, err = Open(Options{Location: location})
 	if err != nil || f == nil || f.entries["test.js"]["x"].Count != 1 {
 		t.Fatalf("recorded baseline: file=%v err=%v", f, err)
 	}

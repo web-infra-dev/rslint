@@ -205,7 +205,7 @@ func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 		}
 		t.Chdir(dir)
 		args.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-		if err := prepareCLIInputs(context.Background(), &args, nil); err != nil {
+		if err := prepareCLIInputs(context.Background(), &args); err != nil {
 			t.Fatal(err)
 		}
 		code, stdout, stderr := runLintCommandForTest(t, dir, args)
@@ -271,7 +271,7 @@ func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 	}
 	t.Chdir(dir)
 	args.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	if err := prepareCLIInputs(context.Background(), &args, nil); err != nil {
+	if err := prepareCLIInputs(context.Background(), &args); err != nil {
 		t.Fatal(err)
 	}
 	code, stdout, stderr := runLintCommandForTest(t, dir, args)

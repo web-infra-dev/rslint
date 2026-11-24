@@ -29,6 +29,9 @@ func (draft *catalogDraft) addFallback(path, owner string) {
 	if draft.fallbacks == nil {
 		draft.fallbacks = make(map[fallbackScope]bool)
 	}
+	// A requested directory may end with a separator. Use the same spelling
+	// as the ancestor paths returned for files under that directory.
+	path = tspath.GetNormalizedAbsolutePath(path, "")
 	draft.fallbacks[fallbackScope{path, owner}] = true
 }
 

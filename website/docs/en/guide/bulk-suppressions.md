@@ -38,7 +38,7 @@ If a third `no-debugger` error appears in that file, Rslint reports all three. M
 
 File keys use the name Rslint linted, relative to the physical working directory, with `/` as the separator. A file on another Windows drive or UNC share uses its absolute path.
 
-Entering the project through a directory symlink and running `rslint .` produces the same keys as entering the real directory. A symlink named in the lint target keeps its own spelling. For example, if `linked.js` points to `src/app.js`, checking `linked.js` alone updates its own entry. Each spelling can match different lint rules. If a run selects both names, Rslint checks the file once and applies counts for the selected name.
+Use the same directory spelling when recording and checking. If `checkout-link` points to `checkout`, Rslint can pass a different filename to a rule when launched from each directory. Those names have separate counts, even when they refer to the same file. The same applies to a symlink such as `linked.js` pointing to `src/app.js`. If a run selects both names, Rslint checks the file once and uses the selected name.
 
 To reuse an ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. Entries apply when the file path and rule ID match.
 

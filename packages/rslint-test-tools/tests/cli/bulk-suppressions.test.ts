@@ -135,19 +135,20 @@ describe('CLI bulk suppressions', () => {
     expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
   });
 
-  test('keeps the physical target when pruning through a working directory alias', async () => {
+  test('keeps the CLI target and its config when the working directory is a symlink', async () => {
     const temp = await project({
       'rslint.config.mjs': `export default [
-        {rules:{'no-debugger':'error'}},
+        {rules:{'no-debugger':'error','no-var':'error'}},
         {files:['nested/link/**/*.js'],rules:{'no-debugger':'off'}}
       ];`,
       'shared.js': 'debugger;',
       'work/src/app.js': 'debugger;',
+      'sibling.js': 'var physical = 1;',
+      'nested/sibling.js': 'var logical = 1;',
     });
     const root = await fs.realpath(temp);
     const work = path.join(root, 'work');
     const nested = path.join(root, 'nested');
-    await fs.mkdir(nested);
     const cwd = path.join(nested, 'link');
     await fs.symlink(work, cwd, 'junction');
     const shared = path.join(root, 'shared.js');
@@ -158,8 +159,22 @@ describe('CLI bulk suppressions', () => {
         cwd,
         env: { ...process.env, PWD: cwd },
       });
-    expect((await fromAlias('src/app.js')).exitCode).toBe(1);
-    const recorded = await fromAlias('--suppress-all', shared, '.');
+    const fixSibling = async () => {
+      const result = await fromAlias('--fix', '../sibling.js');
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(await fs.readFile(path.join(nested, 'sibling.js'), 'utf8')).toBe(
+        'let logical = 1;',
+      );
+      expect(await fs.readFile(path.join(root, 'sibling.js'), 'utf8')).toBe(
+        'var physical = 1;',
+      );
+    };
+    await fixSibling();
+    expect((await fromAlias('src/app.js')).exitCode).toBe(0);
+    const recorded = await runRslint(
+      ['--suppress-all', shared, 'src/app.js'],
+      work,
+    );
     expect(recorded.exitCode, recorded.stderr).toBe(0);
     const saved = await fs.readFile(baseline, 'utf8');
     expect(JSON.parse(saved)).toEqual({
@@ -167,14 +182,27 @@ describe('CLI bulk suppressions', () => {
       'src/app.js': { 'no-debugger': { count: 1 } },
     });
 
-    const pruned = await fromAlias(
-      '--prune-suppressions',
-      path.join(cwd, 'src/app.js'),
-    );
+    await fs.writeFile(path.join(nested, 'sibling.js'), 'var logical = 1;');
+    await fixSibling();
+    const pruned = await fromAlias('--prune-suppressions', 'src/app.js');
     expect(pruned.exitCode, pruned.stderr).toBe(0);
     expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
     const physical = await runRslint([physicalFile, shared], work);
     expect(physical.exitCode, physical.stderr).toBe(0);
+
+    await fs.writeFile(
+      path.join(work, 'rslint.config.mjs'),
+      "export default [{rules:{'no-debugger':'error'}}];",
+    );
+    const fromOtherName = await fromAlias('src/app.js');
+    expect(fromOtherName.exitCode, fromOtherName.stderr).toBe(1);
+    const recordAlias = await fromAlias('--suppress-all', 'src/app.js');
+    expect(recordAlias.exitCode, recordAlias.stderr).toBe(0);
+    expect(await readBaseline(work)).toEqual({
+      ...JSON.parse(saved),
+      '../nested/link/src/app.js': { 'no-debugger': { count: 1 } },
+    });
+    expect((await fromAlias('src/app.js')).exitCode).toBe(0);
   });
 
   test('prunes after fixes and preserves files skipped by lint', async () => {
@@ -297,10 +325,30 @@ describe('CLI bulk suppressions', () => {
     );
     expect(partial.exitCode).toBe(2);
     expect(partial.stdout).toContain('listener getter failed');
-    expect((await readBaseline(cwd))['a.js']).toEqual({
+    expect(partial.stdout).not.toContain('no-debugger');
+    const frozen = {
       ...JSON.parse(saved)['a.js'],
       'no-debugger': { count: 2 },
-    });
+    };
+    expect((await readBaseline(cwd))['a.js']).toEqual(frozen);
+
+    // Keep the failed file's count at two while one covered error remains.
+    await fs.writeFile(path.join(cwd, 'a.js'), 'debugger;');
+    for (const [flag, source, healthy] of [
+      [
+        '--suppress-all',
+        'var a; var b;',
+        { 'fixed.js': { 'no-var': { count: 2 } } },
+      ],
+      ['--prune-suppressions', 'const a = 1;', {}],
+    ] as const) {
+      await fs.writeFile(path.join(cwd, 'fixed.js'), source);
+      const result = await runRslint([flag, ...args, 'fixed.js'], cwd);
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toContain('listener getter failed');
+      expect(result.stdout).not.toContain('no-debugger');
+      expect(await readBaseline(cwd)).toEqual({ 'a.js': frozen, ...healthy });
+    }
   });
 
   test('preserves recorded counts when a nested config fails to load', async () => {
@@ -334,8 +382,10 @@ describe('CLI bulk suppressions', () => {
       ruleName: 'no-console',
       range: { start: { line: 2 } },
     });
+    await fs.writeFile(path.join(cwd, 'nested/a.js'), 'console.log(1);');
     await fs.writeFile(path.join(cwd, 'nested/ok/b.js'), '');
-    expect((await check('--prune-suppressions')).exitCode).toBe(2);
+    const prune = await runRslint(['--prune-suppressions', 'nested/'], cwd);
+    expect(prune.exitCode).toBe(2);
     expect(await readBaseline(cwd)).toEqual({ 'nested/a.js': count });
 
     // Without the root config, nested/a.js has no owner to fall back to.

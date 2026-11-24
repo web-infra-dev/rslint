@@ -22,7 +22,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
-	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
@@ -57,7 +56,7 @@ func TestClassifyPaths(t *testing.T) {
 	}
 	missing := filepath.Join(dir, "nope.ts")
 
-	files, dirs := classifyPaths(target.InputRoot{Directory: dir}, []string{dir, "a.ts", missing})
+	files, dirs := classifyPaths([]string{dir, file, missing})
 
 	wantDir := tspath.NormalizePath(dir)
 	if len(dirs) != 1 || dirs[0] != wantDir {

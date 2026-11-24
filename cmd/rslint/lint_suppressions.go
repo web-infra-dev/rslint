@@ -38,14 +38,18 @@ func applyLintSuppressions(
 		(args.Suppressions.Mode == suppressions.Record && args.Suppressions.Rules == nil)
 	checked := make([]suppressions.FileResult, 0, len(files))
 	for _, file := range files {
-		if file.SyntaxError || fallback[file.Path] || (wholeFileUpdate && incompleteFiles[file.Path]) {
+		if file.SyntaxError || fallback[file.Path] {
 			continue
 		}
 		skipped := file.SkippedErrorRules
 		if failed := failedRules[file.Path]; len(failed) > 0 {
 			skipped = append(failed, skipped...)
 		}
-		checked = append(checked, suppressions.FileResult{Path: file.Path, SkippedRules: skipped})
+		checked = append(checked, suppressions.FileResult{
+			Path:            file.Path,
+			SkippedRules:    skipped,
+			PreserveEntries: wholeFileUpdate && incompleteFiles[file.Path],
+		})
 	}
 	var failure string
 	switch {

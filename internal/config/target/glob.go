@@ -57,7 +57,7 @@ type globExpansion struct {
 // expandGlobs returns one expansion per input, in the same order. Patterns with
 // the same lexical root share a walk; other roots retain independent entry points.
 // Config ownership and ignores are evaluated later using each result's root.
-func (base InputRoot) expandGlobs(ctx context.Context, fsys vfs.FS, patterns []string) ([]globExpansion, error) {
+func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string) ([]globExpansion, error) {
 	type compiledGlob struct {
 		inputs    []int
 		files     *minimatch3.Matcher
@@ -82,7 +82,7 @@ func (base InputRoot) expandGlobs(ctx context.Context, fsys vfs.FS, patterns []s
 		options := inputPatternOptions
 		options.NoNegate = !strings.HasPrefix(pattern, "!")
 		directory, prefix, relative := globDirectory(pattern)
-		root, err := base.ResolvePath(directory)
+		root, err := resolveInputPath(cwd, directory)
 		if err != nil {
 			return nil, err
 		}
@@ -93,12 +93,12 @@ func (base InputRoot) expandGlobs(ctx context.Context, fsys vfs.FS, patterns []s
 		// Normalize both sides in authored syntax, so escapes in a returning
 		// suffix cannot be confused with the decoded filesystem root.
 		if runtime.GOOS == "windows" {
-			prefix, err = base.ResolvePath(prefix)
+			prefix, err = resolveInputPath(cwd, prefix)
 			if err != nil {
 				return nil, err
 			}
 		} else if !filepath.IsAbs(prefix) {
-			prefix = filepath.Join(base.Directory, prefix)
+			prefix = filepath.Join(cwd, prefix)
 		}
 		pattern, err = filepath.Rel(prefix, filepath.Join(prefix, relative))
 		if err != nil {

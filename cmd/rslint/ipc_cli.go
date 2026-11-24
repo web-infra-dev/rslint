@@ -38,6 +38,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"sync"
 	"syscall"
@@ -268,6 +269,10 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 			return 2
 		}
 	}
+	if len(payload.Files) > 0 {
+		baseArgs.AllowFiles, baseArgs.AllowDirs = classifyPaths(payload.Files)
+		baseArgs.Positional = nil
+	}
 	if payload.Format != "" {
 		baseArgs.Format = payload.Format
 	}
@@ -298,7 +303,7 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 			fmt.Fprintln(os.Stderr, "error: CLI host did not provide config discovery intent")
 			return 2
 		}
-		prepareErr := prepareCLIInputs(ctx, &baseArgs, payload.Files)
+		prepareErr := prepareCLIInputs(ctx, &baseArgs)
 		if prepareErr == nil {
 			prepareErr = discoverCLIConfigCatalog(ctx, &baseArgs, payload, ch)
 		}
@@ -402,6 +407,27 @@ func (w acknowledgedOutputWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// classifyPaths splits exact IPC targets into files and directories using
+// lexical absolute paths. An Abs failure is skipped with a stderr warning
+// rather than silently dropping the path.
+func classifyPaths(paths []string) (files []string, dirs []string) {
+	for _, p := range paths {
+		absPath, err := filepath.Abs(p)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "rslint: filepath.Abs(%q) failed: %v\n", p, err)
+			continue
+		}
+		normalized := tspath.NormalizePath(absPath)
+		info, statErr := os.Stat(absPath)
+		if statErr == nil && info.IsDir() {
+			dirs = append(dirs, normalized)
+		} else {
+			files = append(files, normalized)
+		}
+	}
+	return files, dirs
+}
+
 func discoverCLIConfigCatalog(
 	ctx context.Context,
 	args *lintArgs,
@@ -411,11 +437,11 @@ func discoverCLIConfigCatalog(
 	if args == nil || payload == nil || payload.ConfigDiscovery == nil {
 		return nil
 	}
-	root, err := args.invocationRoot()
+	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory for config discovery: %w", err)
 	}
-	cwd := tspath.NormalizePath(root.Directory)
+	cwd = tspath.NormalizePath(cwd)
 	request := discovery.ConfigDiscoveryRequest{
 		CWD:            cwd,
 		Directories:    rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, args.FS),

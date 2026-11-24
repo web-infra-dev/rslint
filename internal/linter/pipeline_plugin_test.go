@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -128,13 +129,17 @@ func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
 					}
 				}
 				outcomes := result.PluginOutcomes()
-				if len(outcomes) != 1 || len(outcomes[0].Notices) != len(paths) {
-					t.Fatalf("expected one unconfigured rule notice per target, got %+v", outcomes)
+				if len(outcomes) != 1 {
+					t.Fatalf("expected one plugin outcome, got %+v", outcomes)
 				}
-				for i, notice := range outcomes[0].Notices {
-					if notice.FilePath != "target:"+paths[i] {
-						t.Errorf("notice %d has path %q, want target for %q", i, notice.FilePath, paths[i])
+				var noticePaths []string
+				for _, notice := range outcomes[0].Notices {
+					if notice.Kind == EslintPluginUnconfiguredDiagnostic {
+						noticePaths = append(noticePaths, notice.FilePath)
 					}
+				}
+				if !slices.EqualFunc(noticePaths, paths, func(got, source string) bool { return got == target.Path(source) }) {
+					t.Fatalf("unconfigured diagnostic paths %q do not match target order for %q", noticePaths, paths)
 				}
 			})
 		})
