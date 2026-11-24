@@ -88,13 +88,15 @@ describe('CLI bulk suppressions', () => {
     ).toBe(0);
   });
 
-  test('keeps distinct counts for separately linted aliases', async () => {
+  test('counts by the reported target when aliases share a TypeScript source', async () => {
     const cwd = await project({
+      'tsconfig.json': JSON.stringify({ files: ['real/file.ts'] }),
       'rslint.config.mjs': `export default [
-        {files:['link/*.js'],rules:{'no-console':['error',{allow:['warn']}]}},
-        {files:['real/*.js'],rules:{'no-console':['error',{allow:['log']}]}}
+        {languageOptions:{parserOptions:{projectService:false,project:['./tsconfig.json']}}},
+        {files:['link/*.ts'],rules:{'no-console':['error',{allow:['warn']}]}},
+        {files:['real/*.ts'],rules:{'no-console':['error',{allow:['log']}]}}
       ];`,
-      'real/file.js': 'console.log(1);\nconsole.warn(2);',
+      'real/file.ts': 'console.log(1);\nconsole.warn(2);',
     });
     await fs.symlink(
       path.join(cwd, 'real'),
@@ -104,7 +106,7 @@ describe('CLI bulk suppressions', () => {
     const check = (...args: string[]) =>
       runRslint(['--format', 'jsonline', ...args], cwd);
     const baseline = path.join(cwd, 'rslint-suppressions.json');
-    const names = ['real/file.js', 'link/file.js'];
+    const names = ['real/file.ts', 'link/file.ts'];
     const linted = await check(...names);
     expect(linted.exitCode, linted.stderr).toBe(1);
     const selected = JSON.parse(linted.stdout).filePath;
@@ -116,21 +118,27 @@ describe('CLI bulk suppressions', () => {
     });
     await fs.unlink(baseline);
 
-    const recorded = await check('--suppress-all', 'link/file.js');
+    const recorded = await check('--suppress-all', 'link/file.ts');
     expect(recorded.exitCode, recorded.stderr).toBe(0);
     const saved = await fs.readFile(baseline, 'utf8');
     expect(JSON.parse(saved)).toEqual({
-      'link/file.js': { 'no-console': { count: 1 } },
+      'link/file.ts': { 'no-console': { count: 1 } },
     });
 
-    const checked = await check('real/file.js');
+    const checked = await check('real/file.ts');
     expect(checked.exitCode, checked.stderr).toBe(1);
     expect(JSON.parse(checked.stdout)).toMatchObject({
       ruleName: 'no-console',
       range: { start: { line: 2 } },
     });
-    await fs.writeFile(path.join(cwd, 'real/file.js'), 'console.log(1);');
-    const pruned = await check('--prune-suppressions', 'real/file.js');
+    await fs.writeFile(
+      path.join(cwd, 'tsconfig.json'),
+      JSON.stringify({ files: ['link/file.ts'] }),
+    );
+    const sameTarget = await check('link/file.ts');
+    expect(sameTarget.exitCode, sameTarget.stderr).toBe(0);
+    await fs.writeFile(path.join(cwd, 'real/file.ts'), 'console.log(1);');
+    const pruned = await check('--prune-suppressions', 'real/file.ts');
     expect(pruned.exitCode, pruned.stderr).toBe(0);
     expect(await fs.readFile(baseline, 'utf8')).toBe(saved);
   });

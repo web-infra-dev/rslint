@@ -150,10 +150,10 @@ The table is written to stderr, so machine-readable output formats such as `json
 
 ## Exit Codes
 
-| Code | Meaning                                                          |
-| ---- | ---------------------------------------------------------------- |
-| `0`  | No errors (warnings may be present)                              |
-| `1`  | Errors found, or warnings exceed `--max-warnings`                |
-| `2`  | Invalid usage, a suppressions file error, or unused suppressions |
+| Code | Meaning                                                                                                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0`  | No errors (warnings may be present)                                                                                                        |
+| `1`  | Errors found, or warnings exceed `--max-warnings`                                                                                          |
+| `2`  | Invalid usage, a suppressions file error, unused suppressions, or a baseline check or update left incomplete by a config or plugin failure |
 
 Terminating Rslint stops the current check even when output is paused. On macOS and Linux, `SIGHUP`, `SIGINT`, and `SIGTERM` exit with status `129`, `130`, and `143`, respectively.

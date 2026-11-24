@@ -1495,10 +1495,11 @@ diagnostics and checked files to `internal/suppressions`, excluding files with s
 The lint plan identifies rules skipped for lack of type information. The plugin
 dispatcher identifies the files and error-level rules affected by incomplete
 worker results. The CLI passes these exclusions to the package, which compares
-completed rule counts and owns baseline persistence. The package uses the
-exact filename from the lint result, relative to the physical working directory,
-for recording, checking and pruning. The discovery catalog
-records where an actual file or directory lookup fell back to an ancestor.
+completed rule counts and owns baseline persistence. The package keys counts
+by the CLI target path in the final lint result, relative to the physical
+working directory. A rule can receive a different TypeScript Program filename
+for that target. The discovery catalog records where an actual file or
+directory lookup fell back to an ancestor.
 Those targets keep their diagnostics and baseline entries. Catalog failures also
 cover subtrees with no working owner. A failed plugin rule keeps its own count.
 An incomplete plugin file result limits updates for that file. A batch dispatch
