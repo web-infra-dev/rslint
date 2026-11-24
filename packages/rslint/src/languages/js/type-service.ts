@@ -1,4 +1,5 @@
 import type { TypeServiceCompilerData } from './type-service-compiler-data.js';
+import type { ParserOptions } from '../../config/define-config.js';
 import type ts from 'typescript';
 import { SyntaxKind as nativeSyntaxKind } from '@rslint/api';
 import type { DecodedFrame } from './frame.js';
@@ -2470,13 +2471,17 @@ type NodeMaps = Pick<
   'esTreeNodeToTSNodeMap' | 'tsNodeToESTreeNodeMap'
 >;
 
-export function syntaxOnlyParserServices(maps: NodeMaps) {
+export function syntaxOnlyParserServices(
+  { esTreeNodeToTSNodeMap, tsNodeToESTreeNodeMap }: NodeMaps,
+  options?: ParserOptions,
+) {
   return {
-    ...maps,
+    esTreeNodeToTSNodeMap,
+    tsNodeToESTreeNodeMap,
     program: null,
-    emitDecoratorMetadata: undefined,
-    experimentalDecorators: undefined,
-    isolatedDeclarations: undefined,
+    emitDecoratorMetadata: options?.emitDecoratorMetadata === true,
+    experimentalDecorators: options?.experimentalDecorators === true,
+    isolatedDeclarations: options?.isolatedDeclarations === true,
   };
 }
 
@@ -2497,14 +2502,12 @@ export class TypeServiceFile {
     frame: DecodedFrame,
     projection: TypeServiceProjection,
     sourceFileName = this.binding.sourceFileName,
+    parserOptions?: ParserOptions,
   ) {
     if (this.closed) throw new Error('file type services are closed');
     this.syntax.attach(frame, projection, sourceFileName);
     if (this.owner.descriptor.syntaxOnly)
-      return syntaxOnlyParserServices({
-        esTreeNodeToTSNodeMap: this.syntax.esTreeNodeToTSNodeMap,
-        tsNodeToESTreeNodeMap: this.syntax.tsNodeToESTreeNodeMap,
-      });
+      return syntaxOnlyParserServices(this.syntax, parserOptions);
     const toTS = this.syntax.esTreeNodeToTSNodeMap.get;
     const options = this.owner.descriptor.compilerOptions;
     return {

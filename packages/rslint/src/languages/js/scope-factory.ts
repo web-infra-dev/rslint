@@ -126,9 +126,10 @@ export function makeScopeManagerFactory(
 function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
   const ecmaVersion = normalizeEcmaVersion(opts.ecmaVersion);
   const { jsxPragma, jsxFragmentName } = opts;
+  const program = opts.parserServices?.program;
   if (
     shouldUseTsScopeManager(opts.filePath) ||
-    (opts.parserServices && 'program' in opts.parserServices) ||
+    program !== undefined ||
     jsxPragma !== undefined ||
     jsxFragmentName !== undefined
   ) {
@@ -136,7 +137,7 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
       opts.lib === undefined ||
       jsxPragma === undefined ||
       jsxFragmentName === undefined
-        ? opts.parserServices?.program?.getCompilerOptions()
+        ? program?.getCompilerOptions()
         : undefined;
     const tsScope = tsScopeManagerPkg as unknown as {
       analyze: (ast: object, options?: object) => unknown;
@@ -166,10 +167,13 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
         jsxPragma === undefined
           ? compiler?.jsxFactory?.split('.')[0].trim()
           : jsxPragma,
+      // The ordinary CLI has no parser services and historically uses Fragment.
       jsxFragmentName:
-        jsxFragmentName === undefined
-          ? compiler?.jsxFragmentFactory?.split('.')[0].trim()
-          : jsxFragmentName,
+        jsxFragmentName !== undefined
+          ? jsxFragmentName
+          : program === undefined
+            ? 'Fragment'
+            : compiler?.jsxFragmentFactory?.split('.')[0].trim(),
       lib: opts.lib ?? (compiler && scopeLibs(compiler.lib, compiler.target)),
     });
     return scopeManager;

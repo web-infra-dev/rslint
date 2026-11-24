@@ -249,6 +249,33 @@ export default [{ files: ['**/*.ts'],
     },
   );
 
+  test('ordinary CLI preserves the JSX Fragment import', async () => {
+    const plugin = import.meta.resolve('@typescript-eslint/eslint-plugin');
+    const { dir, exitCode, diags } = await lint(
+      {
+        'rslint.config.mjs': `import community from ${JSON.stringify(plugin)};
+export default [{ files: ['**/*.tsx'], plugins: { community }, rules: { 'community/no-unused-vars': 'error' } }];`,
+        'tsconfig.json': JSON.stringify({
+          compilerOptions: {
+            jsx: 'react',
+            jsxFactory: 'React.createElement',
+            jsxFragmentFactory: 'Fragment',
+          },
+        }),
+        'factory.ts': 'export declare const React: any, Fragment: any;',
+        'example.tsx':
+          "import { React, Fragment } from './factory'; export const view = <><div /></>;",
+      },
+      ['example.tsx'],
+    );
+    try {
+      expect(diags).toEqual([]);
+      expect(exitCode).toBe(0);
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
   test('plugin rules produce diagnostics at precise locations', async () => {
     const { dir, diags } = await lint({
       'local-plugin.mjs': LOCAL_PLUGIN,

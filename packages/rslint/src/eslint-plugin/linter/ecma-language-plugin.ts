@@ -181,7 +181,10 @@ type ParserServices = object &
 export function lintFile(
   req: LintFileRequest,
   loadedPlugins: LoadedPlugins,
-  services?: (frame: ReturnType<typeof decodeFrame>) => ParserServices,
+  services?: (
+    frame: ReturnType<typeof decodeFrame>,
+    parserOptions: LanguageOptions['parserOptions'],
+  ) => ParserServices,
 ): LintFileResult {
   const result: LintFileResult = {
     filePath: req.filePath,
@@ -195,7 +198,7 @@ export function lintFile(
   let parserServices: ParserServices | undefined;
   try {
     parsed = readFrame(req);
-    parserServices = services?.(parsed);
+    parserServices = services?.(parsed, req.languageOptions?.parserOptions);
   } catch (err) {
     if (err instanceof FrameCancelled) result.cancelled = true;
     else
@@ -277,25 +280,7 @@ export function lintFile(
       ends: parsed.tokenEnds,
     },
   });
-  if (parserServices) {
-    const supplied: Record<string, unknown> = parserServices;
-    const flags = [
-      'emitDecoratorMetadata',
-      'experimentalDecorators',
-      'isolatedDeclarations',
-    ] as const;
-    if (
-      'esTreeNodeToTSNodeMap' in supplied &&
-      flags.some((key) => supplied[key] === undefined)
-    ) {
-      const resolved = { ...supplied };
-      for (const key of flags)
-        resolved[key] ??= languageOptions?.parserOptions?.[key] === true;
-      sharedSourceCode.parserServices = resolved;
-    } else {
-      sharedSourceCode.parserServices = supplied;
-    }
-  }
+  if (parserServices) sharedSourceCode.parserServices = parserServices;
 
   // ESLint v10's espree attaches `Program.tokens` (and `Program.comments`)
   // to the AST root directly. the frame decoder doesn't, so plugin rules that
