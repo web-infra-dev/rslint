@@ -34,6 +34,7 @@ import {
 import { buildUtf16ToByteMap } from '../../languages/js/positions.js';
 import {
   makeScopeManagerFactory,
+  type ScopeFactoryOptions,
   seedEcmaGlobals,
   seedGlobals,
 } from '../../languages/js/scope-factory.js';
@@ -119,6 +120,8 @@ export interface LintFileRequest {
     sourceType?: 'module' | 'script' | 'commonjs';
     globals?: GlobalsConfig;
     parserOptions?: {
+      jsxPragma?: string | null;
+      jsxFragmentName?: string | null;
       ecmaFeatures?: {
         jsx?: boolean;
         globalReturn?: boolean;
@@ -196,6 +199,9 @@ function readFrame(req: LintFileRequest): ReturnType<typeof decodeFrame> {
   );
 }
 
+type ParserServices = Record<string, unknown> &
+  NonNullable<ScopeFactoryOptions['jsxServices']>;
+
 /**
  * Lint a single file. Stateless — `loadedPlugins` is owned by the
  * Worker; this function does not mutate it.
@@ -203,7 +209,7 @@ function readFrame(req: LintFileRequest): ReturnType<typeof decodeFrame> {
 export function lintFile(
   req: LintFileRequest,
   loadedPlugins: LoadedPlugins,
-  services?: (frame: ReturnType<typeof decodeFrame>) => Record<string, unknown>,
+  services?: (frame: ReturnType<typeof decodeFrame>) => ParserServices,
 ): LintFileResult {
   const result: LintFileResult = {
     filePath: req.filePath,
@@ -214,7 +220,7 @@ export function lintFile(
   };
 
   let parsed: ReturnType<typeof decodeFrame> | undefined;
-  let parserServices: Record<string, unknown> | undefined;
+  let parserServices: ParserServices | undefined;
   try {
     parsed = readFrame(req);
     parserServices = services?.(parsed);
@@ -252,6 +258,11 @@ export function lintFile(
     // are filled in by `scope-factory` to match ESLint v10.
     impliedStrict: ecmaFeatures?.impliedStrict,
     globalReturn: ecmaFeatures?.globalReturn,
+    ...(parsed.hasJSX && {
+      jsxServices: parserServices,
+      jsxPragma: languageOptions?.parserOptions?.jsxPragma,
+      jsxFragmentName: languageOptions?.parserOptions?.jsxFragmentName,
+    }),
   });
   const scopeManagerFactory = () => {
     const sm = createScopeManager();

@@ -136,6 +136,14 @@
       "type": "object",
       "description": "Parser-specific configuration options",
       "properties": {
+        "jsxPragma": {
+          "type": ["string", "null"],
+          "description": "Binding used by JSX elements in community rule scope analysis"
+        },
+        "jsxFragmentName": {
+          "type": ["string", "null"],
+          "description": "Binding used by JSX fragments in community rule scope analysis"
+        },
         "projectService": {
           "type": "boolean",
           "description": "Enable project service for typed linting (runs TypeScript language service behind the scene)",

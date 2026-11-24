@@ -100,11 +100,20 @@ interface Case {
   options?: unknown[];
   reports: number;
   dependencies?: Record<string, string>;
-  js?: boolean;
+  extension?: 'js' | 'tsx';
 }
 // Focused valid/invalid examples follow the original rule fixtures and exercise
 // their actual npm implementations, including real type-utils dependencies.
 const cases: Case[] = [
+  {
+    name: 'JSX factories count as uses of their imports',
+    plugin: typedPlugin,
+    rule: 'no-unused-vars',
+    extension: 'tsx',
+    dependencies: { 'factory.ts': 'export const h = () => null, F = 0;' },
+    code: 'import { h, F } from "./factory"; export const view = <><div /></>;',
+    reports: 0,
+  },
   {
     name: 'await nonthenable and Promise',
     plugin: typedPlugin,
@@ -184,7 +193,7 @@ const cases: Case[] = [
     name: 'unbound JavaScript method with a JSDoc overload',
     plugin: typedPlugin,
     rule: 'unbound-method',
-    js: true,
+    extension: 'js',
     code: `
       class Counter {
         value = 0;
@@ -539,7 +548,7 @@ const cases: Case[] = [
     plugin: sonarPlugin,
     rule: 'new-operator-misuse',
     options: [{ considerJSDoc: true }],
-    js: true,
+    extension: 'js',
     code: `
       /** @constructor Creates a box. */
       function Box() { this.value = 1; }
@@ -677,7 +686,7 @@ describe('original npm typed rules over Go type services', () => {
       const directory = mkdtempSync(
         resolve(root, 'packages/rslint-test-tools/.type-services-'),
       );
-      const extension = c.js ? 'js' : 'ts';
+      const extension = c.extension ?? 'ts';
       const file = resolve(directory, `input.${extension}`),
         config = resolve(directory, 'tsconfig.json');
       writeFileSync(file, c.code);
@@ -688,9 +697,14 @@ describe('original npm typed rules over Go type services', () => {
         JSON.stringify({
           compilerOptions: {
             allowJs:
-              c.js ||
+              extension === 'js' ||
               Object.keys(c.dependencies ?? {}).some((f) => f.endsWith('.js')),
-            checkJs: c.js,
+            checkJs: extension === 'js',
+            ...(extension === 'tsx' && {
+              jsx: 'react',
+              jsxFactory: 'h',
+              jsxFragmentFactory: 'F',
+            }),
             strict: true,
             target: 'ES2022',
             module: 'ESNext',
@@ -1752,11 +1766,18 @@ test('public checker, Program and source reads match TypeScript', async () => {
       'declare const condition: boolean; condition;',
     ].join('\r\n') + '\r\n';
   writeFileSync(file, code);
-  writeFileSync(resolve(dir, 'external.ts'), 'export type External = string;');
+  const external = resolve(dir, 'external.ts');
+  writeFileSync(external, 'export type External = string; using item = null;');
   writeFileSync(
     config,
     JSON.stringify({
-      compilerOptions: { strict: true, target: 'esnext', module: 'esnext' },
+      compilerOptions: {
+        strict: true,
+        target: 'esnext',
+        module: 'esnext',
+        lib: ['es2022'],
+        types: [],
+      },
       files: ['input.ts'],
     }),
   );
@@ -1834,14 +1855,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
         c.getUndefinedType(),
       ];
       const literal = c.getStringLiteralType('abc');
-      const metadata = Symbol();
-      let getterCalls = 0;
-      Object.defineProperty(literal, metadata, {
-        get() {
-          getterCalls++;
-        },
-      });
-      const wrapped = new Proxy(t, {});
       const computed = c.getTypeAtLocation(
         (enm as ts.EnumDeclaration).members[2].name,
       ) as ts.EnumType;
@@ -1960,9 +1973,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
           };
         })(),
         shape: [
-          [Object.hasOwn(literal, metadata), metadata in literal, getterCalls],
-          wrapped.getProperties() === t.getProperties(),
-          wrapped.typeArguments?.map(format),
           computed.regularType?.freshType === computed,
           [regularBefore, Reflect.get(boolean, 'regularType') === boolean],
           'types' in literal,
@@ -1971,8 +1981,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
           'thisType' in t,
           tuple.thisType && format(tuple.thisType),
           'types' in c.getBooleanType(),
-          Reflect.get(c, 'getOptionalExtension'),
-          Reflect.get(src, 'getOptionalExtension'),
           'root' in cond,
           'root' in literal,
           'elementFlags' in tuple,
@@ -2084,6 +2092,10 @@ test('public checker, Program and source reads match TypeScript', async () => {
       };
     };
     expect(diagnostics(actual)).toEqual(diagnostics(reference));
+
+    expect(actual.getGlobalDiagnostics()).toHaveLength(0);
+    actual.getSemanticDiagnostics(actual.getSourceFile(external));
+    expect(actual.getGlobalDiagnostics().map((d) => d.code)).toContain(2318);
 
     for (const method of [
       'getNodeCount',

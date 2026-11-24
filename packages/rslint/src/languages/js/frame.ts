@@ -129,6 +129,7 @@ export interface DecodedFrame {
   /** Original byte positions when source decoding replaces invalid bytes. */
   utf16ToByte?: number[];
   hasBOM: boolean;
+  hasJSX: boolean;
   lineStarts: number[];
   tokenTypes: Uint8Array;
   tokenStarts: Uint32Array;
@@ -357,6 +358,7 @@ export function decodeFrame(
         return undefined;
     }
   };
+  let hasJSX = false;
   for (let id = 1; id <= count; id++) {
     poll(id);
     const node = nodes[id],
@@ -394,6 +396,8 @@ export function decodeFrame(
       if (typeof node.bigint === 'string') node.value = BigInt(node.bigint);
     } else if (node.type === 'TemplateElement') {
       node.value = { cooked, raw };
+    } else if (node.type === 'JSXElement' || node.type === 'JSXFragment') {
+      hasJSX = true;
     }
   }
   // Link complete nodes in the canonical visitor order.
@@ -461,6 +465,7 @@ export function decodeFrame(
     text,
     utf16ToByte,
     hasBOM: flags === 1,
+    hasJSX,
     lineStarts,
     tokenTypes,
     tokenStarts,

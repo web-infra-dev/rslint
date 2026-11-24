@@ -29,10 +29,6 @@ export class TypePacketReader {
     this.bytes = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
     this.kind = this.word(4);
-    const words = [
-      0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 3, 1, 3, 1, 1, 21, 4,
-    ][this.kind];
-    if (!words || bytes.length < 8 + words * 4) invalid();
   }
   get retainedBytes(): number {
     return this.bytes?.byteLength ?? 0;

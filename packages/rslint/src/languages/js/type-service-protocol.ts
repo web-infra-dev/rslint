@@ -507,6 +507,7 @@ export function isCacheableTypeQuery(query: TypeServiceQuery): boolean {
     case 'modeForUsageLocation':
     case 'syntacticDiagnostics':
       return true;
+    case 'globalDiagnostics':
     case 'semanticDiagnostics':
     case 'declarationDiagnostics':
     case 'resolvedSignatureWithOptions':

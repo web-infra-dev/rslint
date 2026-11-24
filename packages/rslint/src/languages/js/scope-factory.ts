@@ -14,7 +14,8 @@
  * eslint-scope on `.ts` files would silently miscount `Variable.references`
  * for the TS-only constructs.
  *
- * Selection is by file extension; languageOptions can override globals
+ * JSX with TypeScript parser services uses the TS analyzer even in JS files.
+ * Otherwise selection is by file extension. languageOptions can override globals
  * (forwarded per-file in the wire request's `languageOptions`, which Go
  * computes via `GetConfigForFile`).
  */
@@ -71,22 +72,16 @@ export interface ScopeFactoryOptions {
    * `nodejsScope` to eslint-scope.
    */
   globalReturn?: boolean;
-  /**
-   * `languageOptions.parserOptions.ecmaFeatures.jsxPragma`. The TS
-   * scope-manager treats `<X />` as a reference to this identifier so
-   * `no-unused-vars` on the JSX-pragma import doesn't false-positive.
-   * Defaults to `'React'` to match the historical behaviour, but
-   * Preact / Vue JSX configurations override it.
-   */
-  jsxPragma?: string;
-  /**
-   * `languageOptions.parserOptions.ecmaFeatures.jsxFragmentName`. The
-   * TS scope-manager treats `<>...</>` as a reference to this
-   * identifier (defaults to `'Fragment'`). Preact users set this to
-   * `'Fragment'` already; some bundlers / TS configs use a custom
-   * fragment factory.
-   */
-  jsxFragmentName?: string;
+  jsxPragma?: string | null;
+  jsxFragmentName?: string | null;
+  jsxServices?: {
+    program?: {
+      getCompilerOptions(): {
+        jsxFactory?: string;
+        jsxFragmentFactory?: string;
+      };
+    } | null;
+  };
 }
 
 const TS_EXT = new Set(['.ts', '.tsx', '.mts', '.cts']);
@@ -125,9 +120,15 @@ export function makeScopeManagerFactory(
 }
 
 function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
-  const useTs = shouldUseTsScopeManager(opts.filePath);
   const ecmaVersion = normalizeEcmaVersion(opts.ecmaVersion);
-  if (useTs) {
+  const program = opts.jsxServices?.program;
+  if (
+    shouldUseTsScopeManager(opts.filePath) ||
+    program !== undefined ||
+    opts.jsxPragma !== undefined ||
+    opts.jsxFragmentName !== undefined
+  ) {
+    const compiler = program?.getCompilerOptions();
     const tsScope = tsScopeManagerPkg as unknown as {
       analyze: (ast: object, options?: object) => unknown;
     };
@@ -151,10 +152,15 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
       // strict, producing false-positives for `no-shadow-restricted-
       // names` and similar in legacy bundles.
       impliedStrict: opts.impliedStrict ?? false,
-      // Defaults preserved for back-compat; Preact / Vue JSX users
-      // override via languageOptions.parserOptions.ecmaFeatures.
-      jsxPragma: opts.jsxPragma ?? 'React',
-      jsxFragmentName: opts.jsxFragmentName ?? 'Fragment',
+      // A factory such as preact.h references the binding named preact.
+      jsxPragma:
+        opts.jsxPragma === undefined
+          ? compiler?.jsxFactory?.split('.')[0].trim()
+          : opts.jsxPragma,
+      jsxFragmentName:
+        opts.jsxFragmentName === undefined
+          ? compiler?.jsxFragmentFactory?.split('.')[0].trim()
+          : opts.jsxFragmentName,
       // Keep scope-manager's established esnext *type* catalog, but never let
       // it independently decide runtime globals. seedEcmaGlobals reconciles
       // every value binding with the same ecmaVersion table used by native

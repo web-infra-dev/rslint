@@ -93,6 +93,10 @@ export interface RulesRecord {
  * TypeScript parser options. `project` may be a single tsconfig path or a list.
  */
 export interface ParserOptions {
+  /** Binding used by JSX elements in community rule scope analysis. Defaults to the project's JSX factory. */
+  jsxPragma?: string | null;
+  /** Binding used by JSX fragments in community rule scope analysis. Defaults to the project's JSX fragment factory. */
+  jsxFragmentName?: string | null;
   /**
    * Discover a tsconfig/jsconfig whose files/include roots contain each target,
    * including nested configs and project references. Cannot be combined with
