@@ -435,6 +435,14 @@ type ReferenceConfig = ConfigSourceInfo & {
   watchOptions?: ts.WatchOptions;
   diagnostics?: string;
 };
+function readProjectReferences(refs?: readonly ts.ProjectReference[] | null) {
+  return refs?.map(({ path, originalPath, prepend, circular }) => ({
+    path,
+    originalPath,
+    prepend,
+    circular,
+  }));
+}
 type DiagnosticView = Omit<ts.Diagnostic, 'file' | 'relatedInformation'> & {
   file: object | undefined;
   relatedInformation?: DiagnosticView[];
@@ -1444,7 +1452,7 @@ export class TypeServiceClient {
           const refs: ts.ProjectReference[] | null = JSON.parse(
             this.query({ op: 'projectReferences', args: {} }),
           );
-          return refs ?? undefined;
+          return readProjectReferences(refs);
         }),
         getResolvedProjectReferences: memo(ensure, () =>
           this.resolvedReferences(),
@@ -1504,6 +1512,9 @@ export class TypeServiceClient {
         sourceFile,
         commandLine: {
           ...commandLine,
+          projectReferences: readProjectReferences(
+            commandLine.projectReferences,
+          ),
           fileNames: commandLine.fileNames ?? [],
           options: readCompilerOptions(this.typescript, options, sourceFile),
           errors,

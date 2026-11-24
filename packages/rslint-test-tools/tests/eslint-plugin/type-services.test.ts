@@ -2312,6 +2312,7 @@ test('resolved project references retain config syntax, nesting and missing entr
         { path: './child.json' },
         { path: './nested.json' },
         { path: './missing.json' },
+        { path: './child.json', circular: false },
       ],
     }),
   );

@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 )
 
@@ -94,7 +95,7 @@ func (order symbolOrder) sort(c *checker.Checker, symbols []*ast.Symbol) {
 	for i, symbol := range symbols {
 		bindings[i] = bindingOf(symbol, order.ranks[symbol])
 	}
-	unreachable := make(map[*ast.Node]bool)
+	flow := make(bindingFlow)
 	slices.SortFunc(bindings, func(a, b symbolBinding) int {
 		if byTable := cmp.Compare(a.rank, b.rank); byTable != 0 {
 			return byTable
@@ -107,7 +108,7 @@ func (order symbolOrder) sort(c *checker.Checker, symbols []*ast.Symbol) {
 				if byPhase := cmp.Compare(a.filePhase, b.filePhase); byPhase != 0 {
 					return byPhase
 				}
-				if bySyntax := compareBindingNodes(a, b, unreachable); bySyntax != 0 {
+				if bySyntax := compareBindingNodes(a, b, flow); bySyntax != 0 {
 					return bySyntax
 				}
 			}
@@ -119,7 +120,7 @@ func (order symbolOrder) sort(c *checker.Checker, symbols []*ast.Symbol) {
 	}
 }
 
-func compareBindingNodes(a, b symbolBinding, unreachable map[*ast.Node]bool) int {
+func compareBindingNodes(a, b symbolBinding, flow bindingFlow) int {
 	left, right := a.decl, b.decl
 	for range a.depth - b.depth {
 		left = left.Parent
@@ -131,15 +132,8 @@ func compareBindingNodes(a, b symbolBinding, unreachable map[*ast.Node]bool) int
 		for left.Parent != right.Parent {
 			left, right = left.Parent, right.Parent
 		}
-		if byChild := cmp.Compare(bindingChildPhase(left), bindingChildPhase(right)); byChild != 0 {
-			dead, known := unreachable[left.Parent]
-			if !known {
-				dead = unreachableBinding(left.Parent)
-				unreachable[left.Parent] = dead
-			}
-			if !dead {
-				return byChild
-			}
+		if byChild := cmp.Compare(bindingChildPhase(left), bindingChildPhase(right)); byChild != 0 && !flow.unreachable(left.Parent) {
+			return byChild
 		}
 	}
 	return cmp.Compare(a.decl.Pos(), b.decl.Pos())
@@ -163,7 +157,7 @@ func bindingChildPhase(child *ast.Node) int {
 			return -1
 		}
 	case ast.KindCallExpression:
-		if child == parent.Expression() && !ast.IsOptionalChain(parent) && ast.IsFunctionExpressionOrArrowFunction(ast.SkipParentheses(child)) {
+		if child == parent.Expression() && immediateCallee(parent) != nil {
 			return 1
 		}
 	case ast.KindParameter, ast.KindBindingElement:
@@ -180,26 +174,51 @@ func bindingChildPhase(child *ast.Node) int {
 	return 0
 }
 
-func hasReachableFlow(node *ast.Node) bool {
+func immediateCallee(node *ast.Node) *ast.Node {
+	if node.Kind == ast.KindCallExpression && !ast.IsOptionalChain(node) {
+		if callee := ast.SkipParentheses(node.Expression()); ast.IsFunctionExpressionOrArrowFunction(callee) {
+			return callee
+		}
+	}
+	return nil
+}
+
+// Cache binder entry reachability for this sort, including nested calls in arguments.
+type bindingFlow map[*ast.Node]bool
+
+func (flow bindingFlow) unreachable(node *ast.Node) bool {
+	if dead, ok := flow[node]; ok {
+		return dead
+	}
+	dead := flow.unreachableBinding(node)
+	flow[node] = dead
+	return dead
+}
+
+func (flow bindingFlow) hasReachableFlow(node *ast.Node) bool {
 	if data := node.FlowNodeData(); data != nil && data.FlowNode != nil {
 		return data.FlowNode.Flags&ast.FlowFlagsUnreachable == 0
 	}
-	// A nested function body starts its own flow.
-	return !ast.IsFunctionLike(node) && node.ForEachChild(hasReachableFlow)
+	// A class static block runs in the surrounding flow. A field initializer
+	// or nested function gets its own flow even in an unreachable argument.
+	if binder.GetContainerFlags(node)&binder.ContainerFlagsIsControlFlowContainer != 0 && !ast.IsClassStaticBlockDeclaration(node) {
+		return false
+	}
+	if immediateCallee(node) != nil {
+		return !flow.unreachable(node)
+	}
+	return node.ForEachChild(flow.hasReachableFlow)
 }
 
 // Unreachable statements bind children in syntax order, including their expressions.
-func unreachableBinding(node *ast.Node) bool {
+func (flow bindingFlow) unreachableBinding(node *ast.Node) bool {
 	for ; node != nil; node = node.Parent {
 		if node.Flags&ast.NodeFlagsUnreachable != 0 {
 			return true
 		}
-		if node.Kind == ast.KindCallExpression {
-			callee := ast.SkipParentheses(node.Expression())
-			if ast.IsFunctionExpressionOrArrowFunction(callee) {
-				// An argument can terminate flow before the binder visits the callee.
-				return !hasReachableFlow(callee) && !slices.ContainsFunc(node.AsCallExpression().Arguments.Nodes, hasReachableFlow)
-			}
+		if callee := immediateCallee(node); callee != nil {
+			// An argument can terminate flow before the binder visits the callee.
+			return !flow.hasReachableFlow(callee) && !slices.ContainsFunc(node.AsCallExpression().Arguments.Nodes, flow.hasReachableFlow)
 		}
 		if node.Kind == ast.KindBlock && !ast.IsFunctionLike(node.Parent) {
 			// Blocks have no entry flow of their own. The binder records it on

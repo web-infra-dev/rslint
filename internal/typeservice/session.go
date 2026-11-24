@@ -253,9 +253,10 @@ func compilerOptions(c *tsoptions.ParsedCommandLine) (map[string]any, error) {
 	return options, nil
 }
 
+type jsonObject = collections.OrderedMap[string, any]
+
 // tsgo keeps language-service plugins only in the config file's raw options.
 func configPlugins(raw any) []any {
-	type jsonObject = collections.OrderedMap[string, any]
 	config, _ := raw.(*jsonObject)
 	if config == nil {
 		return nil
