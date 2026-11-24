@@ -7,6 +7,9 @@ import (
 	"os"
 )
 
+func openBaselineFile(path string, flags int) (*os.File, error) { return os.OpenFile(path, flags, 0) }
+func openReplacementStage(string, *os.File) (*os.File, error)   { return nil, errors.ErrUnsupported }
+
 // The browser worker uses the service API, which does not write CLI baselines.
 func lockBaseline(file *os.File) (*os.File, error) {
 	return nil, &os.PathError{Op: "lock", Path: file.Name(), Err: errors.ErrUnsupported}

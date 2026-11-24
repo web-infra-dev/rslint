@@ -2749,6 +2749,9 @@ func TestParseLintFlagsSuppressRuleList(t *testing.T) {
 	if code != 0 || empty.Suppressions.Mode != suppressions.Record || empty.Suppressions.Rules == nil || len(empty.Suppressions.Rules) != 0 {
 		t.Fatalf("explicit empty selection = %+v, exit code %d", empty.Suppressions, code)
 	}
+	if _, help, code := parseLintFlags([]string{"--help", "--suppress-all", "--suppress-rule=[]"}); !help || code != 0 {
+		t.Fatalf("help with conflicting suppression modes: help=%t, exit code %d", help, code)
+	}
 }
 
 func TestParseLintFlagsNegatedSuppressions(t *testing.T) {
@@ -2759,8 +2762,8 @@ func TestParseLintFlagsNegatedSuppressions(t *testing.T) {
 	if code != 0 || args.Suppressions.Mode != suppressions.Prune || args.PassOnUnpruned || !slices.Equal(args.Positional, []string{"file.ts"}) {
 		t.Fatalf("expected only prune to be enabled for file.ts, got %+v and exit code %d", args, code)
 	}
-	if _, _, code := parseLintFlags([]string{"--no-suppress-all=1"}); code != 2 {
-		t.Errorf("invalid negated boolean returned %d, want exit code 2", code)
+	if _, _, code := parseLintFlags([]string{"--help", "--no-suppress-all=1"}); code != 2 {
+		t.Errorf("help with an invalid negated boolean returned %d, want exit code 2", code)
 	}
 }
 

@@ -36,16 +36,16 @@ import type { ESTreeNode } from '../../../src/languages/js/types.js';
 const require = createRequire(import.meta.url);
 const esquery = require('esquery') as { parse: (s: string) => object };
 
-test('reports a shared selector match failure once per owner and visit', () => {
+test('reports each distinct selector failure once per owner and visit', () => {
   const ast = {
     type: 'Program',
-    body: ['first', 'second', 'ok'].map((name) => ({
+    body: ['a', 'a', 'b', 'ok'].map((name) => ({
       type: 'ExpressionStatement',
       expression: { type: 'Identifier', name },
     })),
   } as unknown as ESTreeNode;
-  // The first two identifiers reach the unknown class. The last matches.
-  const selector = 'Identifier[name="ok"], Identifier:unsupported';
+  const selector =
+    'Identifier[name="ok"], Identifier[name="a"]:bad-a, Identifier[name="b"]:bad-b';
   let matches = 0;
   const merged = mergeListeners([
     { ruleName: 'first-owner', listeners: { [selector]: () => matches++ } },
@@ -66,17 +66,20 @@ test('reports a shared selector match failure once per owner and visit', () => {
   const visitFile = () => {
     const errors: Array<[string | undefined, string]> = [];
     visit(ast, merged, {
-      onListenerError: ({ ruleName, selector }) =>
-        errors.push([ruleName, selector]),
+      onListenerError: ({ ruleName, err }) =>
+        errors.push([
+          ruleName,
+          err instanceof Error ? err.message : String(err),
+        ]),
     });
     return errors.sort();
   };
   const expected = [
-    ['first-owner', selector],
-    ['other-owner', selector],
-    ['throws', 'Identifier'],
-    ['throws', 'Identifier'],
-    ['throws', 'Identifier'],
+    ['first-owner', 'Unknown class name: bad-a'],
+    ['first-owner', 'Unknown class name: bad-b'],
+    ['other-owner', 'Unknown class name: bad-a'],
+    ['other-owner', 'Unknown class name: bad-b'],
+    ...Array.from({ length: 4 }, () => ['throws', 'listener failure']),
   ];
   expect(visitFile()).toEqual(expected);
   expect(visitFile()).toEqual(expected);

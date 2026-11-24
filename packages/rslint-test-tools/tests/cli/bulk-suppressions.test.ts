@@ -74,12 +74,10 @@ describe('CLI bulk suppressions', () => {
       'a.js': { 'no-var': { count: 1 } },
     });
 
-    const directory = path.join(cwd, 'baselines');
+    const directory = path.join(cwd, 'rslint-suppressions.json');
+    await fs.unlink(directory);
     await fs.mkdir(directory);
-    expect(
-      (await check('--suppressions-location', directory, '--suppress-all'))
-        .exitCode,
-    ).toBe(0);
+    expect((await check('--suppress-all')).exitCode).toBe(0);
     expect(await fs.readdir(directory)).toEqual([
       expect.stringMatching(/^rslint-suppressions_[a-z0-9]+$/),
     ]);

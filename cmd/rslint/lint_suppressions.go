@@ -25,22 +25,23 @@ func applyLintSuppressions(
 	fallback, configFailed := args.ConfigCatalog.FilesWithConfigFallback(targets)
 	pluginIncomplete := dispatchErr != nil
 	files := observation.Native.Files
-	checked := make([]suppressions.FileResult, 0, len(files))
-	for _, file := range files {
+	results := make([]suppressions.FileResult, len(files))
+	hasCheckedFile := false
+	for index, file := range files {
 		failure := pluginFailures[file.Path]
 		pluginIncomplete = pluginIncomplete || failure.FileIncomplete
-		if file.SyntaxError || fallback[file.Path] {
+		result := &results[index]
+		result.Path = file.Path
+		result.Unchecked = file.SyntaxError || fallback[file.Path]
+		if result.Unchecked {
 			continue
 		}
-		skipped := file.SkippedErrorRules
+		hasCheckedFile = true
+		result.Incomplete = failure.FileIncomplete
+		result.SkippedRules = file.SkippedErrorRules
 		if len(failure.Rules) > 0 {
-			skipped = slices.Concat(skipped, failure.Rules)
+			result.SkippedRules = slices.Concat(result.SkippedRules, failure.Rules)
 		}
-		checked = append(checked, suppressions.FileResult{
-			Path:         file.Path,
-			SkippedRules: skipped,
-			Incomplete:   failure.FileIncomplete,
-		})
 	}
 	var failure string
 	switch {
@@ -49,10 +50,10 @@ func applyLintSuppressions(
 	case pluginIncomplete:
 		failure = "Plugin lint results are incomplete."
 	}
-	if failure != "" && len(checked) == 0 {
+	if failure != "" && !hasCheckedFile {
 		return diagnostics, failure
 	}
-	visible, unused, err := baseline.Apply(ctx, checked, diagnostics)
+	visible, unused, err := baseline.Apply(ctx, results, diagnostics)
 	if err != nil {
 		return diagnostics, err.Error()
 	}

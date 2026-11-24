@@ -1495,11 +1495,14 @@ CLI uses the final observation from the same lint or autofix run.
 Config discovery identifies inputs whose intended
 config failed to load. The native lint plan identifies syntax errors and rules
 skipped for lack of type information. Plugin dispatch identifies incomplete
-file or rule results. These facts let the CLI pass verified targets and their
-diagnostics to `internal/suppressions`, including clean files with zero errors.
+file or rule results. The CLI passes the final targets, their completeness
+and their diagnostics to `internal/suppressions`, including clean files with
+zero errors. Pruning uses those results for observed files and checks the
+filesystem for missing paths outside the observation.
 The package counts error-level lint findings by rule and by the selected
-target path relative to the physical working directory. It owns comparison,
-scoped updates and atomic file replacement. The CLI renders the remaining
+target path relative to the physical working directory. It owns comparison
+and scoped updates, writing the complete JSON in the same directory before
+replacing the baseline. The CLI renders the remaining
 diagnostics and sets the exit code. See the [bulk suppressions guide](website/docs/en/guide/bulk-suppressions.md)
 for how recording and pruning handle incomplete checks.
 

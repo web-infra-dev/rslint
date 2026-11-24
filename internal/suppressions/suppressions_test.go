@@ -2,6 +2,7 @@ package suppressions
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -27,9 +28,10 @@ func tempWorkingDirectory(t *testing.T) string {
 func TestScopedUpdate(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
 	checked := filepath.ToSlash(filepath.Join(cwd, "a.ts"))
+	unchecked := filepath.ToSlash(filepath.Join(cwd, "fallback.ts"))
 	private := filepath.Join(cwd, "private")
 	assert.NilError(t, os.Mkdir(private, 0o755))
-	for _, name := range []string{"a.ts", "private/untouched.ts", "former-dir"} {
+	for _, name := range []string{"a.ts", "fallback.ts", "private/untouched.ts", "former-dir"} {
 		assert.NilError(t, os.WriteFile(filepath.Join(cwd, name), nil, 0o644))
 	}
 	linkErr := os.Symlink("gone.ts", filepath.Join(cwd, "linked.ts"))
@@ -49,6 +51,7 @@ func TestScopedUpdate(t *testing.T) {
 	}
 	initial := fmt.Sprintf(`{
 		"a.ts":{"x":{"count":3},"y":{"count":1},"typed":{"count":2}},
+		"fallback.ts":{"x":{"count":1}},
 		"private/untouched.ts":{"x":{"count":1}},
 		"gone.ts":{"x":{"count":1}},
 		"incomplete.ts":{"plugin/check":{"count":1}},
@@ -63,6 +66,7 @@ func TestScopedUpdate(t *testing.T) {
 	diagnostics := []rule.RuleDiagnostic{
 		{FilePath: checked, RuleName: "x", Severity: rule.SeverityError},
 		{FilePath: checked, RuleName: "z", Severity: rule.SeverityWarning},
+		{FilePath: unchecked, RuleName: "x", Severity: rule.SeverityError},
 	}
 	run := func(options Options, unused bool) *File {
 		t.Helper()
@@ -70,11 +74,12 @@ func TestScopedUpdate(t *testing.T) {
 		assert.NilError(t, err)
 		results := []FileResult{
 			{Path: checked, SkippedRules: []string{"typed"}},
+			{Path: unchecked, Unchecked: true},
 			// The plugin could not read a file that disappeared during lint.
 			{Path: filepath.ToSlash(filepath.Join(cwd, "incomplete.ts")), SkippedRules: []string{"plugin/check"}, Incomplete: true},
 		}
 		visible, stale, err := file.Apply(t.Context(), results, append([]rule.RuleDiagnostic(nil), diagnostics...))
-		if err != nil || stale != unused || len(visible) != 1 || visible[0].RuleName != "z" {
+		if err != nil || stale != unused || len(visible) != 2 || visible[0].RuleName != "z" || visible[1].FilePath != unchecked {
 			t.Fatalf("apply: %v, stale %v, error %v", visible, stale, err)
 		}
 		return file
@@ -84,9 +89,15 @@ func TestScopedUpdate(t *testing.T) {
 	if got := recorded.entries["a.ts"]; got["x"].Count != 1 || got["y"].Count != 1 {
 		t.Fatalf("recorded counts: %v", got)
 	}
+	// Both files moved after the final observation. Its verified counts and
+	// its skipped rules still govern pruning for their original paths.
+	for _, name := range []string{"a.ts", "fallback.ts"} {
+		assert.NilError(t, os.Rename(filepath.Join(cwd, name), filepath.Join(cwd, name+".saved")))
+	}
 	pruned := run(Options{Mode: Prune}, false)
 	want := entries{
 		"a.ts":                   {"x": {Count: 1}, "typed": {Count: 2}},
+		"fallback.ts":            {"x": {Count: 1}},
 		"incomplete.ts":          {"plugin/check": {Count: 1}},
 		"private/untouched.ts":   {"x": {Count: 1}},
 		"linked-dir/src/file.ts": {"x": {Count: 1}},
@@ -183,15 +194,26 @@ func TestFileKeyUsesNativeRelativePaths(t *testing.T) {
 }
 
 func TestNormalizeDriveKeys(t *testing.T) {
+	owner := json.RawMessage(`"team"`)
+	ticket := json.RawMessage(`123`)
 	data := entries{
 		"D:/Other.js": {"x": {Count: 1}},
-		"D:/File.js":  {"x": {Count: 2}, "y": {Count: 1}},
-		"d:/File.js":  {"x": {Count: 2}, "z": {Count: 1}},
+		"D:/File.js": {
+			"x": {Count: 2, Extra: map[string]json.RawMessage{"owner": owner}},
+			"y": {Count: 1},
+		},
+		"d:/File.js": {
+			"x": {Count: 2, Extra: map[string]json.RawMessage{"ticket": ticket}},
+			"z": {Count: 1},
+		},
 	}
 	assert.NilError(t, normalizeDriveKeys(data))
 	assert.DeepEqual(t, data, entries{
 		"d:/Other.js": {"x": {Count: 1}},
-		"d:/File.js":  {"x": {Count: 2}, "y": {Count: 1}, "z": {Count: 1}},
+		"d:/File.js": {
+			"x": {Count: 2, Extra: map[string]json.RawMessage{"owner": owner, "ticket": ticket}},
+			"y": {Count: 1}, "z": {Count: 1},
+		},
 	})
 	data["D:/File.js"] = map[string]entry{"x": {Count: 1}}
 	assert.ErrorContains(t, normalizeDriveKeys(data), `conflicting counts for rule "x"`)
@@ -380,5 +402,33 @@ func TestDirectoryHash(t *testing.T) {
 		if got := cwdHash(cwd); got != want {
 			t.Errorf("cwdHash(%q) = %q, want %q", cwd, got, want)
 		}
+	}
+}
+
+func TestUpdatePreservesExtraMembers(t *testing.T) {
+	cwd := tempWorkingDirectory(t)
+	for _, name := range []string{"a.js", "b.js"} {
+		assert.NilError(t, os.WriteFile(name, nil, 0o644))
+	}
+	const initial = `{
+		"a.js":{"x":{"count":2,"reason":"deferred"}},
+		"b.js":{"x":{"count":1,"ticket":9007199254740993}}
+	}`
+	assert.NilError(t, os.WriteFile(DefaultFilename, []byte(initial), 0o644))
+	for _, step := range []struct {
+		mode   Mode
+		reason string
+	}{{Prune, `"deferred"`}, {Record, ""}} {
+		file, err := Open(Options{Mode: step.mode})
+		assert.NilError(t, err)
+		_, _, err = reportError(t.Context(), file, filepath.Join(cwd, "a.js"), "x")
+		assert.NilError(t, err)
+		encoded, err := os.ReadFile(DefaultFilename)
+		assert.NilError(t, err)
+		var saved map[string]map[string]map[string]json.RawMessage
+		assert.NilError(t, json.Unmarshal(encoded, &saved))
+		assert.Equal(t, string(saved["a.js"]["x"]["count"]), "1")
+		assert.Equal(t, string(saved["a.js"]["x"]["reason"]), step.reason)
+		assert.Equal(t, string(saved["b.js"]["x"]["ticket"]), "9007199254740993")
 	}
 }

@@ -199,6 +199,8 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	args.RuleFlags = []string(ruleFlags)
 	suppressRuleSet := args.Suppressions.Rules != nil
 	switch {
+	case help:
+		// The flag values were parsed above. Help does not run a suppression mode.
 	case suppressAll && suppressRuleSet || prune && (suppressAll || suppressRuleSet):
 		fmt.Fprintln(os.Stderr, "error: choose only one of --suppress-all, --suppress-rule and --prune-suppressions")
 		return args, help, 2

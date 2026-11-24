@@ -1,6 +1,7 @@
 package suppressions
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"crypto/rand"
@@ -26,31 +27,34 @@ const DefaultFilename = "rslint-suppressions.json"
 func Open(options Options) (*File, error) {
 	f := &File{options: options, path: DefaultFilename}
 	var cwd string
-	if location := options.Location; location != "" {
+	location := options.Location
+	if location != "" {
 		path, err := filepath.Abs(location)
 		if err != nil {
 			return nil, err
 		}
-		info, err := os.Stat(path)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return nil, err
-		}
-		if os.IsPathSeparator(location[len(location)-1]) || (info != nil && info.IsDir()) {
-			// ESLint hashes Node's native process.cwd() for directory locations.
-			cwd, err = syscall.Getwd()
-			if err != nil {
-				return nil, err
-			}
-			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(cwd))
-		}
 		f.path = path
 	}
-	data, err := f.read(f.path)
-	if err != nil {
+	info, err := os.Stat(f.path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
-	if data == nil && options.Mode == Check {
-		return nil, nil //nolint:nilnil // No active baseline means the CLI can skip collecting linted files.
+	if info != nil && info.IsDir() || location != "" && os.IsPathSeparator(location[len(location)-1]) {
+		// ESLint hashes Node's native process.cwd() for directory locations.
+		cwd, err = syscall.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		f.path = filepath.Join(f.path, "rslint-suppressions_"+cwdHash(cwd))
+	}
+	if err == nil {
+		f.entries, err = readEntries(f.path)
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		err = f.missing(f.path)
+	}
+	if err != nil || f.entries == nil && options.Mode == Check {
+		return nil, err
 	}
 	if cwd == "" {
 		cwd, err = syscall.Getwd()
@@ -62,11 +66,10 @@ func Open(options Options) (*File, error) {
 		// Resolve directory junctions with the same native filesystem used by target selection.
 		cwd = filepath.FromSlash(osvfs.FS().Realpath(filepath.ToSlash(cwd)))
 	}
-	if options.Location == "" {
-		f.path = filepath.Join(cwd, DefaultFilename)
+	if !filepath.IsAbs(f.path) {
+		f.path = filepath.Join(cwd, f.path)
 	}
 	f.cwd = cwd
-	f.entries = data
 	return f, nil
 }
 
@@ -128,23 +131,37 @@ func (f *File) missing(path string) error {
 	return nil
 }
 
-func (f *File) read(path string) (entries, error) {
-	file, err := os.Open(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, f.missing(path)
+// Validate the opened object. The name may have changed since directory detection or linting.
+func openRegularBaseline(path string, flags int) (*os.File, fs.FileInfo, error) {
+	file, err := openBaselineFile(path, flags)
+	if err != nil {
+		return nil, nil, err
+	}
+	info, err := file.Stat()
+	if err == nil && !info.Mode().IsRegular() {
+		err = fmt.Errorf("suppressions file %q must be a regular file", path)
 	}
 	if err != nil {
-		return nil, err
+		_ = file.Close()
+		return nil, nil, err
 	}
-	defer file.Close()
-	return decodeEntries(file, path)
+	return file, info, nil
 }
 
-func decodeEntries(file *os.File, path string) (entries, error) {
-	content, err := io.ReadAll(file)
+func readEntries(path string) (entries, error) {
+	file, _, err := openRegularBaseline(path, os.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}
+	content, err := io.ReadAll(file)
+	_ = file.Close()
+	if err != nil {
+		return nil, err
+	}
+	return decodeEntries(content, path)
+}
+
+func decodeEntries(content []byte, path string) (entries, error) {
 	var data entries
 	if err := json.Unmarshal(content, &data); err != nil {
 		return nil, fmt.Errorf("invalid suppressions file %q: %w", path, err)
@@ -178,8 +195,19 @@ func normalizeDriveKeys(data entries) error {
 		}
 		if existing := data[key]; existing != nil {
 			for id, value := range rules {
-				if prior, ok := existing[id]; ok && prior != value {
-					return fmt.Errorf("conflicting counts for rule %q in %q and %q", id, file, key)
+				if prior, ok := existing[id]; ok {
+					if prior.Count != value.Count {
+						return fmt.Errorf("conflicting counts for rule %q in %q and %q", id, file, key)
+					}
+					if len(value.Extra) == 0 {
+						continue
+					}
+					for name, field := range prior.Extra {
+						if other, ok := value.Extra[name]; ok && !bytes.Equal(field, other) {
+							return fmt.Errorf("conflicting field %q for rule %q in %q and %q", name, id, file, key)
+						}
+						value.Extra[name] = field
+					}
 				}
 				existing[id] = value
 			}
@@ -207,9 +235,8 @@ func (f *File) update(ctx context.Context, change func(entries) bool) (err error
 			err = fmt.Errorf("cannot update suppressions %q: %w (if another writer is active, retry after it finishes)", path, err)
 		}
 	}()
-	var info fs.FileInfo
 	var data entries
-	file, err := os.OpenFile(path, os.O_RDWR, 0)
+	file, held, err := openRegularBaseline(path, os.O_RDWR)
 	switch {
 	case err == nil:
 		guard, err := lockBaseline(file)
@@ -218,11 +245,10 @@ func (f *File) update(ctx context.Context, change func(entries) bool) (err error
 			return err
 		}
 		defer guard.Close()
-		data, info, err = readLockedBaseline(file, path)
 		if guard != file {
-			// Windows keeps a separate guard so the data handle can close before Rename.
-			_ = file.Close()
+			defer file.Close()
 		}
+		data, err = readLockedBaseline(file, held)
 		if err != nil {
 			return err
 		}
@@ -234,8 +260,8 @@ func (f *File) update(ctx context.Context, change func(entries) bool) (err error
 	default:
 		return err
 	}
-	if changed := change(data); changed || info == nil {
-		if err := writeBaseline(ctx, path, info, data); err != nil {
+	if changed := change(data); changed || file == nil {
+		if err := writeBaseline(ctx, path, file, data); err != nil {
 			return err
 		}
 	} else if err := ctx.Err(); err != nil {
@@ -245,27 +271,38 @@ func (f *File) update(ctx context.Context, change func(entries) bool) (err error
 	return nil
 }
 
-func readLockedBaseline(file *os.File, path string) (entries, fs.FileInfo, error) {
-	held, err := file.Stat()
-	if err != nil {
-		return nil, nil, err
-	}
+func readLockedBaseline(file *os.File, held fs.FileInfo) (entries, error) {
 	// A previous writer may have replaced the open file before we acquired its lock.
-	named, err := os.Lstat(path)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, nil, err
+	named, err := os.Lstat(file.Name())
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fs.ErrExist
+	}
+	if err != nil {
+		return nil, err
 	}
 	if !os.SameFile(held, named) {
-		return nil, nil, fs.ErrExist
+		return nil, fs.ErrExist
 	}
-	data, err := decodeEntries(file, path)
-	return data, held, err
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	return decodeEntries(content, file.Name())
 }
 
-func writeBaseline(ctx context.Context, path string, info fs.FileInfo, data entries) error {
-	// O_EXCL and the creation mode preserve the caller's umask for a new baseline.
+func writeBaseline(ctx context.Context, path string, existing *os.File, data entries) error {
 	name := filepath.Join(filepath.Dir(path), ".rslint-suppressions-"+rand.Text()+".tmp")
-	stage, err := os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o666)
+	var stage *os.File
+	var err error
+	if existing == nil {
+		// Honor the caller's umask and directory defaults for a new baseline.
+		stage, err = os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o666)
+	} else {
+		stage, err = openReplacementStage(name, existing)
+		if err != nil {
+			return fmt.Errorf("cannot stage replacement for %q with its access permissions: %w", path, err)
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -276,8 +313,9 @@ func writeBaseline(ctx context.Context, path string, info fs.FileInfo, data entr
 			_ = os.Remove(name)
 		}
 	}()
-	if info != nil {
-		if err := stage.Chmod(info.Mode().Perm()); err != nil {
+	if existing != nil && runtime.GOOS == "windows" {
+		// The separate Windows guard remains locked through publication.
+		if err := existing.Close(); err != nil {
 			return err
 		}
 	}
@@ -293,7 +331,7 @@ func writeBaseline(ctx context.Context, path string, info fs.FileInfo, data entr
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if info == nil {
+	if existing == nil {
 		err = renameNew(name, path)
 		if errors.Is(err, fs.ErrExist) {
 			if link, statErr := os.Lstat(path); statErr == nil && link.Mode()&fs.ModeSymlink != 0 {

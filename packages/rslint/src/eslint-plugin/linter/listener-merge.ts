@@ -698,7 +698,7 @@ export function visit(
   };
   const result: VisitResult = { cancelled: false, visitedNodes: 0 };
   const errH = opts.onListenerError;
-  let reportedMatchErrors: Set<EsqEntry> | undefined;
+  let reportedMatchErrors: Map<EsqEntry, Set<string>> | undefined;
   const cancelFlag = opts.cancelFlag;
 
   // No-ESQuery fast path. When the merged set contains no esquery
@@ -722,16 +722,18 @@ export function visit(
       try {
         matched = esquery().matches(node, entry.selector!, reversedAncestry());
       } catch (err) {
-        if (errH && !reportedMatchErrors?.has(entry)) {
-          // The selector may still match later nodes in this visit.
-          reportedMatchErrors ??= new Set();
-          reportedMatchErrors.add(entry);
-          const owners = new Set(
-            entry.listeners.map((listener) => listener.ruleName),
-          );
-          for (const ruleName of owners) {
-            errH({ ruleName, selector: entry.raw, node, err });
-          }
+        if (!errH) return;
+        // Different branches of one selector can fail for different reasons.
+        const message = err instanceof Error ? err.message : String(err);
+        const messages = reportedMatchErrors?.get(entry) ?? new Set<string>();
+        if (messages.has(message)) return;
+        messages.add(message);
+        (reportedMatchErrors ??= new Map()).set(entry, messages);
+        const owners = new Set(
+          entry.listeners.map((listener) => listener.ruleName),
+        );
+        for (const ruleName of owners) {
+          errH({ ruleName, selector: entry.raw, node, err });
         }
         return;
       }

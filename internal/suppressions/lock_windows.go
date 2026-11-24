@@ -6,9 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
+
+// cspell:ignore DACL
 
 func nativePath(path string) (*uint16, error) {
 	// CreateFile needs the extended form for long paths when Win32 long paths
@@ -23,6 +26,67 @@ func nativePath(path string) (*uint16, error) {
 		}
 	}
 	return windows.UTF16PtrFromString(native)
+}
+
+func openBaselineFile(path string, flags int) (*os.File, error) {
+	if flags == os.O_RDWR {
+		return os.OpenFile(path, flags, 0)
+	}
+	native, err := nativePath(path)
+	if err != nil {
+		return nil, err
+	}
+	handle, err := windows.CreateFile(native, windows.GENERIC_READ,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil, windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
+	if err != nil {
+		return nil, &os.PathError{Op: "open", Path: path, Err: err}
+	}
+	return os.NewFile(uintptr(handle), path), nil
+}
+
+func openReplacementStage(name string, existing *os.File) (*os.File, error) {
+	native, err := nativePath(name)
+	if err != nil {
+		return nil, err
+	}
+	src := windows.Handle(existing.Fd())
+	var flags uint32
+	volumeErr := windows.GetVolumeInformationByHandle(src, nil, 0, nil, nil, &flags, nil, 0)
+	const access = windows.OWNER_SECURITY_INFORMATION | windows.GROUP_SECURITY_INFORMATION |
+		windows.DACL_SECURITY_INFORMATION | windows.LABEL_SECURITY_INFORMATION
+	var attrs *windows.SecurityAttributes
+	// SMB shares can expose file security without supporting volume queries.
+	if volumeErr != nil || flags&windows.FILE_PERSISTENT_ACLS != 0 {
+		security, err := windows.GetSecurityInfo(src, windows.SE_FILE_OBJECT, access)
+		if err != nil {
+			return nil, err
+		}
+		attrs = &windows.SecurityAttributes{Length: uint32(unsafe.Sizeof(windows.SecurityAttributes{})), SecurityDescriptor: security}
+	}
+	// Keep the empty file exclusive until its access permissions have been verified.
+	handle, err := windows.CreateFile(native, windows.GENERIC_WRITE|windows.READ_CONTROL, 0, attrs,
+		windows.CREATE_NEW, windows.FILE_ATTRIBUTE_NORMAL, 0)
+	if err != nil {
+		return nil, &os.PathError{Op: "create", Path: name, Err: err}
+	}
+	stage := os.NewFile(uintptr(handle), name)
+	if attrs != nil {
+		// Windows can combine the supplied descriptor with inheritable directory ACEs.
+		actual, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT, access)
+		if err == nil {
+			want := attrs.SecurityDescriptor.String()
+			if want == "" || actual.String() != want {
+				err = errors.New("the directory grants different access to replacement files")
+			}
+		}
+		if err != nil {
+			_ = stage.Close()
+			_ = os.Remove(name)
+			return nil, err
+		}
+	}
+	return stage, nil
 }
 
 func lockBaseline(file *os.File) (*os.File, error) {
