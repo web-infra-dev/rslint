@@ -1466,30 +1466,39 @@ func jsCheckFlags(flags ast.CheckFlags) uint32 {
 }
 
 func diagnosticFacts(p *program.Program, diagnostics []*ast.Diagnostic) SuggestionDiagnostics {
-	var result SuggestionDiagnostics
-	for _, diagnostic := range diagnostics {
+	return collectDiagnostics(p, diagnostics, make(map[*ast.SourceFile]*configSourceInfo))
+}
+
+func collectDiagnostics(p *program.Program, diagnostics []*ast.Diagnostic, configs map[*ast.SourceFile]*configSourceInfo) SuggestionDiagnostics {
+	if len(diagnostics) == 0 {
+		return nil
+	}
+	result := make(SuggestionDiagnostics, len(diagnostics))
+	for i, diagnostic := range diagnostics {
 		d := DiagnosticFact{
 			Code: uint32(diagnostic.Code()), Category: uint32(diagnostic.Category()),
 			Message: diagnostic.Localize(locale.Default), Source: diagnostic.Source(),
 			Deprecated: diagnostic.ReportsDeprecated(), Unnecessary: diagnostic.ReportsUnnecessary(),
-			Chain: diagnosticFacts(p, diagnostic.MessageChain()), Related: diagnosticFacts(p, diagnostic.RelatedInformation()),
+			Chain: collectDiagnostics(p, diagnostic.MessageChain(), configs), Related: collectDiagnostics(p, diagnostic.RelatedInformation(), configs),
 		}
 		if f := diagnostic.File(); f != nil {
 			d.File = f.FileName()
-			if !p.OwnsSourceFile(f) {
+			d.Config = configs[f]
+			if d.Config == nil && !p.OwnsSourceFile(f) {
 				if c := parsedConfig(p.CompilerQueries(), f.Path()); c != nil && c.ConfigFile != nil && c.ConfigFile.SourceFile == f {
 					d.Config = configSource(p, c)
 				} else {
 					d.Config = registerConfig(p, f)
 					d.Config.ExtendedSourceFiles = utils.ConfigAncestors(f)
 				}
+				configs[f] = d.Config
 			}
 			positions := f.GetPositionMap()
 			start := positions.UTF8ToUTF16(diagnostic.Pos())
 			d.Start = uint32(start)
 			d.Length = uint32(positions.UTF8ToUTF16(diagnostic.End()) - start)
 		}
-		result = append(result, d)
+		result[i] = d
 	}
 	return result
 }
