@@ -225,7 +225,7 @@ func materializePluginTask(
 		targetPathByWire: targetPathByWire,
 		fixCandidates:    fixCandidates,
 		collectFixes:     collectFixes,
-		collectFailures:  policy.Demand.SkippedErrorRules,
+		collectFailures:  policy.Demand.IncompleteRuleResults,
 		suggestionsMode:  suggestionsMode,
 		timing:           timing,
 		failure:          policy.PluginFailure,

@@ -2,9 +2,10 @@ import path from 'node:path';
 import fs from 'node:fs';
 import {
   OUTPUT_FORMATS,
-  parseArgs,
+  bindSuppressRuleArgs,
   isJSConfigFile,
   isOutputFormat,
+  parseArgs,
 } from '../utils/args.js';
 import { resolveRslintBinary } from '../internal/resolve-binary.js';
 
@@ -63,9 +64,25 @@ export async function run(
     }
   }
 
-  // Build Go args: start-time flag BEFORE positional args, because Go's
-  // flag.Parse stops at the first positional argument.
-  const goArgs = [`--start-time=${startTime}`, ...args.rest];
+  let argumentError = args.argumentError;
+  let suppressRuleArgs: string[] = [];
+  if (!argumentError && args.suppressRuleValues.length > 0) {
+    try {
+      suppressRuleArgs = await bindSuppressRuleArgs(args.suppressRuleValues);
+    } catch (error) {
+      argumentError = `invalid --suppress-rule value: ${String(error)}`;
+    }
+  }
+  if (argumentError) {
+    process.stderr.write(`error: ${argumentError}\n`);
+    return 2;
+  }
+  // Go's flag.Parse stops at the first positional argument.
+  const goArgs = [
+    `--start-time=${startTime}`,
+    ...suppressRuleArgs,
+    ...args.rest,
+  ];
 
   // Configuration discovery is initiated by Go after the IPC channel is
   // live; Node only evaluates the exact frontier candidates Go sends back

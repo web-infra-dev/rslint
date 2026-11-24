@@ -76,7 +76,7 @@ func prepareObservation(
 			TargetsByProgram:         generation.Native.TargetsByProgram,
 			SingleThreaded:           generation.Native.SingleThreaded,
 			GetRulesForFile:          generation.Native.RulesForFile,
-			collectSkippedErrorRules: policy.Demand.SkippedErrorRules,
+			collectSkippedErrorRules: policy.Demand.IncompleteRuleResults,
 		})
 		if err != nil {
 			return preparedObservation{}, fmt.Errorf("linter pipeline: prepare lint plan: %w", err)

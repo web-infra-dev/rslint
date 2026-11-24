@@ -22,6 +22,8 @@ You can also repeat `--suppress-rule` or pass comma-separated IDs. To record all
 
 Commit the generated `rslint-suppressions.json` with your config. Developers and CI can then run `rslint` from the same working directory to check against it.
 
+If recording or pruning is interrupted, you can rerun the command even if a temporary file remains.
+
 ## How the suppressions file works
 
 This baseline records two `no-debugger` errors in `src/app.js`.
@@ -36,7 +38,7 @@ This baseline records two `no-debugger` errors in `src/app.js`.
 
 If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
 
-File keys use the target path selected by the CLI, relative to the physical working directory, with `/` as the separator. If the CLI selects `real.ts`, its count stays under `real.ts` even when `tsconfig.json` loads it through a symlink with a different name. A file on another Windows drive or UNC share uses its absolute path.
+File keys use the target path selected by the CLI, relative to the physical working directory, with `/` as the separator. If the CLI selects `real.ts`, its count stays under `real.ts` even when `tsconfig.json` loads it through a symlink with a different name. A file on another Windows drive or UNC share uses its absolute path. On Windows, `D:/src/app.js` and `d:/src/app.js` share one entry.
 
 Use the physical checkout directory when sharing a baseline. From a sibling symlink `checkout-link` pointing to `checkout`, the CLI can display `src/app.js` and record `../checkout-link/src/app.js`. From `checkout`, the key is `src/app.js`. Rules can produce different findings for those paths. When the CLI deduplicates two inputs that name the same file, the baseline uses the path that was linted.
 

@@ -49,13 +49,13 @@ func projectGenerationTargets(
 	}
 	fileCount := plan.fileCount()
 	sources := make(map[string]ast.SourceFileLike, fileCount)
-	collectLintedFiles := demand.LintedFiles || demand.SkippedErrorRules || demand.SourceFiles
+	collectLintedFiles := demand.LintedFiles || demand.IncompleteRuleResults || demand.SourceFiles
 	var lintedFiles []LintedFile
 	if collectLintedFiles {
 		lintedFiles = make([]LintedFile, 0, fileCount)
 	}
 	var skippedByConfig map[ruleSetKey][]string
-	if demand.SkippedErrorRules {
+	if demand.IncompleteRuleResults {
 		skippedByConfig = make(map[ruleSetKey][]string)
 	}
 	for _, programPlan := range plan.programs {

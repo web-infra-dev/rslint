@@ -718,9 +718,9 @@ the original frames until source identity checks and fix text freezing finish.
 Producer finalization waits for actual generation borrowers; detached plugin
 work continues with frozen inputs. Frames are shared by source object identity,
 not by file path, and compute ECMAScript line maps lazily. `LintedFiles` requests
-selected target paths. `SkippedErrorRules` also returns the error-level rule IDs
-excluded from each target because it lacks a type checker. `SourceFiles`
-retains the original ASTs for selected targets.
+selected target paths. `IncompleteRuleResults` also reports error-level rules
+skipped for lack of a type checker and incomplete plugin file or rule results.
+`SourceFiles` retains the original ASTs for selected targets.
 The API requests ASTs only for its encoded-source response. Diagnostic
 projection does not invalidate those explicitly retained artifacts.
 
@@ -1489,8 +1489,10 @@ in `internal/config/lint`, Program construction in `internal/program/loader`,
 the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
 
-With an active bulk suppressions file, the CLI uses the final observation from
-the same lint or autofix run. Config discovery identifies inputs whose intended
+For `--suppress-rule`, the Node wrapper parses the user's rule list and passes
+the rule IDs to Go as a JSON array. With an active bulk suppressions file, the
+CLI uses the final observation from the same lint or autofix run.
+Config discovery identifies inputs whose intended
 config failed to load. The native lint plan identifies syntax errors and rules
 skipped for lack of type information. Plugin dispatch identifies incomplete
 file or rule results. These facts let the CLI pass verified targets and their

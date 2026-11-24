@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'rstack/test';
 import {
+  bindSuppressRuleArgs,
   isJSConfigFile,
   isOutputFormat,
   parseArgs,
@@ -230,17 +231,32 @@ describe('parseArgs rest ordering', () => {
     expect(parseArgs(['a.js', ...flags]).rest).toEqual([...flags, 'a.js']);
   });
 
-  test('distinguishes an empty suppression argument from a missing value', () => {
-    expect(parseArgs(['--suppress-rule', '']).rest).toEqual([
+  test('binds repeated ESLint rule lists before forwarding them to Go', async () => {
+    const args = parseArgs([
+      'a.js',
+      '--suppress-rule',
+      String.raw`[p/first("a,b"), 'p/with,comma', "no-\u0076ar"]`,
+      '--suppress-rule=p/second,p/third',
+      '--suppress-rule',
+      '',
+    ]);
+    expect(args.rest).toEqual(['a.js']);
+    expect(await bindSuppressRuleArgs(args.suppressRuleValues)).toEqual([
+      `--suppress-rule=${JSON.stringify(['p/first("a,b")', 'p/with,comma', 'no-var'])}`,
+      '--suppress-rule=["p/second","p/third"]',
       '--suppress-rule=[]',
     ]);
+    await expect(bindSuppressRuleArgs(['[p/first'])).rejects.toThrow();
+  });
+
+  test('distinguishes an empty suppression location from a missing value', () => {
     const location = '--suppressions-location';
     expect(
       parseArgs(['a.js', location, 'custom.json', location, '']).rest,
-    ).toEqual(['a.js']);
+    ).toEqual([`${location}=custom.json`, `${location}=`, 'a.js']);
     for (const flag of ['--suppress-rule', location]) {
       for (const arg of [flag, `${flag}=`]) {
-        expect(parseArgs(['a.js', arg]).rest).toEqual([`${flag}=`, 'a.js']);
+        expect(parseArgs(['a.js', arg]).argumentError).toContain(flag);
       }
     }
   });

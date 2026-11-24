@@ -182,9 +182,9 @@ type ArtifactDemand struct {
 	Plugin rule.EditDemand
 	// LintedFiles returns selected target paths without retaining compiler ASTs.
 	LintedFiles bool
-	// SkippedErrorRules additionally reports configured error rules excluded
-	// by the target's checker capability, and implies LintedFiles.
-	SkippedErrorRules bool
+	// IncompleteRuleResults reports native error rules skipped without a checker
+	// and incomplete plugin files or error rules. It implies LintedFiles.
+	IncompleteRuleResults bool
 	// SourceFiles additionally retains the selected ASTs, including their paths,
 	// for consumers such as the API's optional encoded-source response.
 	SourceFiles bool

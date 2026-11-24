@@ -2739,20 +2739,15 @@ func TestReadPhysicalFileTextPreservesEncodingAndSourceBOM(t *testing.T) {
 }
 
 func TestParseLintFlagsSuppressRuleList(t *testing.T) {
-	const list = ` @scope/plugin/first(legacy), p/first("a,b"), 'plugin/with,comma', "no-\u0076ar", `
-	want := []string{"@scope/plugin/first(legacy)", `p/first("a,b")`, "plugin/with,comma", "no-var", "no-alert", "no-debugger"}
-	for _, value := range []string{list, "[" + list + "]"} {
-		args, _, code := parseLintFlags([]string{
-			"--suppress-rule", value,
-			"--suppress-rule", "no-alert,no-debugger",
-			"--suppress-rule", "[]",
-		})
-		if code != 0 || !slices.Equal(args.Suppressions.Rules, want) {
-			t.Errorf("list %q: got rules %q and exit code %d, want %q and exit code 0", value, args.Suppressions.Rules, code, want)
-		}
+	args, _, code := parseLintFlags([]string{
+		"--suppress-rule=[]", `--suppress-rule=["p/one,two","p/second"]`, `--suppress-rule=["p/third"]`,
+	})
+	if code != 0 || !slices.Equal(args.Suppressions.Rules, []string{"p/one,two", "p/second", "p/third"}) {
+		t.Fatalf("bound rule selection = %q, exit code %d", args.Suppressions.Rules, code)
 	}
-	if _, _, code := parseLintFlags([]string{"--suppress-rule", "[no-var,no-debugger"}); code != 2 {
-		t.Errorf("unterminated list returned %d, want exit code 2", code)
+	empty, _, code := parseLintFlags([]string{"--suppress-rule=[]"})
+	if code != 0 || empty.Suppressions.Mode != suppressions.Record || empty.Suppressions.Rules == nil || len(empty.Suppressions.Rules) != 0 {
+		t.Fatalf("explicit empty selection = %+v, exit code %d", empty.Suppressions, code)
 	}
 }
 

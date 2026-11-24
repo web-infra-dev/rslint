@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -82,60 +80,6 @@ type repeatedFlag []string
 
 func (f *repeatedFlag) String() string     { return strings.Join(*f, ", ") }
 func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
-
-// ESLint's [String] option joins consecutive tokens into one rule ID. Quoted
-// strings and slash- or hash-delimited literals can contain list separators.
-var suppressRuleToken = regexp.MustCompile(`^(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|/(?:\\/|[^/])*/[a-zA-Z]*|#[^\r\n\x{2028}\x{2029}]*#|[\[\](){}:,]|[^\[\](){}:,]+)`)
-var quotedRuleEscape = regexp.MustCompile(`(?:\\u[0-9a-fA-F]{4})+|\\[^u]`)
-
-func decodeRuleEscape(escape string) string {
-	var decoded string
-	if json.Unmarshal([]byte(`"`+escape+`"`), &decoded) == nil {
-		return decoded
-	}
-	return escape[1:] // ESLint drops the backslash from other escapes.
-}
-
-func appendSuppressRules(rules []string, value string) ([]string, error) {
-	if value == "" {
-		return nil, errors.New("expected a rule ID")
-	}
-	var tokens []string
-	for list := ecmascript.StringTrim(value); list != ""; {
-		token := suppressRuleToken.FindString(list)
-		tokens = append(tokens, ecmascript.StringTrim(token))
-		list = ecmascript.StringTrim(list[len(token):])
-	}
-	end := slices.Index(tokens, "]")
-	if len(tokens) > 0 && tokens[0] == "[" {
-		if end < 0 || end != len(tokens)-1 {
-			return nil, errors.New("expected a single bracketed list of rule IDs")
-		}
-		tokens = tokens[1:end]
-	} else if end >= 0 {
-		tokens = tokens[:end] // ESLint parses a bare list up to its closing bracket.
-	}
-	if rules == nil {
-		rules = []string{} // An explicit empty selection records no rules.
-	}
-	for len(tokens) > 0 {
-		switch tokens[0] {
-		case "[", "(", "{":
-			return nil, errors.New("expected a string rule ID")
-		}
-		comma := slices.Index(tokens, ",")
-		if comma < 0 {
-			comma = len(tokens)
-		}
-		id := strings.Join(tokens[:comma], "")
-		if len(id) >= 2 && (id[0] == '\'' || id[0] == '"') && id[len(id)-1] == id[0] {
-			id = quotedRuleEscape.ReplaceAllStringFunc(id[1:len(id)-1], decodeRuleEscape)
-		}
-		rules = append(rules, id)
-		tokens = tokens[min(comma+1, len(tokens)):]
-	}
-	return rules, nil
-}
 
 func suppressionBoolFlag(fs *flag.FlagSet, target *bool, name, usage string) {
 	for _, spelling := range []string{name, "no-" + name} {
@@ -233,17 +177,19 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	suppressionBoolFlag(fs, &suppressAll, "suppress-all", "record all lint errors")
 	suppressionBoolFlag(fs, &prune, "prune-suppressions", "remove unused suppressions")
 	suppressionBoolFlag(fs, &args.PassOnUnpruned, "pass-on-unpruned-suppressions", "allow unused suppressions")
-	fs.Func("suppressions-location", "suppressions file or directory", func(value string) error {
-		if value == "" {
-			return errors.New("expected a file or directory")
-		}
-		args.Suppressions.Location = value
-		return nil
-	})
+	fs.StringVar(&args.Suppressions.Location, "suppressions-location", "", "suppressions file or directory")
 	fs.Func("suppress-rule", "rule IDs to record", func(value string) error {
-		var err error
-		args.Suppressions.Rules, err = appendSuppressRules(args.Suppressions.Rules, value)
-		return err
+		// The Node file CLI sends one JSON array per occurrence, including [].
+		var ids []string
+		if err := json.Unmarshal([]byte(value), &ids); err != nil {
+			return err
+		}
+		if args.Suppressions.Rules == nil {
+			args.Suppressions.Rules = ids
+		} else {
+			args.Suppressions.Rules = append(args.Suppressions.Rules, ids...)
+		}
+		return nil
 	})
 
 	if err := fs.Parse(argv); err != nil {

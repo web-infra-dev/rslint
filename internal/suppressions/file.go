@@ -3,6 +3,7 @@ package suppressions
 import (
 	"cmp"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
@@ -43,7 +45,7 @@ func Open(options Options) (*File, error) {
 		}
 		f.path = path
 	}
-	data, err := f.read(f.path, os.O_RDONLY)
+	data, err := f.read(f.path)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +75,7 @@ func (f *File) fileKey(path string) string {
 	if runtime.GOOS == "windows" {
 		from, to := filepath.VolumeName(f.cwd), filepath.VolumeName(path)
 		if !strings.EqualFold(from, to) {
-			return path // Files on another drive or share have no relative path.
+			return utils.NormalizeAbsoluteDrive(path) // Another drive or share has no relative path.
 		}
 		// Windows volumes are case-insensitive. Inside a volume, preserve the
 		// file and directory spellings that the rule actually received.
@@ -119,18 +121,26 @@ func (f *File) fileMissing(key string) bool {
 	}
 }
 
-func (f *File) read(path string, access int) (entries, error) {
-	file, err := os.OpenFile(path, access, 0)
+func (f *File) missing(path string) error {
+	if f.options.Location != "" && f.options.Mode != Record {
+		return fmt.Errorf("suppressions file %q does not exist: use --suppress-all or --suppress-rule to create it", path)
+	}
+	return nil
+}
+
+func (f *File) read(path string) (entries, error) {
+	file, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		if f.options.Location == "" || f.options.Mode == Record {
-			return nil, nil //nolint:nilnil // A missing optional or newly requested baseline has no entries.
-		}
-		return nil, fmt.Errorf("suppressions file %q does not exist: use --suppress-all or --suppress-rule to create it", path)
+		return nil, f.missing(path)
 	}
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
+	return decodeEntries(file, path)
+}
+
+func decodeEntries(file *os.File, path string) (entries, error) {
 	content, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
@@ -152,56 +162,120 @@ func (f *File) read(path string, access int) (entries, error) {
 			}
 		}
 	}
+	if runtime.GOOS == "windows" {
+		if err := normalizeDriveKeys(data); err != nil {
+			return nil, fmt.Errorf("invalid suppressions file %q: %w", path, err)
+		}
+	}
 	return data, nil
 }
 
-// The exclusive staging file is also the writer lock. Read the latest counts
-// after creating it, then replace the destination with the completed JSON.
-func (f *File) update(ctx context.Context, change func(entries) bool) error {
+func normalizeDriveKeys(data entries) error {
+	for file, rules := range data {
+		key := utils.NormalizeAbsoluteDrive(file)
+		if key == file {
+			continue
+		}
+		if existing := data[key]; existing != nil {
+			for id, value := range rules {
+				if prior, ok := existing[id]; ok && prior != value {
+					return fmt.Errorf("conflicting counts for rule %q in %q and %q", id, file, key)
+				}
+				existing[id] = value
+			}
+		} else {
+			data[key] = rules
+		}
+		delete(data, file)
+	}
+	return nil
+}
+
+// Reread and lock an existing baseline, or publish a new one without replacement.
+func (f *File) update(ctx context.Context, change func(entries) bool) (err error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	path, err := filepath.EvalSymlinks(f.path)
 	if errors.Is(err, fs.ErrNotExist) {
-		path = f.path // A new baseline has no symlink target to resolve.
+		path = f.path
 	} else if err != nil {
 		return err
 	}
-	stagePath := path + ".tmp"
-	stage, err := os.OpenFile(stagePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o666)
-	if errors.Is(err, fs.ErrExist) {
-		return fmt.Errorf("stage suppressions: %w (retry after the writer finishes or remove the temporary file if it was interrupted)", err)
+	defer func() {
+		if err = nativeUpdateError(err); errors.Is(err, fs.ErrExist) {
+			err = fmt.Errorf("cannot update suppressions %q: %w (if another writer is active, retry after it finishes)", path, err)
+		}
+	}()
+	var info fs.FileInfo
+	var data entries
+	file, err := os.OpenFile(path, os.O_RDWR, 0)
+	switch {
+	case err == nil:
+		guard, err := lockBaseline(file)
+		if err != nil {
+			_ = file.Close()
+			return err
+		}
+		defer guard.Close()
+		data, info, err = readLockedBaseline(file, path)
+		if guard != file {
+			// Windows keeps a separate guard so the data handle can close before Rename.
+			_ = file.Close()
+		}
+		if err != nil {
+			return err
+		}
+	case errors.Is(err, fs.ErrNotExist):
+		if err := f.missing(path); err != nil {
+			return err
+		}
+		data = make(entries)
+	default:
+		return err
 	}
+	if changed := change(data); changed || info == nil {
+		if err := writeBaseline(ctx, path, info, data); err != nil {
+			return err
+		}
+	} else if err := ctx.Err(); err != nil {
+		return err
+	}
+	f.entries = data
+	return nil
+}
+
+func readLockedBaseline(file *os.File, path string) (entries, fs.FileInfo, error) {
+	held, err := file.Stat()
+	if err != nil {
+		return nil, nil, err
+	}
+	// A previous writer may have replaced the open file before we acquired its lock.
+	named, err := os.Lstat(path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, nil, err
+	}
+	if !os.SameFile(held, named) {
+		return nil, nil, fs.ErrExist
+	}
+	data, err := decodeEntries(file, path)
+	return data, held, err
+}
+
+func writeBaseline(ctx context.Context, path string, info fs.FileInfo, data entries) error {
+	// O_EXCL and the creation mode preserve the caller's umask for a new baseline.
+	name := filepath.Join(filepath.Dir(path), ".rslint-suppressions-"+rand.Text()+".tmp")
+	stage, err := os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o666)
 	if err != nil {
 		return err
 	}
 	published := false
 	defer func() {
-		if !published { // After a successful rename the name can belong to a new writer.
+		if !published {
 			_ = stage.Close()
-			_ = os.Remove(stagePath)
+			_ = os.Remove(name)
 		}
 	}()
-
-	info, err := os.Lstat(path)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	// A dangling symlink also reports ErrNotExist during resolution.
-	if info != nil && info.Mode()&fs.ModeSymlink != 0 {
-		return fmt.Errorf("cannot resolve suppressions destination %q", path)
-	}
-	// Reload under the lock with write access. A rename alone could replace
-	// a read-only file on Unix.
-	data, err := f.read(path, os.O_RDWR)
-	if err != nil {
-		return err
-	}
-	newFile := data == nil
-	if newFile {
-		data = make(entries)
-	}
-	if !change(data) && !newFile {
-		f.entries = data
-		return ctx.Err()
-	}
 	if info != nil {
 		if err := stage.Chmod(info.Mode().Perm()); err != nil {
 			return err
@@ -219,10 +293,19 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := os.Rename(stagePath, path); err != nil {
+	if info == nil {
+		err = renameNew(name, path)
+		if errors.Is(err, fs.ErrExist) {
+			if link, statErr := os.Lstat(path); statErr == nil && link.Mode()&fs.ModeSymlink != 0 {
+				return fmt.Errorf("cannot resolve suppressions destination %q", path)
+			}
+		}
+	} else {
+		err = os.Rename(name, path)
+	}
+	if err != nil {
 		return err
 	}
 	published = true
-	f.entries = data
 	return nil
 }

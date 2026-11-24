@@ -96,7 +96,7 @@ func (files *pluginFileFailures) add(path string, failure PluginFileFailure) {
 	(*files)[path] = failure
 }
 
-// PluginFailures reports the dispatch error and, when SkippedErrorRules was
+// PluginFailures reports the dispatch error and, when IncompleteRuleResults was
 // requested, the files and error-level rules with incomplete worker results.
 // The returned map and rule slices belong to the observation and are read-only.
 func (r ObservationResult) PluginFailures() (map[string]PluginFileFailure, error) {

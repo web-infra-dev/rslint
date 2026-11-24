@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 
@@ -174,10 +175,26 @@ func TestFileKeyUsesNativeRelativePaths(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		check("C:/tree/pkg/", "c:/tree/pkg/File.js", "File.js")
 		check("C:/tree/", "d:/Shared/File.js", "d:/Shared/File.js")
+		check("C:/tree/", "D:/Shared/File.js", "d:/Shared/File.js")
 		check("//server/share/pkg/", "//SERVER/SHARE/pkg/File.js", "File.js")
 		check("//server/share/pkg/", "//server/other/File.js", "//server/other/File.js")
 		check("//server/share", "//SERVER/SHARE/File.js", "File.js")
 	}
+}
+
+func TestNormalizeDriveKeys(t *testing.T) {
+	data := entries{
+		"D:/Other.js": {"x": {Count: 1}},
+		"D:/File.js":  {"x": {Count: 2}, "y": {Count: 1}},
+		"d:/File.js":  {"x": {Count: 2}, "z": {Count: 1}},
+	}
+	assert.NilError(t, normalizeDriveKeys(data))
+	assert.DeepEqual(t, data, entries{
+		"d:/Other.js": {"x": {Count: 1}},
+		"d:/File.js":  {"x": {Count: 2}, "y": {Count: 1}, "z": {Count: 1}},
+	})
+	data["D:/File.js"] = map[string]entry{"x": {Count: 1}}
+	assert.ErrorContains(t, normalizeDriveKeys(data), `conflicting counts for rule "x"`)
 }
 
 func makeDirectoryLink(t *testing.T, destination, link string) {
@@ -193,7 +210,20 @@ func makeDirectoryLink(t *testing.T, destination, link string) {
 }
 
 func TestConcurrentUpdates(t *testing.T) {
+	const holdLock = "RSLINT_TEST_HOLD_SUPPRESSIONS_LOCK"
+	if os.Getenv(holdLock) == "1" {
+		f, err := Open(Options{Mode: Record})
+		assert.NilError(t, err)
+		assert.NilError(t, f.update(t.Context(), func(entries) bool {
+			fmt.Fprintln(os.Stdout, "locked")
+			var reply string
+			_, _ = fmt.Fscan(os.Stdin, &reply)
+			return false
+		}))
+		return
+	}
 	cwd := tempWorkingDirectory(t)
+	assert.NilError(t, os.WriteFile(DefaultFilename+".tmp", []byte("unrelated"), 0o600))
 	var writers [2]*File
 	for i := range writers {
 		f, err := Open(Options{Mode: Record})
@@ -211,19 +241,58 @@ func TestConcurrentUpdates(t *testing.T) {
 		group.Go(func() { errs[i] = write(i) })
 	}
 	group.Wait()
+	contended := func(err error) bool {
+		// Windows may report access denied while an earlier handle is closing.
+		return errors.Is(err, os.ErrExist) || runtime.GOOS == "windows" && errors.Is(err, os.ErrPermission)
+	}
 	for i, err := range errs {
-		if errors.Is(err, os.ErrExist) {
-			err = write(i) // Retry after the overlapping writer completes.
+		if contended(err) {
+			err = write(i)
 		}
 		assert.NilError(t, err)
 	}
+	if runtime.GOOS != "js" && runtime.GOOS != "wasip1" {
+		program, err := os.Executable()
+		assert.NilError(t, err)
+		holder := exec.CommandContext(t.Context(), program, "-test.run=^TestConcurrentUpdates$")
+		holder.Env = append(os.Environ(), holdLock+"=1")
+		input, err := holder.StdinPipe()
+		assert.NilError(t, err)
+		defer input.Close()
+		output, err := holder.StdoutPipe()
+		assert.NilError(t, err)
+		assert.NilError(t, holder.Start())
+		var ready string
+		_, err = fmt.Fscan(output, &ready)
+		assert.NilError(t, err)
+		assert.Equal(t, ready, "locked")
+		_, _, err = reportError(t.Context(), writers[0], name, "contended")
+		assert.Assert(t, contended(err), "contended update returned %v", err)
+		assert.ErrorContains(t, err, "retry")
+		// A separate baseline with a maximum-length basename can update while the first is locked.
+		longName := strings.Repeat("x", 250) + ".json"
+		other, err := Open(Options{Mode: Record, Location: longName})
+		assert.NilError(t, err)
+		for _, id := range []string{"first", "second"} {
+			_, _, err := reportError(t.Context(), other, name, id)
+			assert.NilError(t, err)
+		}
+		assert.NilError(t, holder.Process.Kill())
+		assert.Assert(t, holder.Wait() != nil)
+	}
+	// The kernel released the interrupted writer's lock.
+	_, _, err := reportError(t.Context(), writers[0], name, "after-crash")
+	assert.NilError(t, err)
+	leftover, err := os.ReadFile(DefaultFilename + ".tmp")
+	assert.NilError(t, err)
+	assert.Equal(t, string(leftover), "unrelated")
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, _, err := reportError(ctx, writers[0], name, "cancelled"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled write returned %v", err)
 	}
 	f, err := Open(Options{})
-	want := entries{"test.js": {"rule0": {Count: 1}, "rule1": {Count: 1}}}
+	want := entries{"test.js": {"rule0": {Count: 1}, "rule1": {Count: 1}, "after-crash": {Count: 1}}}
 	assert.NilError(t, err)
 	assert.Assert(t, f != nil)
 	assert.DeepEqual(t, f.entries, want)
@@ -271,9 +340,8 @@ func TestUpdateThroughFileSymlink(t *testing.T) {
 		t.Fatalf("write via symlink: file=%v err=%v", defaultFile, err)
 	}
 	assert.NilError(t, os.Remove(path))
-	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "y"); err == nil {
-		t.Fatal("replaced a dangling baseline link")
-	}
+	_, _, err = reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "y")
+	assert.ErrorContains(t, err, "cannot resolve suppressions destination")
 	if name, err := os.Readlink(link); err != nil || name != DefaultFilename {
 		t.Fatalf("stored symlink = %q, err=%v", name, err)
 	}
