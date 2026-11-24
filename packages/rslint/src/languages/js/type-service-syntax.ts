@@ -583,7 +583,11 @@ export class GenerationSyntaxViews {
             );
             child = list?.getChildren().find(matches);
           }
-          if (child) return this.sourceLocation(this.wrapNode(child));
+          if (child instanceof RemoteNode) return this.ref(child);
+          if (child && child.parent instanceof RemoteNode) {
+            const { kind, pos, end } = child;
+            return { ...this.ref(child.parent), token: { kind, pos, end } };
+          }
         } else if (
           token.parent &&
           (token.parent.flags & this.typescript.NodeFlags.Synthesized ||
