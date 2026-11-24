@@ -15,6 +15,7 @@ import { WeakObjectCache } from './type-service-cache.js';
 import type {
   FileBinding,
   GeneratedSyntax,
+  Operation,
   TypeServiceDescriptor,
   TypeServiceProjection,
   SyntaxSource,
@@ -381,7 +382,7 @@ function needsRealPosition(kind: SyntaxKind): boolean {
 export class GenerationSyntaxViews {
   private readonly identities = new WeakMap<object, SyntaxRef>();
   private readonly wrapped = new WeakObjectCache<string, object>();
-  private readonly generatedOrigins = new WeakMap<object, NodeRef | null>();
+  private readonly generated = new WeakSet<object>();
   private readonly syntheticRefs = new WeakMap<Node, SyntheticRef>();
   private children = new WeakMap<object, object[]>();
   private readonly activeSources = new Map<
@@ -407,7 +408,11 @@ export class GenerationSyntaxViews {
   constructor(
     private readonly typescript: Pick<
       TypeServiceCompilerData,
-      'SyntaxKind' | 'NodeFlags' | 'ScriptTarget' | 'jsDocKinds'
+      | 'SyntaxKind'
+      | 'NodeFlags'
+      | 'ScriptTarget'
+      | 'jsDocKinds'
+      | 'originalKinds'
     >,
     private readonly descriptor: TypeServiceDescriptor,
     private lookup: SyntaxSource | undefined,
@@ -445,20 +450,33 @@ export class GenerationSyntaxViews {
     this.ensure();
     const ref = this.identities.get(node);
     if (!ref) {
-      if (this.generatedOrigins.has(node)) return undefined;
+      if (
+        this.generated.has(node) ||
+        (node as ts.Node).flags & this.typescript.NodeFlags.Synthesized
+      )
+        return undefined;
       throw new Error('foreign compiler node handle');
     }
     if (!('owner' in ref)) return ref;
     const { kind, pos, end } = this.rawSyntax(ref);
     return { ...ref.owner, token: { kind, pos, end } };
   }
-  parseTreeLocation(node: object): NodeRef | undefined {
-    return (
-      this.sourceLocation(node) ?? this.generatedOrigins.get(node) ?? undefined
-    );
+  parseTreeLocation(node: object, op?: Operation): NodeRef | undefined {
+    const ref = this.sourceLocation(node);
+    if (ref) return ref;
+    let original: ts.Node | undefined = Reflect.get(node, 'original');
+    while (original) {
+      const source = this.sourceLocation(original);
+      if (source) {
+        const kinds = op && this.typescript.originalKinds[op];
+        return !kinds || kinds.includes(original.kind) ? source : undefined;
+      }
+      original = Reflect.get(original, 'original');
+    }
+    return undefined;
   }
-  location(node: object): NodeRef {
-    const ref = this.parseTreeLocation(node);
+  location(node: object, op?: Operation): NodeRef {
+    const ref = this.parseTreeLocation(node, op);
     if (!ref) throw new Error('generated compiler node has no source location');
     return ref;
   }
@@ -1137,7 +1155,7 @@ export class GenerationSyntaxViews {
         this.ensure,
         this.typescript.jsDocKinds,
       );
-      this.generatedOrigins.set(proxy, original ?? null);
+      this.generated.add(proxy);
       views.set(value, proxy);
       return proxy;
     };

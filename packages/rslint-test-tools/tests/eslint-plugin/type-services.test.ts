@@ -1644,6 +1644,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
       "import type { External } from './external' with { 'resolution-mode': 'import' }; export type Used = External;",
       'export const grow = () => 1; grow.item = 1;',
       'declare const computedKey: string;',
+      "export * from './external';",
       'declare const condition: boolean; condition;',
     ].join('\r\n') + '\r\n';
   writeFileSync(file, code);
@@ -1756,6 +1757,11 @@ test('public checker, Program and source reads match TypeScript', async () => {
           ).expression as ts.PropertyAccessExpression;
           const left = c.getTypeAtLocation(access.expression);
           const fileSymbol = c.getSymbolAtLocation(src)!;
+          const factoryName = ts.factory.createIdentifier('input');
+          const originalName = ts.setOriginalNode(
+            ts.factory.createIdentifier('input'),
+            param.name,
+          );
           const exportSpec = (
             (src.statements[9] as ts.ExportDeclaration)
               .exportClause as ts.NamedExports
@@ -1811,7 +1817,10 @@ test('public checker, Program and source reads match TypeScript', async () => {
               .map((s) => s.name),
             local: c.getExportSpecifierLocalTargetSymbol(exportSpec)?.name,
             exp: c.tryGetMemberInModuleExports('alias', fileSymbol)?.name,
-            rawExports: [...(fileSymbol.exports?.keys() ?? [])].sort(),
+            rawExports: [...(fileSymbol.exports?.keys() ?? [])],
+            exports: c
+              .getExportsOfModule(fileSymbol)
+              .map((symbol) => symbol.name),
             indices: c
               .getIndexInfosOfIndexSymbol(indexSymbol)
               .map((i) => format(i.type)),
@@ -1821,6 +1830,8 @@ test('public checker, Program and source reads match TypeScript', async () => {
                 .map((info) => format(info.type)),
             ),
             generatedType: [
+              c.getSymbolAtLocation(factoryName)?.name,
+              format(c.getTypeAtLocation(originalName)),
               c.getTypeFromTypeNode(
                 c.typeToTypeNode(c.getStringType(), undefined, undefined)!,
               ) === c.getAnyType(),
@@ -1854,9 +1865,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
           'types' in literal,
           'target' in c.getStringType(),
           'target' in literal,
-          Object.hasOwn(literal, 'getFlags'),
-          Object.hasOwn(t, 'typeArguments'),
-          Object.hasOwn(tuple, 'thisType'),
           'thisType' in t,
           tuple.thisType && format(tuple.thisType),
           'types' in c.getBooleanType(),

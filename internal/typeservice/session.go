@@ -700,6 +700,7 @@ func (s *Session) namedSymbols(symbols []*ast.Symbol) NamedSymbols {
 	}
 	return result
 }
+
 func (s *Session) indexInfo(info *checker.IndexInfo) IndexInfo {
 	if s.indexInfoIDs == nil {
 		s.indexInfoIDs = make(map[*checker.IndexInfo]uint32)
@@ -751,8 +752,14 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "fromTypeNode":
 			return Handle(s.typeID(c.GetTypeFromTypeNode(native))), nil
 		case "context":
+			if !ast.IsExpression(native) {
+				return Handle(0), nil
+			}
 			return Handle(s.typeID(c.GetContextualType(native, checker.ContextFlagsNone))), nil
 		case "symbol":
+			if native.Kind == ast.KindSourceFile && !ast.IsExternalModule(native.AsSourceFile()) {
+				return Handle(0), nil
+			}
 			return Handle(s.symbolID(c.GetSymbolAtLocation(native))), nil
 		case "signature":
 			if native.Kind == ast.KindJSDocSignature {
@@ -852,6 +859,9 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		builder := checker.NewNodeBuilder(c, printer.NewEmitContext())
 		return encodeGeneratedNode(builder.IndexInfoToIndexSignatureDeclaration(&info, native, nodebuilder.Flags(r.Flags), nodebuilder.InternalFlagsNone, nil), builder, native)
 	case *ContextualArgumentRequest:
+		if !ast.IsCallLikeExpression(native) {
+			return Handle(0), nil
+		}
 		return Handle(s.typeID(c.GetContextualTypeForArgumentAtIndex(native, r.Index))), nil
 	case *ResolvedSignatureRequest:
 		ids := Handles{0}
@@ -1096,7 +1106,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "isUnknownSymbol":
 			return Boolean(c.IsUnknownSymbol(s.symbolByID(r.ID))), nil
 		case "exportsOfModule":
-			return s.namedSymbols(c.GetExportsOfModule(s.symbolByID(r.ID))), nil
+			return s.namedSymbols(moduleExports(c, s.symbolByID(r.ID))), nil
 		case "fullyQualifiedName":
 			return Text(c.GetFullyQualifiedName(s.symbolByID(r.ID))), nil
 		case "symbolLinkType":
@@ -1111,7 +1121,11 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				table = globalExports(symbol)
 			}
 			members := slices.Collect(maps.Values(table))
-			checker.Checker_sortSymbols(c, members)
+			if r.Op == "symbolExports" {
+				symbolOrder(nil).sort(c, members)
+			} else {
+				checker.Checker_sortSymbols(c, members)
+			}
 			result := make(NamedSymbols, len(members))
 			for i, member := range members {
 				result[i] = NamedSymbol{ID: s.symbolID(member), Name: ast.EscapeSymbolName(member.Name)}
@@ -1206,7 +1220,9 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "falseType":
 			return Handle(s.typeID(checker.Checker_regularFalseType(c))), nil
 		case "ambientModules":
-			return s.namedSymbols(c.GetAmbientModules()), nil
+			modules := slices.Clone(c.GetAmbientModules())
+			checker.Checker_sortSymbols(c, modules)
+			return s.namedSymbols(modules), nil
 		}
 	case *VoidRequest:
 		return Handle(s.typeID(c.GetVoidType())), nil

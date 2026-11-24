@@ -1,4 +1,5 @@
 import type * as TypeScript from 'typescript';
+import type { Operation } from './type-service-protocol.js';
 
 /** Build-time data shared by the worker and the parser-services tests. */
 export function typeServiceCompilerData(ts: typeof TypeScript) {
@@ -15,6 +16,44 @@ export function typeServiceCompilerData(ts: typeof TypeScript) {
   jsDocKinds.ModuleBlock = jsDocKinds.MissingDeclaration = true;
   delete jsDocKinds.EndOfFileToken;
   delete jsDocKinds.SemicolonClassElement;
+  // These checker APIs pass a node predicate to TypeScript's getParseTreeNode.
+  const kinds = [...new Set(Object.values(ts.SyntaxKind))].filter(
+    (kind): kind is TypeScript.SyntaxKind => typeof kind === 'number',
+  );
+  const matching = (name: 'isTypeNodeKind' | 'isFunctionLikeKind') => {
+    const test: (kind: TypeScript.SyntaxKind) => boolean = Reflect.get(
+      ts,
+      name,
+    );
+    return kinds.filter(test);
+  };
+  const k = ts.SyntaxKind;
+  const functions = matching('isFunctionLikeKind');
+  const originalKinds: Partial<
+    Record<Operation, readonly TypeScript.SyntaxKind[]>
+  > = {
+    fromTypeNode: matching('isTypeNodeKind'),
+    signature: functions,
+    isImplementationOfOverload: functions,
+    typeOfAssignmentPattern: [
+      k.ArrayLiteralExpression,
+      k.ObjectLiteralExpression,
+    ],
+    exportSpecifierLocalTargetSymbol: [k.ExportSpecifier],
+    propertySymbolOfDestructuringAssignment: [k.Identifier],
+    isOptionalParameter: [k.Parameter],
+    parameterPropertySymbols: [k.Parameter],
+    constantValue: [
+      k.EnumMember,
+      k.PropertyAccessExpression,
+      k.ElementAccessExpression,
+    ],
+    validPropertyAccess: [
+      k.PropertyAccessExpression,
+      k.QualifiedName,
+      k.ImportType,
+    ],
+  };
   return {
     SyntaxKind: ts.SyntaxKind,
     TypeFlags: ts.TypeFlags,
@@ -25,6 +64,7 @@ export function typeServiceCompilerData(ts: typeof TypeScript) {
     ModuleDetectionKind: ts.ModuleDetectionKind,
     ScriptTarget: ts.ScriptTarget,
     jsDocKinds,
+    originalKinds,
   } as const;
 }
 

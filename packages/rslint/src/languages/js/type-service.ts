@@ -16,6 +16,7 @@ import {
   nameToUnits,
   type FileBinding,
   type NodeRef,
+  type Operation,
   type TypeServiceDescriptor,
   type TypeServiceProjection,
   type QueryTransport,
@@ -741,8 +742,12 @@ export class TypeServiceClient {
       options.maxSyntaxFactsBytes ?? 1 << 20,
     );
     const errorType = () => this.query({ op: 'errorType', args: {} });
-    const atParseTreeNode = <T>(n: object, read: (node: NodeRef) => T) => {
-      const node = this.syntax.parseTreeLocation(n);
+    const atParseTreeNode = <T>(
+      op: Operation,
+      n: object,
+      read: (node: NodeRef) => T,
+    ) => {
+      const node = this.syntax.parseTreeLocation(n, op);
       return node && read(node);
     };
     const nodeHandle = (
@@ -758,7 +763,7 @@ export class TypeServiceClient {
         | 'shorthandValueSymbol',
       n: object,
     ) => {
-      const node = this.syntax.parseTreeLocation(n);
+      const node = this.syntax.parseTreeLocation(n, op);
       if (node) return this.query({ op, args: { node } });
       // TypeScript's checker looks for an original parse-tree node on generated syntax.
       return op === 'type' ||
@@ -858,15 +863,15 @@ export class TypeServiceClient {
         getTypeOfAssignmentPattern: (n) =>
           this.type(nodeHandle('typeOfAssignmentPattern', n)),
         isOptionalParameter: (n) =>
-          atParseTreeNode(n, (node) =>
+          atParseTreeNode('isOptionalParameter', n, (node) =>
             this.query({ op: 'isOptionalParameter', args: { node } }),
           ) ?? false,
         getConstantValue: (n) =>
-          atParseTreeNode(n, (node) =>
+          atParseTreeNode('constantValue', n, (node) =>
             this.query({ op: 'constantValue', args: { node } }),
           ),
         isImplementationOfOverload: (n) =>
-          atParseTreeNode(n, (node) =>
+          atParseTreeNode('isImplementationOfOverload', n, (node) =>
             this.query({ op: 'isImplementationOfOverload', args: { node } }),
           ),
         getTypeArgumentsForResolvedSignature: (s) => {
@@ -909,7 +914,7 @@ export class TypeServiceClient {
             }),
           )!,
         getPrivateIdentifierPropertyOfType: (t, name, location) =>
-          atParseTreeNode(location, (node) =>
+          atParseTreeNode('privateIdentifierProperty', location, (node) =>
             this.symbol(
               this.query({
                 op: 'privateIdentifierProperty',
@@ -928,7 +933,7 @@ export class TypeServiceClient {
             }),
           ),
         isValidPropertyAccess: (n, name) =>
-          atParseTreeNode(n, (node) =>
+          atParseTreeNode('validPropertyAccess', n, (node) =>
             this.query({
               op: 'validPropertyAccess',
               args: { node, name: nameToUnits(name) },
@@ -938,7 +943,10 @@ export class TypeServiceClient {
           this.symbolsFor(
             this.query({
               op: 'parameterPropertySymbols',
-              args: { node: this.syntax.location(n), name: nameToUnits(name) },
+              args: {
+                node: this.syntax.location(n, 'parameterPropertySymbols'),
+                name: nameToUnits(name),
+              },
             }),
           ),
         getSymbolOfExpando: (n, allowDeclaration) => {
@@ -1087,7 +1095,7 @@ export class TypeServiceClient {
         getTypeFromTypeNode: (n) => this.type(nodeHandle('fromTypeNode', n)),
         getContextualType: (n) => this.type(nodeHandle('context', n)),
         getContextualTypeForArgumentAtIndex: (n, index) =>
-          atParseTreeNode(n, (node) =>
+          atParseTreeNode('contextualArgument', n, (node) =>
             this.type(
               this.query({ op: 'contextualArgument', args: { node, index } }),
             ),
