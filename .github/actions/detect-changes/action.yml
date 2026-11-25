@@ -36,7 +36,6 @@ runs:
             - '!**/_meta.json'
             - '!**/dictionary.txt'
             - '!.agents/skills/**'
-            - '!skills-lock.json'
           go:
             - '!{website,scripts,npm,crates,packages,.agents,.rstack,.vscode,tests}/**'
     - name: Classify Go changes
@@ -63,7 +62,7 @@ runs:
           while IFS= read -r file; do
             if [[ ! "$file" =~ ^(cmd|internal)/ ]]; then
               case "$file" in
-                *.md|*.mdx|_meta.json|*/_meta.json|dictionary.txt|*/dictionary.txt|skills-lock.json) continue ;;
+                *.md|*.mdx|_meta.json|*/_meta.json|dictionary.txt|*/dictionary.txt) continue ;;
               esac
               echo "Full Go tests required by: $file"
               mode=full

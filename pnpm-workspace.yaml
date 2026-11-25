@@ -6,6 +6,19 @@ packages:
   - 'npm/tsgo/*'
   - 'website'
 
+permissions:
+  '@rstackjs/maintainer-skills':
+    skills:
+      - create-draft-release-notes
+      - pr-creator
+      - rstack-docs-writer
+  '@rstackjs/skills':
+    skills:
+      - rspress-description-generator
+  rstack:
+    skills:
+      - rstack-cli-docs
+
 allowBuilds:
   '@tailwindcss/oxide': false
   core-js: false
@@ -41,7 +54,7 @@ catalog:
   '@codspeed/tinybench-plugin': ^5.7.1
   tinybench: ^6.2.3
   ajv: ^6.15.0
-  rstack: ^0.9.1
+  rstack: ^0.9.4
   zx: ^8.8.5
   '@types/node': ^26.6.6
   '@types/react': ^19.2.17
@@ -56,6 +69,8 @@ catalog:
   '@rsbuild/plugin-node-polyfill': ^1.4.6
   '@rsbuild/plugin-sass': ^1.5.3
   '@rspress/core': '2.1.2'
+  '@rstackjs/maintainer-skills': ^1.0.0
+  '@rstackjs/skills': ^1.0.0
   '@rstackjs/doc-ui': 1.14.12
   '@tailwindcss/postcss': ^4.3.5
   '@types/dagre': ^0.7.54

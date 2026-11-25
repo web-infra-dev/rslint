@@ -39,6 +39,8 @@
     "@microsoft/api-extractor": "catalog:",
     "@rslint/core": "workspace:*",
     "@rspress/core": "catalog:",
+    "@rstackjs/maintainer-skills": "catalog:",
+    "@rstackjs/skills": "catalog:",
     "@types/react": "catalog:",
     "@typescript/native-preview": "catalog:",
     "ajv": "catalog:",
