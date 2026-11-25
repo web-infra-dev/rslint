@@ -1548,7 +1548,11 @@ func (conditionTypes *conditionTypeChecker) getCapturedReadType(node *ast.Node) 
 				// Iterable destructuring reads the iterator, not an indexed getter.
 				// An Object.assign intersection can hide a replacement iterator's
 				// nullable yield type, just as it can hide a getter's read type.
-				var iteratedTypes []*checker.Type
+				// Preserve the native binding contract, including tuple positions
+				// and possibly exhausted iterators. Intersection members describe
+				// possible iterators; they do not prove that Object.assign copied
+				// an own enumerable method over the target's iterator.
+				iteratedTypes := []*checker.Type{checker.Checker_getTypeOfSymbol(tc, symbol)}
 				for _, variant := range utils.UnionTypeParts(parentType) {
 					parts := utils.IntersectionTypeParts(variant)
 					custom := slices.ContainsFunc(parts, hasCustomIterator)
@@ -1571,18 +1575,10 @@ func (conditionTypes *conditionTypeChecker) getCapturedReadType(node *ast.Node) 
 		if readType == originalType {
 			return nil
 		}
-		for parent := declaration.Parent.Parent; ast.IsBindingElement(parent); parent = parent.Parent.Parent {
-			if parent.Initializer() != nil {
-				parentRead := getBindingReadReference(tc, parent)
-				if parentRead != nil && checker.Checker_getTypeWithFacts(tc, conditionTypes.getConditionType(parentRead, nil), checker.TypeFactsEQUndefined).Flags()&checker.TypeFlagsNever != 0 {
-					continue
-				}
-				// The synthetic access omits enclosing defaults. Keep the
-				// checker's binding contract, which includes those alternatives.
-				readType = tc.GetUnionType([]*checker.Type{readType, checker.Checker_getTypeOfSymbol(tc, symbol)})
-				break
-			}
-		}
+		// A corrected read can widen the native binding type, but must not
+		// discard its enclosing defaults or other alternatives. Even a default
+		// proven unreachable here can remain part of the TypeScript contract.
+		readType = tc.GetUnionType([]*checker.Type{readType, checker.Checker_getTypeOfSymbol(tc, symbol)})
 		if declaration.Initializer() != nil &&
 			checker.Checker_getTypeWithFacts(tc, readType, checker.TypeFactsEQUndefined).Flags()&checker.TypeFlagsNever == 0 {
 			readType = tc.GetUnionType([]*checker.Type{

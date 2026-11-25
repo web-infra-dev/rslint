@@ -31,7 +31,12 @@ func executionRoot(node *ast.Node) *ast.Node {
 		case ast.KindSourceFile, ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
 			return node
 		}
-		node = node.Parent
+		if node.Parent == nil {
+			return nil
+		}
+		// Computed method names and decorator expressions execute outside
+		// the method. Reuse the AST helper's container rules for those paths.
+		node = ast.GetThisContainer(node, true, false)
 	}
 	return nil
 }

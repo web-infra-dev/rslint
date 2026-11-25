@@ -144,6 +144,8 @@ const (
 	staticReferenceCallReceiver
 	// Deletions and prototype/computed writes can invalidate data properties.
 	staticReferencePropertyShapeMutation
+	// Assigning an array's length can delete its indexed data properties.
+	staticReferenceArrayLengthMutation
 )
 
 // objectPassThroughMethods are the `Object` methods that return their argument
@@ -1938,7 +1940,7 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 
 // HasPropertyShapeMutation conservatively detects changes that can invalidate
 // a data-property assumption, including unknown calls through aliases. Ordinary
-// writes to a known property name are allowed. The caller may exclude specific
+// writes to a known property name are allowed, except array truncation. The caller may exclude specific
 // calls whose writes it has already accounted for. With a proven fresh origin
 // and an access, later calls in the same invocation and harmless built-ins do
 // not invalidate this read. Call-escape tracking is required.
@@ -1969,9 +1971,15 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 			}
 		}
 	}
-	for site := range staticEvaluator.escapeFacts.sites[symbol] {
+	for site, flags := range staticEvaluator.escapeFacts.sites[symbol] {
+		if flags&staticReferenceArrayLengthMutation != 0 && origin != nil && access != nil {
+			key, known := staticEvaluator.evalAccessExpressionKey(access)
+			if !ast.IsArrayLiteralExpression(origin) || known && !isArrayIndexProperty(key) {
+				continue
+			}
+		}
 		if accountedCalls[site] || origin != nil && access != nil &&
-			(propertyCallFollowsRead(site, origin, access) || staticEvaluator.callPreservesPropertyShape(site, origin, access, symbol)) {
+			(propertyMutationFollowsRead(site, origin, access) || staticEvaluator.callPreservesPropertyShape(site, origin, access, symbol)) {
 			continue
 		}
 		return true
@@ -1979,18 +1987,18 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 	return false
 }
 
-func propertyCallFollowsRead(call, origin, access *ast.Node) bool {
+func propertyMutationFollowsRead(mutation, origin, access *ast.Node) bool {
 	root := executionRoot(access)
-	// Invocation follows argument evaluation, including an enclosing call
-	// which consumes this read. Other argument calls are checked separately.
-	if root == nil || executionRoot(origin.Parent) != root || executionRoot(call) != root || call.End() <= access.End() {
+	// Invocation and assignment follow argument and right-hand-side evaluation,
+	// including an enclosing operation which consumes this read.
+	if root == nil || executionRoot(origin.Parent) != root || executionRoot(mutation) != root || mutation.End() <= access.End() {
 		return false
 	}
 	if access.Parent != nil && ast.IsBindingElement(access.Parent) {
 		declaration := ast.GetRootDeclaration(access.Parent)
 		if ast.IsVariableDeclaration(declaration) && declaration.Initializer() != nil {
 			initializer := declaration.Initializer()
-			if initializer.Pos() <= call.Pos() && call.End() <= initializer.End() {
+			if initializer.Pos() <= mutation.Pos() && mutation.End() <= initializer.End() {
 				// Synthetic destructuring reads carry the binding's location,
 				// but its initializer executes before any binding is read.
 				return false
@@ -2008,12 +2016,15 @@ func propertyCallFollowsRead(call, origin, access *ast.Node) bool {
 			// declaration and possibly after later statements in this function.
 			return false
 		}
-		if ast.IsClassLike(parent) && ast.IsNodeDescendantOf(call, parent) {
-			// Computed names are evaluated before static field initializers.
+	}
+	for child := mutation; child.Parent != nil && child.Parent != root; child = child.Parent {
+		if (ast.IsComputedPropertyName(child) || ast.IsDecorator(child)) &&
+			ast.IsClassElement(child.Parent) && ast.IsClassLike(child.Parent.Parent) &&
+			ast.IsNodeDescendantOf(access, child.Parent.Parent) {
+			// Computed names and decorator expressions run before static
+			// initializers. Static fields and blocks themselves run in order.
 			return false
 		}
-	}
-	for child := call; child.Parent != nil && child.Parent != root; child = child.Parent {
 		if ast.IsCaseClause(child.Parent) && child.Parent.Expression() == child &&
 			ast.IsNodeDescendantOf(access, child.Parent.Parent) {
 			// A later case selector can execute before an earlier default body.
@@ -2081,14 +2092,8 @@ func (staticEvaluator *StaticStringEvaluator) callPreservesPropertyShape(call, o
 		if !known || key == definedKey || ast.IsArrayLiteralExpression(origin) && definedKey == "push" {
 			return false
 		}
-		if ast.IsArrayLiteralExpression(origin) && definedKey == "length" {
-			number, known := ecmascript.StringToNumber(key)
-			index := ecmascript.NumberToUint32(number)
-			if known && index != math.MaxUint32 && ecmascript.NumberToString(float64(index)) == key {
-				// ArraySetLength deletes indexed elements when it truncates.
-				// Its uint32 boundary is independent of the host's int width.
-				return false
-			}
+		if ast.IsArrayLiteralExpression(origin) && definedKey == "length" && isArrayIndexProperty(key) {
+			return false
 		}
 		// ToPropertyDescriptor can invoke getters, including inherited ones.
 		// Only an independently folded plain data descriptor is harmless.
@@ -2097,6 +2102,14 @@ func (staticEvaluator *StaticStringEvaluator) callPreservesPropertyShape(call, o
 		return descriptor.ok && ok && (!object.prototypeSet || object.prototype == nil)
 	}
 	return false
+}
+
+// ArraySetLength deletes indexed elements when it truncates. Its uint32
+// boundary is independent of the host's int width.
+func isArrayIndexProperty(key string) bool {
+	number, known := ecmascript.StringToNumber(key)
+	index := ecmascript.NumberToUint32(number)
+	return known && index != math.MaxUint32 && ecmascript.NumberToString(float64(index)) == key
 }
 
 // The caller establishes a non-Proxy target and an unchanged built-in.
@@ -2236,6 +2249,7 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		defer func() { staticEvaluator.escapeFacts.collecting = false }()
 	}
 	var mutationCandidates []staticMutationCandidate
+	var lengthWrites []staticMutationCandidate
 	var calls []*ast.Node
 
 	var visit func(node *ast.Node)
@@ -2279,6 +2293,9 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 					name, known := AccessExpressionStaticName(node)
 					if !known || name == "__proto__" || outer.Parent.Kind == ast.KindDeleteExpression {
 						flags |= staticReferencePropertyShapeMutation
+					}
+					if known && name == "length" {
+						lengthWrites = append(lengthWrites, staticMutationCandidate{call: outer.Parent, access: node})
 					}
 				}
 				staticEvaluator.markReference(AccessExpressionObject(node), flags)
@@ -2324,6 +2341,14 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		staticEvaluator.escapeFacts.call = call
 		staticEvaluator.markedReferences = nil
 		staticEvaluator.markCallEscapes(call)
+	}
+	// Reuse the completed alias/store graph and per-mutation sites. Length
+	// writes affect indexed reads, without invalidating unrelated named fields
+	// or values captured before the truncation.
+	for _, write := range lengthWrites {
+		staticEvaluator.escapeFacts.call = write.call
+		staticEvaluator.markedReferences = nil
+		staticEvaluator.markReference(AccessExpressionObject(write.access), staticReferencePropertyMutation|staticReferenceArrayLengthMutation)
 	}
 	if staticEvaluator.escapeFacts != nil {
 		staticEvaluator.escapeFacts.call = nil
@@ -2417,8 +2442,8 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 				if facts.sites[symbol] == nil {
 					facts.sites[symbol] = make(map[*ast.Node]staticReferenceFlags)
 				}
-				// Each call must reach the entire alias chain, even if a prior
-				// call already marked the same symbols as mutable.
+				// Each mutation must reach the entire alias chain, even if a
+				// prior mutation already marked the same symbols as mutable.
 				if facts.sites[symbol][facts.call]&flag == flag {
 					return
 				}
@@ -2435,8 +2460,11 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			staticEvaluator.invalidateMutationValues()
 		}
 		latestBinding := staticEvaluator.latestBindingTransfer(symbol)
-		if flag&staticReferenceCallEscape != 0 {
+		if flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
 			for _, transfer := range staticEvaluator.storedReferences[symbol] {
+				if flag&staticReferenceCallEscape == 0 && !transfer.binding && flag&staticReferenceNestedMutation == 0 {
+					continue
+				}
 				if !staticEvaluator.transferAvailable(transfer) || transfer.binding && latestBinding != nil && transfer.site.End() < latestBinding.End() {
 					continue
 				}
@@ -2447,7 +2475,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 				}
 			}
 		}
-		if latestBinding != nil && flag&staticReferenceCallEscape != 0 {
+		if latestBinding != nil && flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
 			return
 		}
 		if flag&staticReferencePropertyMutation == 0 || len(symbol.Declarations) != 1 {
@@ -2476,7 +2504,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			declaration = root
 		}
 		if declaration.Kind != ast.KindVariableDeclaration {
-			if flag&staticReferenceCallEscape != 0 {
+			if flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
 				staticEvaluator.markReturnedReferences(declaration, flag)
 			}
 			return
@@ -2520,7 +2548,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 				case ast.KindSpreadAssignment:
 					staticEvaluator.markCopiedReferences(property.Expression(), flag)
 				case ast.KindMethodDeclaration, ast.KindGetAccessor:
-					if flag&staticReferenceCallEscape != 0 {
+					if flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
 						staticEvaluator.markReturnedReferences(property, flag)
 					}
 				}
@@ -2583,7 +2611,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			staticEvaluator.markReference(node.Expression(), flag)
 		}
 	case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindClassExpression:
-		if flag&staticReferenceCallEscape != 0 {
+		if flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
 			staticEvaluator.markReturnedReferences(node, flag)
 		}
 	}

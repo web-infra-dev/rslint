@@ -108,8 +108,13 @@ argument, including explicitly typed locals and destructuring defaults. Named
 and computed bindings, including nested patterns and direct call results, use
 the same read contracts. Calls in a destructuring initializer precede those reads.
 Enclosing defaults remain possible: in `const {box: {item} = fallback} = copy`,
-`item` can come from `fallback` when the getter returns `undefined`. Array bindings
-also preserve custom iterator result types.
+`item` can come from `fallback` when the getter returns `undefined`. Corrected
+reads preserve the native binding type, including defaults and tuple positions.
+Array bindings also preserve custom iterator result types and, with
+`noUncheckedIndexedAccess`, the possibility that an iterator is exhausted. For
+example, `const [item] = new Set<Item>()` retains the guard in `item?.id` under
+that option. An iterator declared on a source's prototype does not prove that
+`Object.assign` copied it over the target's iterator.
 Ordinary fields on a captured object retain their own control-flow narrowing and explicitly
 declared field types, so a wider mutable field can still become `undefined`.
 Fresh objects, arrays, and functions retain ordinary data-copy narrowing when no descriptor
@@ -121,10 +126,13 @@ Read-only operations such as `Object.keys` and `Object.hasOwn` preserve ordinary
 data reads; property-key coercions that can run user code remain conservative.
 Calls after a read of a fresh local do not invalidate that read. Class instance
 fields read during construction, and `switch` selectors run before the selected
-body. Loops and objects shared across function invocations remain conservative.
+body. Class computed names and decorator expressions run before static
+initializers; static fields and blocks themselves run in source order. Loops
+and objects shared across function invocations remain conservative.
 An unchanged array `push` method also preserves unrelated named properties.
-Defining an array's `length` can delete indexed elements, so those reads retain
-their guards after a possible truncation.
+Assigning or defining an array's `length` can delete indexed elements, so those
+reads retain their guards after a possible truncation, including through aliases.
+Named properties and values captured before the truncation retain their types.
 Initializer types never narrow a getter's public read type, and an annotation on
 the copy cannot erase the target getter's or index signature's actual read type. This also covers values
 supplied by later spreads or descriptor changes. Calls resolve the applicable

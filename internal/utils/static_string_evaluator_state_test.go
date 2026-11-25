@@ -104,40 +104,54 @@ func TestStaticPropertyShapeMutations(t *testing.T) {
 
 func TestStaticPropertyReadShapeMutations(t *testing.T) {
 	for _, test := range []struct {
-		name, before, after string
-		changed             bool
+		name, before, after, read string
+		changed                   bool
 	}{
-		{"plain", "", "", false},
-		{"keys", "Object.keys(copy);", "", false},
-		{"keys alias", "const keys = Object.keys; keys(copy);", "", false},
-		{"repeated keys alias", "const keys = Object.keys; keys(copy); keys(copy);", "", false},
-		{"own property check", "Object.hasOwn(copy, 'value');", "", false},
-		{"own property check alias", "const own = Object.hasOwn; own(copy, 'value');", "", false},
-		{"own property descriptor", "Object.getOwnPropertyDescriptor(copy, 'value');", "", false},
-		{"primitive property key", "const key: string = String(Math.random()); Object.hasOwn(copy, key);", "", false},
-		{"property key coercion", "const key = {toString() { unknown(copy); return 'value'; }}; Object.hasOwn(copy, key as unknown as string);", "", true},
-		{"empty copy", "Object.assign(copy, {});", "", false},
-		{"other descriptor", "Object.defineProperty(copy, 'tag', {value: 2});", "", false},
-		{"descriptor getter", "Object.defineProperty(copy, 'tag', {get value() { unknown(copy); return 2; }});", "", true},
-		{"earlier descriptor", "Object.defineProperty(copy, 'value', {value: undefined});", "", true},
-		{"later descriptor", "", "Object.defineProperty(copy, 'value', {value: undefined});", false},
-		{"earlier escape", "unknown(copy);", "", true},
-		{"later escape", "", "unknown(copy);", false},
-		{"closure", "function mutate() { unknown(copy); } mutate();", "", true},
-		{"loop", "for (let i = 0; i < 2; i++) {", "unknown(copy); }", true},
-		{"array push", "copy.push(1);", "", false},
-		{"array method write", "target.push = () => 0; copy.push(1);", "", true},
-		{"array method descriptor", "Object.defineProperty(target, 'push', {value: () => 0}); copy.push(1);", "", true},
-		{"changed builtin", "Object.keys = () => []; Object.keys(copy);", "", true},
-		{"builtin descriptor", "Object.defineProperty(Object, 'keys', {value: () => []}); Object.keys(copy);", "", true},
-		{"object prototype", "Object.defineProperty(Object.prototype, 'value', {get: () => undefined});", "", true},
-		{"array prototype", "Object.defineProperty(Array.prototype, 'value', {get: () => undefined});", "", true},
-		{"constructor tag", "(function tag(...values: unknown[]) {})`value ${Object}`;", "", true},
+		{"plain", "", "", "copy.value", false},
+		{"keys", "Object.keys(copy);", "", "copy.value", false},
+		{"keys alias", "const keys = Object.keys; keys(copy);", "", "copy.value", false},
+		{"repeated keys alias", "const keys = Object.keys; keys(copy); keys(copy);", "", "copy.value", false},
+		{"own property check", "Object.hasOwn(copy, 'value');", "", "copy.value", false},
+		{"own property check alias", "const own = Object.hasOwn; own(copy, 'value');", "", "copy.value", false},
+		{"own property descriptor", "Object.getOwnPropertyDescriptor(copy, 'value');", "", "copy.value", false},
+		{"primitive property key", "const key: string = String(Math.random()); Object.hasOwn(copy, key);", "", "copy.value", false},
+		{"property key coercion", "const key = {toString() { unknown(copy); return 'value'; }}; Object.hasOwn(copy, key as unknown as string);", "", "copy.value", true},
+		{"empty copy", "Object.assign(copy, {});", "", "copy.value", false},
+		{"other descriptor", "Object.defineProperty(copy, 'tag', {value: 2});", "", "copy.value", false},
+		{"descriptor getter", "Object.defineProperty(copy, 'tag', {get value() { unknown(copy); return 2; }});", "", "copy.value", true},
+		{"earlier descriptor", "Object.defineProperty(copy, 'value', {value: undefined});", "", "copy.value", true},
+		{"later descriptor", "", "Object.defineProperty(copy, 'value', {value: undefined});", "copy.value", false},
+		{"earlier escape", "unknown(copy);", "", "copy.value", true},
+		{"later escape", "", "unknown(copy);", "copy.value", false},
+		{"closure", "function mutate() { unknown(copy); } mutate();", "", "copy.value", true},
+		{"loop", "for (let i = 0; i < 2; i++) {", "unknown(copy); }", "copy.value", true},
+		{"array push", "copy.push(1);", "", "copy.value", false},
+		{"array method write", "target.push = () => 0; copy.push(1);", "", "copy.value", true},
+		{"array method descriptor", "Object.defineProperty(target, 'push', {value: () => 0}); copy.push(1);", "", "copy.value", true},
+		{"changed builtin", "Object.keys = () => []; Object.keys(copy);", "", "copy.value", true},
+		{"builtin descriptor", "Object.defineProperty(Object, 'keys', {value: () => []}); Object.keys(copy);", "", "copy.value", true},
+		{"object prototype", "Object.defineProperty(Object.prototype, 'value', {get: () => undefined});", "", "copy.value", true},
+		{"array prototype", "Object.defineProperty(Array.prototype, 'value', {get: () => undefined});", "", "copy.value", true},
+		{"constructor tag", "(function tag(...values: unknown[]) {})`value ${Object}`;", "", "copy.value", true},
+		{"length write", "copy.length = 0;", "", "copy[0]", true},
+		{"length alias", "const alias = copy; alias.length = 0;", "", "copy[0]", true},
+		{"length reassigned alias", "let alias: number[] = []; alias = copy; alias.length = 0;", "", "copy[0]", true},
+		{"length stored alias", "const holder = {items: [] as number[]}; holder.items = copy; holder.items.length = 0;", "", "copy[0]", true},
+		{"length copied alias", "const holder = {items: [] as number[]}; Object.assign(holder, {items: copy}); holder.items.length = 0;", "", "copy[0]", true},
+		{"length getter alias", "const holder = {get items() { return copy; }}; holder.items.length = 0;", "", "copy[0]", true},
+		{"length descriptor alias", "const holder = {items: [] as number[]}; Object.defineProperty(holder, 'items', {get() { return copy; }}); holder.items.length = 0;", "", "copy[0]", true},
+		{"later length write", "", "copy.length = 0;", "copy[0]", false},
+		{"length write keeps named properties", "copy.length = 0;", "", "copy.value", false},
+		{"length write keeps length", "copy.length = 0;", "", "copy.length", false},
+		{"length write keeps non-index", "copy.length = 0;", "", "copy['4294967295']", false},
+		{"length write removes large index", "copy.length = 0;", "", "copy['4294967294']", true},
+		{"length write in earlier static block", "class C {static {copy.length = 0;} static {", "}}", "copy[0]", true},
+		{"length write in later static block", "class C {static {", "} static {copy.length = 0;}}", "copy[0]", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := fixtures.GetRootDir()
 			file := tspath.ResolvePath(root.Dir, "property-read.ts")
-			code := "declare function unknown(value: unknown): void; function read() { const target: number[] = []; const copy = Object.assign(target, {value: 1}); " + test.before + " const result = copy.value; " + test.after + " }"
+			code := "declare function unknown(value: unknown): void; function read() { const target: number[] = []; const copy = Object.assign(target, {0: 1, value: 1}); " + test.before + " const result = " + test.read + "; " + test.after + " }"
 			fs := NewOverlayVFS(root.FS, map[string]string{file: code})
 			program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
 			assert.NilError(t, err)
