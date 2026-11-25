@@ -303,7 +303,7 @@ describe('CLI bulk suppressions', () => {
     });
   });
 
-  test('refuses to update suppressions when a discovered config fails to load', async () => {
+  test('refuses to apply or update suppressions when a discovered config fails to load', async () => {
     const count = { 'no-console': { count: 1 } };
     const cwd = await project({
       'rslint.config.mjs':
@@ -328,6 +328,14 @@ describe('CLI bulk suppressions', () => {
       'throw Error("broken config");',
     );
     await fs.writeFile(path.join(cwd, 'nested/ok/b.js'), '');
+    const check = await runRslint(['--format', 'jsonline', 'nested/'], cwd);
+    expect(check.exitCode).toBe(2);
+    expect(check.stderr).toContain('configuration failed');
+    expect(JSON.parse(check.stdout)).toMatchObject({
+      filePath: 'nested/a.js',
+      ruleName: 'no-console',
+      range: { start: { line: 2 } },
+    });
     const prune = await runRslint(
       ['--prune-suppressions', '--format', 'jsonline', 'nested/'],
       cwd,
@@ -344,6 +352,132 @@ describe('CLI bulk suppressions', () => {
       'nested/skip.js': count,
       'nested/ok/b.js': count,
     });
+  });
+
+  test('uses portable keys when invoked through a symlinked project root', async () => {
+    const temp = await project({
+      'physical/rslint.config.mjs':
+        "export default [{rules:{'no-debugger':'error'}}];",
+      'physical/src/app.js': 'debugger;',
+    });
+    const root = await fs.realpath(temp);
+    const physical = path.join(root, 'physical');
+    const workspace = path.join(root, 'workspace');
+    await fs.symlink(physical, workspace, 'junction');
+
+    const runFrom = (dir: string, args: string[]) =>
+      runCliProcess(process.execPath, [RSLINT_BIN, ...args], {
+        cwd: dir,
+        env: { ...process.env, PWD: dir },
+      });
+
+    const record = await runFrom(workspace, ['--suppress-all', 'src/app.js']);
+    expect(record.exitCode, record.stderr).toBe(0);
+    expect(await readBaseline(physical)).toEqual({
+      'src/app.js': { 'no-debugger': { count: 1 } },
+    });
+
+    const checkViaLink = await runFrom(workspace, ['src/app.js']);
+    expect(checkViaLink.exitCode, checkViaLink.stderr).toBe(0);
+    const checkViaPhysical = await runFrom(physical, ['src/app.js']);
+    expect(checkViaPhysical.exitCode, checkViaPhysical.stderr).toBe(0);
+  });
+
+  test('creates missing custom baseline directories and fails fast on invalid parents', async () => {
+    const cwd = await project({
+      'rslint.config.mjs':
+        "export default [{rules:{'no-var':'error','no-debugger':'error'}}];",
+      'a.js': 'var a = 1; debugger;',
+    });
+
+    const invalid = await runRslint(
+      [
+        '--fix',
+        '--suppress-all',
+        '--suppressions-location',
+        'a.js/sub/',
+        'a.js',
+      ],
+      cwd,
+    );
+    expect(invalid.exitCode).toBe(2);
+    expect(await fs.readFile(path.join(cwd, 'a.js'), 'utf8')).toBe(
+      'var a = 1; debugger;',
+    );
+
+    const created = await runRslint(
+      [
+        '--fix',
+        '--suppress-all',
+        '--suppressions-location',
+        '.cache/suppressions/',
+        'a.js',
+      ],
+      cwd,
+    );
+    expect(created.exitCode, created.stderr).toBe(0);
+    expect(await fs.readFile(path.join(cwd, 'a.js'), 'utf8')).toBe(
+      'let a = 1; debugger;',
+    );
+    expect(await fs.readdir(path.join(cwd, '.cache', 'suppressions'))).toEqual([
+      expect.stringMatching(/^rslint-suppressions_[a-z0-9]+$/),
+    ]);
+    const checked = await runRslint(
+      ['--suppressions-location', '.cache/suppressions/', 'a.js'],
+      cwd,
+    );
+    expect(checked.exitCode, checked.stderr).toBe(0);
+
+    if (process.platform === 'win32') {
+      const drive = path.parse(cwd).root.slice(0, 2);
+      const driveRel = `${drive}drive-rel.json`;
+      const driveRecord = await runRslint(
+        ['--suppress-all', '--suppressions-location', driveRel, 'a.js'],
+        cwd,
+      );
+      expect(driveRecord.exitCode, driveRecord.stderr).toBe(0);
+      expect(
+        JSON.parse(await fs.readFile(path.join(cwd, 'drive-rel.json'), 'utf8')),
+      ).toEqual({
+        'a.js': { 'no-debugger': { count: 1 } },
+      });
+      const driveCheck = await runRslint(
+        ['--suppressions-location', driveRel, 'a.js'],
+        cwd,
+      );
+      expect(driveCheck.exitCode, driveCheck.stderr).toBe(0);
+    }
+  });
+
+  test('preserves all updates from parallel recording processes', async () => {
+    const seed: Record<string, Record<string, { count: number }>> = {};
+    for (let i = 0; i < 2000; i++) {
+      seed[`existing/file-${String(i).padStart(4, '0')}.js`] = {
+        'no-debugger': { count: 1 },
+      };
+    }
+    const files: Record<string, string> = {
+      'rslint.config.mjs': "export default [{rules:{'no-debugger':'error'}}];",
+      'rslint-suppressions.json': JSON.stringify(seed, null, 2),
+    };
+    const targets = ['w0.js', 'w1.js', 'w2.js', 'w3.js'];
+    for (const target of targets) {
+      files[target] = 'debugger;';
+    }
+    const cwd = await project(files);
+
+    const results = await Promise.all(
+      targets.map((target) => runRslint(['--suppress-all', target], cwd)),
+    );
+    for (const result of results) {
+      expect(result.exitCode, result.stderr).toBe(0);
+    }
+
+    const baseline = await readBaseline(cwd);
+    expect(Object.keys(baseline)).toHaveLength(2000 + targets.length);
+    for (const target of targets) {
+      expect(baseline[target]).toEqual({ 'no-debugger': { count: 1 } });
+    }
   });
 
   test('preserves a type-aware count when the file is outside its TypeScript project', async () => {

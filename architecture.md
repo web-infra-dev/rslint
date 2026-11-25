@@ -1495,13 +1495,18 @@ same run. The native lint plan identifies syntax errors and rules skipped for
 lack of type information. Plugin dispatch identifies incomplete file or rule
 results. The CLI passes the final targets, their completeness, and their
 diagnostics to `internal/suppressions`, including clean files with zero errors.
-If a discovered configuration failed to load or plugin dispatch failed, record
-and prune modes refuse to modify the baseline. Pruning uses those results for
+If a discovered configuration failed to load, check mode refuses to apply
+suppressions (leaving fallback diagnostics visible) and record/prune modes
+refuse to modify the baseline; plugin dispatch failures likewise prevent record
+and prune modes from modifying the baseline. Pruning uses those results for
 observed files and checks the filesystem for missing paths outside the
 observation. The package counts error-level lint findings by rule and by the
-selected target path relative to the physical working directory. It owns
-comparison and scoped updates, writing the complete JSON to a temporary file in
-the same directory before replacing the baseline. The CLI renders the remaining
+selected target path (relative to the caller working directory for files inside
+it, and to the physical working directory for external paths). It owns
+comparison and scoped updates, serializing writes per destination file with an
+OS advisory lock, creating missing parent directories on first record, and
+writing the complete JSON to a temporary file in the same directory before
+replacing the baseline. The CLI renders the remaining
 diagnostics and sets the exit code. See the [bulk suppressions guide](website/docs/en/guide/bulk-suppressions.md)
 for how recording and pruning handle incomplete checks.
 

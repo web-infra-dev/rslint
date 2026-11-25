@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -35,9 +37,10 @@ func Open(cwd string, options Options) (*File, error) {
 	physicalCwd := resolvePhysicalDirectory(cwd)
 
 	f := &File{
-		cwd:     physicalCwd,
-		path:    filepath.Join(cwd, DefaultFilename),
-		options: options,
+		cwd:        physicalCwd,
+		logicalCwd: cwd,
+		path:       filepath.Join(cwd, DefaultFilename),
+		options:    options,
 	}
 	location := options.Location
 	if location != "" {
@@ -63,12 +66,17 @@ func Open(cwd string, options Options) (*File, error) {
 		if !info.Mode().IsRegular() {
 			return nil, fmt.Errorf("suppressions file %q must be a regular file", f.path)
 		}
-		f.entries, err = readEntries(f.path)
+		f.entries, err = readEntriesLocked(f.path)
 	}
 	if errors.Is(err, fs.ErrNotExist) {
 		if options.Mode != Check {
 			if link, lstatErr := os.Lstat(f.path); lstatErr == nil && link.Mode()&fs.ModeSymlink != 0 {
 				return nil, fmt.Errorf("cannot resolve suppressions destination %q", f.path)
+			}
+			if options.Mode == Record {
+				if parentErr := validateParentDirectory(filepath.Dir(f.path)); parentErr != nil {
+					return nil, parentErr
+				}
 			}
 		}
 		err = f.missing(f.path)
@@ -83,12 +91,44 @@ func resolveLocationPath(cwd, location string) string {
 	if filepath.IsAbs(location) {
 		return filepath.Clean(location)
 	}
-	if runtime.GOOS == "windows" && len(location) > 0 && os.IsPathSeparator(location[0]) {
-		if vol := filepath.VolumeName(cwd); vol != "" {
-			return filepath.Clean(vol + location)
+	if runtime.GOOS == "windows" {
+		if vol := filepath.VolumeName(location); vol != "" {
+			if strings.EqualFold(vol, filepath.VolumeName(cwd)) {
+				return filepath.Join(cwd, location[len(vol):])
+			}
+			if abs, err := filepath.Abs(location); err == nil {
+				return abs
+			}
+		} else if len(location) > 0 && os.IsPathSeparator(location[0]) {
+			if vol := filepath.VolumeName(cwd); vol != "" {
+				return filepath.Clean(vol + location)
+			}
 		}
 	}
 	return filepath.Join(cwd, location)
+}
+
+func validateParentDirectory(dir string) error {
+	for cur := dir; ; {
+		info, err := os.Stat(cur)
+		if err == nil {
+			if !info.IsDir() {
+				return fmt.Errorf("suppressions parent path %q is not a directory", cur)
+			}
+			return nil
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		if link, lstatErr := os.Lstat(cur); lstatErr == nil && link.Mode()&fs.ModeSymlink != 0 {
+			return fmt.Errorf("cannot resolve suppressions parent directory %q", cur)
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return err
+		}
+		cur = parent
+	}
 }
 
 func resolvePhysicalDirectory(cwd string) string {
@@ -114,21 +154,42 @@ func resolvePhysicalDirectory(cwd string) string {
 	return cwd
 }
 
-// Keep the linted spelling: different paths to one file can activate different rules.
+// Keep the linted spelling within the working directory so symlinks to the
+// checkout root produce portable keys, while intra-repo aliases stay distinct.
 func (f *File) fileKey(path string) string {
+	if f.logicalCwd != "" && f.logicalCwd != f.cwd {
+		if rel, ok := relativeWithinBase(f.logicalCwd, path); ok {
+			return rel
+		}
+	}
+	return relativeToBase(f.cwd, path)
+}
+
+func relativeWithinBase(base, path string) (string, bool) {
+	rel := relativeToBase(base, path)
+	if rel == "" || rel == "." || rel == ".." || strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, "/") || filepath.IsAbs(rel) {
+		return "", false
+	}
+	if runtime.GOOS == "windows" && filepath.VolumeName(rel) != "" {
+		return "", false
+	}
+	return rel, true
+}
+
+func relativeToBase(base, path string) string {
 	if runtime.GOOS == "windows" {
-		from, to := filepath.ToSlash(filepath.VolumeName(f.cwd)), filepath.ToSlash(filepath.VolumeName(path))
+		from, to := filepath.ToSlash(filepath.VolumeName(base)), filepath.ToSlash(filepath.VolumeName(path))
 		if !strings.EqualFold(from, to) {
 			return utils.NormalizeAbsoluteDrive(path) // Another drive or share has no relative path.
 		}
 		// Windows volumes are case-insensitive. Inside a volume, preserve the
 		// file and directory spellings that the rule actually received.
 		return tspath.GetRelativePathFromDirectory(
-			cmp.Or(filepath.ToSlash(f.cwd[len(from):]), "/"), cmp.Or(path[len(to):], "/"),
+			cmp.Or(filepath.ToSlash(base[len(from):]), "/"), cmp.Or(path[len(to):], "/"),
 			tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true},
 		)
 	}
-	relative, err := filepath.Rel(f.cwd, path)
+	relative, err := filepath.Rel(base, path)
 	if err != nil {
 		return path
 	}
@@ -171,6 +232,15 @@ func (f *File) missing(path string) error {
 		return fmt.Errorf("suppressions file %q does not exist: use --suppress-all or --suppress-rule to create it", path)
 	}
 	return nil
+}
+
+func readEntriesLocked(path string) (entries, error) {
+	unlock, err := lockBaselineFile(path, false)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	return readEntries(path)
 }
 
 func readEntries(path string) (entries, error) {
@@ -239,8 +309,39 @@ func normalizeDriveKeys(data entries) error {
 	return nil
 }
 
-// update re-reads the current baseline, applies change, and writes the updated
-// JSON atomically via a temporary file in the same directory.
+func updateLockPath(targetPath string) string {
+	key := canonicalLockKey(targetPath)
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		key = strings.ToLower(key)
+	}
+	sum := sha256.Sum256([]byte(key))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("rslint-suppressions-%d-%x.lock", os.Getuid(), sum[:8]))
+}
+
+func canonicalLockKey(targetPath string) string {
+	if abs, err := filepath.Abs(targetPath); err == nil {
+		targetPath = abs
+	}
+	if resolved, err := filepath.EvalSymlinks(targetPath); err == nil {
+		return resolved
+	}
+	var tail []string
+	for cur := targetPath; ; {
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return targetPath
+		}
+		tail = append(tail, filepath.Base(cur))
+		cur = parent
+		if base, err := filepath.EvalSymlinks(cur); err == nil {
+			slices.Reverse(tail)
+			return filepath.Join(append([]string{base}, tail...)...)
+		}
+	}
+}
+
+// update serializes updates to the baseline, re-reads the latest contents,
+// applies change, and writes the updated JSON atomically via a temporary file.
 func (f *File) update(ctx context.Context, change func(entries) bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -254,6 +355,15 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 		return fmt.Errorf("cannot resolve suppressions destination %q", f.path)
 	}
 
+	unlock, err := lockBaselineFile(path, true)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	var data entries
 	var mode fs.FileMode
 	hasExisting := false
@@ -263,14 +373,6 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("suppressions file %q must be a regular file", path)
 		}
-		// Require write permission on an existing baseline before replacing it
-		// via rename, which checks directory permissions on Unix.
-		probe, openErr := os.OpenFile(path, os.O_WRONLY, 0)
-		if openErr != nil {
-			return openErr
-		}
-		_ = probe.Close()
-
 		hasExisting = true
 		mode = info.Mode().Perm()
 		data, err = readEntries(path)
@@ -298,6 +400,17 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 }
 
 func writeBaseline(ctx context.Context, path string, data entries, preserveMode bool, mode fs.FileMode) error {
+	if preserveMode {
+		// Require write permission on an existing baseline before replacing it
+		// via rename, which checks directory permissions on Unix.
+		probe, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			return err
+		}
+		_ = probe.Close()
+	} else if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
 	tempName := filepath.Join(filepath.Dir(path), ".rslint-suppressions-"+rand.Text()+".tmp")
 	perm := fs.FileMode(0o666)
 	if preserveMode {

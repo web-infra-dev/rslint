@@ -248,7 +248,8 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 
 // parseSuppressRuleList parses one --suppress-rule occurrence. It accepts a
 // single rule ID, a comma-separated list, or an ESLint-style bracketed list
-// such as "[no-var, no-debugger]", including single- or double-quoted entries.
+// such as "[no-var, no-debugger]", including quoted entries and an optional
+// trailing comma.
 func parseSuppressRuleList(raw string) ([]string, error) {
 	s := ecmascript.StringTrim(raw)
 	if s == "" {
@@ -267,14 +268,15 @@ func parseSuppressRuleList(raw string) ([]string, error) {
 	}
 
 	rules := []string{}
-	rest := s
-	for {
+	for rest := s; ; {
 		rest = ecmascript.StringTrim(rest)
 		if rest == "" {
+			if len(rules) > 0 {
+				break // Allow a trailing comma after at least one rule ID.
+			}
 			return nil, fmt.Errorf("invalid --suppress-rule value %q: empty rule ID", raw)
 		}
-		var item string
-		var after string
+		var item, after string
 		if rest[0] == '"' || rest[0] == '\'' {
 			var next int
 			var err error
@@ -287,11 +289,9 @@ func parseSuppressRuleList(raw string) ([]string, error) {
 				return nil, fmt.Errorf("invalid --suppress-rule value %q: unexpected %q after quoted rule ID", raw, after[0])
 			}
 		} else {
-			comma := strings.IndexByte(rest, ',')
 			head := rest
-			if comma >= 0 {
-				head = rest[:comma]
-				after = rest[comma:]
+			if comma := strings.IndexByte(rest, ','); comma >= 0 {
+				head, after = rest[:comma], rest[comma:]
 			}
 			if idx := strings.IndexAny(head, "[]"); idx >= 0 {
 				return nil, fmt.Errorf("invalid --suppress-rule value %q: unexpected %q", raw, head[idx])

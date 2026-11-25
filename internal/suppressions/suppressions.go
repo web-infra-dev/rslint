@@ -31,10 +31,11 @@ type entry struct {
 type entries map[string]map[string]entry
 
 type File struct {
-	cwd     string // Physical working directory.
-	path    string
-	options Options
-	entries entries
+	cwd        string // Physical working directory.
+	logicalCwd string // Caller working directory (may differ from cwd when entered via a symlink).
+	path       string
+	options    Options
+	entries    entries
 }
 
 // FileResult identifies one target in the final lint observation. A completed

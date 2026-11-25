@@ -2741,11 +2741,13 @@ func TestReadPhysicalFileTextPreservesEncodingAndSourceBOM(t *testing.T) {
 func TestParseLintFlagsSuppressRuleList(t *testing.T) {
 	args, _, code := parseLintFlags([]string{
 		"--suppress-rule=[]",
-		`--suppress-rule=['p/one,two', "no-\u0076ar"]`,
+		`--suppress-rule=['p/one,two', "no-\u0076ar",]`,
 		"--suppress-rule=p/second,p/third",
+		"--suppress-rule=[no-console,]",
+		"--suppress-rule=no-debugger,",
 		"--suppress-rule", "@typescript-eslint/no-explicit-any",
 	})
-	want := []string{"p/one,two", "no-var", "p/second", "p/third", "@typescript-eslint/no-explicit-any"}
+	want := []string{"p/one,two", "no-var", "p/second", "p/third", "no-console", "no-debugger", "@typescript-eslint/no-explicit-any"}
 	if code != 0 || !slices.Equal(args.Suppressions.Rules, want) {
 		t.Fatalf("rule selection = %q, want %q, exit code %d", args.Suppressions.Rules, want, code)
 	}
@@ -2755,7 +2757,7 @@ func TestParseLintFlagsSuppressRuleList(t *testing.T) {
 			t.Fatalf("explicit empty selection %q = %+v, exit code %d", raw, empty.Suppressions, code)
 		}
 	}
-	for _, invalid := range []string{"[p/first", "p/first]", "a,,b", ",a", "a,", "'unterminated", `"a"extra`, "[a,[b]]"} {
+	for _, invalid := range []string{"[p/first", "p/first]", "[,]", "a,,b", "[a,,]", ",a", "'unterminated", `"a"extra`, "[a,[b]]"} {
 		if _, _, code := parseLintFlags([]string{"--suppress-rule=" + invalid}); code != 2 {
 			t.Errorf("invalid --suppress-rule=%q returned exit code %d, want 2", invalid, code)
 		}

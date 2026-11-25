@@ -17,13 +17,14 @@ func applyLintSuppressions(
 	args lintArgs,
 ) ([]rule.RuleDiagnostic, string) {
 	pluginFailures, dispatchErr := observation.PluginFailures()
-	if args.Suppressions.Mode != suppressions.Check {
-		if len(args.ConfigCatalog.Failures) > 0 {
-			return diagnostics, "Cannot update suppressions because a lint configuration failed to load."
+	if len(args.ConfigCatalog.Failures) > 0 {
+		if args.Suppressions.Mode == suppressions.Check {
+			return diagnostics, "Cannot apply suppressions because a lint configuration failed to load."
 		}
-		if dispatchErr != nil {
-			return diagnostics, "Cannot update suppressions because plugin lint dispatch failed."
-		}
+		return diagnostics, "Cannot update suppressions because a lint configuration failed to load."
+	}
+	if dispatchErr != nil && args.Suppressions.Mode != suppressions.Check {
+		return diagnostics, "Cannot update suppressions because plugin lint dispatch failed."
 	}
 	pluginIncomplete := dispatchErr != nil
 	files := observation.Native.Files
