@@ -2780,6 +2780,119 @@ func TestParseLintFlagsNegatedSuppressions(t *testing.T) {
 	}
 }
 
+func TestConfigFailureAffectsRun(t *testing.T) {
+	baseCatalog := func() *discovery.ConfigCatalog {
+		return &discovery.ConfigCatalog{
+			Configs: map[string]rslintconfig.RslintConfig{
+				"/repo":                {},
+				"/repo/nested/healthy": {},
+			},
+			Failures: []discovery.ConfigFailure{
+				{Path: "/repo/nested/rslint.config.mjs", Directory: "/repo/nested"},
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		cat  func() *discovery.ConfigCatalog
+		plan target.Plan
+		dirs []rslintconfig.DirectoryIdentity
+		want bool
+	}{
+		{
+			name: "healthy child directory shadowed by own config",
+			cat:  baseCatalog,
+			plan: target.Plan{Files: []target.File{{
+				Path:            "/repo/nested/healthy/ok.js",
+				CanonicalPath:   "/repo/nested/healthy/ok.js",
+				ConfigDirectory: "/repo/nested/healthy",
+			}}},
+			dirs: []rslintconfig.DirectoryIdentity{{
+				LexicalPath:   "/repo/nested/healthy",
+				CanonicalPath: "/repo/nested/healthy",
+			}},
+			want: false,
+		},
+		{
+			name: "healthy child file under broken ancestor",
+			cat: func() *discovery.ConfigCatalog {
+				c := baseCatalog()
+				c.TargetFiles = []rslintconfig.PathIdentity{{
+					Path:          "/repo/nested/healthy/ok.js",
+					CanonicalPath: "/repo/nested/healthy/ok.js",
+				}}
+				return c
+			},
+			plan: target.Plan{Files: []target.File{{
+				Path:            "/repo/nested/healthy/ok.js",
+				CanonicalPath:   "/repo/nested/healthy/ok.js",
+				ConfigDirectory: "/repo/nested/healthy",
+			}}},
+			want: false,
+		},
+		{
+			name: "file falling back across broken config",
+			cat:  baseCatalog,
+			plan: target.Plan{Files: []target.File{{
+				Path:            "/repo/nested/a.js",
+				CanonicalPath:   "/repo/nested/a.js",
+				ConfigDirectory: "/repo",
+			}}},
+			want: true,
+		},
+		{
+			name: "ignored explicit file falling back across broken config",
+			cat: func() *discovery.ConfigCatalog {
+				c := baseCatalog()
+				c.TargetFiles = []rslintconfig.PathIdentity{{
+					Path:          "/repo/nested/skip.js",
+					CanonicalPath: "/repo/nested/skip.js",
+				}}
+				return c
+			},
+			want: true,
+		},
+		{
+			name: "requested directory contains broken config",
+			cat:  baseCatalog,
+			dirs: []rslintconfig.DirectoryIdentity{{
+				LexicalPath:   "/repo",
+				CanonicalPath: "/repo",
+			}},
+			want: true,
+		},
+		{
+			name: "requested directory is broken config itself",
+			cat:  baseCatalog,
+			dirs: []rslintconfig.DirectoryIdentity{{
+				LexicalPath:   "/repo/nested",
+				CanonicalPath: "/repo/nested",
+			}},
+			want: true,
+		},
+		{
+			name: "symlinked target falling back across physical broken config",
+			cat:  baseCatalog,
+			plan: target.Plan{Files: []target.File{{
+				Path:            "/repo/link/a.js",
+				CanonicalPath:   "/repo/nested/a.js",
+				ConfigDirectory: "/repo",
+			}}},
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := configFailureAffectsRun(tc.cat(), tc.plan, tc.dirs, nil)
+			if got != tc.want {
+				t.Fatalf("configFailureAffectsRun() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestParseLintFlagsTiming(t *testing.T) {
 	cases := []struct {
 		name         string

@@ -435,6 +435,47 @@ func TestRecordCreatesMissingParentDirectoryAndRejectsInvalidParent(t *testing.T
 		if _, err := Open(cwd, Options{Mode: Record, Location: "dangling-dir/base.json"}); err == nil {
 			t.Fatal("Open unexpectedly succeeded for dangling parent directory symlink")
 		}
+		readonlyDir := filepath.Join(cwd, "readonly")
+		assert.NilError(t, os.Mkdir(readonlyDir, 0o555))
+		t.Cleanup(func() { _ = os.Chmod(readonlyDir, 0o755) })
+		if err := probeDirectoryWritable(readonlyDir); errors.Is(err, os.ErrPermission) {
+			for _, loc := range []string{"readonly/base.json", "readonly/missing/base.json"} {
+				if _, err := Open(cwd, Options{Mode: Record, Location: loc}); !errors.Is(err, os.ErrPermission) {
+					t.Fatalf("Open(%q) = %v, want permission error", loc, err)
+				}
+			}
+		}
+	}
+}
+
+func TestOpenAndRecordIgnoreTempDirState(t *testing.T) {
+	cwd := tempWorkingDirectory(t)
+	baselinePath := filepath.Join(cwd, DefaultFilename)
+	missingTmp := filepath.Join(cwd, "no-such-tmp")
+	readonlyTmp := filepath.Join(cwd, "readonly-tmp")
+	assert.NilError(t, os.Mkdir(readonlyTmp, 0o555))
+	t.Cleanup(func() { _ = os.Chmod(readonlyTmp, 0o755) })
+
+	for _, tmp := range []string{missingTmp, readonlyTmp} {
+		t.Setenv("TMPDIR", tmp)
+		t.Setenv("TEMP", tmp)
+		t.Setenv("TMP", tmp)
+
+		assert.NilError(t, os.WriteFile(baselinePath, []byte("{oops"), 0o644))
+		if _, err := Open(cwd, Options{}); err == nil {
+			t.Fatalf("TMPDIR=%q: invalid baseline was silently skipped", tmp)
+		}
+
+		assert.NilError(t, os.WriteFile(baselinePath, []byte(`{"a.js":{"no-var":{"count":1}}}`), 0o644))
+		f, err := Open(cwd, Options{})
+		assert.NilError(t, err)
+		assert.Assert(t, f != nil)
+		assert.Equal(t, f.entries["a.js"]["no-var"].Count, 1)
+
+		rec, err := Open(cwd, Options{Mode: Record})
+		assert.NilError(t, err)
+		_, _, err = reportError(t.Context(), rec, filepath.Join(cwd, "b.js"), "no-debugger")
+		assert.NilError(t, err)
 	}
 }
 
@@ -506,11 +547,15 @@ func TestConcurrentProcessUpdatesPreserveAllEntries(t *testing.T) {
 		}
 	}()
 	for i := range workers {
+		workerTmp := t.TempDir()
 		wg.Add(1)
-		go func(idx int) {
+		go func(idx int, tmpDir string) {
 			defer wg.Done()
 			cmd := exec.Command(exe, "-test.run=^TestConcurrentProcessUpdatesHelper$")
 			cmd.Env = append(os.Environ(),
+				"TMPDIR="+tmpDir,
+				"TEMP="+tmpDir,
+				"TMP="+tmpDir,
 				"RSLINT_SUPPRESSIONS_CONCURRENT_WORKER=1",
 				"RSLINT_SUPPRESSIONS_CONCURRENT_CWD="+cwd,
 				fmt.Sprintf("RSLINT_SUPPRESSIONS_CONCURRENT_FILE=worker-%d.js", idx),
@@ -518,7 +563,7 @@ func TestConcurrentProcessUpdatesPreserveAllEntries(t *testing.T) {
 			if out, runErr := cmd.CombinedOutput(); runErr != nil {
 				errs[idx] = fmt.Errorf("worker %d failed: %w\n%s", idx, runErr, out)
 			}
-		}(i)
+		}(i, workerTmp)
 	}
 	wg.Wait()
 	close(readerDone)
@@ -536,6 +581,10 @@ func TestConcurrentProcessUpdatesPreserveAllEntries(t *testing.T) {
 		key := fmt.Sprintf("worker-%d.js", i)
 		assert.Equal(t, final.entries[key]["no-debugger"].Count, 1)
 	}
+	dirEntries, err := os.ReadDir(cwd)
+	assert.NilError(t, err)
+	assert.Equal(t, len(dirEntries), 1)
+	assert.Equal(t, dirEntries[0].Name(), DefaultFilename)
 
 	// Concurrent first-time creation into a missing nested custom directory.
 	const nestedLocation = ".cache/concurrent/"
@@ -565,4 +614,7 @@ func TestConcurrentProcessUpdatesPreserveAllEntries(t *testing.T) {
 		key := fmt.Sprintf("first-%d.js", i)
 		assert.Equal(t, nested.entries[key]["no-debugger"].Count, 1)
 	}
+	nestedEntries, err := os.ReadDir(filepath.Join(cwd, ".cache", "concurrent"))
+	assert.NilError(t, err)
+	assert.Equal(t, len(nestedEntries), 1)
 }

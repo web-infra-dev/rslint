@@ -352,6 +352,45 @@ describe('CLI bulk suppressions', () => {
       'nested/skip.js': count,
       'nested/ok/b.js': count,
     });
+
+    // A healthy child package with its own valid config still passes when
+    // selected directly by file or directory despite the broken ancestor.
+    await fs.writeFile(path.join(cwd, 'nested/ok/b.js'), 'console.log(1);');
+    const healthyFile = await runRslint(['nested/ok/b.js'], cwd);
+    expect(healthyFile.exitCode, healthyFile.stderr).toBe(0);
+    const healthyDir = await runRslint(['nested/ok/'], cwd);
+    expect(healthyDir.exitCode, healthyDir.stderr).toBe(0);
+  });
+
+  test('reads baselines independently of TMPDIR state', async () => {
+    const cwd = await project({
+      'rslint.config.mjs': "export default [{rules:{'no-var':'error'}}];",
+      'a.js': 'var a = 1;',
+      'rslint-suppressions.json': '{oops',
+    });
+    const missingTmp = path.join(cwd, 'missing-tmp');
+    const runWithTmp = (tmpDir: string, args: string[]) =>
+      runCliProcess(process.execPath, [RSLINT_BIN, ...args], {
+        cwd,
+        env: { ...process.env, TMPDIR: tmpDir, TEMP: tmpDir, TMP: tmpDir },
+      });
+
+    const invalid = await runWithTmp(missingTmp, ['--fix', 'a.js']);
+    expect(invalid.exitCode).toBe(2);
+    expect(invalid.stderr).toContain('invalid suppressions');
+    expect(await fs.readFile(path.join(cwd, 'a.js'), 'utf8')).toBe(
+      'var a = 1;',
+    );
+
+    await fs.writeFile(
+      path.join(cwd, 'rslint-suppressions.json'),
+      JSON.stringify({ 'a.js': { 'no-var': { count: 1 } } }),
+    );
+    const readonlyTmp = path.join(cwd, 'readonly-tmp');
+    await fs.mkdir(readonlyTmp, { mode: 0o555 });
+    onTestFinished(() => fs.chmod(readonlyTmp, 0o755).catch(() => {}));
+    const valid = await runWithTmp(readonlyTmp, ['a.js']);
+    expect(valid.exitCode, valid.stderr).toBe(0);
   });
 
   test('uses portable keys when invoked through a symlinked project root', async () => {
@@ -404,6 +443,26 @@ describe('CLI bulk suppressions', () => {
     expect(await fs.readFile(path.join(cwd, 'a.js'), 'utf8')).toBe(
       'var a = 1; debugger;',
     );
+
+    if (process.platform !== 'win32' && process.getuid?.() !== 0) {
+      const readonlyDir = path.join(cwd, 'readonly');
+      await fs.mkdir(readonlyDir, { mode: 0o555 });
+      onTestFinished(() => fs.chmod(readonlyDir, 0o755).catch(() => {}));
+      const unwritable = await runRslint(
+        [
+          '--fix',
+          '--suppress-all',
+          '--suppressions-location',
+          'readonly/missing/base.json',
+          'a.js',
+        ],
+        cwd,
+      );
+      expect(unwritable.exitCode).toBe(2);
+      expect(await fs.readFile(path.join(cwd, 'a.js'), 'utf8')).toBe(
+        'var a = 1; debugger;',
+      );
+    }
 
     const created = await runRslint(
       [
@@ -466,8 +525,30 @@ describe('CLI bulk suppressions', () => {
     }
     const cwd = await project(files);
 
+    const workerTmpDirs = await Promise.all(
+      targets.map(async (_, idx) => {
+        const dir = path.join(cwd, `.tmp-worker-${idx}`);
+        await fs.mkdir(dir);
+        return dir;
+      }),
+    );
+
     const results = await Promise.all(
-      targets.map((target) => runRslint(['--suppress-all', target], cwd)),
+      targets.map((target, idx) =>
+        runCliProcess(
+          process.execPath,
+          [RSLINT_BIN, '--suppress-all', target],
+          {
+            cwd,
+            env: {
+              ...process.env,
+              TMPDIR: workerTmpDirs[idx],
+              TEMP: workerTmpDirs[idx],
+              TMP: workerTmpDirs[idx],
+            },
+          },
+        ),
+      ),
     );
     for (const result of results) {
       expect(result.exitCode, result.stderr).toBe(0);
@@ -478,6 +559,10 @@ describe('CLI bulk suppressions', () => {
     for (const target of targets) {
       expect(baseline[target]).toEqual({ 'no-debugger': { count: 1 } });
     }
+    const leftovers = (await fs.readdir(cwd)).filter((name) =>
+      name.startsWith('.rslint-suppressions-'),
+    );
+    expect(leftovers).toEqual([]);
   });
 
   test('preserves a type-aware count when the file is outside its TypeScript project', async () => {

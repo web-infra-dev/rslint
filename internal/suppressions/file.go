@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"syscall"
 
@@ -66,20 +65,22 @@ func Open(cwd string, options Options) (*File, error) {
 		if !info.Mode().IsRegular() {
 			return nil, fmt.Errorf("suppressions file %q must be a regular file", f.path)
 		}
-		f.entries, err = readEntriesLocked(f.path)
+		f.entries, err = readEntries(f.path)
 	}
 	if errors.Is(err, fs.ErrNotExist) {
 		if options.Mode != Check {
 			if link, lstatErr := os.Lstat(f.path); lstatErr == nil && link.Mode()&fs.ModeSymlink != 0 {
 				return nil, fmt.Errorf("cannot resolve suppressions destination %q", f.path)
 			}
-			if options.Mode == Record {
-				if parentErr := validateParentDirectory(filepath.Dir(f.path)); parentErr != nil {
-					return nil, parentErr
-				}
+		}
+		if err = f.missing(f.path); err != nil {
+			return nil, err
+		}
+		if options.Mode != Check {
+			if parentErr := validateParentDirectory(filepath.Dir(f.path)); parentErr != nil {
+				return nil, parentErr
 			}
 		}
-		err = f.missing(f.path)
 	}
 	if err != nil || f.entries == nil && options.Mode == Check {
 		return nil, err
@@ -115,7 +116,7 @@ func validateParentDirectory(dir string) error {
 			if !info.IsDir() {
 				return fmt.Errorf("suppressions parent path %q is not a directory", cur)
 			}
-			return nil
+			return probeDirectoryWritable(cur)
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
 			return err
@@ -129,6 +130,17 @@ func validateParentDirectory(dir string) error {
 		}
 		cur = parent
 	}
+}
+
+func probeDirectoryWritable(dir string) error {
+	probePath := filepath.Join(dir, ".rslint-suppressions-"+rand.Text()+".tmp")
+	probe, err := os.OpenFile(probePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	_ = probe.Close()
+	_ = os.Remove(probePath)
+	return nil
 }
 
 func resolvePhysicalDirectory(cwd string) string {
@@ -234,15 +246,6 @@ func (f *File) missing(path string) error {
 	return nil
 }
 
-func readEntriesLocked(path string) (entries, error) {
-	unlock, err := lockBaselineFile(path, false)
-	if err != nil {
-		return nil, err
-	}
-	defer unlock()
-	return readEntries(path)
-}
-
 func readEntries(path string) (entries, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -309,35 +312,13 @@ func normalizeDriveKeys(data entries) error {
 	return nil
 }
 
-func updateLockPath(targetPath string) string {
-	key := canonicalLockKey(targetPath)
+func lockPathForBaseline(targetPath string) string {
+	base := filepath.Base(targetPath)
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
-		key = strings.ToLower(key)
+		base = strings.ToLower(base)
 	}
-	sum := sha256.Sum256([]byte(key))
-	return filepath.Join(os.TempDir(), fmt.Sprintf("rslint-suppressions-%d-%x.lock", os.Getuid(), sum[:8]))
-}
-
-func canonicalLockKey(targetPath string) string {
-	if abs, err := filepath.Abs(targetPath); err == nil {
-		targetPath = abs
-	}
-	if resolved, err := filepath.EvalSymlinks(targetPath); err == nil {
-		return resolved
-	}
-	var tail []string
-	for cur := targetPath; ; {
-		parent := filepath.Dir(cur)
-		if parent == cur {
-			return targetPath
-		}
-		tail = append(tail, filepath.Base(cur))
-		cur = parent
-		if base, err := filepath.EvalSymlinks(cur); err == nil {
-			slices.Reverse(tail)
-			return filepath.Join(append([]string{base}, tail...)...)
-		}
-	}
+	sum := sha256.Sum256([]byte(base))
+	return filepath.Join(filepath.Dir(targetPath), fmt.Sprintf(".rslint-suppressions-%x.lock", sum[:8]))
 }
 
 // update serializes updates to the baseline, re-reads the latest contents,
@@ -354,8 +335,16 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 	} else if info, lstatErr := os.Lstat(f.path); lstatErr == nil && info.Mode()&fs.ModeSymlink != 0 {
 		return fmt.Errorf("cannot resolve suppressions destination %q", f.path)
 	}
+	if f.options.Mode == Record {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+	}
+	if realDir, err := filepath.EvalSymlinks(filepath.Dir(path)); err == nil {
+		path = filepath.Join(realDir, filepath.Base(path))
+	}
 
-	unlock, err := lockBaselineFile(path, true)
+	unlock, err := lockBaselineUpdate(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -444,7 +433,7 @@ func writeBaseline(ctx context.Context, path string, data entries, preserveMode 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := os.Rename(tempName, path); err != nil {
+	if err := replaceBaselineFile(ctx, tempName, path); err != nil {
 		return err
 	}
 	published = true
