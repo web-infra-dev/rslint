@@ -12,14 +12,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-func prepareGeneratedSyntax(tree []byte, nodes, origins []*ast.Node, file *ast.SourceFile) {
-	records := tree[binary.LittleEndian.Uint32(tree[encoder.HeaderOffsetNodes:]):]
-	if origins != nil {
-		restoreGeneratedLists(records, nodes, origins)
-	}
+func prepareGeneratedSyntax(tree []byte, file *ast.SourceFile) {
 	if file == nil {
 		return
 	}
+	records := tree[binary.LittleEndian.Uint32(tree[encoder.HeaderOffsetNodes:]):]
 	var positions *ast.PositionMap
 	for offset := encoder.NodeSize; offset < len(records); offset += encoder.NodeSize {
 		for _, field := range [...]int{encoder.NodeOffsetPos, encoder.NodeOffsetEnd} {
@@ -35,73 +32,6 @@ func prepareGeneratedSyntax(tree []byte, nodes, origins []*ast.Node, file *ast.S
 				}
 			}
 			binary.LittleEndian.PutUint32(data, uint32(positions.UTF8ToUTF16(int(pos))))
-		}
-	}
-}
-
-// A copied node keeps its parse origin. Restore its lists' comma flags and,
-// when the builder kept the original span, their bounds before UTF-16 conversion.
-func restoreGeneratedLists(records []byte, nodes, origins []*ast.Node) {
-	var fields, generated, source []*ast.NodeList
-	visitor := ast.NodeVisitor{Hooks: ast.NodeVisitorHooks{
-		VisitNodes: func(list *ast.NodeList, _ *ast.NodeVisitor) *ast.NodeList {
-			fields = append(fields, list)
-			return list
-		},
-		VisitModifiers: func(modifiers *ast.ModifierList, _ *ast.NodeVisitor) *ast.ModifierList {
-			var list *ast.NodeList
-			if modifiers != nil && len(modifiers.Nodes) != 0 {
-				list = &modifiers.NodeList
-			}
-			fields = append(fields, list)
-			return modifiers
-		},
-	}}
-	listFields := func(node *ast.Node, reuse []*ast.NodeList) []*ast.NodeList {
-		fields = reuse[:0]
-		node.VisitEachChild(&visitor)
-		return fields
-	}
-	for index, origin := range origins {
-		if origin == nil || index+1 == len(nodes) {
-			continue
-		}
-		owner := nodes[index]
-		if owner.Kind != origin.Kind || (owner.Pos() >= 0 && owner.Loc != origin.Loc) {
-			continue
-		}
-		first := index + 1
-		if int(binary.LittleEndian.Uint32(records[first*encoder.NodeSize+encoder.NodeOffsetParent:])) != index {
-			continue
-		}
-		// NodeLists occupy nil slots in the encoder's index, in visitor order.
-		slot := 0
-		for child := first; child != 0; {
-			record := records[child*encoder.NodeSize:]
-			isList := nodes[child] == nil
-			child = int(binary.LittleEndian.Uint32(record[encoder.NodeOffsetNext:]))
-			if !isList {
-				continue
-			}
-			if slot == 0 {
-				generated = listFields(owner, generated)
-				source = listFields(origin, source)
-			}
-			for generated[slot] == nil {
-				slot++
-			}
-			original := source[slot]
-			slot++
-			if original == nil || int32(binary.LittleEndian.Uint32(record[encoder.NodeOffsetPos:])) >= 0 {
-				continue
-			}
-			if owner.Pos() >= 0 {
-				binary.LittleEndian.PutUint32(record[encoder.NodeOffsetPos:], uint32(original.Pos()))
-				binary.LittleEndian.PutUint32(record[encoder.NodeOffsetEnd:], uint32(original.End()))
-			}
-			if original.HasTrailingComma() {
-				binary.LittleEndian.PutUint32(record[encoder.NodeOffsetFlags:], 1)
-			}
 		}
 	}
 }
@@ -123,30 +53,18 @@ const (
 	packetTypeNode
 	packetDiagnostics
 	packetLiteral
-	packetOptionalHandles
 	packetStrings
 	packetTypeDetails
-	packetDeclaredMembers
+	packetOptionalNamedSymbols
+	packetOptionalIndexInfos
 )
 
 // EncodePacket has a finite record layout: header/kind, fixed fields, then
 // offset-addressed lists and an interned UTF-16 string pool. No arbitrary map,
 // recursive value graph, reflection, or Go pointer enters a packet.
-// These bytes are owned. A transport may lease them only for its call; a client
-// copies fallback packets before retaining them in its disposable fact store.
 func EncodePacket(result Result) ([]byte, error) {
 	var kind, words uint32
 	switch result.(type) {
-	case Literal:
-		kind, words = packetLiteral, 3
-	case *DeclaredMembers:
-		kind, words = packetDeclaredMembers, 4
-	case *TypeDetails:
-		kind, words = packetTypeDetails, 21
-	case Strings:
-		kind, words = packetStrings, 1
-	case OptionalHandles:
-		kind, words = packetOptionalHandles, 1
 	case Handle:
 		kind, words = packetHandle, 1
 	case Boolean:
@@ -158,7 +76,7 @@ func EncodePacket(result Result) ([]byte, error) {
 	case *TypeFact:
 		kind, words = packetType, 13
 	case *SymbolFact:
-		kind, words = packetSymbol, 7
+		kind, words = packetSymbol, 6
 	case *SignatureFact:
 		kind, words = packetSignature, 5
 	case NodeFacts:
@@ -177,6 +95,16 @@ func EncodePacket(result Result) ([]byte, error) {
 		kind, words = packetTypeNode, 3
 	case SuggestionDiagnostics:
 		kind, words = packetDiagnostics, 1
+	case Literal:
+		kind, words = packetLiteral, 3
+	case Strings:
+		kind, words = packetStrings, 1
+	case *TypeDetails:
+		kind, words = packetTypeDetails, 15
+	case OptionalNamedSymbols:
+		kind, words = packetOptionalNamedSymbols, 1
+	case OptionalIndexInfos:
+		kind, words = packetOptionalIndexInfos, 1
 	default:
 		return nil, errors.New("unsupported semantic fact")
 	}
@@ -184,58 +112,6 @@ func EncodePacket(result Result) ([]byte, error) {
 	copy(w.data, "RTS5")
 	w.put(4, kind)
 	switch fact := result.(type) {
-	case Literal:
-		w.put(8, fact.Kind)
-		switch fact.Kind {
-		case 1:
-			w.put(12, w.text(fact.Text))
-		case 2:
-			binary.LittleEndian.PutUint64(w.data[12:], math.Float64bits(fact.Number))
-		}
-	case *DeclaredMembers:
-		if fact != nil {
-			w.put(8, w.ids(fact.properties))
-			w.put(12, w.ids(fact.calls))
-			w.put(16, w.ids(fact.constructs))
-			w.put(20, w.indexInfos(fact.indices))
-		}
-	case *TypeDetails:
-		w.put(8, w.node(fact.patternRef))
-		w.put(12, w.node(fact.nodeRef))
-		w.put(20, fact.regular)
-		w.put(24, fact.base)
-		w.put(28, fact.constraint)
-		w.put(32, w.ids(fact.outer))
-		w.put(36, w.ids(fact.local))
-		w.put(40, w.ids(fact.elements))
-		w.put(44, fact.minPlusOne)
-		w.put(48, fact.fixedPlusOne)
-		w.put(52, w.nodeList(fact.labelRefs))
-		if fact.texts != nil {
-			ids := make([]uint32, len(fact.texts))
-			for i, v := range fact.texts {
-				ids[i] = w.text(v)
-			}
-			w.put(56, w.ids(ids))
-		}
-		w.put(60, w.node(fact.rootRef))
-		w.put(64, fact.rootCheck)
-		w.put(68, fact.rootExtends)
-		w.put(72, fact.rootAlias)
-		if fact.distributive {
-			w.put(76, 1)
-		}
-		w.put(80, w.ids(fact.infer))
-		w.put(84, w.ids(fact.rootOuter))
-		w.put(88, w.ids(fact.rootArguments))
-	case Strings:
-		ids := make([]uint32, len(fact))
-		for i, value := range fact {
-			ids[i] = w.text(value)
-		}
-		w.put(8, w.ids(ids))
-	case OptionalHandles:
-		w.put(8, w.ids(fact))
 	case Handle:
 		w.put(8, uint32(fact))
 	case Boolean:
@@ -249,6 +125,44 @@ func EncodePacket(result Result) ([]byte, error) {
 			fact = Handles{}
 		}
 		w.put(8, w.ids(fact))
+	case Strings:
+		ids := make([]uint32, len(fact))
+		for i, value := range fact {
+			ids[i] = w.text(value)
+		}
+		w.put(8, w.ids(ids))
+	case Literal:
+		w.put(8, fact.Kind)
+		switch fact.Kind {
+		case 1:
+			w.put(12, w.text(fact.Text))
+		case 2:
+			binary.LittleEndian.PutUint64(w.data[12:], math.Float64bits(fact.Number))
+		}
+	case *TypeDetails:
+		w.put(8, w.ids(fact.outer))
+		w.put(12, w.ids(fact.local))
+		w.put(16, w.ids(fact.elements))
+		w.put(20, fact.minPlusOne)
+		w.put(24, fact.fixedPlusOne)
+		w.put(28, w.nodeList(fact.labelRefs))
+		if fact.texts != nil {
+			ids := make([]uint32, len(fact.texts))
+			for i, v := range fact.texts {
+				ids[i] = w.text(v)
+			}
+			w.put(32, w.ids(ids))
+		}
+		w.put(36, w.node(fact.rootRef))
+		w.put(40, fact.rootCheck)
+		w.put(44, fact.rootExtends)
+		w.put(48, fact.rootAlias)
+		if fact.distributive {
+			w.put(52, 1)
+		}
+		w.put(56, w.ids(fact.infer))
+		w.put(60, w.ids(fact.rootOuter))
+		w.put(64, w.ids(fact.rootArguments))
 	case *TypeFact:
 		flags := make([]uint32, 0, len(fact.Flags))
 		for _, flag := range fact.Flags {
@@ -319,24 +233,13 @@ func EncodePacket(result Result) ([]byte, error) {
 		if fact.Flags&uint32(ast.SymbolFlagsTransient) != 0 {
 			w.put(28, fact.CheckFlags+1)
 		}
-		var tables uint32
-		if fact.HasMembers {
-			tables |= 1
-		}
-		if fact.HasExports {
-			tables |= 2
-		}
-		if fact.HasGlobalExports {
-			tables |= 4
-		}
-		w.put(32, tables)
 	case *EncodedTypeNode:
 		w.put(8, uint32(len(fact.tree)))
 		w.data = append(w.data, fact.tree...)
 		w.put(12, w.nodeList(fact.origins))
 		w.put(16, w.ids(fact.emitFlags))
 	case SuggestionDiagnostics:
-		w.put(8, w.diagnostics(fact, make(map[string]uint32)))
+		w.put(8, w.diagnostics(fact))
 	case NodeFacts:
 		offset := uint32(len(w.data))
 		w.data = append(w.data, make([]byte, 4+len(fact)*28)...)
@@ -362,6 +265,10 @@ func EncodePacket(result Result) ([]byte, error) {
 		w.put(24, uint32(fact.MinArgumentCount))
 	case IndexInfos:
 		w.put(8, w.indexInfos(fact))
+	case OptionalIndexInfos:
+		if fact.Present {
+			w.put(8, w.indexInfos(fact.Infos))
+		}
 	case *TypePredicateFact:
 		if fact != nil {
 			w.put(8, fact.Kind+1)
@@ -372,15 +279,11 @@ func EncodePacket(result Result) ([]byte, error) {
 			w.put(20, fact.Type)
 		}
 	case NamedSymbols:
-		offset := uint32(len(w.data))
-		w.data = append(w.data, make([]byte, 4+len(fact)*8)...)
-		w.put(offset, uint32(len(fact)))
-		for i, symbol := range fact {
-			at := offset + 4 + uint32(i)*8
-			w.put(at, symbol.ID)
-			w.put(at+4, w.text(symbol.Name))
+		w.put(8, w.namedSymbols(fact))
+	case OptionalNamedSymbols:
+		if fact.Present {
+			w.put(8, w.namedSymbols(fact.Symbols))
 		}
-		w.put(8, offset)
 	case DisplayParts:
 		w.put(8, w.displayParts(fact))
 	case JSDocTags:
@@ -405,12 +308,24 @@ type packetWriter struct {
 	strings map[string]uint32
 }
 
+func (w *packetWriter) namedSymbols(symbols NamedSymbols) uint32 {
+	offset := uint32(len(w.data))
+	w.data = append(w.data, make([]byte, 4+len(symbols)*8)...)
+	w.put(offset, uint32(len(symbols)))
+	for i, symbol := range symbols {
+		at := offset + 4 + uint32(i)*8
+		w.put(at, symbol.ID)
+		w.put(at+4, w.text(symbol.Name))
+	}
+	return offset
+}
+
 func (w *packetWriter) indexInfos(infos IndexInfos) uint32 {
 	offset := uint32(len(w.data))
-	w.data = append(w.data, make([]byte, 4+len(infos)*24)...)
+	w.data = append(w.data, make([]byte, 4+len(infos)*20)...)
 	w.put(offset, uint32(len(infos)))
 	for i, info := range infos {
-		at := offset + 4 + uint32(i)*24
+		at := offset + 4 + uint32(i)*20
 		w.put(at, info.ID)
 		w.put(at+4, info.KeyType)
 		w.put(at+8, info.Type)
@@ -418,12 +333,11 @@ func (w *packetWriter) indexInfos(infos IndexInfos) uint32 {
 			w.put(at+12, 1)
 		}
 		w.put(at+16, w.node(info.Declaration))
-		w.put(at+20, w.nodeList(info.Components))
 	}
 	return offset
 }
 
-func (w *packetWriter) diagnostics(facts SuggestionDiagnostics, configs map[string]uint32) uint32 {
+func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
 	if len(facts) == 0 {
 		return 0
 	}
@@ -432,14 +346,7 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics, configs map[stri
 	w.put(at, uint32(len(facts)))
 	for i, d := range facts {
 		pos := at + 4 + uint32(i)*40
-		if d.Config != nil {
-			offset := configs[d.Config.ID]
-			if offset == 0 {
-				offset = w.diagnosticConfig(d.Config)
-				configs[d.Config.ID] = offset
-			}
-			w.put(pos, offset)
-		} else if d.File != "" {
+		if d.File != "" {
 			w.put(pos, w.text(d.File))
 		}
 		w.put(pos+4, d.Start)
@@ -457,33 +364,15 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics, configs map[stri
 		if d.Unnecessary {
 			flags |= 2
 		}
-		if d.Config != nil {
-			flags |= 4
-		}
 		w.put(pos+28, flags)
-		w.put(pos+32, w.diagnostics(d.Chain, configs))
-		w.put(pos+36, w.diagnostics(d.Related, configs))
-	}
-	return at
-}
-
-func (w *packetWriter) diagnosticConfig(info *configSourceInfo) uint32 {
-	at := uint32(len(w.data))
-	w.data = append(w.data, make([]byte, 16)...)
-	w.put(at, w.text(info.Name))
-	w.put(at+4, w.text(string(info.Path)))
-	w.put(at+12, w.text(info.ID))
-	if len(info.ExtendedSourceFiles) != 0 {
-		files := make([]uint32, len(info.ExtendedSourceFiles))
-		for i, file := range info.ExtendedSourceFiles {
-			files[i] = w.text(file)
-		}
-		w.put(at+8, w.ids(files))
+		w.put(pos+32, w.diagnostics(d.Chain))
+		w.put(pos+36, w.diagnostics(d.Related))
 	}
 	return at
 }
 
 func (w *packetWriter) put(at, value uint32) { binary.LittleEndian.PutUint32(w.data[at:], value) }
+
 func (w *packetWriter) text(text string) uint32 {
 	if offset, ok := w.strings[text]; ok {
 		return offset
@@ -497,6 +386,7 @@ func (w *packetWriter) text(text string) uint32 {
 	w.strings[text] = offset
 	return offset
 }
+
 func (w *packetWriter) ids(ids []uint32) uint32 {
 	if ids == nil {
 		return 0
@@ -508,6 +398,7 @@ func (w *packetWriter) ids(ids []uint32) uint32 {
 	}
 	return offset
 }
+
 func (w *packetWriter) displayParts(parts DisplayParts) uint32 {
 	if parts == nil {
 		return 0
@@ -530,6 +421,7 @@ func (w *packetWriter) displayParts(parts DisplayParts) uint32 {
 	}
 	return offset
 }
+
 func (w *packetWriter) nodeList(nodes []*NodeRef) uint32 {
 	if nodes == nil {
 		return 0
@@ -540,21 +432,15 @@ func (w *packetWriter) nodeList(nodes []*NodeRef) uint32 {
 	}
 	return w.ids(ids)
 }
+
 func (w *packetWriter) node(node *NodeRef) uint32 {
 	if node == nil {
 		return 0
 	}
 	offset := uint32(len(w.data))
 	w.data = append(w.data, make([]byte, 8)...)
-	// Config nodes carry the identity of the parse after the signed index.
-	index := int32(node.Index)
-	if node.Config != "" {
-		w.data = append(w.data, make([]byte, 4)...)
-		w.put(offset+8, w.text(node.Config))
-		index = -index
-	}
 	w.put(offset, w.text(node.File))
-	w.put(offset+4, uint32(index))
+	w.put(offset+4, node.Index)
 	return offset
 }
 

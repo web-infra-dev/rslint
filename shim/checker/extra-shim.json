@@ -41,30 +41,12 @@
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",
       "getTemplateTypeFromMappedType",
-      "getNamedMembers",
-      "getNodeBuilder",
-      "getAugmentedPropertiesOfType",
-      "getStringLiteralType",
-      "getNumberLiteralType",
-      "getBigIntLiteralType",
-      "getNullableType",
-      "getMembersOfSymbol",
-      "getIndexInfosOfIndexSymbol",
-      "getPrivateIdentifierPropertyOfType",
-      "lookupSymbolForPrivateIdentifierDeclaration",
-      "getTypeOfAssignmentPattern",
-      "isOptionalParameter",
-      "getSignaturesOfSymbol",
-      "getSymbolOfDeclaration",
-      "getSymbolOfNode",
-      "instantiateTypes",
-      "newTypePredicate",
-      "typePredicateToStringEx"
+      "getAugmentedPropertiesOfType"
     ]
   },
   "ExtraFields": {
     "Type": ["alias", "flags", "symbol", "objectFlags"],
-    "ConditionalType": ["root", "resolvedTrueType", "resolvedFalseType"],
+    "ConditionalType": ["root"],
     "ConditionalRoot": [
       "node",
       "checkType",
@@ -76,21 +58,8 @@
     ],
     "TupleType": ["combinedFlags", "minLength"],
     "LiteralType": ["freshType", "regularType"],
-    "Relation": ["results"],
-    "IndexInfo": ["components"],
-    "TypeReference": ["node"],
-    "EvolvingArrayType": ["elementType", "finalArrayType"],
-    "TypeParameter": ["constraint"],
-    "Signature": ["parameters", "declaration", "mapper"],
+    "Signature": ["parameters", "declaration"],
     "Checker": [
-      "assignableRelation",
-      "identityRelation",
-      "subtypeRelation",
-      "strictSubtypeRelation",
-      "patternForType",
-      "unresolvedType",
-      "regularTrueType",
-      "regularFalseType",
       "numberType",
       "booleanType",
       "globalRegExpType",
@@ -99,9 +68,6 @@
     "InterfaceType": [
       "thisType",
       "declaredMembersResolved",
-      "declaredMembers",
-      "declaredCallSignatures",
-      "declaredConstructSignatures",
       "declaredIndexInfos"
     ],
     "MappedType": [
@@ -110,9 +76,5 @@
       "templateType",
       "modifiersType"
     ]
-  },
-  "ExtraFieldPointers": {
-    "Checker": ["apparentArgumentCount"],
-    "IndexInfo": ["keyType", "valueType", "isReadonly", "declaration"]
   }
 }

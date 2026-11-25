@@ -10,79 +10,100 @@ import type {
   IndexInfoFact,
   TypePredicateFact,
   NamedSymbolFact,
-  ConfigSourceInfo,
   DiagnosticFact,
   ScalarOperation,
   QueryResults,
 } from './type-service-protocol.js';
+
 const invalid = (): never => {
   throw new Error('invalid type service packet');
 };
 
-/** Offset-addressed fields stay lazy. Only this disposable reader owns bytes;
- * semantic wrappers may retain decoded values, never a reader or byte view. */
+/**
+ * Offset-addressed fields stay lazy. Only this disposable reader owns bytes;
+ * semantic wrappers retain decoded values, never a reader or byte view.
+ */
 export class TypePacketReader {
   private bytes: Buffer | undefined;
   private readonly strings = new Map<number, string>();
   readonly kind: number;
-  constructor(bytes: Uint8Array) {
+
+  constructor(bytes: Readonly<Uint8Array>) {
     this.bytes = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
     this.kind = this.word(4);
   }
+
   get retainedBytes(): number {
     return this.bytes?.byteLength ?? 0;
   }
+
   close(): void {
     this.bytes = undefined;
     this.strings.clear();
   }
+
+  private buf(): Buffer {
+    if (!this.bytes) throw new Error('type packet reader is closed');
+    return this.bytes;
+  }
+
   private word(offset: number): number {
-    const bytes = this.bytes;
-    if (!bytes) throw new Error('type packet reader is closed');
+    const bytes = this.buf();
     if (offset < 0 || offset + 4 > bytes.length) return invalid();
     return bytes.readUInt32LE(offset);
   }
+
   private text(offset: number): string {
     const old = this.strings.get(offset);
     if (old !== undefined) return old;
+    const bytes = this.buf();
     const size = this.word(offset);
     const start = offset + 4;
     const end = start + size * 2;
-    if (end > this.bytes!.length) return invalid();
-    const value = this.bytes!.toString('utf16le', start, end);
+    if (end > bytes.length) return invalid();
+    const value = bytes.toString('utf16le', start, end);
     this.strings.set(offset, value);
     return value;
   }
+
   private ids(offset: number): number[] {
+    const bytes = this.buf();
     const size = this.word(offset);
-    if (offset + 4 + size * 4 > this.bytes!.length) return invalid();
+    if (offset + 4 + size * 4 > bytes.length) return invalid();
     return Array.from({ length: size }, (_, i) =>
       this.word(offset + 4 + i * 4),
     );
   }
+
   private optionalIDs(at: number): number[] | undefined {
     const offset = this.word(at);
     return offset ? this.ids(offset) : undefined;
   }
+
   private node(offset: number): NodeRef | undefined {
     if (!offset) return undefined;
-    const file = this.text(this.word(offset)),
-      index = this.word(offset + 4) | 0;
-    return index < 0
-      ? { file, index: -index, config: this.text(this.word(offset + 8)) }
-      : { file, index };
+    return {
+      file: this.text(this.word(offset)),
+      index: this.word(offset + 4),
+    };
   }
+
+  private requiredNode(offset: number): NodeRef {
+    return this.node(offset) ?? invalid();
+  }
+
   nodeFacts(): readonly NodeFact[] {
     if (this.kind !== 8) return invalid();
-    const at = this.word(8),
-      count = this.word(at);
-    if (at + 4 + count * 28 > this.bytes!.length) return invalid();
+    const bytes = this.buf();
+    const at = this.word(8);
+    const count = this.word(at);
+    if (at + 4 + count * 28 > bytes.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
-      const pos = at + 4 + i * 28,
-        text = this.word(pos + 20);
+      const pos = at + 4 + i * 28;
+      const text = this.word(pos + 20);
       return {
-        node: this.node(this.word(pos))!,
+        node: this.requiredNode(this.word(pos)),
         kind: this.text(this.word(pos + 4)),
         flags: this.word(pos + 8),
         moduleKeyword: this.word(pos + 24),
@@ -92,6 +113,7 @@ export class TypePacketReader {
       };
     });
   }
+
   typeField<K extends keyof TypeFact>(field: K): TypeFact[K] {
     if (this.kind !== 5) return invalid();
     let value: TypeFact[keyof TypeFact];
@@ -145,26 +167,30 @@ export class TypePacketReader {
         break;
       }
       case 'value': {
-        const tag = this.word(24),
-          at = this.word(28);
-        if (tag === 0) value = undefined;
-        else if (tag === 1) value = this.text(at);
-        else if (tag === 2) {
-          if (at + 8 > this.bytes!.length) return invalid();
-          value = this.bytes!.readDoubleLE(at);
-        } else if (tag === 3)
+        const tag = this.word(24);
+        const at = this.word(28);
+        if (tag === 0) {
+          value = undefined;
+        } else if (tag === 1) {
+          value = this.text(at);
+        } else if (tag === 2) {
+          const bytes = this.buf();
+          if (at + 8 > bytes.length) return invalid();
+          value = bytes.readDoubleLE(at);
+        } else if (tag === 3) {
           value = {
             negative: this.word(at) !== 0,
             base10Value: this.text(this.word(at + 4)),
           };
-        else return invalid();
+        } else {
+          return invalid();
+        }
         break;
       }
-      default:
-        return invalid();
     }
     return value as TypeFact[K];
   }
+
   symbolField<K extends keyof SymbolFact>(field: K): SymbolFact[K] {
     if (this.kind !== 6) return invalid();
     let value: SymbolFact[keyof SymbolFact];
@@ -186,32 +212,24 @@ export class TypePacketReader {
         value = flags ? flags - 1 : undefined;
         break;
       }
-      case 'hasMembers':
-        value = (this.word(32) & 1) !== 0;
-        break;
-      case 'hasExports':
-        value = (this.word(32) & 2) !== 0;
-        break;
-      case 'hasGlobalExports':
-        value = (this.word(32) & 4) !== 0;
-        break;
       case 'declarations': {
         const at = this.word(20);
-        if (!at) value = undefined;
-        else {
+        if (!at) {
+          value = undefined;
+        } else {
+          const bytes = this.buf();
           const size = this.word(at);
-          if (at + 4 + size * 8 > this.bytes!.length) return invalid();
+          if (at + 4 + size * 8 > bytes.length) return invalid();
           value = Array.from({ length: size }, (_, i) =>
-            this.node(at + 4 + i * 8)!,
+            this.requiredNode(at + 4 + i * 8),
           );
         }
         break;
       }
-      default:
-        return invalid();
     }
     return value as SymbolFact[K];
   }
+
   signatureField<K extends keyof SignatureFact>(field: K): SignatureFact[K] {
     if (this.kind !== 7) return invalid();
     let value: SignatureFact[keyof SignatureFact];
@@ -234,24 +252,26 @@ export class TypePacketReader {
     }
     return value as SignatureFact[K];
   }
+
   private indexInfos(at: number): readonly IndexInfoFact[] {
+    const bytes = this.buf();
     const count = this.word(at);
-    if (at + 4 + count * 24 > this.bytes!.length) return invalid();
+    if (at + 4 + count * 20 > bytes.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
-      const pos = at + 4 + i * 24;
+      const pos = at + 4 + i * 20;
       return {
         id: this.word(pos),
         keyType: this.word(pos + 4),
         type: this.word(pos + 8),
         isReadonly: this.word(pos + 12) !== 0,
         declaration: this.node(this.word(pos + 16)),
-        components: this.optionalIDs(pos + 20)?.map((at) => this.node(at)!),
       };
     });
   }
+
   private typePredicate(): TypePredicateFact | undefined {
-    const kind = this.word(8),
-      name = this.word(12);
+    const kind = this.word(8);
+    const name = this.word(12);
     return kind
       ? {
           kind: kind - 1,
@@ -261,26 +281,29 @@ export class TypePacketReader {
         }
       : undefined;
   }
-  private namedSymbols(): readonly NamedSymbolFact[] {
-    const at = this.word(8),
-      count = this.word(at);
-    if (at + 4 + count * 8 > this.bytes!.length) return invalid();
+
+  private namedSymbols(at: number): readonly NamedSymbolFact[] {
+    const bytes = this.buf();
+    const count = this.word(at);
+    if (at + 4 + count * 8 > bytes.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
       const pos = at + 4 + i * 8;
       return { id: this.word(pos), name: this.text(this.word(pos + 4)) };
     });
   }
+
   private displayParts(at: number): SymbolDisplayPart[] {
     if (!at) return [];
+    const bytes = this.buf();
     const count = this.word(at);
-    if (at + 4 + count * 12 > this.bytes!.length) return invalid();
+    if (at + 4 + count * 12 > bytes.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
-      const pos = at + 4 + i * 12,
-        part = {
-          text: this.text(this.word(pos)),
-          kind: this.text(this.word(pos + 4)),
-        },
-        target = this.word(pos + 8);
+      const pos = at + 4 + i * 12;
+      const part = {
+        text: this.text(this.word(pos)),
+        kind: this.text(this.word(pos + 4)),
+      };
+      const target = this.word(pos + 8);
       return target
         ? {
             ...part,
@@ -295,62 +318,48 @@ export class TypePacketReader {
         : part;
     });
   }
+
   private jsDocTags(): JSDocTagInfo[] {
-    const at = this.word(8),
-      count = this.word(at);
-    if (at + 4 + count * 8 > this.bytes!.length) return invalid();
+    const bytes = this.buf();
+    const at = this.word(8);
+    const count = this.word(at);
+    if (at + 4 + count * 8 > bytes.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
-      const pos = at + 4 + i * 8,
-        text = this.word(pos + 4);
+      const pos = at + 4 + i * 8;
+      const text = this.word(pos + 4);
       return {
         name: this.text(this.word(pos)),
         text: text ? this.displayParts(text) : undefined,
       };
     });
   }
-  private diagnostics(
-    at: number,
-    configs: Map<number, ConfigSourceInfo>,
-  ): DiagnosticFact[] {
+
+  private diagnostics(at: number): readonly DiagnosticFact[] {
     if (!at) return [];
+    const bytes = this.buf();
     const count = this.word(at);
-    if (at + 4 + count * 40 > this.bytes!.length) return invalid();
+    if (at + 4 + count * 40 > bytes.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
       const pos = at + 4 + i * 40;
-      const file = this.word(pos),
-        source = this.word(pos + 24),
-        flags = this.word(pos + 28);
-      let config: ConfigSourceInfo | undefined;
-      if (flags & 4) {
-        config = configs.get(file);
-        if (!config) {
-          config = {
-            id: this.text(this.word(file + 12)),
-            name: this.text(this.word(file)),
-            path: this.text(this.word(file + 4)),
-            extendedSourceFiles: this.optionalIDs(file + 8)?.map((name) =>
-              this.text(name),
-            ),
-          };
-          configs.set(file, config);
-        }
-      }
+      const file = this.word(pos);
+      const source = this.word(pos + 24);
+      const flags = this.word(pos + 28);
       return {
-        fileName: config?.name ?? (file ? this.text(file) : undefined),
+        fileName: file ? this.text(file) : undefined,
         start: this.word(pos + 4),
         length: this.word(pos + 8),
         category: this.word(pos + 12),
         code: this.word(pos + 16),
         text: this.text(this.word(pos + 20)),
         source: source ? this.text(source) : undefined,
-        config,
         reportsDeprecated: flags & 1 ? true : undefined,
         reportsUnnecessary: flags & 2 ? true : undefined,
-        chain: this.diagnostics(this.word(pos + 32), configs),
-        related: this.diagnostics(this.word(pos + 36), configs),
+        chain: this.diagnostics(this.word(pos + 32)),
+        related: this.diagnostics(this.word(pos + 36)),
       };
     });
   }
+
   scalar<K extends ScalarOperation>(operation: K): QueryResults[K] {
     if (this.kind !== SCALAR_KINDS[operation]) return invalid();
     let value: QueryResults[ScalarOperation];
@@ -374,7 +383,7 @@ export class TypePacketReader {
         value = this.typePredicate();
         break;
       case 11:
-        value = this.namedSymbols();
+        value = this.namedSymbols(this.word(8));
         break;
       case 12:
         value = this.displayParts(this.word(8));
@@ -383,78 +392,73 @@ export class TypePacketReader {
         value = this.jsDocTags();
         break;
       case 14: {
+        const bytes = this.buf();
         const len = this.word(8);
-        if (20 + len > this.bytes!.length) return invalid();
+        if (20 + len > bytes.length) return invalid();
         value = len
           ? {
-              tree: Uint8Array.from(this.bytes!.subarray(20, 20 + len)),
+              tree: Uint8Array.from(bytes.subarray(20, 20 + len)),
               origins: this.optionalIDs(12)?.map((offset) => this.node(offset)),
               emitFlags: this.optionalIDs(16),
             }
           : undefined;
         break;
       }
-      case 16:
-        switch (this.word(8)) {
-          case 0:
-            value = undefined;
-            break;
-          case 1:
-            value = this.text(this.word(12));
-            break;
-          case 2:
-            value = this.bytes!.readDoubleLE(12);
-            break;
-          default:
-            return invalid();
+      case 15:
+        value = this.diagnostics(this.word(8));
+        break;
+      case 16: {
+        const tag = this.word(8);
+        if (tag === 0) {
+          value = undefined;
+        } else if (tag === 1) {
+          value = this.text(this.word(12));
+        } else if (tag === 2) {
+          const bytes = this.buf();
+          if (20 > bytes.length) return invalid();
+          value = bytes.readDoubleLE(12);
+        } else {
+          return invalid();
         }
         break;
-      case 20:
-        value = this.word(8)
-          ? {
-              properties: this.ids(this.word(8)),
-              calls: this.ids(this.word(12)),
-              constructs: this.ids(this.word(16)),
-              indices: this.indexInfos(this.word(20)),
-            }
-          : undefined;
+      }
+      case 17:
+        value = this.ids(this.word(8)).map((at) => this.text(at));
         break;
-      case 19: {
+      case 18: {
         const list = (offset: number) =>
           this.word(offset) ? this.ids(this.word(offset)) : undefined;
+        const minPlusOne = this.word(20);
+        const fixedPlusOne = this.word(24);
         value = {
-          pattern: this.node(this.word(8)),
-          node: this.node(this.word(12)),
-          regular: this.word(20),
-          base: this.word(24),
-          constraint: this.word(28),
-          outer: list(32),
-          local: list(36),
-          elements: list(40),
-          minLength: this.word(44) ? this.word(44) - 1 : undefined,
-          fixedLength: this.word(48) ? this.word(48) - 1 : undefined,
-          labels: list(52)?.map((at) => this.node(at)),
-          texts: list(56)?.map((at) => this.text(at)),
-          root: this.node(this.word(60)),
-          rootCheck: this.word(64),
-          rootExtends: this.word(68),
-          rootAlias: this.word(72),
-          distributive: this.word(76) !== 0,
-          infer: list(80),
-          rootOuter: list(84),
-          rootArguments: list(88),
+          outer: list(8),
+          local: list(12),
+          elements: list(16),
+          minLength: minPlusOne ? minPlusOne - 1 : undefined,
+          fixedLength: fixedPlusOne ? fixedPlusOne - 1 : undefined,
+          labels: list(28)?.map((at) => this.node(at)),
+          texts: list(32)?.map((at) => this.text(at)),
+          root: this.node(this.word(36)),
+          rootCheck: this.word(40),
+          rootExtends: this.word(44),
+          rootAlias: this.word(48),
+          distributive: this.word(52) !== 0,
+          infer: list(56),
+          rootOuter: list(60),
+          rootArguments: list(64),
         };
         break;
       }
-      case 18:
-        value = this.ids(this.word(8)).map((at) => this.text(at));
+      case 19: {
+        const at = this.word(8);
+        value = at ? this.namedSymbols(at) : undefined;
         break;
-      case 17:
-        value = this.word(8) ? this.ids(this.word(8)) : undefined;
+      }
+      case 20: {
+        const at = this.word(8);
+        value = at ? this.indexInfos(at) : undefined;
         break;
-      case 15:
-        value = this.diagnostics(this.word(8), new Map());
-        break;
+      }
       default:
         return invalid();
     }
@@ -462,37 +466,53 @@ export class TypePacketReader {
   }
 }
 
-// Supplemental slices have independent packet offset origins. The owner copies
-// each retained packet into exact storage so one small fact never pins a reply.
-export function typeReplyPackets(bytes: Uint8Array): {
-  packet: Uint8Array;
-  records: Array<{
-    op: 'typeRecord' | 'symbolRecord' | 'signatureRecord';
-    id: number;
-    packet: Uint8Array;
-  }>;
-} {
+export interface TypeReplyRecord {
+  readonly op: 'typeRecord' | 'symbolRecord' | 'signatureRecord';
+  readonly id: number;
+  readonly packet: Uint8Array;
+}
+
+export interface TypeReply {
+  readonly packet: Uint8Array;
+  readonly records: readonly TypeReplyRecord[];
+}
+
+export function typeReplyPackets(bytes: Readonly<Uint8Array>): TypeReply {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (bytes.length < 4 || view.getUint32(0, true) !== 0x31425452)
+  if (bytes.byteLength < 12 || view.getUint32(0, true) !== 0x31425452) {
     return { packet: bytes, records: [] };
-  if (bytes.length < 12) return invalid();
-  const length = view.getUint32(4, true),
-    count = view.getUint32(8, true),
-    start = 12 + count * 16;
-  if (start > bytes.length || start + length > bytes.length) return invalid();
-  const records = [];
-  for (let i = 0; i < count; i++) {
-    const at = 12 + i * 16,
-      kind = view.getUint32(at, true),
-      id = view.getUint32(at + 4, true),
-      offset = view.getUint32(at + 8, true),
-      size = view.getUint32(at + 12, true);
-    const op = (
-      [undefined, 'typeRecord', 'symbolRecord', 'signatureRecord'] as const
-    )[kind];
-    if (!op || offset < start + length || offset + size > bytes.length)
-      return invalid();
-    records.push({ op, id, packet: bytes.subarray(offset, offset + size) });
   }
-  return { packet: bytes.subarray(start, start + length), records };
+  const packetLength = view.getUint32(4, true);
+  const count = view.getUint32(8, true);
+  const packetStart = 12 + count * 16;
+  const packetEnd = packetStart + packetLength;
+  if (packetEnd > bytes.byteLength) return invalid();
+  const records: TypeReplyRecord[] = [];
+  for (let i = 0; i < count; i++) {
+    const at = 12 + i * 16;
+    const tag = view.getUint32(at, true);
+    const id = view.getUint32(at + 4, true);
+    const offset = view.getUint32(at + 8, true);
+    const length = view.getUint32(at + 12, true);
+    if (offset < packetEnd || offset + length > bytes.byteLength) {
+      return invalid();
+    }
+    const op =
+      tag === 1
+        ? 'typeRecord'
+        : tag === 2
+          ? 'symbolRecord'
+          : tag === 3
+            ? 'signatureRecord'
+            : invalid();
+    records.push({
+      op,
+      id,
+      packet: bytes.subarray(offset, offset + length),
+    });
+  }
+  return {
+    packet: bytes.subarray(packetStart, packetEnd),
+    records,
+  };
 }

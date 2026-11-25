@@ -2,76 +2,89 @@ import type { JSDocTagInfo, SymbolDisplayPart } from 'typescript';
 
 /** Finite semantic protocol shared by the checker client and injected host. */
 export interface Scope {
-  generation: number;
+  readonly generation: number;
 }
+
+export interface SyntaxTokenRef {
+  readonly kind: number;
+  readonly pos: number;
+  readonly end: number;
+}
+
 export interface NodeRef {
-  file: string;
-  config?: string;
-  index: number;
-  token?: { kind: number; pos: number; end: number };
+  readonly file: string;
+  readonly index: number;
+  readonly token?: SyntaxTokenRef;
 }
+
 export interface GeneratedSyntax {
-  tree: Uint8Array;
-  origins?: readonly (NodeRef | undefined)[];
-  emitFlags?: readonly number[];
+  readonly tree: Uint8Array;
+  readonly origins?: readonly (NodeRef | undefined)[];
+  readonly emitFlags?: readonly number[];
 }
+
 export interface FileBinding extends Scope {
-  sourceFileName: string;
+  readonly sourceFileName: string;
 }
-export interface ConfigSourceInfo {
-  id: string;
-  name: string;
-  path: string;
-  extendedSourceFiles?: string[];
+
+export interface SourceDescriptor {
+  readonly fileName: string;
+  readonly path: string;
+  readonly packages?: readonly string[];
+  readonly impliedNodeFormat?: number;
+  readonly checkJsDirective?: {
+    readonly pos: number;
+    readonly end: number;
+    readonly enabled: boolean;
+  };
+  readonly external: boolean;
+  readonly defaultLibrary: boolean;
+  readonly isDeclarationFile: boolean;
 }
+
 export interface TypeServiceDescriptor extends Scope {
-  syntaxOnly?: boolean;
-  currentDirectory: string;
-  compilerOptions: Record<string, unknown>;
-  configFile?: ConfigSourceInfo;
-  implicitImportTrees?: Record<string, string>;
-  sources: Array<{
-    fileName: string;
-    path: string;
-    packages?: string[];
-    implicitImports?: string[];
-    impliedNodeFormat?: number;
-    checkJsDirective?: { pos: number; end: number; enabled: boolean };
-    external: boolean;
-    defaultLibrary: boolean;
-    isDeclarationFile: boolean;
-  }>;
+  readonly syntaxOnly?: boolean;
+  readonly currentDirectory: string;
+  readonly compilerOptions: Readonly<Record<string, unknown>>;
+  readonly sources: readonly SourceDescriptor[];
 }
+
+export interface SequenceAlias {
+  readonly index: number;
+  readonly sequence: number;
+  readonly count: number;
+  readonly start: number;
+  readonly end: number;
+}
+
+export interface ChainAlias {
+  readonly index: number;
+  readonly origin: number;
+  readonly expression: number;
+  readonly start: number;
+  readonly end: number;
+}
+
 export interface TypeServiceProjection {
-  sourceFileName: string;
-  binding: FileBinding;
-  tree: Uint8Array;
-  origins: number[];
-  firstTokens?: Record<number, number>;
-  reverse: Record<string, number>;
-  aliases: Array<{
-    index: number;
-    sequence: number;
-    count: number;
-    start: number;
-    end: number;
-  }> | null;
+  readonly sourceFileName: string;
+  readonly binding: FileBinding;
+  readonly tree: Uint8Array;
+  readonly origins: readonly number[];
+  readonly firstTokens?: Readonly<Record<number, number>>;
+  readonly reverse: Readonly<Record<string, number>>;
+  readonly aliases: readonly SequenceAlias[] | null;
   /** Original frame IDs shared by all aliases of a flattened sequence. */
-  sequenceMembers?: Record<number, number[]>;
+  readonly sequenceMembers?: Readonly<Record<number, readonly number[]>>;
   /** Optional chain prefixes removed from the ordinary frame. */
-  chainAliases?: Array<{
-    index: number;
-    origin: number;
-    expression: number;
-    start: number;
-    end: number;
-  }>;
+  readonly chainAliases?: readonly ChainAlias[];
 }
+
 export type SyntaxSource = (
   scope: Scope,
   file: string,
   metadataOnly?: boolean,
-) => { fileName: string; tree?: Uint8Array } | undefined;
+) => { readonly fileName: string; readonly tree?: Uint8Array } | undefined;
+
 export interface NodeFact {
   readonly node: NodeRef;
   readonly kind: string;
@@ -81,6 +94,7 @@ export interface NodeFact {
   readonly name: NodeRef | undefined;
   readonly text: string | undefined;
 }
+
 export interface TypeFact {
   readonly flags: readonly string[];
   readonly symbol: number;
@@ -89,66 +103,59 @@ export interface TypeFact {
   readonly escapedName: string | undefined;
   readonly objectFlags: readonly string[] | undefined;
   readonly value:
-    string | number | { negative: boolean; base10Value: string } | undefined;
+    | string
+    | number
+    | { readonly negative: boolean; readonly base10Value: string }
+    | undefined;
   readonly typeOperands: readonly number[] | undefined;
   readonly target: number;
   readonly aliasTypeArguments: readonly number[] | undefined;
   readonly typeParameters: readonly number[] | undefined;
-  readonly tuple: { combinedFlags: number; readonly: boolean } | undefined;
+  readonly tuple:
+    { readonly combinedFlags: number; readonly readonly: boolean } | undefined;
 }
-export interface DeclaredMembersFact {
-  properties: readonly number[];
-  calls: readonly number[];
-  constructs: readonly number[];
-  indices: readonly IndexInfoFact[];
-}
+
 export interface TypeDetailFact {
-  pattern?: NodeRef;
-  node?: NodeRef;
-  regular: number;
-  base: number;
-  constraint: number;
-  outer?: readonly number[];
-  local?: readonly number[];
-  elements?: readonly number[];
-  minLength?: number;
-  fixedLength?: number;
-  labels?: readonly (NodeRef | undefined)[];
-  texts?: readonly string[];
-  root?: NodeRef;
-  rootCheck: number;
-  rootExtends: number;
-  rootAlias: number;
-  distributive: boolean;
-  infer?: readonly number[];
-  rootOuter?: readonly number[];
-  rootArguments?: readonly number[];
+  readonly outer?: readonly number[];
+  readonly local?: readonly number[];
+  readonly elements?: readonly number[];
+  readonly minLength?: number;
+  readonly fixedLength?: number;
+  readonly labels?: readonly (NodeRef | undefined)[];
+  readonly texts?: readonly string[];
+  readonly root?: NodeRef;
+  readonly rootCheck: number;
+  readonly rootExtends: number;
+  readonly rootAlias: number;
+  readonly distributive: boolean;
+  readonly infer?: readonly number[];
+  readonly rootOuter?: readonly number[];
+  readonly rootArguments?: readonly number[];
 }
+
 export interface SymbolFact {
   readonly name: string;
   readonly escapedName: string;
   readonly flags: number;
   readonly checkFlags: number | undefined;
-  readonly hasMembers: boolean;
-  readonly hasExports: boolean;
-  readonly hasGlobalExports: boolean;
   readonly declarations: readonly NodeRef[] | undefined;
   readonly valueDeclaration: NodeRef | undefined;
 }
+
 export interface DiagnosticFact {
-  config?: ConfigSourceInfo;
-  fileName?: string;
-  start: number;
-  length: number;
-  code: number;
-  category: number;
-  text: string;
-  source?: string;
-  reportsDeprecated?: true;
-  reportsUnnecessary?: true;
-  chain: DiagnosticFact[];
-  related: DiagnosticFact[];
+  readonly fileName?: string;
+  readonly start: number;
+  readonly length: number;
+  readonly code: number;
+  readonly category: number;
+  readonly text: string;
+  readonly source?: string;
+  readonly reportsDeprecated?: true;
+  readonly reportsUnnecessary?: true;
+  readonly chain: readonly DiagnosticFact[];
+  readonly related: readonly DiagnosticFact[];
 }
+
 export interface SignatureFact {
   readonly parameters: readonly number[];
   readonly declaration: NodeRef | undefined;
@@ -156,239 +163,148 @@ export interface SignatureFact {
   readonly thisParameter: number;
   readonly minArgumentCount: number;
 }
+
 export interface IndexInfoFact {
   readonly id: number;
-  readonly components?: readonly NodeRef[];
   readonly keyType: number;
   readonly type: number;
   readonly isReadonly: boolean;
   readonly declaration: NodeRef | undefined;
 }
+
 export interface TypePredicateFact {
   readonly kind: number;
   readonly parameterName: string | undefined;
   readonly parameterIndex: number | undefined;
   readonly type: number;
 }
+
 export interface NamedSymbolFact {
   readonly id: number;
   readonly name: string;
 }
-type NodeArgs = { node: NodeRef };
-type IDArgs = { id: number };
+
+type EmptyArgs = Readonly<Record<string, never>>;
+type NodeArgs = { readonly node: NodeRef };
+type IDArgs = { readonly id: number };
 type PrintArgs = IDArgs & {
-  node: NodeRef | undefined;
-  flags: number | undefined;
+  readonly node: NodeRef | undefined;
+  readonly flags: number | undefined;
 };
+
 export interface QueryArguments {
-  freshLiteral: IDArgs;
-  evolvingElement: IDArgs;
-  finalArray: IDArgs;
-  typeParameterConstraint: IDArgs;
-  typeDetails: IDArgs;
-  declaredMembers: IDArgs;
-  resolvedTrueType: IDArgs;
-  resolvedFalseType: IDArgs;
-  symbolExports: IDArgs;
-  symbolGlobalExports: IDArgs;
-  configFileParsingDiagnostics: Record<string, never>;
-  optionsDiagnostics: Record<string, never>;
-  globalDiagnostics: Record<string, never>;
-  syntacticDiagnostics: { node?: NodeRef };
-  semanticDiagnostics: { node?: NodeRef };
-  declarationDiagnostics: { node?: NodeRef };
-  nodeCount: Record<string, never>;
-  identifierCount: Record<string, never>;
-  symbolCount: Record<string, never>;
-  typeCount: Record<string, never>;
-  instantiationCount: Record<string, never>;
-  relationCacheSizes: Record<string, never>;
-  rootFileNames: Record<string, never>;
-  modeForUsageLocation: NodeArgs & { file: string };
-  modeForResolutionAtIndex: NodeArgs & { index: number };
-  projectReferences: Record<string, never>;
-  resolvedProjectReferences: Record<string, never>;
-  configSyntax: { config: string };
-  stringLiteralType: { name: readonly number[] };
-  numberLiteralType: { value: string };
-  bigintLiteralType: { negative: boolean; digits: string };
-  nullableType: IDArgs & { nullable: boolean; undefinable: boolean };
-  privateIdentifierProperty: IDArgs & NodeArgs & { name: readonly number[] };
-  moduleMember: IDArgs & { name: readonly number[] };
-  validPropertyAccess: NodeArgs & { name: readonly number[] };
-  parameterPropertySymbols: NodeArgs & { name: readonly number[] };
-  expandoSymbol: NodeArgs & { allowDeclaration: boolean };
-  indexSymbolInfos: IDArgs & { siblings?: readonly number[] };
-  signatureDeclaration: PrintArgs & { kind: number };
-  parameterDeclaration: PrintArgs & { kind: number };
-  typeParameterDeclarations: PrintArgs & { kind: number };
-  typeParameterDeclaration: PrintArgs & { kind: number };
-  entityName: PrintArgs & { kind: number };
-  symbolExpression: PrintArgs & { kind: number };
-  symbolString: PrintArgs & { kind: number };
-  predicateString: {
-    kind: number;
-    name?: readonly number[];
-    position?: number;
-    type: number;
-    node?: NodeRef;
-    flags?: number;
-  };
-  indexDeclaration: {
-    key: number;
-    value: number;
-    readonly: boolean;
-    declaration?: NodeRef;
-    node?: NodeRef;
-    flags?: number;
-  };
-  errorType: Record<string, never>;
-  anyType: Record<string, never>;
-  unknownType: Record<string, never>;
-  stringType: Record<string, never>;
-  numberType: Record<string, never>;
-  booleanType: Record<string, never>;
-  bigIntType: Record<string, never>;
-  eSSymbolType: Record<string, never>;
-  nonPrimitiveType: Record<string, never>;
-  neverType: Record<string, never>;
-  nullType: Record<string, never>;
-  undefinedType: Record<string, never>;
-  trueType: Record<string, never>;
-  falseType: Record<string, never>;
-  ambientModules: Record<string, never>;
-  augmentedPropertiesOfType: IDArgs;
-  rootSymbols: IDArgs;
-  mergedSymbol: IDArgs;
-  isArgumentsSymbol: IDArgs;
-  isUndefinedSymbol: IDArgs;
-  exportSpecifierLocalTargetSymbol: NodeArgs;
-  propertySymbolOfDestructuringAssignment: NodeArgs;
-  jsxIntrinsicTagNamesAt: NodeArgs;
-  typeOfAssignmentPattern: NodeArgs;
-  isOptionalParameter: NodeArgs;
-  constantValue: NodeArgs;
-  isImplementationOfOverload: NodeArgs;
-  typeArgumentsForResolvedSignature: IDArgs;
+  // Program queries
+  rootFileNames: EmptyArgs;
+  syntacticDiagnostics: { readonly node?: NodeRef };
+  semanticDiagnostics: { readonly node?: NodeRef };
+  declarationDiagnostics: { readonly node?: NodeRef };
+  // Syntax summaries
   nodeRecord: NodeArgs;
+  // Intrinsic types & ambient modules
+  errorType: EmptyArgs;
+  anyType: EmptyArgs;
+  unknownType: EmptyArgs;
+  stringType: EmptyArgs;
+  numberType: EmptyArgs;
+  booleanType: EmptyArgs;
+  bigIntType: EmptyArgs;
+  eSSymbolType: EmptyArgs;
+  nonPrimitiveType: EmptyArgs;
+  neverType: EmptyArgs;
+  nullType: EmptyArgs;
+  undefinedType: EmptyArgs;
+  void: EmptyArgs;
+  ambientModules: EmptyArgs;
+  // Node -> semantic queries
   type: NodeArgs;
   fromTypeNode: NodeArgs;
   context: NodeArgs;
-  contextualArgument: NodeArgs & { index: number };
+  contextualArgument: NodeArgs & { readonly index: number };
   suggestionDiagnostics: NodeArgs;
   symbol: NodeArgs;
   declarationSymbol: NodeArgs;
   signature: NodeArgs;
   resolvedSignature: NodeArgs;
-  resolvedSignatureWithOptions: NodeArgs & {
-    withCandidates: boolean;
-    argumentCount: number | undefined;
-  };
   shorthandValueSymbol: NodeArgs;
+  exportSpecifierLocalTargetSymbol: NodeArgs;
+  propertySymbolOfDestructuringAssignment: NodeArgs;
+  jsxIntrinsicTagNamesAt: NodeArgs;
+  constantValue: NodeArgs;
+  validPropertyAccess: NodeArgs & { readonly name: readonly number[] };
+  symbolsInScope: NodeArgs & { readonly meaning: number };
+  resolveName: {
+    readonly name: readonly number[];
+    readonly node: NodeRef | undefined;
+    readonly kind: number;
+    readonly excludeGlobals: boolean;
+  };
+  // Type queries
+  typeRecord: IDArgs;
+  typeDetails: IDArgs;
+  declaredIndexInfos: IDArgs;
+  mappedFields: IDArgs;
+  classThisType: IDArgs;
   constraint: IDArgs;
   apparent: IDArgs;
   baseLiteral: IDArgs;
   nonNullable: IDArgs;
-  typeString: PrintArgs;
-  typeNode: PrintArgs;
-  signatureString: PrintArgs & { kind: number };
   awaited: IDArgs;
   widened: IDArgs;
   baseTypes: IDArgs;
   defaultType: IDArgs;
-  isTypeAssignableTo: { source: number; target: number };
+  isTypeAssignableTo: { readonly source: number; readonly target: number };
   properties: IDArgs;
-  apparentProperties: IDArgs;
+  augmentedPropertiesOfType: IDArgs;
+  property: IDArgs & { readonly name: readonly number[] };
+  propertyType: IDArgs & { readonly name: readonly number[] };
   typeArguments: IDArgs;
   isArray: IDArgs;
   isArrayLike: IDArgs;
   isTuple: IDArgs;
   numberIndexType: IDArgs;
   stringIndexType: IDArgs;
-  indexInfo: IDArgs & { kind: number };
+  indexInfo: IDArgs & { readonly kind: number };
   indexInfos: IDArgs;
-  typeRecord: IDArgs;
-  mappedFields: IDArgs;
-  classThisType: IDArgs;
-  fullyQualifiedName: IDArgs;
+  signatures: IDArgs & { readonly kind: number };
+  typeString: PrintArgs;
+  typeNode: PrintArgs;
+  // Symbol queries
+  symbolRecord: IDArgs;
   symbolMembers: IDArgs;
+  symbolExports: IDArgs;
+  symbolDocumentation: IDArgs & { readonly withChecker: boolean };
+  symbolJSDocTags: IDArgs & { readonly withChecker: boolean };
+  fullyQualifiedName: IDArgs;
   aliasedSymbol: IDArgs;
   immediateAliasedSymbol: IDArgs;
   isUnknownSymbol: IDArgs;
   exportsOfModule: IDArgs;
   exportSymbol: IDArgs;
-  symbolsInScope: NodeArgs & { meaning: number };
   declaredType: IDArgs;
   typeOfSymbol: IDArgs;
-  symbolRecord: IDArgs;
-  symbolDocumentation: IDArgs & { withChecker: boolean };
-  symbolJSDocTags: IDArgs & { withChecker: boolean };
+  symbolType: IDArgs & NodeArgs;
+  rootSymbols: IDArgs;
+  mergedSymbol: IDArgs;
+  isArgumentsSymbol: IDArgs;
+  isUndefinedSymbol: IDArgs;
+  moduleMember: IDArgs & { readonly name: readonly number[] };
+  symbolString: PrintArgs & { readonly kind: number };
+  // Signature queries
+  signatureRecord: IDArgs;
   returnType: IDArgs;
   typePredicate: IDArgs;
-  parameterType: IDArgs & { position: number };
-  signatureRecord: IDArgs;
+  parameterType: IDArgs & { readonly position: number };
   signatureDocumentation: IDArgs;
   signatureJSDocTags: IDArgs;
-  void: Record<string, never>;
-  property: IDArgs & { name: readonly number[] };
-  propertyType: IDArgs & { name: readonly number[] };
-  symbolType: IDArgs & NodeArgs;
-  signatures: IDArgs & { kind: number };
-  resolveName: {
-    name: readonly number[];
-    node: NodeRef | undefined;
-    kind: number;
-    excludeGlobals: boolean;
-  };
+  signatureString: PrintArgs & { readonly kind: number };
 }
+
 export interface QueryResults {
-  freshLiteral: number;
-  evolvingElement: number;
-  finalArray: number;
-  typeParameterConstraint: number;
-  typeDetails: TypeDetailFact;
-  declaredMembers: DeclaredMembersFact | undefined;
-  resolvedTrueType: number;
-  resolvedFalseType: number;
-  symbolExports: readonly NamedSymbolFact[];
-  symbolGlobalExports: readonly NamedSymbolFact[];
-  configFileParsingDiagnostics: DiagnosticFact[];
-  optionsDiagnostics: DiagnosticFact[];
-  globalDiagnostics: DiagnosticFact[];
-  syntacticDiagnostics: DiagnosticFact[];
-  semanticDiagnostics: DiagnosticFact[];
-  declarationDiagnostics: DiagnosticFact[];
-  nodeCount: number;
-  identifierCount: number;
-  symbolCount: number;
-  typeCount: number;
-  instantiationCount: number;
-  relationCacheSizes: readonly number[];
   rootFileNames: readonly string[];
-  modeForUsageLocation: number;
-  modeForResolutionAtIndex: number;
-  projectReferences: string;
-  resolvedProjectReferences: string;
-  configSyntax: GeneratedSyntax;
-  stringLiteralType: number;
-  numberLiteralType: number;
-  bigintLiteralType: number;
-  nullableType: number;
-  privateIdentifierProperty: number;
-  moduleMember: number;
-  validPropertyAccess: boolean;
-  parameterPropertySymbols: readonly number[];
-  expandoSymbol: number;
-  indexSymbolInfos: readonly IndexInfoFact[];
-  signatureDeclaration: GeneratedSyntax | undefined;
-  parameterDeclaration: GeneratedSyntax | undefined;
-  typeParameterDeclarations: GeneratedSyntax | undefined;
-  typeParameterDeclaration: GeneratedSyntax | undefined;
-  entityName: GeneratedSyntax | undefined;
-  symbolExpression: GeneratedSyntax | undefined;
-  symbolString: string;
-  predicateString: string;
-  indexDeclaration: GeneratedSyntax | undefined;
+  syntacticDiagnostics: readonly DiagnosticFact[];
+  semanticDiagnostics: readonly DiagnosticFact[];
+  declarationDiagnostics: readonly DiagnosticFact[];
+  nodeRecord: readonly NodeFact[];
   errorType: number;
   anyType: number;
   unknownType: number;
@@ -401,48 +317,43 @@ export interface QueryResults {
   neverType: number;
   nullType: number;
   undefinedType: number;
-  trueType: number;
-  falseType: number;
+  void: number;
   ambientModules: readonly NamedSymbolFact[];
-  augmentedPropertiesOfType: readonly NamedSymbolFact[];
-  rootSymbols: readonly NamedSymbolFact[];
-  mergedSymbol: number;
-  isArgumentsSymbol: boolean;
-  isUndefinedSymbol: boolean;
-  exportSpecifierLocalTargetSymbol: number;
-  propertySymbolOfDestructuringAssignment: number;
-  jsxIntrinsicTagNamesAt: readonly NamedSymbolFact[];
-  typeOfAssignmentPattern: number;
-  isOptionalParameter: boolean;
-  constantValue: string | number | undefined;
-  isImplementationOfOverload: boolean | undefined;
-  typeArgumentsForResolvedSignature: readonly number[] | undefined;
-  nodeRecord: readonly NodeFact[];
   type: number;
   fromTypeNode: number;
   context: number;
   contextualArgument: number;
-  suggestionDiagnostics: DiagnosticFact[];
+  suggestionDiagnostics: readonly DiagnosticFact[];
   symbol: number;
   declarationSymbol: number;
   signature: number;
   resolvedSignature: number;
-  resolvedSignatureWithOptions: readonly [number, ...number[]];
   shorthandValueSymbol: number;
+  exportSpecifierLocalTargetSymbol: number;
+  propertySymbolOfDestructuringAssignment: number;
+  jsxIntrinsicTagNamesAt: readonly NamedSymbolFact[];
+  constantValue: string | number | undefined;
+  validPropertyAccess: boolean;
+  symbolsInScope: readonly NamedSymbolFact[];
+  resolveName: number;
+  typeRecord: TypeFact;
+  typeDetails: TypeDetailFact;
+  declaredIndexInfos: readonly IndexInfoFact[] | undefined;
+  mappedFields: readonly number[];
+  classThisType: number;
   constraint: number;
   apparent: number;
   baseLiteral: number;
   nonNullable: number;
-  typeString: string;
-  typeNode: GeneratedSyntax | undefined;
-  signatureString: string;
   awaited: number;
   widened: number;
   baseTypes: readonly number[];
   defaultType: number;
   isTypeAssignableTo: boolean;
   properties: readonly number[];
-  apparentProperties: readonly number[];
+  augmentedPropertiesOfType: readonly NamedSymbolFact[];
+  property: number;
+  propertyType: number;
   typeArguments: readonly number[];
   isArray: boolean;
   isArrayLike: boolean;
@@ -451,38 +362,41 @@ export interface QueryResults {
   stringIndexType: number;
   indexInfo: readonly IndexInfoFact[];
   indexInfos: readonly IndexInfoFact[];
-  typeRecord: TypeFact;
-  mappedFields: readonly number[];
-  classThisType: number;
+  signatures: readonly number[];
+  typeString: string;
+  typeNode: GeneratedSyntax | undefined;
+  symbolRecord: SymbolFact;
+  symbolMembers: readonly NamedSymbolFact[] | undefined;
+  symbolExports: readonly NamedSymbolFact[] | undefined;
+  symbolDocumentation: readonly SymbolDisplayPart[];
+  symbolJSDocTags: readonly JSDocTagInfo[];
   fullyQualifiedName: string;
-  symbolMembers: readonly NamedSymbolFact[];
   aliasedSymbol: number;
   immediateAliasedSymbol: number;
   isUnknownSymbol: boolean;
   exportsOfModule: readonly NamedSymbolFact[];
   exportSymbol: number;
-  symbolsInScope: readonly NamedSymbolFact[];
   declaredType: number;
   typeOfSymbol: number;
-  symbolRecord: SymbolFact;
-  symbolDocumentation: SymbolDisplayPart[];
-  symbolJSDocTags: JSDocTagInfo[];
+  symbolType: number;
+  rootSymbols: readonly NamedSymbolFact[];
+  mergedSymbol: number;
+  isArgumentsSymbol: boolean;
+  isUndefinedSymbol: boolean;
+  moduleMember: number;
+  symbolString: string;
+  signatureRecord: SignatureFact;
   returnType: number;
   typePredicate: TypePredicateFact | undefined;
   parameterType: number;
-  signatureRecord: SignatureFact;
-  signatureDocumentation: SymbolDisplayPart[];
-  signatureJSDocTags: JSDocTagInfo[];
-  void: number;
-  property: number;
-  propertyType: number;
-  symbolType: number;
-  signatures: readonly number[];
-  resolveName: number;
+  signatureDocumentation: readonly SymbolDisplayPart[];
+  signatureJSDocTags: readonly JSDocTagInfo[];
+  signatureString: string;
 }
+
 export type Operation = keyof QueryArguments;
 export type TypeServiceQuery<K extends Operation = Operation> = {
-  [P in K]: Scope & { op: P; args: QueryArguments[P] };
+  [P in K]: Scope & { readonly op: P; readonly args: QueryArguments[P] };
 }[K];
 export type QueryTransport = (
   query: TypeServiceQuery,
@@ -490,87 +404,43 @@ export type QueryTransport = (
   cacheable: boolean,
 ) => Uint8Array;
 
-/** Any client of the checker can re-resolve a call or populate a lazy slot. */
+const NON_CACHEABLE_OPS = new Set<Operation>([
+  'semanticDiagnostics',
+  'declarationDiagnostics',
+  'suggestionDiagnostics',
+  'declaredIndexInfos',
+  'mappedFields',
+  'symbolMembers',
+  'symbolExports',
+]);
+
+/**
+ * Only genuinely immutable compiler facts may be cached across queries.
+ * Queries backed by lazily mutated checker tables (e.g. symbol tables,
+ * unresolved mapped/declared member slots, diagnostics) stay uncached.
+ */
 export function isCacheableTypeQuery(query: TypeServiceQuery): boolean {
-  switch (query.op) {
-    case 'nodeRecord':
-    case 'modeForResolutionAtIndex':
-    case 'modeForUsageLocation':
-    case 'syntacticDiagnostics':
-      return true;
-    case 'globalDiagnostics':
-    case 'semanticDiagnostics':
-    case 'declarationDiagnostics':
-    case 'resolvedSignatureWithOptions':
-    case 'symbolCount':
-    case 'typeCount':
-    case 'instantiationCount':
-    case 'relationCacheSizes':
-    case 'declaredMembers':
-    case 'freshLiteral':
-    case 'typeParameterConstraint':
-    case 'finalArray':
-    case 'resolvedTrueType':
-    case 'resolvedFalseType':
-    case 'mappedFields':
-    case 'configSyntax':
-      return false;
-    default:
-      // A node can depend on a re-resolved call elsewhere in the expression.
-      return !('node' in query.args && query.args.node !== undefined);
+  if (query.op === 'nodeRecord' || query.op === 'syntacticDiagnostics') {
+    return true;
   }
+  if (NON_CACHEABLE_OPS.has(query.op)) {
+    return false;
+  }
+  return !('node' in query.args && query.args.node !== undefined);
 }
+
+function formatNodeKey(node: NodeRef | undefined): string {
+  if (!node) return '-';
+  const base = `${node.file.length}:${node.file}:${node.index}`;
+  return node.token
+    ? `${base}:${node.token.kind}:${node.token.pos}:${node.token.end}`
+    : base;
+}
+
 export function typeQueryKey(q: TypeServiceQuery): string {
-  const nodeKey = (node: NodeRef | undefined): string => {
-    if (!node) return '-';
-    const key = node.config
-      ? `c${node.config}:${node.index}`
-      : `${node.file.length}:${node.file}:${node.index}`;
-    return node.token
-      ? `${key}:${node.token.kind}:${node.token.pos}:${node.token.end}`
-      : key;
-  };
-  const prefix = `${q.generation}:${operationIDs.get(q.op)}:`;
+  const prefix = `${q.generation}:${operationIDs.get(q.op) ?? 0}:`;
   switch (q.op) {
-    case 'configFileParsingDiagnostics':
-    case 'optionsDiagnostics':
-    case 'globalDiagnostics':
-    case 'syntacticDiagnostics':
-    case 'semanticDiagnostics':
-    case 'declarationDiagnostics':
-    case 'nodeCount':
-    case 'identifierCount':
-    case 'symbolCount':
-    case 'typeCount':
-    case 'instantiationCount':
-    case 'relationCacheSizes':
     case 'rootFileNames':
-    case 'modeForUsageLocation':
-    case 'modeForResolutionAtIndex':
-    case 'projectReferences':
-    case 'resolvedProjectReferences':
-    case 'configSyntax':
-      return prefix + JSON.stringify(q.args);
-    case 'stringLiteralType':
-    case 'numberLiteralType':
-    case 'bigintLiteralType':
-    case 'nullableType':
-    case 'privateIdentifierProperty':
-    case 'moduleMember':
-    case 'validPropertyAccess':
-    case 'parameterPropertySymbols':
-    case 'expandoSymbol':
-    case 'indexSymbolInfos':
-    case 'signatureDeclaration':
-    case 'parameterDeclaration':
-    case 'typeParameterDeclarations':
-    case 'typeParameterDeclaration':
-    case 'entityName':
-    case 'symbolExpression':
-    case 'symbolString':
-    case 'predicateString':
-    case 'indexDeclaration':
-      return prefix + JSON.stringify(q.args);
     case 'errorType':
     case 'anyType':
     case 'unknownType':
@@ -583,17 +453,13 @@ export function typeQueryKey(q: TypeServiceQuery): string {
     case 'neverType':
     case 'nullType':
     case 'undefinedType':
-    case 'trueType':
-    case 'falseType':
+    case 'void':
     case 'ambientModules':
-    case 'exportSpecifierLocalTargetSymbol':
-    case 'propertySymbolOfDestructuringAssignment':
-    case 'jsxIntrinsicTagNamesAt':
-    case 'typeOfAssignmentPattern':
-    case 'isOptionalParameter':
-    case 'constantValue':
-    case 'isImplementationOfOverload':
-      return prefix + JSON.stringify(q.args);
+      return prefix;
+    case 'syntacticDiagnostics':
+    case 'semanticDiagnostics':
+    case 'declarationDiagnostics':
+      return prefix + formatNodeKey(q.args.node);
     case 'nodeRecord':
     case 'type':
     case 'fromTypeNode':
@@ -604,25 +470,28 @@ export function typeQueryKey(q: TypeServiceQuery): string {
     case 'resolvedSignature':
     case 'shorthandValueSymbol':
     case 'suggestionDiagnostics':
-      return prefix + nodeKey(q.args.node);
+    case 'exportSpecifierLocalTargetSymbol':
+    case 'propertySymbolOfDestructuringAssignment':
+    case 'jsxIntrinsicTagNamesAt':
+    case 'constantValue':
+      return prefix + formatNodeKey(q.args.node);
     case 'contextualArgument':
-      return `${prefix}${nodeKey(q.args.node)}:${q.args.index}`;
-    case 'resolvedSignatureWithOptions':
-      return `${prefix}${nodeKey(q.args.node)}:${q.args.withCandidates}:${q.args.argumentCount ?? '-'}`;
-    case 'void':
-      return prefix;
+      return `${prefix}${formatNodeKey(q.args.node)}:${q.args.index}`;
+    case 'validPropertyAccess':
+      return `${prefix}${formatNodeKey(q.args.node)}:${q.args.name.length}:${q.args.name.join(',')}`;
     case 'property':
     case 'propertyType':
+    case 'moduleMember':
       return `${prefix}${q.args.id}:${q.args.name.length}:${q.args.name.join(',')}`;
     case 'symbolType':
-      return `${prefix}${q.args.id}:${nodeKey(q.args.node)}`;
+      return `${prefix}${q.args.id}:${formatNodeKey(q.args.node)}`;
     case 'signatures':
     case 'indexInfo':
       return `${prefix}${q.args.id}:${q.args.kind}`;
     case 'isTypeAssignableTo':
       return `${prefix}${q.args.source}:${q.args.target}`;
     case 'symbolsInScope':
-      return `${prefix}${nodeKey(q.args.node)}:${q.args.meaning}`;
+      return `${prefix}${formatNodeKey(q.args.node)}:${q.args.meaning}`;
     case 'parameterType':
       return `${prefix}${q.args.id}:${q.args.position}`;
     case 'symbolDocumentation':
@@ -630,13 +499,55 @@ export function typeQueryKey(q: TypeServiceQuery): string {
       return `${prefix}${q.args.id}:${q.args.withChecker}`;
     case 'typeString':
     case 'typeNode':
-      return `${prefix}${q.args.id}:${nodeKey(q.args.node)}:${q.args.flags ?? '-'}`;
+      return `${prefix}${q.args.id}:${formatNodeKey(q.args.node)}:${q.args.flags ?? '-'}`;
     case 'signatureString':
-      return `${prefix}${q.args.id}:${nodeKey(q.args.node)}:${q.args.flags ?? '-'}:${q.args.kind}`;
+    case 'symbolString':
+      return `${prefix}${q.args.id}:${formatNodeKey(q.args.node)}:${q.args.flags ?? '-'}:${q.args.kind}`;
     case 'resolveName':
-      return `${prefix}${q.args.name.length}:${q.args.name.join(',')}:${nodeKey(q.args.node)}:${q.args.kind}:${q.args.excludeGlobals}`;
-    default:
-      return prefix + q.args.id;
+      return `${prefix}${q.args.name.length}:${q.args.name.join(',')}:${formatNodeKey(q.args.node)}:${q.args.kind}:${q.args.excludeGlobals}`;
+    case 'typeRecord':
+    case 'typeDetails':
+    case 'declaredIndexInfos':
+    case 'mappedFields':
+    case 'classThisType':
+    case 'constraint':
+    case 'apparent':
+    case 'baseLiteral':
+    case 'nonNullable':
+    case 'awaited':
+    case 'widened':
+    case 'baseTypes':
+    case 'defaultType':
+    case 'properties':
+    case 'augmentedPropertiesOfType':
+    case 'typeArguments':
+    case 'isArray':
+    case 'isArrayLike':
+    case 'isTuple':
+    case 'numberIndexType':
+    case 'stringIndexType':
+    case 'indexInfos':
+    case 'symbolRecord':
+    case 'symbolMembers':
+    case 'symbolExports':
+    case 'fullyQualifiedName':
+    case 'aliasedSymbol':
+    case 'immediateAliasedSymbol':
+    case 'isUnknownSymbol':
+    case 'exportsOfModule':
+    case 'exportSymbol':
+    case 'declaredType':
+    case 'typeOfSymbol':
+    case 'rootSymbols':
+    case 'mergedSymbol':
+    case 'isArgumentsSymbol':
+    case 'isUndefinedSymbol':
+    case 'signatureRecord':
+    case 'returnType':
+    case 'typePredicate':
+    case 'signatureDocumentation':
+    case 'signatureJSDocTags':
+      return `${prefix}${q.args.id}`;
   }
 }
 
@@ -644,54 +555,12 @@ export type ScalarOperation = Exclude<
   Operation,
   'typeRecord' | 'symbolRecord' | 'signatureRecord' | 'nodeRecord'
 >;
-export const SCALAR_KINDS: Record<ScalarOperation, number> = {
-  freshLiteral: 1,
-  evolvingElement: 1,
-  finalArray: 1,
-  typeParameterConstraint: 1,
-  typeDetails: 19,
-  declaredMembers: 20,
-  resolvedTrueType: 1,
-  resolvedFalseType: 1,
-  symbolExports: 11,
-  symbolGlobalExports: 11,
-  configFileParsingDiagnostics: 15,
-  optionsDiagnostics: 15,
-  globalDiagnostics: 15,
+
+export const SCALAR_KINDS: Readonly<Record<ScalarOperation, number>> = {
+  rootFileNames: 17,
   syntacticDiagnostics: 15,
   semanticDiagnostics: 15,
   declarationDiagnostics: 15,
-  nodeCount: 1,
-  identifierCount: 1,
-  symbolCount: 1,
-  typeCount: 1,
-  instantiationCount: 1,
-  relationCacheSizes: 4,
-  rootFileNames: 18,
-  modeForUsageLocation: 1,
-  modeForResolutionAtIndex: 1,
-  projectReferences: 3,
-  resolvedProjectReferences: 3,
-  configSyntax: 14,
-  stringLiteralType: 1,
-  numberLiteralType: 1,
-  bigintLiteralType: 1,
-  nullableType: 1,
-  privateIdentifierProperty: 1,
-  moduleMember: 1,
-  validPropertyAccess: 2,
-  parameterPropertySymbols: 4,
-  expandoSymbol: 1,
-  indexSymbolInfos: 9,
-  signatureDeclaration: 14,
-  parameterDeclaration: 14,
-  typeParameterDeclarations: 14,
-  typeParameterDeclaration: 14,
-  entityName: 14,
-  symbolExpression: 14,
-  symbolString: 3,
-  predicateString: 3,
-  indexDeclaration: 14,
   errorType: 1,
   anyType: 1,
   unknownType: 1,
@@ -704,22 +573,8 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   neverType: 1,
   nullType: 1,
   undefinedType: 1,
-  trueType: 1,
-  falseType: 1,
+  void: 1,
   ambientModules: 11,
-  augmentedPropertiesOfType: 11,
-  rootSymbols: 11,
-  mergedSymbol: 1,
-  isArgumentsSymbol: 2,
-  isUndefinedSymbol: 2,
-  exportSpecifierLocalTargetSymbol: 1,
-  propertySymbolOfDestructuringAssignment: 1,
-  jsxIntrinsicTagNamesAt: 11,
-  typeOfAssignmentPattern: 1,
-  isOptionalParameter: 2,
-  constantValue: 16,
-  isImplementationOfOverload: 2,
-  typeArgumentsForResolvedSignature: 17,
   type: 1,
   fromTypeNode: 1,
   context: 1,
@@ -729,27 +584,32 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   declarationSymbol: 1,
   signature: 1,
   resolvedSignature: 1,
-  resolvedSignatureWithOptions: 4,
   shorthandValueSymbol: 1,
+  exportSpecifierLocalTargetSymbol: 1,
+  propertySymbolOfDestructuringAssignment: 1,
+  jsxIntrinsicTagNamesAt: 11,
+  constantValue: 16,
+  validPropertyAccess: 2,
+  symbolsInScope: 11,
+  resolveName: 1,
+  typeDetails: 18,
+  declaredIndexInfos: 20,
+  mappedFields: 4,
+  classThisType: 1,
   constraint: 1,
   apparent: 1,
   baseLiteral: 1,
   nonNullable: 1,
-  typeString: 3,
-  typeNode: 14,
-  signatureString: 3,
   awaited: 1,
   widened: 1,
   baseTypes: 4,
   defaultType: 1,
   isTypeAssignableTo: 2,
   properties: 4,
-  apparentProperties: 4,
+  augmentedPropertiesOfType: 11,
+  property: 1,
+  propertyType: 1,
   typeArguments: 4,
-  mappedFields: 4,
-  classThisType: 1,
-  fullyQualifiedName: 3,
-  symbolMembers: 11,
   isArray: 2,
   isArrayLike: 2,
   isTuple: 2,
@@ -757,30 +617,36 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   stringIndexType: 1,
   indexInfo: 9,
   indexInfos: 9,
+  signatures: 4,
+  typeString: 3,
+  typeNode: 14,
+  symbolMembers: 19,
+  symbolExports: 19,
+  symbolDocumentation: 12,
+  symbolJSDocTags: 13,
+  fullyQualifiedName: 3,
   aliasedSymbol: 1,
   immediateAliasedSymbol: 1,
   isUnknownSymbol: 2,
   exportsOfModule: 11,
   exportSymbol: 1,
-  symbolsInScope: 11,
   declaredType: 1,
   typeOfSymbol: 1,
-  symbolDocumentation: 12,
-  symbolJSDocTags: 13,
+  symbolType: 1,
+  rootSymbols: 11,
+  mergedSymbol: 1,
+  isArgumentsSymbol: 2,
+  isUndefinedSymbol: 2,
+  moduleMember: 1,
+  symbolString: 3,
   returnType: 1,
   typePredicate: 10,
   parameterType: 1,
   signatureDocumentation: 12,
   signatureJSDocTags: 13,
-  void: 1,
-  property: 1,
-  propertyType: 1,
-  symbolType: 1,
-  signatures: 4,
-  resolveName: 1,
+  signatureString: 3,
 };
 
-// Both ends of the shared cache use these short, generation-local keys.
 const operationIDs = new Map(
   [
     ...Object.keys(SCALAR_KINDS),
@@ -792,7 +658,7 @@ const operationIDs = new Map(
 );
 
 export type ServiceRequest<K extends Operation = Operation> = {
-  [P in K]: { op: P; args: QueryArguments[P] };
+  [P in K]: { readonly op: P; readonly args: QueryArguments[P] };
 }[K];
 export type ScalarRequest = ServiceRequest<ScalarOperation>;
 

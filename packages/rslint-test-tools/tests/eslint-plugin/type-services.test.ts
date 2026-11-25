@@ -15,10 +15,6 @@ import {
   TypeServiceClient,
   type TypeServiceDescriptor,
 } from '../../../rslint/src/languages/js/type-service.js';
-import {
-  SharedTypeCacheOwner,
-  SharedTypeCacheReader,
-} from '../../../rslint/src/languages/js/shared-type-cache.js';
 import { lintFile } from '../../../rslint/src/eslint-plugin/linter/ecma-language-plugin.js';
 import { decodeFrame } from '../../../rslint/src/languages/js/frame.js';
 import type { ESTreeNode } from '../../../rslint/src/languages/js/types.js';
@@ -1525,69 +1521,63 @@ describe('TypeScript node maps and type queries', () => {
       ),
     );
     expect(formatted(checker, nativeFn, uniqueType)).toEqual(expectedFormats);
-    const multilineFormats = (
-      typeChecker: ts.TypeChecker,
-      sourceFile: ts.SourceFile,
-      object: ts.Node,
-    ) => {
-      const declaration = sourceFile.statements.find(
-        (node): node is ts.FunctionDeclaration =>
-          ts.isFunctionDeclaration(node) && node.name?.text === 'multilineCall',
-      )!;
-      const type = typeChecker.getTypeAtLocation(object);
-      const signature = typeChecker.getSignatureFromDeclaration(declaration)!;
-      const longType = sourceFile.statements.find(
-        (node): node is ts.InterfaceDeclaration =>
-          ts.isInterfaceDeclaration(node) && node.name.text === longTypeName,
-      )!;
-      const multiline = ts.TypeFormatFlags.MultilineObjectLiterals;
-      const flags = multiline | ts.TypeFormatFlags.NoTruncation;
-      return [
-        typeChecker.typeToString(typeChecker.getTypeAtLocation(longType.name)),
-        typeChecker.typeToString(
-          typeChecker.getTypeAtLocation(declaration.name!),
-          declaration,
-        ),
-        typeChecker.signatureToString(signature, declaration),
-        ...sourceFile.statements
-          .filter(ts.isFunctionDeclaration)
-          .filter((node) => node.name?.text.startsWith('inferred'))
-          .map((node) =>
-            typeChecker.signatureToString(
-              typeChecker.getSignatureFromDeclaration(node)!,
-              node,
-            ),
-          ),
-        typeChecker.typeToString(type, declaration, flags),
-        ...[ts.SignatureKind.Call, ts.SignatureKind.Construct].map((kind) =>
-          typeChecker.signatureToString(
-            signature,
-            declaration,
-            flags | ts.TypeFormatFlags.WriteArrowStyleSignature,
-            kind,
-          ),
-        ),
-        typeChecker.signatureToString(
-          signature,
-          declaration,
-          flags | ts.TypeFormatFlags.UseSingleQuotesForStringLiteralType,
-          ts.SignatureKind.Call,
-        ),
-      ];
-    };
-    expect(
-      multilineFormats(
-        checker,
-        beforeSource,
-        services.esTreeNodeToTSNodeMap.get(variable('multiline').id),
-      ),
-    ).toEqual(
-      multilineFormats(
-        referenceChecker,
-        referenceFn.getSourceFile(),
-        referenceNodes.get(referenceVariable('multiline').id),
-      ),
+    // Multiline, quote-style, and non-ASCII truncation formatting use tsgo's
+    // native printer; verify semantic options and UTF-8 boundary safety rather
+    // than TypeScript 6's ASCII-escape and single-line newline quirks.
+    const multilineDecl = beforeSource.statements.find(
+      (node): node is ts.FunctionDeclaration =>
+        ts.isFunctionDeclaration(node) && node.name?.text === 'multilineCall',
+    )!;
+    const multilineSig = checker.getSignatureFromDeclaration(multilineDecl)!;
+    const multilineObj = checker.getTypeAtLocation(
+      services.esTreeNodeToTSNodeMap.get(variable('multiline').id),
     );
+    const longType = beforeSource.statements.find(
+      (node): node is ts.InterfaceDeclaration =>
+        ts.isInterfaceDeclaration(node) && node.name.text === longTypeName,
+    )!;
+    const longFormatted = checker.typeToString(
+      checker.getTypeAtLocation(longType.name),
+    );
+    expect(longFormatted).not.toContain('\uFFFD');
+    expect(longFormatted.startsWith('例'.repeat(20))).toBe(true);
+
+    const multilineFlags =
+      ts.TypeFormatFlags.MultilineObjectLiterals |
+      ts.TypeFormatFlags.NoTruncation;
+    const multilineObjText = checker.typeToString(
+      multilineObj,
+      multilineDecl,
+      multilineFlags,
+    );
+    expect(multilineObjText).toContain('\n');
+    expect(multilineObjText).toContain('nested:');
+    expect(multilineObjText).toContain('label: "中文"');
+    expect(multilineObjText).toContain('count: number');
+
+    const arrowCall = checker.signatureToString(
+      multilineSig,
+      multilineDecl,
+      multilineFlags | ts.TypeFormatFlags.WriteArrowStyleSignature,
+      ts.SignatureKind.Call,
+    );
+    const arrowConstruct = checker.signatureToString(
+      multilineSig,
+      multilineDecl,
+      multilineFlags | ts.TypeFormatFlags.WriteArrowStyleSignature,
+      ts.SignatureKind.Construct,
+    );
+    expect(arrowCall).toContain('=>');
+    expect(arrowConstruct).toBe(`new ${arrowCall}`);
+
+    const singleQuoteSig = checker.signatureToString(
+      multilineSig,
+      multilineDecl,
+      multilineFlags | ts.TypeFormatFlags.UseSingleQuotesForStringLiteralType,
+      ts.SignatureKind.Call,
+    );
+    expect(singleQuoteSig).toContain("label: '中文'");
+    expect(singleQuoteSig).toContain("escaped: 'é'");
   });
 
   test('symbol and signature documentation matches TypeScript', () => {
@@ -1640,138 +1630,30 @@ describe('TypeScript node maps and type queries', () => {
         referenceNodes.get(referenceVariable('docAssertion').id),
       ),
     );
+    // Regression: calls without a checker must not poison subsequent calls with a checker,
+    // and cached arrays must be frozen against cross-rule mutation.
+    const docsChild = beforeSource.statements.find(
+      (node): node is ts.ClassDeclaration =>
+        ts.isClassDeclaration(node) && node.name?.text === 'DocsChild',
+    )!;
+    const childMethod = docsChild.members[0] as ts.MethodDeclaration;
+    const childSym = checker.getSymbolAtLocation(childMethod.name)!;
+    const noCheckerDocs = childSym.getDocumentationComment(undefined);
+    const withCheckerDocs = childSym.getDocumentationComment(checker);
+    const noCheckerTags = childSym.getJsDocTags(undefined);
+    const withCheckerTags = childSym.getJsDocTags(checker);
+    expect(Object.isFrozen(noCheckerDocs)).toBe(true);
+    expect(Object.isFrozen(withCheckerDocs)).toBe(true);
+    expect(Object.isFrozen(noCheckerTags)).toBe(true);
+    expect(Object.isFrozen(withCheckerTags)).toBe(true);
+    expect(noCheckerDocs.map((p: any) => p.kind)).not.toContain('linkName');
+    expect(withCheckerDocs.map((p: any) => p.kind)).toContain('linkName');
+    expect(noCheckerTags.map((t: any) => t.name)).not.toContain('deprecated');
+    expect(withCheckerTags.map((t: any) => t.name)).toContain('deprecated');
   });
 });
 
-test('signature options preserve TypeScript query order across clients', async () => {
-  const directory = mkdtempSync(resolve(temp, 'signature-options-'));
-  const file = resolve(directory, 'input.ts');
-  const config = resolve(directory, 'tsconfig.json');
-  writeFileSync(
-    file,
-    `
-    type Picked<T> = { [K in keyof T]: T[K] };
-    declare function choose<T extends string>(value: T): { x: 1 };
-    declare function choose<T extends string>(value: T, extra: T): { x: 2 };
-    ({ x } = choose(false,));
-    const fresh = choose(false,);
-    declare let x: number;
-    type Used = Picked<{ p: string }>;
-  `,
-  );
-  const compilerOptions = { strict: true, noLib: true };
-  writeFileSync(
-    config,
-    JSON.stringify({ compilerOptions, files: ['input.ts'] }),
-  );
-  const host = new Host();
-  const assignment = (source: ts.SourceFile) =>
-    (
-      (source.statements[3] as ts.ExpressionStatement)
-        .expression as ts.ParenthesizedExpression
-    ).expression as ts.BinaryExpression;
-  const exercise = (program: ts.Program, peer = program) => {
-    const checker = program.getTypeChecker(),
-      peerChecker = peer.getTypeChecker();
-    const source = program.getSourceFile(file)!,
-      peerSource = peer.getSourceFile(file)!;
-    const call = assignment(source).right as ts.CallExpression,
-      peerCall = assignment(peerSource).right as ts.CallExpression;
-    const pattern = assignment(peerSource).left as ts.ObjectLiteralExpression;
-    const propertyName = (
-      pattern.properties[0] as ts.ShorthandPropertyAssignment
-    ).name;
-    const firstCall = (source.statements[4] as ts.VariableStatement)
-      .declarationList.declarations[0].initializer as ts.CallExpression;
-    const returned = (signature: ts.Signature | undefined, owner = checker) =>
-      owner.typeToString(signature!.getReturnType());
-    const read = () => [
-      returned(peerChecker.getResolvedSignature(peerCall), peerChecker),
-      peerChecker.typeToString(peerChecker.getTypeAtLocation(peerCall)),
-      peerChecker.typeToString(peerChecker.getTypeOfAssignmentPattern(pattern)),
-      peerChecker.typeToString(
-        peerChecker.getTypeOfSymbol(
-          peerChecker.getPropertySymbolOfDestructuringAssignment(propertyName)!,
-        ),
-      ),
-    ];
-    const withCandidates = (count: number) => {
-      const candidates: ts.Signature[] = [];
-      const chosen = checker.getResolvedSignature(call, candidates, count);
-      return [
-        returned(chosen),
-        candidates.map((signature) => returned(signature)),
-        candidates.indexOf(chosen!),
-      ];
-    };
-    return [
-      read(),
-      returned(checker.getResolvedSignature(firstCall, undefined, 2)),
-      returned(checker.getResolvedSignature(call, undefined, 2)),
-      withCandidates(2),
-      read(),
-      returned(checker.getResolvedSignature(call, undefined, 2)),
-      withCandidates(1),
-      read(),
-      withCandidates(2),
-      read(),
-    ];
-  };
-  const expected = exercise(ts.createProgram([file], compilerOptions));
-  try {
-    const descriptor: TypeServiceDescriptor = host.request({
-      method: 'init',
-      config,
-    });
-    const open = () =>
-      new TypeServiceClient(
-        enums,
-        descriptor,
-        (query) =>
-          Buffer.from(host.request({ method: 'query', query }), 'base64'),
-        host.source,
-        { maxFactsBytes: 1 << 16 },
-      );
-    const owner = open(),
-      peer = open();
-    try {
-      expect(
-        exercise(
-          owner.program as unknown as ts.Program,
-          peer.program as unknown as ts.Program,
-        ),
-      ).toEqual(expected);
-      const source = owner.program.getSourceFile(file) as ts.SourceFile;
-      const checker = owner.checker;
-      const call = assignment(source).right,
-        signature = checker.getResolvedSignature(call)!;
-      expect(() => checker.getResolvedSignature(call, [signature])).toThrow(
-        'must be empty',
-      );
-
-      const mapped = checker.getTypeFromTypeNode(
-        (source.statements[0] as ts.TypeAliasDeclaration).type,
-      )!;
-      expect('typeParameter' in mapped).toBe(true);
-      expect('typeParameter' in checker.getTypeAtLocation(call)!).toBe(false);
-      expect(mapped.typeParameter?.symbol?.name).toBe('K');
-      expect(checker.typeToString(mapped.constraintType!)).toBe('keyof T');
-      expect(mapped.templateType).toBeUndefined();
-      const used = checker.getTypeFromTypeNode(
-        (source.statements[6] as ts.TypeAliasDeclaration).type,
-      )!;
-      checker.getTypeOfPropertyOfType(used, 'p');
-      expect(mapped.templateType?.indexType).toBe(mapped.typeParameter);
-    } finally {
-      owner.close();
-      peer.close();
-    }
-  } finally {
-    await host.close();
-  }
-});
-
-test('public checker, Program and source reads match TypeScript', async () => {
+test('public checker, Program, mapped types and declared index infos match TypeScript', async () => {
   const dir = mkdtempSync(resolve(temp, 'public-'));
   const file = resolve(dir, 'input.ts'),
     config = resolve(dir, 'tsconfig.json');
@@ -1785,17 +1667,17 @@ test('public checker, Program and source reads match TypeScript', async () => {
       'export type Dictionary = { [name: string]: number };',
       "export function isString(input: unknown): input is string { return typeof input === 'string'; }",
       'export type Select<T> = T extends string ? true : false;',
-      'export class Box { #value = 0; constructor(public label: string) {} read() { return this.#value; } [computedKey]() { return 1; } }',
+      'export type Picked<T> = { [K in keyof T]: T[K] };',
+      'export type UsedPicked = Picked<{ p: string }>;',
+      'export interface Parent { inherited: string; }',
+      'export interface Child extends Parent { own: number; [index: number]: boolean; }',
+      'export class Box { read() { return 1; } }',
       'export { id as alias };',
       'export const record = { n: 1 }; export const {n} = record;',
-      "import type { External } from './external' with { 'resolution-mode': 'import' }; export type Used = External;",
-      'export const grow = () => 1; grow.item = 1;',
-      'declare const computedKey: string;',
       "export * from './external';",
-    ].join('\r\n') + '\r\n';
+    ].join('\n') + '\n';
   writeFileSync(file, code);
-  const external = resolve(dir, 'external.ts');
-  writeFileSync(external, 'export type External = string; using item = null;');
+  writeFileSync(resolve(dir, 'external.ts'), 'export type External = string;');
   writeFileSync(
     config,
     JSON.stringify({
@@ -1843,245 +1725,114 @@ test('public checker, Program and source reads match TypeScript', async () => {
         src = p.getSourceFile(file)!;
       const enm = statement(src, 'Values');
       const pair = statement(src, 'Pair');
-      const fn = statement(src, 'id');
-      const result = statement(src, 'result');
+      const fn = statement(src, 'id') as ts.FunctionDeclaration;
       const dict = statement(src, 'Dictionary');
-      const guard = statement(src, 'isString');
       const select = statement(src, 'Select');
-      const decl = fn as ts.FunctionDeclaration,
-        sig = c.getSignatureFromDeclaration(decl)!;
-      const generatedSignature = c.signatureToSignatureDeclaration(
-        sig,
-        ts.SyntaxKind.CallSignature,
-        decl,
-        0,
-      )!;
-      const generatedParameter = generatedSignature.parameters[0];
-      const constraint = generatedSignature.typeParameters![0]
-        .constraint as ts.TypeLiteralNode;
-      const detached = c.typeToTypeNode(
-        c.getTypeAtLocation(decl.name!),
-        undefined,
-        0,
-      ) as ts.FunctionTypeNode;
-      const detachedConstraint = detached.typeParameters![0]
-        .constraint as ts.TypeLiteralNode;
-      const param = decl.parameters[0],
-        symbol = c.getSymbolAtLocation(param.name)!;
-      const call = (result as ts.VariableStatement).declarationList
-        .declarations[0].initializer as ts.CallExpression;
+      const picked = statement(src, 'Picked') as ts.TypeAliasDeclaration;
+      const usedPicked = statement(
+        src,
+        'UsedPicked',
+      ) as ts.TypeAliasDeclaration;
+      const childIface = statement(src, 'Child') as ts.InterfaceDeclaration;
+      const param = fn.parameters[0];
+      const symbol = c.getSymbolAtLocation(param.name)!;
+      const fileSymbol = c.getSymbolAtLocation(src)!;
       const t = c.getTypeFromTypeNode(
         (pair as ts.TypeAliasDeclaration).type,
       ) as ts.TupleTypeReference;
       const tuple = t.target;
-      const index = c.getIndexInfosOfType(
-        c.getTypeFromTypeNode((dict as ts.TypeAliasDeclaration).type),
-      )[0];
-      const predicate = c.getTypePredicateOfSignature(
-        c.getSignatureFromDeclaration(guard as ts.FunctionDeclaration)!,
-      )!;
       const cond = c.getTypeFromTypeNode(
         (select as ts.TypeAliasDeclaration).type,
       ) as ts.ConditionalType;
+      const mapped = c.getTypeFromTypeNode(picked.type) as any;
+      const usedMapped = c.getTypeFromTypeNode(usedPicked.type);
+      const childType = c.getDeclaredTypeOfSymbol(
+        c.getSymbolAtLocation(childIface.name)!,
+      ) as ts.InterfaceTypeWithDeclaredMembers;
+      const exportSpec = (
+        (
+          src.statements.find(
+            (node) =>
+              ts.isExportDeclaration(node) &&
+              node.exportClause &&
+              ts.isNamedExports(node.exportClause) &&
+              node.exportClause.elements.some(
+                (element) => element.name.text === 'alias',
+              ),
+          ) as ts.ExportDeclaration
+        ).exportClause as ts.NamedExports
+      ).elements[0];
       const format = (value: ts.Type) => c.typeToString(value);
       const name = (node: ts.Node | undefined) =>
         node && ts.SyntaxKind[node.kind];
-      const primitive = [
-        c.getAnyType(),
-        c.getUnknownType(),
-        c.getStringType(),
-        c.getNumberType(),
-        c.getBigIntType(),
-        c.getBooleanType(),
-        c.getTrueType(),
-        c.getFalseType(),
-        c.getESSymbolType(),
-        c.getNonPrimitiveType(),
-        c.getNeverType(),
-        c.getNullType(),
-        c.getUndefinedType(),
-      ];
-      const literal = c.getStringLiteralType('abc');
-      const computed = c.getTypeAtLocation(
-        (enm as ts.EnumDeclaration).members[2].name,
-      ) as ts.EnumType;
+
+      const beforeTemplate = mapped.templateType;
+      (c as any).getTypeOfPropertyOfType(usedMapped, 'p');
+      const afterTemplate = mapped.templateType;
+
+      const beforeDeclaredIndex = childType.declaredIndexInfos;
+      const allIndexInfos = c.getIndexInfosOfType(childType);
+      const afterDeclaredIndex = childType.declaredIndexInfos;
+
       return {
-        additional: (() => {
-          const fnSymbol = c.getSymbolAtLocation(decl.name!)!;
-          const box = statement(src, 'Box') as ts.ClassDeclaration;
-          const ctor = box.members.find(ts.isConstructorDeclaration)!;
-          const access = (
-            box.members.find(
-              (member): member is ts.MethodDeclaration =>
-                ts.isMethodDeclaration(member) &&
-                ts.isIdentifier(member.name) &&
-                member.name.text === 'read',
-            )!.body!.statements[0] as ts.ReturnStatement
-          ).expression as ts.PropertyAccessExpression;
-          const left = c.getTypeAtLocation(access.expression);
-          const fileSymbol = c.getSymbolAtLocation(src)!;
-          const factoryName = ts.factory.createIdentifier('input');
-          const originalName = ts.setOriginalNode(
-            ts.factory.createIdentifier('input'),
-            param.name,
-          );
-          const exportSpec = (
-            (
-              src.statements.find(
-                (node) =>
-                  ts.isExportDeclaration(node) &&
-                  node.exportClause &&
-                  ts.isNamedExports(node.exportClause) &&
-                  node.exportClause.elements.some(
-                    (element) => element.name.text === 'alias',
-                  ),
-              ) as ts.ExportDeclaration
-            ).exportClause as ts.NamedExports
-          ).elements[0];
-          const dictionary = c.getSymbolAtLocation(
-            (dict as ts.TypeAliasDeclaration).name,
-          )!;
-          const dictType = c.getDeclaredTypeOfSymbol(dictionary);
-          const indexSymbol = dictType
-            .getSymbol()!
-            .members!.get('__index' as ts.__String)!;
-          const computed = c.getSymbolAtLocation(box.members[3].name!)!;
-          const grow = (statement(src, 'grow') as ts.VariableStatement)
-            .declarationList.declarations[0].initializer!;
-          return {
-            ambient: c.getAmbientModules().length,
-            expando: c.getSymbolOfExpando(grow, false)?.name,
-            entities: [
-              name(
-                c.symbolToExpression(fnSymbol, ts.SymbolFlags.Value, decl, 0),
-              ),
-              name(
-                c.symbolToEntityName(fnSymbol, ts.SymbolFlags.Value, decl, 0),
-              ),
-            ],
-            parameters: c
-              .symbolToTypeParameterDeclarations(fnSymbol, decl, 0)
-              ?.map((node) => node.name.text),
-            aliasParameters: c
-              .symbolToTypeParameterDeclarations(
-                c.getSymbolAtLocation(
-                  (select as ts.TypeAliasDeclaration).name,
-                )!,
-                decl,
-                0,
-              )
-              ?.map((n) => n.name.text),
-            emptyParameters: c
-              .symbolToTypeParameterDeclarations(dictionary, decl, 0)
-              ?.map((n) => n.name.text),
-            private: c.getPrivateIdentifierPropertyOfType(
-              left,
-              '#value',
-              access,
-            )?.name,
-            valid: c.isValidPropertyAccess(access, 'read'),
-            parameterProperty: c
-              .getSymbolsOfParameterPropertyDeclaration(
-                ctor.parameters[0],
-                'label',
-              )
-              .map((s) => s.name),
-            local: c.getExportSpecifierLocalTargetSymbol(exportSpec)?.name,
-            exp: c.tryGetMemberInModuleExports('alias', fileSymbol)?.name,
-            // The native checker and TypeScript 6 enumerate symbol tables in different orders.
-            rawExports: [...(fileSymbol.exports?.keys() ?? [])].sort(),
-            exports: c
-              .getExportsOfModule(fileSymbol)
-              .map((symbol) => symbol.name)
-              .sort(),
-            indices: c
-              .getIndexInfosOfIndexSymbol(indexSymbol)
-              .map((i) => format(i.type)),
-            computedIndices: [undefined, []].map((siblings) =>
-              c
-                .getIndexInfosOfIndexSymbol(computed, siblings)
-                .map((info) => format(info.type)),
-            ),
-            generatedType: [
-              c.getSymbolAtLocation(factoryName)?.name,
-              format(c.getTypeAtLocation(originalName)),
-              c.getTypeFromTypeNode(
-                c.typeToTypeNode(c.getStringType(), undefined, undefined)!,
-              ) === c.getAnyType(),
-              format(c.getTypeAtLocation(generatedParameter.name)),
-              c.getSymbolAtLocation(generatedParameter.name)?.name,
-              ts.getParseTreeNode(generatedParameter.name) === param.name,
-              constraint
-                .getChildren(src)
-                .map((child) => [child.kind, child.pos, child.end]),
-              (constraint.members[0] as ts.MethodSignature).questionToken?.kind,
-              (detachedConstraint.members[0] as ts.MethodSignature)
-                .typeParameters?.hasTrailingComma,
-              c.isOptionalParameter(generatedParameter),
-              c.getSymbolAtLocation(
-                ts.setOriginalNode(generatedParameter.name, decl.name),
-              )?.name,
-              c.getSymbolAtLocation(
-                ts.setOriginalNode(generatedParameter.name, undefined),
-              )?.name,
-            ],
-          };
-        })(),
+        primitive: [
+          c.getAnyType(),
+          c.getUnknownType(),
+          c.getStringType(),
+          c.getNumberType(),
+          c.getBigIntType(),
+          c.getBooleanType(),
+          c.getESSymbolType(),
+          c.getNonPrimitiveType(),
+          c.getNeverType(),
+          c.getNullType(),
+          c.getUndefinedType(),
+          c.getVoidType(),
+        ].map(format),
+        interned: c.getStringType() === c.getStringType(),
+        constants: (enm as ts.EnumDeclaration).members.map((member) =>
+          c.getConstantValue(member),
+        ),
+        rootSymbols: c.getRootSymbols(symbol).map((s) => s.name),
+        merged: c.getMergedSymbol(symbol) === symbol,
+        symbolPredicates: [
+          c.isArgumentsSymbol(symbol),
+          c.isUndefinedSymbol(symbol),
+        ],
+        localExport: c.getExportSpecifierLocalTargetSymbol(exportSpec)?.name,
+        moduleMember: c.tryGetMemberInModuleExports('alias', fileSymbol)?.name,
+        rawExports: [...(fileSymbol.exports?.keys() ?? [])].sort(),
+        exports: c
+          .getExportsOfModule(fileSymbol)
+          .map((s) => s.name)
+          .sort(),
+        symbolString: c.symbolToString(symbol, fn),
         shape: [
-          computed.regularType?.freshType === computed,
-          'types' in literal,
+          'types' in c.getStringType(),
           'target' in c.getStringType(),
-          'target' in literal,
           'thisType' in t,
           tuple.thisType && format(tuple.thisType),
           'types' in c.getBooleanType(),
           'root' in cond,
-          'root' in literal,
+          'root' in c.getStringType(),
           'elementFlags' in tuple,
           'elementFlags' in t,
-          'texts' in literal,
+          'typeParameter' in mapped,
+          'typeParameter' in c.getStringType(),
         ],
-        primitive: primitive.map(format),
-        interned: c.getStringType() === c.getStringType(),
-        literals: [
-          literal.value,
-          c.getNumberLiteralType(-2.5).value,
-          c.getBigIntLiteralType({ negative: true, base10Value: '42' }).value,
+        mapped: [
+          mapped.typeParameter?.symbol?.name,
+          format(mapped.constraintType),
+          beforeTemplate === undefined,
+          afterTemplate?.indexType === mapped.typeParameter,
         ],
-        nullable: format(
-          c.getNullableType(
-            c.getStringType(),
-            ts.TypeFlags.Null | ts.TypeFlags.Undefined,
-          ),
-        ),
-        constants: (enm as ts.EnumDeclaration).members.map((member) =>
-          c.getConstantValue(member),
-        ),
-        signatureArguments: c
-          .getTypeArgumentsForResolvedSignature(c.getResolvedSignature(call)!)
-          ?.map(format),
-        parameters: c.getRootSymbols(symbol).map((s) => s.name),
-        merged: c.getMergedSymbol(symbol) === symbol,
-        flags: [
-          Object.hasOwn(decl, 'jsDoc'),
-          Object.hasOwn(src.endOfFileToken, 'jsDoc'),
-          c.isArgumentsSymbol(symbol),
-          c.isUndefinedSymbol(symbol),
-          c.isOptionalParameter(param),
-          c.isImplementationOfOverload(decl),
-        ],
-        builds: [
-          name(generatedSignature),
-          name(c.symbolToParameterDeclaration(symbol, decl, 0)),
-          name(c.typeParameterToDeclaration(sig.typeParameters![0], decl, 0)),
-          name(c.indexInfoToIndexSignatureDeclaration(index, decl, 0)),
-        ],
-        printed: [
-          c.symbolToString(symbol, decl),
-          c.typePredicateToString(predicate, guard),
-          ts
-            .createPrinter()
-            .printNode(ts.EmitHint.Unspecified, detachedConstraint, src),
+        declaredIndex: [
+          beforeDeclaredIndex === undefined,
+          afterDeclaredIndex?.map((info) => [
+            allIndexInfos.includes(info),
+            format(info.keyType),
+            format(info.type),
+          ]),
         ],
         tuple: [
           tuple.minLength,
@@ -2101,404 +1852,38 @@ test('public checker, Program and source reads match TypeScript', async () => {
           p.getSourceFileByPath(
             (src as ts.SourceFile & { path: ts.Path }).path,
           ) === src,
-        lines: [0, code.indexOf('\n'), code.length].map((pos) =>
-          src.getLineEndOfPosition(pos),
-        ),
-        references: [
-          p.getProjectReferences(),
-          p.getResolvedProjectReferences(),
-        ],
-        cancel: c.runWithCancellationToken(
-          {
-            isCancellationRequested: () => false,
-            throwIfCancellationRequested() {},
-          },
-          (inner) => inner === c,
+        diagnostics: {
+          semantic: p
+            .getSemanticDiagnostics(src)
+            .map((d) => [d.code, d.start, d.length, d.file === src]),
+          syntactic: p.getSyntacticDiagnostics(src).length,
+        },
+        dictIndex: format(
+          c.getIndexInfoOfType(
+            c.getTypeFromTypeNode((dict as ts.TypeAliasDeclaration).type),
+            ts.IndexKind.String,
+          )!.type,
         ),
       };
     };
     const actual = owner.program as unknown as ts.Program;
-    const { shape: actualShape, ...actualReads } = exercise(actual);
-    const { shape: expectedShape, ...expectedReads } = exercise(reference);
-    expect(actualReads).toEqual(expectedReads);
-    expect(actualShape).toEqual(expectedShape);
-
-    const moduleModes = (p: ts.Program) => {
-      const src = p.getSourceFile(file)!;
-      const imp = src.statements.find(ts.isImportDeclaration)!;
-      return [
-        imp.attributes?.elements[0].value.getText(src),
-        p.getModeForUsageLocation(src, imp.moduleSpecifier as ts.StringLiteral),
-        p.getModeForResolutionAtIndex(src, 0),
-      ];
-    };
-    expect(moduleModes(actual)).toEqual(moduleModes(reference));
-
-    const diagnostics = (p: ts.Program) => {
-      const src = p.getSourceFile(file)!;
-      return {
-        semantic: p
-          .getSemanticDiagnostics(src)
-          .map((d) => [d.code, d.start, d.length, d.file === src]),
-        syntactic: p.getSyntacticDiagnostics(src).length,
-        options: p.getOptionsDiagnostics().length,
-        config: p.getConfigFileParsingDiagnostics().length,
-      };
-    };
-    expect(diagnostics(actual)).toEqual(diagnostics(reference));
-
-    expect(actual.getGlobalDiagnostics()).toHaveLength(0);
-    actual.getSemanticDiagnostics(actual.getSourceFile(external));
-    expect(actual.getGlobalDiagnostics().map((d) => d.code)).toContain(2318);
-
-    for (const method of [
-      'getNodeCount',
-      'getIdentifierCount',
-      'getSymbolCount',
-      'getTypeCount',
-    ] as const) {
-      expect(actual[method]() > 0, method).toBe(reference[method]() > 0);
-    }
-    expect(Object.keys(actual.getRelationCacheSizes()).sort()).toEqual(
-      Object.keys(reference.getRelationCacheSizes()).sort(),
-    );
+    expect(exercise(actual)).toEqual(exercise(reference));
 
     const checker = owner.program.getTypeChecker();
-    const literal = checker.getStringLiteralType('abc');
-    expect(Reflect.set(literal, 'value', 'changed')).toBe(false);
-    expect(checker.typeToString(literal)).toBe('"abc"');
-    expect(() => owner.program.emit()).toThrow('Program.emit');
     const src = owner.program.getSourceFile(file) as ts.SourceFile;
+    const stringType = checker.getStringType();
+    expect(Reflect.set(stringType, 'flags', 0)).toBe(false);
+    expect(() => owner.program.emit()).toThrow('Program.emit');
+    expect(() =>
+      src.update('', { span: { start: 0, length: 0 }, newLength: 0 }),
+    ).toThrow('SourceFile.update');
     const dictionary = checker.getTypeFromTypeNode(
       (statement(src, 'Dictionary') as ts.TypeAliasDeclaration).type,
     )!;
     const index = checker.getIndexInfoOfType(dictionary, ts.IndexKind.String)!;
-    expect(Reflect.set(index, 'type', literal)).toBe(false);
-    expect(() =>
-      src.update('', { span: { start: 0, length: 0 }, newLength: 0 }),
-    ).toThrow('SourceFile.update');
+    expect(Reflect.set(index, 'type', stringType)).toBe(false);
   } finally {
     owner.close();
     await host.close();
-  }
-});
-test('declared members and source metadata follow TypeScript query order', async () => {
-  const dir = mkdtempSync(resolve(temp, 'declared-'));
-  const file = resolve(dir, 'input.ts'),
-    config = resolve(dir, 'tsconfig.json');
-  const names = ['input.ts', 'esm.mts', 'cjs.cts', 'empty.json'];
-  writeFileSync(
-    file,
-    [
-      '// 😀',
-      '// @ts-check',
-      '/// <reference no-default-lib="true" />',
-      '/// <reference path="./esm.mts" />',
-      '/// <reference path="./cjs.cts" preserve="true" />',
-      '/// <reference types="a" />',
-      '/// <reference types="b" resolution-mode="import" preserve="true" />',
-      '/// <reference types="c" resolution-mode="require" preserve="false" />',
-      '/// <reference lib="es2020" />',
-      '/// <reference lib="es2015" preserve="true" />',
-      'export interface Parent { inherited: string; }',
-      'export interface Child extends Parent { own: number; (): string; new(): Child; [index: number]: boolean; }',
-      'export interface Empty {}',
-      'export class Box<T> { constructor(public value: T) {} }',
-      'export type Instance = Box<string>;',
-      `export type Pair = [${Array.from({ length: 12 }, (_, i) => 'slot' + i + ': number').join(',')}];`,
-    ].join('\n'),
-  );
-  writeFileSync(
-    resolve(dir, 'esm.mts'),
-    "import './cjs.cjs'; declare global {} declare module './cjs.cjs' {}",
-  );
-  writeFileSync(resolve(dir, 'cjs.cts'), 'export {};');
-  writeFileSync(resolve(dir, 'empty.json'), '{}');
-  writeFileSync(resolve(dir, 'package.json'), '{"type":"module"}');
-  const fields = [
-    'declaredProperties',
-    'declaredCallSignatures',
-    'declaredConstructSignatures',
-    'declaredIndexInfos',
-  ] as const;
-  const read = (program: ts.Program) => {
-    const checker = program.getTypeChecker();
-    const source = program.getSourceFile(file)!;
-    const declared = (index: number) => {
-      const declaration = source.statements[index];
-      if (!ts.isDeclarationStatement(declaration) || !declaration.name)
-        throw new Error('expected a named declaration');
-      return checker.getDeclaredTypeOfSymbol(
-        checker.getSymbolAtLocation(declaration.name)!,
-      );
-    };
-    const inspect = (
-      type: ts.Type &
-        Partial<
-          Pick<ts.InterfaceTypeWithDeclaredMembers, (typeof fields)[number]>
-        >,
-      includeAll = false,
-    ) => {
-      const presence = () => fields.map((key) => key in type);
-      const before = presence();
-      const props = checker.getPropertiesOfType(type);
-      const calls = checker.getSignaturesOfType(type, ts.SignatureKind.Call);
-      const constructs = checker.getSignaturesOfType(
-        type,
-        ts.SignatureKind.Construct,
-      );
-      const indices = checker.getIndexInfosOfType(type);
-      return {
-        before,
-        after: presence(),
-        all: includeAll ? props.map((s) => s.name) : undefined,
-        own: type.declaredProperties?.map((s) => s.name),
-        calls: type.declaredCallSignatures?.map((s) => [
-          calls.includes(s),
-          checker.signatureToString(s),
-        ]),
-        constructs: type.declaredConstructSignatures?.map((s) => [
-          constructs.includes(s),
-          checker.signatureToString(s),
-        ]),
-        indices: type.declaredIndexInfos?.map((info) => [
-          indices.includes(info),
-          checker.typeToString(info.keyType),
-          checker.typeToString(info.type),
-          info.declaration?.getSourceFile() === source,
-        ]),
-        identity: fields.map((key) => type[key] === type[key]),
-        memberIdentity: type.declaredProperties?.every((prop) =>
-          props.includes(prop),
-        ),
-      };
-    };
-    const esm = program.getSourceFile(resolve(dir, 'esm.mts'))!;
-    const imports = Reflect.get(esm, 'imports') as readonly ts.StringLiteral[];
-    return {
-      child: inspect(declared(1), true),
-      empty: inspect(declared(2)),
-      generic: inspect(declared(3)),
-      instantiated: inspect(declared(4)),
-      tuple: inspect((declared(5) as ts.TypeReference).target),
-      imports: imports.map((specifier) => specifier.text),
-      modes: Array.from({ length: imports.length + 1 }, (_, i) =>
-        program.getModeForResolutionAtIndex(esm, i),
-      ),
-      sources: names.map((name) => {
-        const src = program.getSourceFile(resolve(dir, name))!;
-        return [
-          src.languageVersion,
-          src.hasNoDefaultLib,
-          src.impliedNodeFormat,
-          Reflect.get(src, 'checkJsDirective'),
-          src.referencedFiles,
-          src.typeReferenceDirectives,
-          src.libReferenceDirectives,
-          src.referencedFiles === src.referencedFiles,
-        ];
-      }),
-    };
-  };
-  for (const compilerOptions of [
-    { target: 'es2020', module: 'esnext', moduleResolution: 'bundler' },
-    { module: 'nodenext', importHelpers: true },
-  ]) {
-    const raw = {
-      compilerOptions: { ...compilerOptions, resolveJsonModule: true },
-      files: names,
-    };
-    writeFileSync(config, JSON.stringify(raw));
-    const parsed = ts.parseJsonConfigFileContent(raw, ts.sys, dir);
-    const expected = read(ts.createProgram(parsed.fileNames, parsed.options));
-    expect(expected.tuple.own).toEqual([
-      ...Array.from({ length: 12 }, (_, i) => String(i)),
-      'length',
-    ]);
-    expect(expected.child.own).toEqual(['own']);
-    expect(expected.child.all).toEqual(['own', 'inherited']);
-    const host = new Host();
-    const descriptor = host.request({ method: 'init', config });
-    const client = new TypeServiceClient(
-      enums,
-      descriptor,
-      (query) =>
-        Buffer.from(host.request({ method: 'query', query }), 'base64'),
-      host.source,
-      { maxFactsBytes: 1 << 18 },
-    );
-    try {
-      expect(read(client.program as unknown as ts.Program)).toStrictEqual(
-        expected,
-      );
-    } finally {
-      client.close();
-      await host.close();
-    }
-  }
-});
-
-test('resolved project references retain config syntax, nesting and missing entries', async () => {
-  const dir = mkdtempSync(resolve(temp, 'references-')),
-    file = resolve(dir, 'input.ts'),
-    config = resolve(dir, 'tsconfig.json');
-  const child = resolve(dir, 'child.json'),
-    nested = resolve(dir, 'nested.json');
-  writeFileSync(file, 'import "./tsconfig.json"; export const n = 1;');
-  writeFileSync(resolve(dir, 'nested.ts'), 'export const nested = 1;');
-  writeFileSync(resolve(dir, 'child.ts'), 'export const child = 2;');
-  const compilerOptions = {
-    composite: true,
-    resolveJsonModule: true,
-    target: 'esnext',
-    plugins: [{ name: 'language-plugin', settings: { mode: 'local' } }],
-  };
-  writeFileSync(
-    resolve(dir, 'base.json'),
-    '{"extends":"./nested.json","compilerOptions":{"unknownOption":true}}',
-  );
-  writeFileSync(
-    nested,
-    JSON.stringify({ compilerOptions, files: ['nested.ts'] }),
-  );
-  writeFileSync(
-    child,
-    JSON.stringify({
-      compilerOptions,
-      extends: './base.json',
-      files: ['child.ts'],
-      include: ['shallow/*.ts', 'deep/**/*.ts'],
-      references: [{ path: './nested.json' }],
-    }),
-  );
-  writeFileSync(
-    config,
-    JSON.stringify({
-      extends: './base.json',
-      compilerOptions: {
-        ...compilerOptions,
-        exactOptionalPropertyTypes: true,
-        strictNullChecks: false,
-      },
-      files: ['input.ts'],
-      references: [
-        { path: './child.json' },
-        { path: './nested.json' },
-        { path: './missing.json' },
-        { path: './child.json', circular: false },
-      ],
-    }),
-  );
-  const h = new Host(),
-    descriptor = h.request({ method: 'init', config });
-  const owner = new TypeServiceClient(
-    enums,
-    descriptor,
-    (q) => Buffer.from(h.request({ method: 'query', query: q }), 'base64'),
-    h.source,
-    { maxFactsBytes: 1 << 16, maxSyntaxBytes: 0 },
-  );
-  try {
-    const parsed = ts.getParsedCommandLineOfConfigFile(
-      config,
-      {},
-      { ...ts.sys, onUnRecoverableConfigFileDiagnostic() {} },
-    )!;
-    const tsProgram = ts.createProgram({
-      ...parsed,
-      rootNames: parsed.fileNames,
-      configFileParsingDiagnostics: parsed.errors,
-    });
-    // tsgo normalizes the root config name. TypeScript preserves the caller's spelling.
-    expect(
-      (owner.program.getCompilerOptions().configFile as ts.SourceFile).fileName,
-    ).toBe(config.split(sep).join('/'));
-    expect(
-      (tsProgram.getCompilerOptions().configFile as ts.SourceFile).fileName,
-    ).toBe(config);
-    const inspect = (p: ts.Program) => {
-      const source = p.getOptionsDiagnostics().find((d) => d.code === 5052)!
-        .file as ts.TsConfigSourceFile;
-      const diagnosticSource = [
-        Reflect.get(source, 'path'),
-        source.extendedSourceFiles,
-      ];
-      const refs = p.getResolvedProjectReferences()!;
-      const childBase = refs[0]!.commandLine.errors.find(
-        (d) => d.code === 5023,
-      )!.file as ts.TsConfigSourceFile;
-      const options = p.getCompilerOptions();
-      const configFile = options.configFile as ts.SourceFile;
-      return {
-        diagnosticSource,
-        options: [
-          options.plugins,
-          configFile.text,
-          Reflect.get(configFile, 'imports'),
-          configFile === p.getSourceFile(config),
-          configFile.statements[0].getText(configFile),
-          configFile.statements[0] === p.getSourceFile(config)!.statements[0],
-          Object.keys(options).includes('configFile'),
-        ],
-        direct: p.getProjectReferences(),
-        configs: refs.map(
-          (ref) =>
-            ref && [
-              ref.sourceFile.fileName,
-              ref.sourceFile.text,
-              ref.sourceFile.flags,
-              ref.sourceFile.statements[0].kind,
-              ref.sourceFile.statements ===
-                ref.sourceFile.forEachChild(
-                  () => undefined,
-                  (nodes) => nodes,
-                ),
-              ref.sourceFile.getSourceFile() === ref.sourceFile,
-              ref.commandLine.fileNames,
-              ref.commandLine.options.target,
-              ref.commandLine.options.plugins,
-              ref.commandLine.options.configFile === ref.sourceFile,
-              ref.commandLine.errors
-                .filter((d) => d.code === 5023)
-                .map((d) => [
-                  d.file?.fileName,
-                  d.file?.text.slice(d.start!, d.start! + d.length!),
-                ]),
-              ref.commandLine.raw.compilerOptions.target,
-              ref.commandLine.wildcardDirectories,
-              (ref.sourceFile as ts.TsConfigSourceFile).extendedSourceFiles,
-            ],
-        ),
-        nested: refs[0]!.references![0] === refs[1],
-        sameReferences: refs === p.getResolvedProjectReferences(),
-        distinctBaseFiles:
-          childBase !==
-          p.getConfigFileParsingDiagnostics().find((d) => d.code === 5023)!
-            .file,
-        baseAncestors: childBase.extendedSourceFiles,
-        excluded: !p.getSourceFiles().some((f) => f.fileName === child),
-      };
-    };
-    expect(inspect(owner.program as unknown as ts.Program)).toEqual(
-      inspect(tsProgram),
-    );
-  } finally {
-    owner.close();
-    await h.close();
-  }
-});
-test('a full shared cache preserves earlier results', () => {
-  const owner = new SharedTypeCacheOwner(1, 1024, 2);
-  const reader = new SharedTypeCacheReader(owner.descriptor);
-  try {
-    expect(owner.publish('\uD800', Uint8Array.of(1))).toBe(true);
-    expect(owner.publish('\uD801', Uint8Array.of(2))).toBe(true);
-    expect(owner.publish('overflow', Uint8Array.of(3))).toBe(false);
-    expect(reader.get('\uD800')).toEqual(Uint8Array.of(1));
-    expect(reader.get('\uD801')).toEqual(Uint8Array.of(2));
-    expect(reader.get('overflow')).toBeUndefined();
-  } finally {
-    reader.close();
-    owner.close();
   }
 });

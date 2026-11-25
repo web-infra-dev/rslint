@@ -1,4 +1,3 @@
-/* rslint-disable @typescript-eslint/no-unsafe-type-assertion */
 import {
   childProperties,
   RemoteSourceFile,
@@ -13,25 +12,48 @@ import type ts from 'typescript';
 import type { TypeServiceCompilerData } from './type-service-compiler-data.js';
 import { WeakObjectCache } from './type-service-cache.js';
 import type {
-  ConfigSourceInfo,
   FileBinding,
   GeneratedSyntax,
-  Operation,
+  NodeFact,
+  NodeRef,
+  SourceDescriptor,
+  SyntaxSource,
   TypeServiceDescriptor,
   TypeServiceProjection,
-  SyntaxSource,
-  NodeRef,
-  NodeFact,
+  SequenceAlias,
+  ChainAlias,
 } from './type-service-protocol.js';
 import type { DecodedFrame } from './frame.js';
 import type { ESTreeNode } from './types.js';
 import { offsetToLineColumn } from './positions.js';
+
 interface SyntheticRef {
   readonly owner: NodeRef;
   readonly child: number;
   readonly listChild?: number;
 }
 type SyntaxRef = NodeRef | SyntheticRef;
+
+function getProp(target: object, key: PropertyKey): unknown {
+  return Reflect.get(target, key);
+}
+
+function isObject(value: unknown): value is object {
+  return typeof value === 'object' && value !== null;
+}
+
+function isCompilerNode(value: unknown): value is Node {
+  return isObject(value) && 'kind' in value && 'getSourceFile' in value;
+}
+
+function isSyntheticRef(ref: SyntaxRef): ref is SyntheticRef {
+  return 'owner' in ref;
+}
+
+function unsupported(name: string): never {
+  throw new Error(`unsupported TypeScript operation: ${name}`);
+}
+
 const tokenNavigation = new Set<PropertyKey>([
   'getChildren',
   'getChildAt',
@@ -39,45 +61,56 @@ const tokenNavigation = new Set<PropertyKey>([
   'getFirstToken',
   'getLastToken',
 ]);
-function unsupported(name: string): never {
-  throw new Error(`unsupported TypeScript operation: ${name}`);
-}
-// These native bits either have no JS equivalent or depend on the node kind.
+
+// Native bits that either have no JS equivalent or depend on the node kind.
 const specialNodeFlags =
   NodeFlags.Reparsed |
   NodeFlags.ReparserTransformedLiteral |
   NodeFlags.HasJSDoc |
   NodeFlags.OptionalChain |
   NodeFlags.PossiblyContainsDeprecatedTag;
-const commonNodeFlags = Object.entries(NodeFlags).filter(
-  (entry): entry is [string, number] => {
-    const value = entry[1];
-    return (
-      typeof value === 'number' &&
-      value > NodeFlags.None &&
-      (value & (value - 1)) === 0 &&
-      !(value & specialNodeFlags)
-    );
-  },
-);
+
+const commonNodeFlags: readonly (readonly [string, number])[] = Object.entries(
+  NodeFlags,
+).filter((entry): entry is [string, number] => {
+  const value = entry[1];
+  return (
+    typeof value === 'number' &&
+    value > NodeFlags.None &&
+    (value & (value - 1)) === 0 &&
+    !(value & specialNodeFlags)
+  );
+});
+
 function translateNodeFlags(
   flags: number,
-  table: object,
+  table: Readonly<Record<string, unknown>>,
   moduleKeyword: SyntaxKind = SyntaxKind.Unknown,
 ): number {
-  const to = table as Record<string, number>;
+  const readFlag = (name: string): number => {
+    const val = table[name];
+    if (typeof val !== 'number') unsupported(`enum.${name}`);
+    return val;
+  };
   let result = 0;
-  if (flags & NodeFlags.OptionalChain)
-    result |= moduleKeyword ? to.NestedNamespace : to.OptionalChain;
-  if (moduleKeyword === SyntaxKind.NamespaceKeyword) result |= to.Namespace;
-  if (moduleKeyword === SyntaxKind.GlobalKeyword)
-    result |= to.GlobalAugmentation;
-  if (flags & NodeFlags.PossiblyContainsDeprecatedTag) result |= to.Deprecated;
+  if (flags & NodeFlags.OptionalChain) {
+    result |= moduleKeyword
+      ? readFlag('NestedNamespace')
+      : readFlag('OptionalChain');
+  }
+  if (moduleKeyword === SyntaxKind.NamespaceKeyword) {
+    result |= readFlag('Namespace');
+  }
+  if (moduleKeyword === SyntaxKind.GlobalKeyword) {
+    result |= readFlag('GlobalAugmentation');
+  }
+  if (flags & NodeFlags.PossiblyContainsDeprecatedTag) {
+    result |= readFlag('Deprecated');
+  }
   for (const [name, value] of commonNodeFlags) {
-    if (!(flags & value)) continue;
-    const translated = to[name];
-    if (typeof translated !== 'number') unsupported(`enum.${name}`);
-    result |= translated;
+    if (flags & value) {
+      result |= readFlag(name);
+    }
   }
   return result;
 }
@@ -100,8 +133,9 @@ const sourceProperties = [
   'moduleAugmentations',
   'ambientModuleNames',
   'externalModuleIndicator',
-];
-function publicSyntaxKind(node: Node): SyntaxKind {
+] as const;
+
+function publicSyntaxKind(node: Readonly<Node>): SyntaxKind {
   if (
     node.kind === SyntaxKind.QualifiedName ||
     node.kind === SyntaxKind.TypeReference
@@ -111,16 +145,17 @@ function publicSyntaxKind(node: Node): SyntaxKind {
     if (
       parent?.kind === SyntaxKind.TypeReference &&
       parent.parent?.kind === SyntaxKind.HeritageClause
-    )
+    ) {
       return node.kind === SyntaxKind.TypeReference
         ? SyntaxKind.ExpressionWithTypeArguments
         : SyntaxKind.PropertyAccessExpression;
+    }
   }
   return node.kind;
 }
 
 // The compiler's child table excludes scalar fields exposed by the JS AST.
-const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
+const scalarFields: Readonly<Partial<Record<SyntaxKind, readonly string[]>>> = {
   [SyntaxKind.MethodDeclaration]: ['symbol'],
   [SyntaxKind.MethodSignature]: ['symbol'],
   [SyntaxKind.Identifier]: ['escapedText'],
@@ -148,12 +183,12 @@ const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
   [SyntaxKind.SourceFile]: sourceProperties,
 };
 
-type JsDocKinds = TypeServiceCompilerData['jsDocKinds'];
+type JsDocKinds = Readonly<Record<string, boolean>>;
 
 // Only differences from the reader's child table belong here. A string names
 // the native slot, and false omits a slot reserved by the Go parser.
-const fieldAliases: Partial<
-  Record<SyntaxKind, Readonly<Record<string, string | false>>>
+const fieldAliases: Readonly<
+  Partial<Record<SyntaxKind, Readonly<Record<string, string | false>>>>
 > = {
   [SyntaxKind.SyntaxList]: { _children: 'children', children: false },
   [SyntaxKind.TypeParameter]: { default: 'defaultType', defaultType: false },
@@ -178,7 +213,7 @@ const fieldAliases: Partial<
   },
 };
 
-function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
+function syntaxFields(raw: Readonly<Node>, jsDocKinds: JsDocKinds): string[] {
   const kind = publicSyntaxKind(raw);
   const aliases = fieldAliases[kind];
   const fields = [
@@ -197,45 +232,53 @@ function syntaxFields(raw: Node, jsDocKinds: JsDocKinds): string[] {
       if (
         kind !== SyntaxKind.MethodSignature &&
         kind !== SyntaxKind.PropertySignature
-      )
+      ) {
         fields.push('exclamationToken');
+      }
       continue;
     }
     fields.push(key);
   }
-  if (aliases)
-    for (const key of Object.keys(aliases))
+  if (aliases) {
+    for (const key of Object.keys(aliases)) {
       if (aliases[key] !== false) fields.push(key);
+    }
+  }
   if (
     kind >= SyntaxKind.FirstLiteralToken &&
     kind <= SyntaxKind.LastTemplateToken
-  )
+  ) {
     fields.push('text');
+  }
   if (
     kind >= SyntaxKind.FirstTemplateToken &&
     kind <= SyntaxKind.LastTemplateToken
-  )
+  ) {
     fields.push('rawText', 'templateFlags');
-  for (const key of ['operator', 'token', 'keywordToken'])
-    if (Reflect.get(raw, key) !== undefined) fields.push(key);
-  if (jsDocKinds[SyntaxKind[kind]] || raw.flags & NodeFlags.HasJSDoc)
+  }
+  for (const key of ['operator', 'token', 'keywordToken']) {
+    if (getProp(raw, key) !== undefined) fields.push(key);
+  }
+  const kindName = SyntaxKind[kind];
+  if ((kindName && jsDocKinds[kindName]) || raw.flags & NodeFlags.HasJSDoc) {
     fields.push('jsDoc');
+  }
   return fields;
 }
 
 type ReadSyntax = (
   key: string | symbol,
   proxy: object,
-  args?: unknown[],
+  args?: readonly unknown[],
 ) => unknown;
-const readSyntax = Symbol();
+
+const readSyntax = Symbol('readSyntax');
 type SyntaxMethod = (
-  this: { [readSyntax]?: ReadSyntax },
-  ...args: unknown[]
+  this: Readonly<{ [readSyntax]?: ReadSyntax }>,
+  ...args: readonly unknown[]
 ) => unknown;
 const syntaxMethods = new Map<PropertyKey, SyntaxMethod>();
 
-// Navigation uses the receiving view's source, including when a rule borrows a method.
 function syntaxMethod(key: string | symbol): SyntaxMethod {
   let method = syntaxMethods.get(key);
   if (!method) {
@@ -243,24 +286,25 @@ function syntaxMethod(key: string | symbol): SyntaxMethod {
       const read = this[readSyntax];
       if (read) return read(key, this, args);
       if (key === 'update') return unsupported('SourceFile.update');
-      const prototype: object | null = Object.getPrototypeOf(this);
-      const native: unknown =
-        (prototype && Reflect.get(prototype, key, this)) ??
-        Reflect.get(this, key);
-      return Reflect.apply(
+      const proto: unknown = Object.getPrototypeOf(this);
+      const native =
+        (isObject(proto) ? getProp(proto, key) : undefined) ??
+        getProp(this, key);
+      const fn =
         typeof native === 'function' && native !== method
           ? native
-          : Reflect.get(RemoteNode.prototype, key),
-        this,
-        args,
-      );
+          : getProp(RemoteNode.prototype, key);
+      if (typeof fn !== 'function') {
+        throw new Error(`missing syntax method: ${String(key)}`);
+      }
+      return Reflect.apply(fn, this, [...args]);
     };
     syntaxMethods.set(key, method);
   }
   return method;
 }
 
-function positionMethod(key: string | symbol) {
+function positionMethod(key: string | symbol): unknown {
   switch (key) {
     case 'getText':
     case 'getFullText':
@@ -269,7 +313,7 @@ function positionMethod(key: string | symbol) {
     case 'getWidth':
     case 'getFullWidth':
     case 'getLeadingTriviaWidth':
-      return Reflect.get(RemoteNode.prototype, key);
+      return getProp(RemoteNode.prototype, key);
     default:
       return undefined;
   }
@@ -283,27 +327,29 @@ function syntaxView(
   target: object = {},
 ): object {
   const proxy: object = new Proxy(target, {
-    get(target, key, receiver) {
+    get(t, key, receiver) {
       ensure();
       if (key === readSyntax) return read;
-      // TypeScript helpers write node-local caches, such as modifier flags.
-      if (key === 'extendedSourceFiles' || Reflect.has(target, key))
-        return Reflect.get(target, key, receiver);
-      if (key === 'assertHasRealPosition')
+      // TypeScript helpers write node-local caches such as modifier flags.
+      if (Reflect.has(t, key)) {
+        const cached: unknown = Reflect.get(t, key, receiver);
+        return cached;
+      }
+      if (key === 'assertHasRealPosition') {
         return needsRealPosition(load()) ? assertHasRealPosition : undefined;
+      }
       return read(key, proxy);
     },
-    set(target, key, value, receiver) {
+    set(t, key, value, receiver) {
       ensure();
-      // A write to a projected field creates an ordinary writable property.
-      if (receiver === proxy && !Reflect.has(target, key))
-        return Reflect.set(target, key, value);
-      return Reflect.set(target, key, value, receiver);
+      if (receiver === proxy && !Reflect.has(t, key)) {
+        return Reflect.set(t, key, value);
+      }
+      return Reflect.set(t, key, value, receiver);
     },
-    has(target, key) {
+    has(t, key) {
       ensure();
-      if (key === 'extendedSourceFiles') return Reflect.has(target, key);
-      if (Reflect.has(target, key)) return true;
+      if (Reflect.has(t, key)) return true;
       const node = load();
       if (key === 'assertHasRealPosition') return needsRealPosition(node);
       return (
@@ -311,24 +357,23 @@ function syntaxView(
         (key === 'text' &&
           (node.kind === SyntaxKind.Identifier ||
             node.kind === SyntaxKind.PrivateIdentifier)) ||
-        typeof Reflect.get(node, key) === 'function'
+        typeof getProp(node, key) === 'function'
       );
     },
-    ownKeys(target) {
+    ownKeys(t) {
       ensure();
       return [
         ...new Set([
           ...syntaxFields(load(), jsDocKinds),
-          ...Reflect.ownKeys(target),
+          ...Reflect.ownKeys(t),
         ]),
       ];
     },
-    getOwnPropertyDescriptor(target, key) {
+    getOwnPropertyDescriptor(t, key) {
       ensure();
       return (
-        Reflect.getOwnPropertyDescriptor(target, key) ??
-        (key !== 'extendedSourceFiles' &&
-        syntaxFields(load(), jsDocKinds).includes(String(key))
+        Reflect.getOwnPropertyDescriptor(t, key) ??
+        (syntaxFields(load(), jsDocKinds).includes(String(key))
           ? {
               configurable: true,
               enumerable: true,
@@ -343,7 +388,7 @@ function syntaxView(
 }
 
 function wrapList(
-  value: unknown[],
+  value: readonly unknown[],
   wrap: (item: unknown) => unknown,
 ): unknown[] & Partial<ts.TextRange> {
   const list: unknown[] = [];
@@ -351,22 +396,26 @@ function wrapList(
     const visible = wrap(item);
     if (visible !== undefined) list.push(visible);
   }
-  for (const key of ['pos', 'end', 'hasTrailingComma'])
+  for (const key of ['pos', 'end', 'hasTrailingComma']) {
     if (key in value) {
-      const field = Reflect.get(value, key);
+      const field = getProp(value, key);
       Reflect.set(
         list,
         key,
-        key === 'hasTrailingComma' ? field : (field as number) | 0,
+        key === 'hasTrailingComma'
+          ? field
+          : typeof field === 'number'
+            ? field | 0
+            : 0,
       );
     }
+  }
   return list;
 }
 
-// The reader's scanner must see the range that a rule writes with ts.setTextRange.
 function shareGeneratedRange(
   value: object,
-  range: Partial<ts.ReadonlyTextRange>,
+  range: Readonly<Partial<ts.ReadonlyTextRange>>,
 ): void {
   Object.defineProperties(value, {
     pos: { get: () => range.pos },
@@ -374,83 +423,96 @@ function shareGeneratedRange(
   });
 }
 
-function jsDocComment(node: Node) {
-  const parts = Reflect.get(node, 'comment') as readonly Node[] | undefined;
-  if (!parts?.length) return undefined;
-  return parts.length === 1 && parts[0].kind === SyntaxKind.JSDocText
-    ? (Reflect.get(parts[0], 'text') as string)
+function jsDocComment(node: Readonly<Node>): unknown {
+  const parts = getProp(node, 'comment');
+  if (!Array.isArray(parts) || parts.length === 0) return undefined;
+  const first: unknown = parts[0];
+  return parts.length === 1 &&
+    isCompilerNode(first) &&
+    first.kind === SyntaxKind.JSDocText
+    ? getProp(first, 'text')
     : parts;
 }
 
 function forEachSyntaxChild(
-  node: Node,
+  node: Readonly<Node>,
   wrap: (item: unknown) => unknown,
-  args: unknown[],
+  args: readonly unknown[],
 ): unknown {
-  const [cb, cbNodes] = args as [
-    (node: unknown) => unknown,
-    ((nodes: unknown) => unknown)?,
-  ];
-  const visit = (child: Node | readonly Node[], callback = cb) => {
+  const cb = args[0];
+  const cbNodes = args[1];
+  if (typeof cb !== 'function') return undefined;
+  const invoke = (fn: typeof cb, arg: unknown): unknown =>
+    Reflect.apply(fn, undefined, [arg]);
+  const listCallback = typeof cbNodes === 'function' ? cbNodes : undefined;
+
+  const visit = (child: unknown, fn = cb): unknown => {
     const visible = wrap(child);
-    return visible === undefined ? undefined : callback(visible);
+    return visible === undefined ? undefined : invoke(fn, visible);
   };
   const visitList = (list: readonly Node[]): unknown => {
-    if (cbNodes) return visit(list, cbNodes);
+    if (listCallback) return visit(list, listCallback);
     for (const child of list) {
       const result = visit(child);
       if (result) return result;
     }
     return undefined;
   };
+
   const kind = node.kind;
   if (kind === SyntaxKind.JSDocSignature) return node.forEachChild(visit);
   if (
     kind !== SyntaxKind.JSDoc &&
     (kind < SyntaxKind.FirstJSDocTagNode || kind > SyntaxKind.LastJSDocTagNode)
-  )
-    return node.forEachChild(visit, cbNodes && visitList);
+  ) {
+    return node.forEachChild(visit, listCallback && visitList);
+  }
 
-  let fields = childProperties[kind];
+  let fields: readonly (string | undefined)[] | undefined =
+    childProperties[kind];
   if (
     (kind === SyntaxKind.JSDocParameterTag ||
       kind === SyntaxKind.JSDocPropertyTag) &&
-    !Reflect.get(node, 'isNameFirst')
-  )
+    !getProp(node, 'isNameFirst')
+  ) {
     fields = ['tagName', 'typeExpression', 'name', 'comment'];
+  }
+  const typeExpr = getProp(node, 'typeExpression');
   if (
     kind === SyntaxKind.JSDocCallbackTag ||
     (kind === SyntaxKind.JSDocTypedefTag &&
-      Reflect.get(node, 'typeExpression')?.kind !==
-        SyntaxKind.JSDocTypeExpression)
-  )
+      (!isCompilerNode(typeExpr) ||
+        typeExpr.kind !== SyntaxKind.JSDocTypeExpression))
+  ) {
     fields = ['tagName', 'name', 'typeExpression', 'comment'];
+  }
   for (const field of fields ?? []) {
     if (!field) continue;
-    const value: unknown =
-      field === 'comment' ? jsDocComment(node) : Reflect.get(node, field);
+    const value =
+      field === 'comment' ? jsDocComment(node) : getProp(node, field);
     if (!value || typeof value === 'string') continue;
     const result = Array.isArray(value)
-      ? visitList(value)
-      : visit(value as Node);
+      ? visitList(value as readonly Node[])
+      : visit(value);
     if (result) return result;
   }
   return undefined;
 }
 
-function isJSDocCast(node: Node | undefined): boolean {
-  return !!(
-    node &&
-    (node.kind === SyntaxKind.AsExpression ||
-      node.kind === SyntaxKind.SatisfiesExpression) &&
-    node.flags & NodeFlags.JavaScriptFile &&
-    (Reflect.get(node, 'type') as Node).flags & NodeFlags.Reparsed
-  );
+function isJSDocCast(node: Readonly<Node> | undefined): boolean {
+  if (
+    !node ||
+    (node.kind !== SyntaxKind.AsExpression &&
+      node.kind !== SyntaxKind.SatisfiesExpression) ||
+    !(node.flags & NodeFlags.JavaScriptFile)
+  ) {
+    return false;
+  }
+  const typeNode = getProp(node, 'type');
+  return isCompilerNode(typeNode) && !!(typeNode.flags & NodeFlags.Reparsed);
 }
 
-// The factory builds these four token kinds as NodeObjects. Tokens scanned
-// between children use TokenObjects, including scanned literals.
-function needsRealPosition(node: Pick<Node, 'kind'>): boolean {
+function needsRealPosition(node: Readonly<Pick<Node, 'kind'>>): boolean {
   const { kind } = node;
   return (
     kind > SyntaxKind.LastToken ||
@@ -462,37 +524,45 @@ function needsRealPosition(node: Pick<Node, 'kind'>): boolean {
   );
 }
 
-function assertHasRealPosition(this: ts.TextRange, message?: string): void {
-  if (!(this.pos >= 0 && this.end >= 0))
+function assertHasRealPosition(
+  this: Readonly<ts.TextRange>,
+  message?: string,
+): void {
+  if (!(this.pos >= 0 && this.end >= 0)) {
     throw new Error(
-      message || 'Node must have a real position for this operation',
+      message ?? 'Node must have a real position for this operation',
     );
+  }
 }
 
-// An encoded subtree has a real node in slot 1 instead of a SourceFile.
-function readSubtree(tree: Uint8Array, parent?: RemoteSourceFile): RemoteNode {
+function readSubtree(tree: Readonly<Uint8Array>): RemoteNode {
   const reader = new RemoteSourceFile(
     tree,
-    parent?._decoder ?? new Wtf8Decoder('utf-8', { ignoreBOM: true }),
+    new Wtf8Decoder('utf-8', { ignoreBOM: true }),
   );
   const root = new RemoteNode(
     reader.view,
     1,
-    parent ?? reader,
+    reader,
     reader,
     reader._offsetNodes,
   );
   reader.nodes[1] = root;
   return root;
 }
-type SourceMetadata = TypeServiceDescriptor['sources'][number];
-type ConfigMetadata = SourceMetadata & {
-  ordinal: number;
-  extendedSourceFiles?: string[];
-};
 
-/** A worker/generation owns stable native identities and a bounded decoded
- * source LRU. Proxies retain identities, never a dependency source buffer. */
+function remoteIndex(node: object): number {
+  const idx = getProp(node, 'index');
+  if (typeof idx !== 'number') {
+    throw new Error('missing encoded compiler node index');
+  }
+  return idx;
+}
+
+/**
+ * A generation owns canonical TS syntax proxies and a bounded decoded source
+ * LRU. Proxies retain lightweight NodeRef identities, never raw source buffers.
+ */
 export class GenerationSyntaxViews {
   private readonly identities = new WeakMap<object, SyntaxRef>();
   private readonly wrapped = new WeakObjectCache<string, object>();
@@ -504,23 +574,22 @@ export class GenerationSyntaxViews {
     { source: RemoteSourceFile; users: number }
   >();
   private readonly sources = new Map<
-    string | ConfigMetadata,
+    string,
     { source: RemoteSourceFile; bytes: number }
   >();
   private oversizedSource?: {
-    key: string | ConfigMetadata;
+    key: string;
     source: WeakRef<RemoteSourceFile>;
   };
-  private configTrees?: WeakMap<Node, string>;
-  private readonly configs = new Map<string, ConfigMetadata>();
   private readonly summaries = new Map<
     string,
     { fact: NodeFact; bytes: number }
   >();
   private readonly sourceOrdinals = new Map<string, number>();
-  private readonly metadataByName = new Map<string, SourceMetadata>();
+  private readonly metadataByName = new Map<string, SourceDescriptor>();
   private sourceBytes = 0;
   private summaryBytes = 0;
+
   constructor(
     private readonly typescript: Pick<
       TypeServiceCompilerData,
@@ -529,7 +598,6 @@ export class GenerationSyntaxViews {
       | 'ScriptTarget'
       | 'builderEmitFlags'
       | 'jsDocKinds'
-      | 'originalKinds'
     >,
     private readonly descriptor: TypeServiceDescriptor,
     private lookup: SyntaxSource | undefined,
@@ -537,7 +605,6 @@ export class GenerationSyntaxViews {
     private readonly ensure: () => void,
     private readonly maxSourceBytes: number,
     private readonly maxSummaryBytes: number,
-    private readonly readConfig: (id: string) => Uint8Array,
     private readonly readDeclarationSymbol: (
       node: NodeRef,
     ) => object | undefined,
@@ -548,118 +615,131 @@ export class GenerationSyntaxViews {
       this.metadataByName.set(source.path, source);
     }
   }
-  private ordinal(ref: NodeRef) {
-    return ref.config
-      ? this.configs.get(ref.config)?.ordinal
-      : this.sourceOrdinals.get(ref.file);
+
+  private ordinal(ref: NodeRef): number | undefined {
+    return this.sourceOrdinals.get(ref.file);
   }
+
   private key(ref: NodeRef): string {
-    return `${this.ordinal(ref)}:${ref.index}`;
+    return `${this.ordinal(ref) ?? 0}:${ref.index}`;
   }
+
   locationOrUndefined(node: object): NodeRef | undefined {
     const ref = this.identities.get(node);
-    return ref && !('owner' in ref) ? ref : undefined;
+    return ref && !isSyntheticRef(ref) ? ref : undefined;
   }
+
   isStableNodeQuery(op: 'type' | 'constantValue', ref: NodeRef): boolean {
     if (ref.token) return false;
-    const source = this.cachedSource(ref.file, ref.config);
+    const source = this.cachedSource(ref.file);
     const node =
       source && ref.index < source.nodes.length
         ? source.getOrCreateNodeAtIndex(ref.index)
         : undefined;
-    // Enum declarations have fixed values. Other constant-value queries can
-    // depend on a property access. Identifier uses can likewise have flow types.
     if (op === 'constantValue') return node?.kind === SyntaxKind.EnumMember;
     return (
       node?.kind === SyntaxKind.Identifier &&
       node.parent?.kind === SyntaxKind.VariableDeclaration &&
-      Reflect.get(node.parent, 'name') === node
+      getProp(node.parent, 'name') === node
     );
   }
+
   sourceLocation(node: object): NodeRef | undefined {
     this.ensure();
     const ref = this.identities.get(node);
     if (!ref) {
-      const token = node as ts.Node;
-      if (
-        this.generated.has(node) ||
-        token.flags & this.typescript.NodeFlags.Synthesized
-      )
-        return undefined;
-      // TypeScript can scan its own tokens when a rule borrows getChildren.
+      const flags = getProp(node, 'flags');
+      const isSynthesized =
+        typeof flags === 'number' &&
+        !!(flags & this.typescript.NodeFlags.Synthesized);
+      if (this.generated.has(node) || isSynthesized) return undefined;
+
+      // Support scanned token nodes borrowed via getChildren.
+      const tokenKind = getProp(node, 'kind');
       const jsKind = this.typescript.SyntaxKind;
-      if (token.kind <= jsKind.LastToken || token.kind === jsKind.SyntaxList) {
-        const parent = this.locationOrUndefined(token.parent);
+      if (
+        typeof tokenKind === 'number' &&
+        (tokenKind <= Number(jsKind.LastToken) ||
+          tokenKind === Number(jsKind.SyntaxList))
+      ) {
+        const parentObj = getProp(node, 'parent');
+        const parent = isObject(parentObj)
+          ? this.locationOrUndefined(parentObj)
+          : undefined;
         if (parent) {
-          const children = this.rawNode(parent).getChildren();
-          const matches = (child: Node) =>
-            child.pos === token.pos &&
-            child.end === token.end &&
-            this.translateKind(SyntaxKind[child.kind]) === token.kind;
-          let child = children.find(matches);
-          if (!child) {
-            // List punctuation has the enclosing declaration as its parent.
-            const list = children.find(
-              (n) =>
-                n.kind === SyntaxKind.SyntaxList &&
-                n.pos <= token.pos &&
-                token.end <= n.end,
-            );
-            child = list?.getChildren().find(matches);
+          const tokenPos = getProp(node, 'pos');
+          const tokenEnd = getProp(node, 'end');
+          if (typeof tokenPos === 'number' && typeof tokenEnd === 'number') {
+            const children = this.rawNode(parent).getChildren();
+            const matches = (child: Readonly<Node>) =>
+              child.pos === tokenPos &&
+              child.end === tokenEnd &&
+              Number(this.translateKind(SyntaxKind[child.kind])) === tokenKind;
+            let child = children.find(matches);
+            if (!child) {
+              const list = children.find(
+                (n) =>
+                  n.kind === SyntaxKind.SyntaxList &&
+                  n.pos <= tokenPos &&
+                  tokenEnd <= n.end,
+              );
+              child = list?.getChildren().find(matches);
+            }
+            if (child instanceof RemoteNode) return this.ref(child);
+            if (child && child.parent instanceof RemoteNode) {
+              const { kind, pos, end } = child;
+              return { ...this.ref(child.parent), token: { kind, pos, end } };
+            }
           }
-          if (child instanceof RemoteNode) return this.ref(child);
-          if (child && child.parent instanceof RemoteNode) {
-            const { kind, pos, end } = child;
-            return { ...this.ref(child.parent), token: { kind, pos, end } };
+        } else if (isObject(parentObj)) {
+          const parentFlags = getProp(parentObj, 'flags');
+          if (
+            (typeof parentFlags === 'number' &&
+              !!(parentFlags & this.typescript.NodeFlags.Synthesized)) ||
+            this.generated.has(parentObj)
+          ) {
+            return undefined;
           }
-        } else if (
-          token.parent &&
-          (token.parent.flags & this.typescript.NodeFlags.Synthesized ||
-            this.generated.has(token.parent))
-        )
-          return undefined;
+        }
       }
       throw new Error('foreign compiler node handle');
     }
-    if (!('owner' in ref)) return ref;
+    if (!isSyntheticRef(ref)) return ref;
     const { kind, pos, end } = this.rawSyntax(ref);
     return { ...ref.owner, token: { kind, pos, end } };
   }
-  parseTreeLocation(
-    node: object | undefined,
-    op?: Operation,
-  ): NodeRef | undefined {
+
+  parseTreeLocation(node: object | undefined): NodeRef | undefined {
     if (!node) return undefined;
     const ref = this.sourceLocation(node);
     if (ref) return ref;
-    let original: ts.Node | undefined = Reflect.get(node, 'original');
-    while (original) {
+    let original = getProp(node, 'original');
+    while (isObject(original)) {
       const source = this.sourceLocation(original);
-      if (source) {
-        const kinds = op && this.typescript.originalKinds[op];
-        return !kinds || kinds.includes(original.kind) ? source : undefined;
-      }
-      original = Reflect.get(original, 'original');
+      if (source) return source;
+      original = getProp(original, 'original');
     }
     return undefined;
   }
-  location(node: object, op?: Operation): NodeRef {
-    const ref = this.parseTreeLocation(node, op);
+
+  location(node: object): NodeRef {
+    const ref = this.parseTreeLocation(node);
     if (!ref) throw new Error('generated compiler node has no source location');
     return ref;
   }
-  metadata(node: object) {
+
+  metadata(node: object): SourceDescriptor {
     const ref = this.location(node);
-    const metadata = ref.config
-      ? this.configs.get(ref.config)
-      : this.metadataByName.get(ref.file);
+    const metadata = this.metadataByName.get(ref.file);
     if (!metadata) throw new Error('foreign source');
     return metadata;
   }
+
   packageName(path: string): string | undefined {
     this.ensure();
     return this.metadataByName.get(path)?.packages?.[0];
   }
+
   sourceByPath(path: string): object | undefined {
     this.ensure();
     const source = this.metadataByName.get(path);
@@ -667,30 +747,12 @@ export class GenerationSyntaxViews {
       ? this.nodeRef({ file: source.fileName, index: 1 })
       : undefined;
   }
-  configSource({
-    id,
-    name: file,
-    path,
-    extendedSourceFiles,
-  }: ConfigSourceInfo): object {
-    if (!this.configs.has(id)) {
-      this.configs.set(id, {
-        fileName: file,
-        path,
-        extendedSourceFiles,
-        external: false,
-        defaultLibrary: false,
-        isDeclarationFile: false,
-        ordinal: this.sourceOrdinals.size + this.configs.size + 1,
-      });
-    }
-    return this.nodeRef({ file, index: 1, config: id })!;
-  }
+
   sourceView(file: string): object | undefined {
     this.ensure();
     let metadata = this.metadataByName.get(file);
-    if (!metadata) {
-      const reply = this.lookup!(this.descriptor, file, true);
+    if (!metadata && this.lookup) {
+      const reply = this.lookup(this.descriptor, file, true);
       metadata = reply && this.metadataByName.get(reply.fileName);
       if (metadata) this.metadataByName.set(file, metadata);
     }
@@ -698,45 +760,39 @@ export class GenerationSyntaxViews {
       ? this.nodeRef({ file: metadata.fileName, index: 1 })
       : undefined;
   }
-  private cachedSource(
-    file: string,
-    config?: string,
-  ): RemoteSourceFile | undefined {
-    const active = !config && this.activeSources.get(file);
+
+  private cachedSource(file: string): RemoteSourceFile | undefined {
+    const active = this.activeSources.get(file);
     if (active) return active.source;
-    const key = config ? this.configs.get(config)! : file;
-    const entry = this.sources.get(key);
+    const entry = this.sources.get(file);
     if (entry) {
-      this.sources.delete(key);
-      this.sources.set(key, entry);
+      this.sources.delete(file);
+      this.sources.set(file, entry);
       return entry.source;
     }
     const oversized = this.oversizedSource;
-    return oversized?.key === key ? oversized.source.deref() : undefined;
+    return oversized?.key === file ? oversized.source.deref() : undefined;
   }
-  private retain(
-    source: RemoteSourceFile,
-    bytes: number,
-    config?: string,
-  ): void {
-    const key = config ? this.configs.get(config)! : source.fileName;
+
+  private retain(source: RemoteSourceFile, bytes: number): void {
+    const key = source.fileName;
     if (bytes > this.maxSourceBytes) {
-      // Reuse consecutive reads of a large dependency without pinning its buffer.
       this.oversizedSource = { key, source: new WeakRef(source) };
       return;
     }
     while (this.sourceBytes + bytes > this.maxSourceBytes) {
-      const [key, entry] = this.sources.entries().next().value!;
-      this.sources.delete(key);
-      this.sourceBytes -= entry.bytes;
+      const oldest = this.sources.entries().next().value;
+      if (!oldest) break;
+      this.sources.delete(oldest[0]);
+      this.sourceBytes -= oldest[1].bytes;
     }
     this.sources.set(key, { source, bytes });
     this.sourceBytes += bytes;
   }
+
   attach(
-    tree: Uint8Array,
-    expected?: { file: string; text: string },
-    config?: string,
+    tree: Readonly<Uint8Array>,
+    expected?: Readonly<{ file: string; text: string }>,
   ): RemoteSourceFile {
     const source = new RemoteSourceFile(
       Uint8Array.from(tree),
@@ -745,11 +801,11 @@ export class GenerationSyntaxViews {
     if (
       expected &&
       (source.fileName !== expected.file || source.text !== expected.text)
-    )
+    ) {
       throw new Error('type service projection belongs to a different source');
-    if (config) (this.configTrees ??= new WeakMap()).set(source, config);
-    const previous = this.cachedSource(source.fileName, config);
-    if (!previous) this.retain(source, tree.byteLength, config);
+    }
+    const previous = this.cachedSource(source.fileName);
+    if (!previous) this.retain(source, tree.byteLength);
     const shared = previous ?? source;
     if (expected) {
       const active = this.activeSources.get(expected.file);
@@ -758,79 +814,57 @@ export class GenerationSyntaxViews {
     }
     return shared;
   }
+
   releaseFile(file: string): void {
     const active = this.activeSources.get(file);
     if (active && --active.users === 0) this.activeSources.delete(file);
   }
-  source(file: string, config?: string): RemoteSourceFile | undefined {
+
+  source(file: string): RemoteSourceFile | undefined {
     this.ensure();
-    if (config)
-      return (
-        this.cachedSource(file, config) ??
-        this.attach(this.readConfig(config), undefined, config)
-      );
     const metadata = this.metadataByName.get(file);
     if (!metadata) return undefined;
     const old = this.cachedSource(metadata.fileName);
     if (old) return old;
-    const reply = this.lookup!(this.descriptor, metadata.fileName);
+    if (!this.lookup) return undefined;
+    const reply = this.lookup(this.descriptor, metadata.fileName);
     if (!reply) return undefined;
-    if (reply.fileName !== metadata.fileName)
+    if (reply.fileName !== metadata.fileName) {
       throw new Error('syntax source identity changed');
+    }
     if (!reply.tree) throw new Error('missing source syntax packet');
     return this.attach(reply.tree);
   }
+
   private rawNode(ref: NodeRef): RemoteNode {
-    const source = this.source(ref.file, ref.config);
+    const source = this.source(ref.file);
     if (!source) throw new Error('foreign source');
-    if (ref.index >= source.nodes.length) this.imports(source);
     const raw = source.getOrCreateNodeAtIndex(ref.index);
-    if (!(raw instanceof RemoteNode))
+    if (!(raw instanceof RemoteNode)) {
       throw new Error('invalid compiler node handle');
+    }
     return raw;
   }
-  private imports(source: RemoteSourceFile): readonly Node[] | undefined {
-    // The config AST is parsed separately even when the program imports the same JSON file.
-    if (this.configTrees?.has(source)) return undefined;
-    const names = this.metadataByName.get(source.fileName)?.implicitImports;
-    if (!names || Object.hasOwn(source, 'imports')) return source.imports;
-    const imports: Node[] = [];
-    for (const name of names) {
-      const declaration = readSubtree(
-        Buffer.from(this.descriptor.implicitImportTrees![name], 'base64'),
-        source,
-      );
-      const specifier = declaration.moduleSpecifier!;
-      // These native nodes belong to the Program, outside the parser's table.
-      for (const node of [declaration, specifier]) {
-        this.identities.set(node, {
-          file: source.fileName,
-          index: source.nodes.length,
-        });
-        source.nodes.push(node);
-      }
-      imports.push(specifier);
-    }
-    const all = imports.concat(source.imports);
-    Object.defineProperty(source, 'imports', { value: all });
-    return all;
-  }
+
   private rawSyntax(ref: SyntaxRef): Node {
-    if (!('owner' in ref)) return this.rawNode(ref);
+    if (!isSyntheticRef(ref)) return this.rawNode(ref);
     const child = this.rawNode(ref.owner).getChildAt(ref.child);
     return ref.listChild === undefined
       ? child
       : child.getChildAt(ref.listChild);
   }
+
   private positionedNode(ref: SyntaxRef): Node {
     const node = this.rawSyntax(ref);
-    if (node.pos < 0 && needsRealPosition(node))
+    if (node.pos < 0 && needsRealPosition(node)) {
       assertHasRealPosition.call(node);
+    }
     return node;
   }
+
   private summary(ref: NodeRef): NodeFact {
-    const requestedKey = this.key(ref),
-      cached = this.summaries.get(requestedKey);
+    const requestedKey = this.key(ref);
+    const cached = this.summaries.get(requestedKey);
     if (cached) {
       this.summaries.delete(requestedKey);
       this.summaries.set(requestedKey, cached);
@@ -851,9 +885,10 @@ export class GenerationSyntaxViews {
             (fact.name?.file.length ?? 0));
       if (bytes > this.maxSummaryBytes) continue;
       while (this.summaryBytes + bytes > this.maxSummaryBytes) {
-        const oldest = this.summaries.keys().next().value!;
-        this.summaryBytes -= this.summaries.get(oldest)!.bytes;
-        this.summaries.delete(oldest);
+        const oldest = this.summaries.entries().next().value;
+        if (!oldest) break;
+        this.summaryBytes -= oldest[1].bytes;
+        this.summaries.delete(oldest[0]);
       }
       this.summaries.set(key, { fact, bytes });
       this.summaryBytes += bytes;
@@ -861,84 +896,85 @@ export class GenerationSyntaxViews {
     if (!result) throw new Error('missing syntax fact');
     return result;
   }
-  private isHeritage(fact: NodeFact): boolean {
-    while (fact.kind === 'QualifiedName' && fact.parent)
+
+  private isHeritage(initial: NodeFact): boolean {
+    let fact = initial;
+    while (fact.kind === 'QualifiedName' && fact.parent) {
       fact = this.summary(fact.parent);
+    }
     return Boolean(
       fact.kind === 'TypeReference' &&
       fact.parent &&
       this.summary(fact.parent).kind === 'HeritageClause',
     );
   }
+
   private translateKind(name: string): ts.SyntaxKind {
-    if (name === 'EndOfFile') name = 'EndOfFileToken';
-    if (name === 'JSDocUnknownTag') name = 'JSDocTag';
-    const result =
-      this.typescript.SyntaxKind[name as keyof typeof ts.SyntaxKind];
-    if (typeof result !== 'number') unsupported(`SyntaxKind.${name}`);
+    const normalized =
+      name === 'EndOfFile'
+        ? 'EndOfFileToken'
+        : name === 'JSDocUnknownTag'
+          ? 'JSDocTag'
+          : name;
+    const result = getProp(this.typescript.SyntaxKind, normalized);
+    if (typeof result !== 'number') unsupported(`SyntaxKind.${normalized}`);
     return result;
   }
+
   nodeRef(ref: NodeRef | undefined): object | undefined {
     this.ensure();
     if (!ref) return undefined;
-    const metadata = ref.config
-      ? this.configs.get(ref.config)
-      : this.metadataByName.get(ref.file);
+    const metadata = this.metadataByName.get(ref.file);
     if (!metadata) throw new Error('foreign source');
-    const identity = ref.config
-      ? ref
-      : { file: metadata.fileName, index: ref.index };
+    const identity: NodeRef = { file: metadata.fileName, index: ref.index };
     return this.wrapRef(identity, this.key(identity));
   }
+
   private wrapRef(identity: SyntaxRef, cacheKey: string): object {
     const old = this.wrapped.get(cacheKey);
     if (old) return old;
-    const extendedSourceFiles =
-      !('owner' in identity) && identity.index === 1 && identity.config
-        ? this.configs.get(identity.config)?.extendedSourceFiles
-        : undefined;
     const proxy = syntaxView(
       () => this.rawSyntax(identity),
-      (key, proxy, args) => this.get(identity, key, proxy, args),
+      (key, view, args) => this.get(identity, key, view, args),
       this.ensure,
       this.typescript.jsDocKinds,
-      extendedSourceFiles ? { extendedSourceFiles } : undefined,
     );
     this.identities.set(proxy, identity);
     this.wrapped.set(cacheKey, proxy);
     return proxy;
   }
-  private ref(
-    value: RemoteNode,
-    index = (value as unknown as { index: number }).index,
-  ): NodeRef {
-    if (value.pos < 0) {
-      const implicit = this.locationOrUndefined(value);
-      if (implicit) return implicit;
-    }
-    const source = value.getSourceFile();
-    const config = this.configTrees?.get(source);
-    return config
-      ? { file: source.fileName, index, config }
-      : { file: source.fileName, index };
+
+  private ref(value: RemoteNode, index = remoteIndex(value)): NodeRef {
+    return { file: value.getSourceFile().fileName, index };
   }
-  private wrapNode(value: Node): object {
-    while (isJSDocCast(value)) value = Reflect.get(value, 'expression') as Node;
-    if (value instanceof RemoteNode) return this.nodeRef(this.ref(value))!;
+
+  private wrapNode(initial: Node): object {
+    let value = initial;
+    while (isJSDocCast(value)) {
+      const expr = getProp(value, 'expression');
+      if (!isCompilerNode(expr)) break;
+      value = expr;
+    }
+    if (value instanceof RemoteNode) {
+      const wrapped = this.nodeRef(this.ref(value));
+      if (!wrapped) throw new Error('foreign source');
+      return wrapped;
+    }
     const parent = value.parent;
-    if (!(parent instanceof RemoteNode))
+    if (!(parent instanceof RemoteNode)) {
       throw new Error('missing syntax owner');
+    }
     let ref = this.syntheticRefs.get(value);
     if (!ref) {
       const owner = this.ref(parent);
-      // Index the reader's cached child objects once per decoded parent.
       for (const [child, item] of parent.getChildren().entries()) {
         if (item instanceof RemoteNode) continue;
         this.syntheticRefs.set(item, { owner, child });
         if (item.kind !== SyntaxKind.SyntaxList) continue;
         for (const [listChild, token] of item.getChildren().entries()) {
-          if (!(token instanceof RemoteNode))
+          if (!(token instanceof RemoteNode)) {
             this.syntheticRefs.set(token, { owner, child, listChild });
+          }
         }
       }
       ref = this.syntheticRefs.get(value);
@@ -947,109 +983,119 @@ export class GenerationSyntaxViews {
     const key =
       value.kind === SyntaxKind.SyntaxList
         ? `list:${this.key(ref.owner)}:${ref.child}`
-        : `token:${this.ordinal(ref.owner)}:${value.pos}:${value.end}`;
+        : `token:${this.ordinal(ref.owner) ?? 0}:${value.pos}:${value.end}`;
     return this.wrapRef(ref, key);
   }
+
   firstToken(ref: NodeRef): object | undefined {
     const token = this.rawNode(ref).getFirstToken();
     return token && this.wrapNode(token);
   }
+
   wrap(value: unknown): unknown {
     if (Array.isArray(value)) {
-      // The pinned reader gives each NodeArray its own encoded node index.
-      if ('parent' in value && value.parent instanceof RemoteNode) {
-        const key = this.key(
-          this.ref(value.parent, (value as unknown as { index: number }).index),
-        );
+      const parent = getProp(value, 'parent');
+      if (parent instanceof RemoteNode) {
+        const key = this.key(this.ref(parent, remoteIndex(value)));
         const found = this.wrapped.get(key);
         if (found) return found;
         const list = wrapList(value, (item) => this.wrap(item));
         if (
-          value.length &&
-          !list.length &&
-          (Reflect.get(value.parent, 'typeParameters') === value ||
-            Reflect.get(value.parent, 'typeArguments') === value ||
-            Reflect.get(value.parent, 'heritageClauses') === value ||
-            Reflect.get(value.parent, 'modifiers') === value)
-        )
+          value.length > 0 &&
+          list.length === 0 &&
+          (getProp(parent, 'typeParameters') === value ||
+            getProp(parent, 'typeArguments') === value ||
+            getProp(parent, 'heritageClauses') === value ||
+            getProp(parent, 'modifiers') === value)
+        ) {
           return undefined;
+        }
         this.wrapped.set(key, list);
         return list;
       }
       return wrapList(value, (item) => this.wrap(item));
     }
-    if (value instanceof RemoteNode)
+    if (value instanceof RemoteNode) {
       return value.flags & NodeFlags.Reparsed
         ? undefined
         : this.wrapNode(value);
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'kind' in value &&
-      'getSourceFile' in value
-    )
-      return this.wrapNode(value as Node);
+    }
+    if (isCompilerNode(value)) return this.wrapNode(value);
     return value;
   }
+
   private get(
     ref: SyntaxRef,
     key: string | symbol,
     proxy: object,
-    args?: unknown[],
+    args?: readonly unknown[],
   ): unknown {
     const position = positionMethod(key);
-    if (position) {
+    if (typeof position === 'function') {
       if (!args) return syntaxMethod(key);
-      if (!this.identities.has(proxy))
-        return Reflect.apply(position, proxy, args);
+      if (!this.identities.has(proxy)) {
+        return Reflect.apply(position, proxy, [...args]);
+      }
       if (
         key === 'getFullStart' ||
         key === 'getEnd' ||
         key === 'getFullWidth'
       ) {
-        const value = Reflect.apply(position, proxy, args) as number;
-        // An implicit import has start and end -1, so its full width is zero.
+        const value: unknown = Reflect.apply(position, proxy, [...args]);
+        const pos = getProp(proxy, 'pos');
         if (
-          value < 0 ||
-          (key === 'getFullWidth' && value === 0 && (proxy as Node).pos < 0)
-        )
+          typeof value === 'number' &&
+          (value < 0 ||
+            (key === 'getFullWidth' &&
+              value === 0 &&
+              typeof pos === 'number' &&
+              pos < 0))
+        ) {
           this.positionedNode(ref);
+        }
         return value;
       }
-      const source = this.identities.get(args[0] as object);
-      if (source) args[0] = this.rawSyntax(source);
-      return Reflect.apply(position, this.positionedNode(ref), args);
+      const callArgs = [...args];
+      const firstArg = callArgs[0];
+      const source = isObject(firstArg)
+        ? this.identities.get(firstArg)
+        : undefined;
+      if (source) callArgs[0] = this.rawSyntax(source);
+      return Reflect.apply(position, this.positionedNode(ref), callArgs);
     }
-    const real = 'owner' in ref ? undefined : ref,
-      owner = 'owner' in ref ? ref.owner : ref,
-      { file, config } = owner;
-    if (key === 'symbol')
+
+    const real = isSyntheticRef(ref) ? undefined : ref;
+    const owner = isSyntheticRef(ref) ? ref.owner : ref;
+    const { file } = owner;
+
+    if (key === 'symbol') {
       return real &&
-        !config &&
         !this.descriptor.syntaxOnly &&
         scalarFields[publicSyntaxKind(this.rawNode(real))]?.includes(key)
         ? this.readDeclarationSymbol(real)
         : undefined;
+    }
     if (key === 'getSourceFile') {
       if (!args) return syntaxMethod(key);
-      return config
-        ? this.nodeRef({ file, index: 1, config })
-        : this.sourceView(file);
+      return this.sourceView(file);
     }
     if (real?.index === 1) {
-      const source = config
-        ? this.configs.get(config)!
-        : this.metadataByName.get(file)!;
-      if (key === 'fileName' || key === 'path' || key === 'isDeclarationFile')
+      const source = this.metadataByName.get(file);
+      if (!source) throw new Error('foreign source');
+      if (key === 'fileName' || key === 'path' || key === 'isDeclarationFile') {
         return source[key];
-      if (key === 'impliedNodeFormat' || key === 'checkJsDirective')
+      }
+      if (key === 'impliedNodeFormat' || key === 'checkJsDirective') {
         return source[key];
+      }
       if (
         key === 'referencedFiles' ||
         key === 'typeReferenceDirectives' ||
         key === 'libReferenceDirectives'
       ) {
-        const references = this.source(file, config)![key].map(
+        const sf = this.source(file);
+        if (!sf) throw new Error('foreign source');
+        const references = sf[key].map(
           ({ pos, end, fileName, resolutionMode, preserve }) => ({
             pos,
             end,
@@ -1066,75 +1112,67 @@ export class GenerationSyntaxViews {
         });
         return references;
       }
-      // TypeScript 6 keeps this legacy property false, including for no-default-lib directives.
       if (key === 'hasNoDefaultLib') return false;
       if (key === 'languageVersion') {
         const targets = this.typescript.ScriptTarget;
-        if (config || file.toLowerCase().endsWith('.json'))
-          return targets.ES2015;
+        if (file.toLowerCase().endsWith('.json')) return targets.ES2015;
         if (this.descriptor.syntaxOnly) return targets.Latest;
         const value = this.descriptor.compilerOptions.target;
-        const target: ts.ScriptTarget | undefined =
-          typeof value === 'number' ? value : undefined;
-        return target === undefined || target === targets.ES3
+        const target = typeof value === 'number' ? value : undefined;
+        return target === undefined || target === Number(targets.ES3)
           ? targets.LatestStandard
           : target;
       }
-      if (key === 'update')
+      if (key === 'update') {
         return args ? unsupported('SourceFile.update') : syntaxMethod(key);
-      if (key === 'getLineEndOfPosition') {
-        if (!args) return syntaxMethod(key);
-        const sourceFile = this.source(file, config)!;
-        const { line } = sourceFile.getLineAndCharacterOfPosition(
-          args[0] as number,
-        );
-        const starts = sourceFile.getLineStarts();
-        const end =
-          (line + 1 >= starts.length && sourceFile.getEnd()) ||
-          starts[line + 1] - 1;
-        return sourceFile.text[end] === '\n' &&
-          sourceFile.text[end - 1] === '\r'
-          ? end - 1
-          : end;
       }
       if (key === 'kind') return this.typescript.SyntaxKind.SourceFile;
       if (key === 'parent') return undefined;
     }
+
     if (
       real &&
-      !config &&
       !this.cachedSource(file) &&
-      ['kind', 'flags', 'parent', 'name', 'text', 'escapedText'].includes(
-        String(key),
-      )
+      (key === 'kind' ||
+        key === 'flags' ||
+        key === 'parent' ||
+        key === 'name' ||
+        key === 'text' ||
+        key === 'escapedText')
     ) {
       const fact = this.summary(real);
       if (key === 'kind') {
-        if (fact.kind === 'TypeReference' && this.isHeritage(fact))
+        if (fact.kind === 'TypeReference' && this.isHeritage(fact)) {
           return this.typescript.SyntaxKind.ExpressionWithTypeArguments;
-        if (fact.kind === 'QualifiedName' && this.isHeritage(fact))
+        }
+        if (fact.kind === 'QualifiedName' && this.isHeritage(fact)) {
           return this.typescript.SyntaxKind.PropertyAccessExpression;
+        }
         return this.translateKind(fact.kind);
       }
-      if (key === 'flags')
+      if (key === 'flags') {
         return translateNodeFlags(
           fact.flags,
           this.typescript.NodeFlags,
           fact.moduleKeyword,
         );
+      }
       if (key === 'parent') return this.nodeRef(fact.parent);
       if (
         key === 'name' &&
         !(fact.kind === 'QualifiedName' && this.isHeritage(fact))
-      )
+      ) {
         return this.nodeRef(fact.name);
+      }
       if (key === 'text' && fact.text !== undefined) return fact.text;
       if (
         key === 'escapedText' &&
         (fact.kind === 'Identifier' || fact.kind === 'PrivateIdentifier')
-      )
+      ) {
         return fact.text?.startsWith('__') ? `_${fact.text}` : fact.text;
+      }
     }
+
     if (key === 'forEachChild') {
       if (!args) return syntaxMethod(key);
       return forEachSyntaxChild(
@@ -1143,45 +1181,51 @@ export class GenerationSyntaxViews {
         args,
       );
     }
+
     if (tokenNavigation.has(key)) {
       if (!args) return syntaxMethod(key);
-      this.checkSource(
-        file,
-        args[key === 'getChildAt' ? 1 : 0] as object | undefined,
-      );
+      const sourceArg = args[key === 'getChildAt' ? 1 : 0];
+      if (isObject(sourceArg)) this.checkSource(file, sourceArg);
       if (key === 'getChildren') return this.childNodes(ref, proxy);
       if (key === 'getChildAt') {
-        const index = args[0] as number;
+        const index = args[0];
+        if (typeof index !== 'number') return undefined;
         const children = this.children.get(proxy);
         if (children) return children[index];
         const child = this.positionedNode(ref).getChildAt(index);
         return child && this.wrapNode(child);
       }
-      if (key === 'getChildCount')
+      if (key === 'getChildCount') {
         return (
           this.children.get(proxy)?.length ??
           this.positionedNode(ref).getChildCount()
         );
+      }
       const node = this.positionedNode(ref);
       const token =
         key === 'getFirstToken' ? node.getFirstToken() : node.getLastToken();
       return token && this.wrapNode(token);
     }
-    if ('owner' in ref) {
+
+    if (isSyntheticRef(ref)) {
       if (key === 'parent') return this.nodeRef(ref.owner);
       if (key === 'flags') {
-        const flags = Reflect.get(this.nodeRef(ref.owner)!, 'flags') as number;
-        return flags & this.typescript.NodeFlags.ContextFlags;
+        const ownerNode = this.nodeRef(ref.owner);
+        const flags = ownerNode ? getProp(ownerNode, 'flags') : 0;
+        return typeof flags === 'number'
+          ? flags & this.typescript.NodeFlags.ContextFlags
+          : 0;
       }
     }
+
     const raw =
       key === 'getStart' && args
         ? this.positionedNode(ref)
         : this.rawSyntax(ref);
+
     if (
       key === 'flags' &&
       real &&
-      !config &&
       (raw.kind === SyntaxKind.ModuleDeclaration ||
         raw.flags & NodeFlags.PossiblyContainsDeprecatedTag)
     ) {
@@ -1192,8 +1236,11 @@ export class GenerationSyntaxViews {
         fact.moduleKeyword,
       );
     }
-    if (key === '_children' && raw.kind === SyntaxKind.SyntaxList)
+
+    if (key === '_children' && raw.kind === SyntaxKind.SyntaxList) {
       return this.childNodes(ref, proxy);
+    }
+
     const member = this.syntaxMember(raw, key);
     if (typeof member === 'function') {
       if (!args) return syntaxMethod(key);
@@ -1202,28 +1249,28 @@ export class GenerationSyntaxViews {
           member,
           raw,
           args.map((arg) => {
-            const identity =
-              typeof arg === 'object' && arg !== null
-                ? this.identities.get(arg)
-                : undefined;
+            const identity = isObject(arg)
+              ? this.identities.get(arg)
+              : undefined;
             return identity ? this.rawSyntax(identity) : arg;
           }),
         ),
       );
     }
+
     const value = this.wrap(member);
-    if (Array.isArray(value))
+    if (Array.isArray(value)) {
       Object.defineProperty(proxy, key, {
         value,
         writable: true,
         configurable: true,
         enumerable: true,
       });
+    }
     return value;
   }
-  private syntaxMember(raw: Node, key: string | symbol): unknown {
-    if (key === 'imports' && raw instanceof RemoteSourceFile)
-      return this.imports(raw);
+
+  private syntaxMember(raw: Readonly<Node>, key: string | symbol): unknown {
     if (key === 'parent') {
       let parent = raw.parent;
       while (parent && isJSDocCast(parent)) parent = parent.parent;
@@ -1232,7 +1279,6 @@ export class GenerationSyntaxViews {
     if (key === 'postfixToken') return undefined;
     const kind = publicSyntaxKind(raw);
     if (key === 'jsDocPropertyTags' && kind === SyntaxKind.JSDocTypeLiteral) {
-      // This native field is an unwrapped slice of child nodes.
       const tags: Node[] = [];
       raw.forEachChild((tag) => {
         tags.push(tag);
@@ -1244,9 +1290,13 @@ export class GenerationSyntaxViews {
       (kind === SyntaxKind.JSDocTypedefTag ||
         kind === SyntaxKind.JSDocCallbackTag)
     ) {
-      let name = Reflect.get(raw, 'name') as Node | undefined;
-      while (name?.kind === SyntaxKind.ModuleDeclaration)
-        name = (Reflect.get(name, 'body') ?? Reflect.get(name, 'name')) as Node;
+      let name = getProp(raw, 'name');
+      while (
+        isCompilerNode(name) &&
+        name.kind === SyntaxKind.ModuleDeclaration
+      ) {
+        name = getProp(name, 'body') ?? getProp(name, 'name');
+      }
       return name;
     }
     if (
@@ -1256,38 +1306,45 @@ export class GenerationSyntaxViews {
     ) {
       return jsDocComment(raw);
     }
-    if (key === 'hasExtendedUnicodeEscape' && kind === SyntaxKind.StringLiteral)
+    if (
+      key === 'hasExtendedUnicodeEscape' &&
+      kind === SyntaxKind.StringLiteral
+    ) {
+      const tokenFlags = getProp(raw, 'tokenFlags');
       return raw.pos < 0
         ? undefined
-        : !!(
-            (Reflect.get(raw, 'tokenFlags') as number) &
-            TokenFlags.ExtendedUnicodeEscape
-          );
+        : typeof tokenFlags === 'number' &&
+            !!(tokenFlags & TokenFlags.ExtendedUnicodeEscape);
+    }
     const alias =
       typeof key === 'string' ? fieldAliases[kind]?.[key] : undefined;
     if (alias === false) return undefined;
-    if (typeof alias === 'string') return Reflect.get(raw, alias);
+    if (typeof alias === 'string') return getProp(raw, alias);
     if (kind !== raw.kind) {
-      if (key === 'expression')
-        return Reflect.get(
+      if (key === 'expression') {
+        return getProp(
           raw,
           kind === SyntaxKind.PropertyAccessExpression ? 'left' : 'typeName',
         );
-      if (key === 'name' && kind === SyntaxKind.PropertyAccessExpression)
-        return Reflect.get(raw, 'right');
-      if (key === 'typeName' || key === 'left' || key === 'right')
+      }
+      if (key === 'name' && kind === SyntaxKind.PropertyAccessExpression) {
+        return getProp(raw, 'right');
+      }
+      if (key === 'typeName' || key === 'left' || key === 'right') {
         return undefined;
+      }
     }
     if (key === 'kind') return this.translateKind(SyntaxKind[kind]);
     if (
       (key === 'questionToken' || key === 'exclamationToken') &&
       childProperties[raw.kind]?.includes('postfixToken')
     ) {
-      const token = Reflect.get(raw, 'postfixToken') as Node | undefined;
-      return token?.kind ===
-        (key === 'questionToken'
-          ? SyntaxKind.QuestionToken
-          : SyntaxKind.ExclamationToken)
+      const token = getProp(raw, 'postfixToken');
+      return isCompilerNode(token) &&
+        token.kind ===
+          (key === 'questionToken'
+            ? SyntaxKind.QuestionToken
+            : SyntaxKind.ExclamationToken)
         ? token
         : undefined;
     }
@@ -1298,55 +1355,68 @@ export class GenerationSyntaxViews {
       key === 'keyword' ||
       key === 'phaseModifier'
     ) {
-      const kind = Reflect.get(raw, key) as number | undefined;
-      return kind === undefined
-        ? undefined
-        : this.translateKind(SyntaxKind[kind]);
+      const tokenKind = getProp(raw, key);
+      return typeof tokenKind === 'number'
+        ? this.translateKind(SyntaxKind[tokenKind])
+        : undefined;
     }
-    if (key === 'flags')
+    if (key === 'flags') {
+      const kw =
+        raw.kind === SyntaxKind.ModuleDeclaration
+          ? getProp(raw, 'keyword')
+          : undefined;
       return translateNodeFlags(
         raw.flags,
         this.typescript.NodeFlags,
-        raw.kind === SyntaxKind.ModuleDeclaration
-          ? (Reflect.get(raw, 'keyword') as number)
-          : 0,
+        typeof kw === 'number' ? kw : 0,
       );
+    }
     if (
       key === 'escapedText' &&
       (raw.kind === SyntaxKind.Identifier ||
         raw.kind === SyntaxKind.PrivateIdentifier)
     ) {
-      const text = Reflect.get(raw, 'text') as string;
+      const text = getProp(raw, 'text');
+      if (typeof text !== 'string') return undefined;
       return text.startsWith('__') ? `_${text}` : text;
     }
-    return Reflect.get(raw, key);
+    return getProp(raw, key);
   }
 
-  // Generated nodes keep their own syntax identity. Checker queries can follow
-  // an original parse node when the compiler supplies one.
+  /**
+   * Decodes a detached syntax tree returned by `checker.typeToTypeNode`.
+   * Generated nodes keep their own identity while exposing `original` when
+   * tsgo's node builder preserved a parse-tree origin.
+   */
   generatedTypeNode({ tree, origins, emitFlags }: GeneratedSyntax): object {
     const root = readSubtree(tree);
     const views = new WeakMap<object, object>();
-    const getSourceFile = function (this: Node) {
-      const view = views.get(this) as ts.Node;
-      return view.parent?.getSourceFile();
+    const getSourceFile = function (this: Node): unknown {
+      const view = views.get(this);
+      const parent = view ? getProp(view, 'parent') : undefined;
+      if (!isObject(parent)) return undefined;
+      const fn = getProp(parent, 'getSourceFile');
+      return typeof fn === 'function'
+        ? Reflect.apply(fn, parent, [])
+        : undefined;
     };
-    // The reader uses these caches for recursive navigation. Generated tokens
-    // need their own parents even when their spans match tokens in the file.
-    const scanSource = (arg: unknown) => {
-      if (typeof arg !== 'object' || arg === null) return arg;
+    const scanSource = (arg: unknown): unknown => {
+      if (!isObject(arg)) return arg;
       let source = views.get(arg);
       if (!source) {
-        source = Object.create(arg, {
+        const created: object = {};
+        Object.setPrototypeOf(created, arg);
+        Object.defineProperties(created, {
           tokenCache: { writable: true },
           childrenCache: { writable: true },
-        }) as object;
+        });
+        source = created;
         views.set(arg, source);
       }
       return source;
     };
     const wrap = (value: unknown): unknown => {
-      if (typeof value !== 'object' || value === null) return value;
+      if (!isObject(value)) return value;
       const old = views.get(value);
       if (old) return old;
       if (Array.isArray(value)) {
@@ -1355,10 +1425,10 @@ export class GenerationSyntaxViews {
         views.set(value, list);
         return list;
       }
-      if (!('kind' in value && 'getSourceFile' in value)) return value;
-      const node = value as Node;
+      if (!isCompilerNode(value)) return value;
+      const node = value;
       const encoded = node instanceof RemoteNode;
-      const index = encoded ? (node as unknown as { index: number }).index : 0;
+      const index = encoded ? remoteIndex(node) : 0;
       const flags = emitFlags?.[index];
       const fields = {
         pos: node.pos,
@@ -1372,30 +1442,38 @@ export class GenerationSyntaxViews {
       const original = origins?.[index];
       const proxy = syntaxView(
         () => node,
-        (key, proxy, args) => {
+        (key, view, args) => {
           if (key === 'original') return this.nodeRef(original);
           if (
             key === 'hasExtendedUnicodeEscape' &&
             encoded &&
             !original &&
             node.kind === SyntaxKind.StringLiteral
-          )
+          ) {
             return undefined;
+          }
           if (key === 'parent') return encoded ? undefined : wrap(node.parent);
           if (key === 'flags') {
-            const flags = this.syntaxMember(node, key) as number;
+            const nodeFlags = this.syntaxMember(node, key);
+            if (typeof nodeFlags !== 'number') return nodeFlags;
             return encoded
-              ? flags | this.typescript.NodeFlags.Synthesized
-              : flags;
+              ? nodeFlags | this.typescript.NodeFlags.Synthesized
+              : nodeFlags;
           }
-          if (key === 'getSourceFile')
-            return args
-              ? (proxy as ts.Node).parent?.getSourceFile()
-              : syntaxMethod(key);
-          if (key === 'forEachChild')
+          if (key === 'getSourceFile') {
+            if (!args) return syntaxMethod(key);
+            const parent = getProp(view, 'parent');
+            if (!isObject(parent)) return undefined;
+            const fn = getProp(parent, 'getSourceFile');
+            return typeof fn === 'function'
+              ? Reflect.apply(fn, parent, [])
+              : undefined;
+          }
+          if (key === 'forEachChild') {
             return args
               ? forEachSyntaxChild(node, wrap, args)
               : syntaxMethod(key);
+          }
           const member = this.syntaxMember(node, key);
           if (typeof member === 'function') {
             if (!args) return syntaxMethod(key);
@@ -1403,13 +1481,16 @@ export class GenerationSyntaxViews {
               assertHasRealPosition.call(node);
             } else {
               const position = positionMethod(key);
-              if (position) return Reflect.apply(position, proxy, args);
+              if (typeof position === 'function') {
+                return Reflect.apply(position, view, [...args]);
+              }
             }
+            const callArgs = [...args];
             if (tokenNavigation.has(key)) {
-              const index = key === 'getChildAt' ? 1 : 0;
-              args[index] = scanSource(args[index] ?? node.getSourceFile());
+              const idx = key === 'getChildAt' ? 1 : 0;
+              callArgs[idx] = scanSource(callArgs[idx] ?? node.getSourceFile());
             }
-            return wrap(Reflect.apply(member, node, args));
+            return wrap(Reflect.apply(member, node, callArgs));
           }
           return wrap(member);
         },
@@ -1421,8 +1502,11 @@ export class GenerationSyntaxViews {
       views.set(value, proxy);
       return proxy;
     };
-    return wrap(root) as object;
+    const wrapped = wrap(root);
+    if (!isObject(wrapped)) throw new Error('invalid generated syntax node');
+    return wrapped;
   }
+
   private childNodes(ref: SyntaxRef, proxy: object): object[] {
     let children = this.children.get(proxy);
     if (!children) {
@@ -1433,13 +1517,14 @@ export class GenerationSyntaxViews {
     }
     return children;
   }
-  private checkSource(file: string, sourceFile: object | undefined): void {
-    if (sourceFile !== undefined) {
-      const ref = this.locationOrUndefined(sourceFile);
-      if (ref?.file !== file || ref.index !== 1)
-        throw new Error('foreign syntax source');
+
+  private checkSource(file: string, sourceFile: object): void {
+    const ref = this.locationOrUndefined(sourceFile);
+    if (ref?.file !== file || ref.index !== 1) {
+      throw new Error('foreign syntax source');
     }
   }
+
   close(): void {
     this.lookup = undefined;
     this.children = new WeakMap();
@@ -1458,28 +1543,27 @@ export class FileSyntaxViews {
   private closed = false;
   private forward = new WeakMap<
     ESTreeNode,
-    number | { firstTokenOf: number }
+    number | { readonly firstTokenOf: number }
   >();
-  private reverse?: TypeServiceProjection['reverse'];
-  private readonly aliases = new Map<
-    number,
-    | NonNullable<TypeServiceProjection['aliases']>[number]
-    | NonNullable<TypeServiceProjection['chainAliases']>[number]
-  >();
+  private reverse?: Readonly<Record<string, number>>;
+  private readonly aliases = new Map<number, SequenceAlias | ChainAlias>();
   private readonly materializedAliases = new Map<number, ESTreeNode>();
   private nodes: DecodedFrame['nodes'] | undefined;
   private lineStarts: number[] = [];
   private readonly sequenceMembers = new Map<number, readonly ESTreeNode[]>();
   private attached = false;
+
   constructor(
     private readonly registry: GenerationSyntaxViews,
     private readonly binding: FileBinding,
     private readonly ensureGeneration: () => void,
   ) {}
+
   private ensure(): void {
     this.ensureGeneration();
     if (this.closed) throw new Error('file type services are closed');
   }
+
   close(): void {
     this.closed = true;
     this.forward = new WeakMap();
@@ -1492,8 +1576,9 @@ export class FileSyntaxViews {
     this.nodes = undefined;
     this.lineStarts = [];
   }
+
   attach(
-    frame: DecodedFrame,
+    frame: Readonly<DecodedFrame>,
     projection: TypeServiceProjection,
     sourceFileName: string,
   ): void {
@@ -1502,16 +1587,18 @@ export class FileSyntaxViews {
     if (
       projection.binding.generation !== this.binding.generation ||
       projection.origins.length !== frame.nodes.length
-    )
+    ) {
       throw new Error('stale or incompatible projection origins');
+    }
     if (
       projection.sourceFileName !== this.binding.sourceFileName ||
       projection.binding.sourceFileName !== this.binding.sourceFileName ||
       (sourceFileName !== this.binding.sourceFileName &&
         this.registry.sourceView(sourceFileName) !==
           this.registry.sourceView(this.binding.sourceFileName))
-    )
+    ) {
       throw new Error('type service projection belongs to a different source');
+    }
     this.registry.attach(projection.tree, {
       file: this.binding.sourceFileName,
       text: frame.text,
@@ -1521,29 +1608,47 @@ export class FileSyntaxViews {
     this.lineStarts = frame.lineStarts;
     for (let id = 1; id < frame.nodes.length; id++) {
       const index = projection.origins[id];
-      if (index) this.forward.set(frame.nodes[id]!, index);
+      const node = frame.nodes[id];
+      if (index && node) this.forward.set(node, index);
     }
     for (const [id, firstTokenOf] of Object.entries(
       projection.firstTokens ?? {},
-    ))
-      this.forward.set(frame.nodes[Number(id)]!, { firstTokenOf });
+    )) {
+      const node = frame.nodes[Number(id)];
+      if (node) this.forward.set(node, { firstTokenOf });
+    }
     this.reverse = { ...projection.reverse };
     for (const alias of projection.aliases ?? []) {
       this.aliases.set(alias.index, alias);
       if (this.sequenceMembers.has(alias.sequence)) continue;
-      const members = projection.sequenceMembers?.[alias.sequence];
-      this.sequenceMembers.set(
-        alias.sequence,
-        members
-          ? members.map((id) => frame.nodes[id]!)
-          : (frame.nodes[alias.sequence]!.expressions as ESTreeNode[]).slice(),
-      );
+      const memberIds = projection.sequenceMembers?.[alias.sequence];
+      if (memberIds) {
+        const resolved: ESTreeNode[] = [];
+        for (const id of memberIds) {
+          const item = frame.nodes[id];
+          if (item) resolved.push(item);
+        }
+        this.sequenceMembers.set(alias.sequence, resolved);
+      } else {
+        const seqNode = frame.nodes[alias.sequence];
+        const expressions = seqNode
+          ? getProp(seqNode, 'expressions')
+          : undefined;
+        if (Array.isArray(expressions)) {
+          this.sequenceMembers.set(
+            alias.sequence,
+            (expressions as readonly ESTreeNode[]).slice(),
+          );
+        }
+      }
     }
-    for (const alias of projection.chainAliases ?? [])
+    for (const alias of projection.chainAliases ?? []) {
       this.aliases.set(alias.index, alias);
+    }
   }
+
   readonly esTreeNodeToTSNodeMap = {
-    get: (node: ESTreeNode): object | undefined => {
+    get: (node: Readonly<ESTreeNode>): object | undefined => {
       this.ensure();
       const origin = this.forward.get(node);
       if (origin === undefined) return undefined;
@@ -1552,20 +1657,20 @@ export class FileSyntaxViews {
         ? this.registry.nodeRef({ file, index: origin })
         : this.registry.firstToken({ file, index: origin.firstTokenOf });
     },
-    has: (node: ESTreeNode): boolean => {
+    has: (node: Readonly<ESTreeNode>): boolean => {
       this.ensure();
       return this.forward.has(node);
     },
   };
+
   readonly tsNodeToESTreeNodeMap = {
     get: (node: object): ESTreeNode | undefined => {
       this.ensure();
       const ref = this.registry.locationOrUndefined(node);
-      if (!ref || ref.config || ref.file !== this.binding.sourceFileName)
-        return undefined;
+      if (ref?.file !== this.binding.sourceFileName) return undefined;
       const index = ref.index;
       const id = this.reverse?.[index];
-      if (id) return this.nodes![id];
+      if (id) return this.nodes?.[id];
       const info = this.aliases.get(index);
       if (!info) return undefined;
       const chain = 'expression' in info;
@@ -1587,14 +1692,15 @@ export class FileSyntaxViews {
             start: info.start,
             end: info.end,
             ...position,
-            expression: this.nodes![info.expression],
+            expression: this.nodes?.[info.expression],
           }
         : {
             type: 'SequenceExpression',
             ...position,
-            expressions: this.sequenceMembers
-              .get(info.sequence)!
-              .slice(0, info.count),
+            expressions: (this.sequenceMembers.get(info.sequence) ?? []).slice(
+              0,
+              info.count,
+            ),
           };
       const origin = chain ? info.origin : index;
       this.materializedAliases.set(key, alias);
@@ -1604,8 +1710,7 @@ export class FileSyntaxViews {
     has: (node: object): boolean => {
       this.ensure();
       const ref = this.registry.locationOrUndefined(node);
-      if (!ref || ref.config || ref.file !== this.binding.sourceFileName)
-        return false;
+      if (ref?.file !== this.binding.sourceFileName) return false;
       const index = ref.index;
       return this.reverse?.[index] !== undefined || this.aliases.has(index);
     },

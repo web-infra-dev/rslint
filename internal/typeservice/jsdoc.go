@@ -27,7 +27,7 @@ func documentation(c *checker.Checker, declarations []*ast.Node, active map[*ast
 		if isJSDocTypeAlias(decl) {
 			nodes = []*ast.Node{decl, decl.Parent}
 		}
-		if decl.Kind == ast.KindJSDocSignature && decl.Parent.Kind == ast.KindJSDocOverloadTag {
+		if decl.Kind == ast.KindJSDocSignature && decl.Parent != nil && decl.Parent.Kind == ast.KindJSDocOverloadTag && decl.Parent.Parent != nil {
 			nodes = []*ast.Node{decl.Parent.Parent}
 		}
 		for _, node := range nodes {
@@ -267,7 +267,7 @@ func fileJSDocIndices(file *ast.SourceFile, table *encoder.NodeIndexTable) *jsDo
 }
 
 func jsDocLookupPos(node *ast.Node) int {
-	if node.Kind == ast.KindJSDocSignature && node.Parent.Kind == ast.KindJSDocOverloadTag {
+	if node.Kind == ast.KindJSDocSignature && node.Parent != nil && node.Parent.Kind == ast.KindJSDocOverloadTag {
 		return node.Parent.TagName().Pos()
 	}
 	return node.Pos()
@@ -338,7 +338,7 @@ func jsDocLocalScopes(location *ast.Node, resolveTemplateNames bool) iter.Seq2[*
 			case ast.KindJSDocTemplateTag:
 				// resolveName uses the first alias in the enclosing comment.
 				// getSymbolsInScope only walks the template's syntactic parents.
-				if resolveTemplateNames && n.Parent.Kind == ast.KindJSDoc {
+				if resolveTemplateNames && n.Parent != nil && n.Parent.Kind == ast.KindJSDoc {
 					tags := docTags(n.Parent)
 					if i := slices.IndexFunc(tags, isJSDocTypeAlias); i >= 0 {
 						bound = boundJSDocDeclaration(tags[i])
@@ -402,7 +402,7 @@ func visibleJSDocLocal(symbol *ast.Symbol, meaning ast.SymbolFlags) bool {
 }
 
 func isSourceJSDocNode(source, node *ast.Node) bool {
-	if source.Kind == ast.KindJSDocSignature && source.Parent.Kind == ast.KindJSDocOverloadTag {
+	if source.Kind == ast.KindJSDocSignature && source.Parent != nil && source.Parent.Kind == ast.KindJSDocOverloadTag {
 		// The native overload declaration uses just the @overload tag name's range.
 		if ast.IsFunctionLike(node) && node.Loc == source.Parent.TagName().Loc {
 			return true
@@ -675,5 +675,9 @@ func linkTarget(c *checker.Checker, name *ast.Node) *DisplayPartTarget {
 	positions := file.GetPositionMap()
 	start := positions.UTF8ToUTF16(scanner.GetTokenPosOfNode(declaration, file, false))
 	end := positions.UTF8ToUTF16(declaration.End())
-	return &DisplayPartTarget{File: file.FileName(), Start: uint32(start), Length: uint32(end - start)}
+	length := uint32(0)
+	if end > start {
+		length = uint32(end - start)
+	}
+	return &DisplayPartTarget{File: file.FileName(), Start: uint32(start), Length: length}
 }

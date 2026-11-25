@@ -20,31 +20,21 @@ import (
 const tsgoInternalPrefix = "github.com/microsoft/TypeScript/tsc/internal/"
 
 type ExtraShim struct {
-	ExtraFunctions []string            `json:"ExtraFunctions"`
-	ExtraMethods   map[string][]string `json:"ExtraMethods"`
-	ExtraFields    map[string][]string `json:"ExtraFields"`
-	// Field pointers preserve the identity of checker state.
-	ExtraFieldPointers map[string][]string `json:"ExtraFieldPointers"`
-	IgnoreFunctions    []string            `json:"IgnoreFunctions"`
+	ExtraFunctions  []string            `json:"ExtraFunctions"`
+	ExtraMethods    map[string][]string `json:"ExtraMethods"`
+	ExtraFields     map[string][]string `json:"ExtraFields"`
+	IgnoreFunctions []string            `json:"IgnoreFunctions"`
 }
 
-func emitFieldAccessor(out *strings.Builder, receiver *types.Named, selector string, pointer bool, qualifier types.Qualifier) {
+func emitFieldAccessor(out *strings.Builder, receiver *types.Named, selector string, qualifier types.Qualifier) {
 	member, _, _ := types.LookupFieldOrMethod(receiver, true, receiver.Obj().Pkg(), selector)
 	field, ok := member.(*types.Var)
 	if !ok || !field.IsField() {
 		log.Fatalf("expected %s to contain field %s", receiver.Obj().Name(), selector)
 	}
-	fieldType := field.Type()
 	name := receiver.Obj().Name()
-	accessor := name + "_" + selector
-	address := ""
-	if pointer {
-		accessor += "Ptr"
-		address = "&"
-		fieldType = types.NewPointer(fieldType)
-	}
-	fmt.Fprintf(out, "func %s(v *%s) %s {\n  return %s((*extra_%s)(unsafe.Pointer(v))).%s\n}\n",
-		accessor, types.TypeString(receiver, qualifier), types.TypeString(fieldType, qualifier), address, name, selector)
+	fmt.Fprintf(out, "func %s_%s(v *%s) %s {\n  return ((*extra_%s)(unsafe.Pointer(v))).%s\n}\n",
+		name, selector, types.TypeString(receiver, qualifier), types.TypeString(field.Type(), qualifier), name, selector)
 }
 
 // check whether signature can be exported
@@ -255,9 +245,6 @@ func main() {
 		for name := range extraShim.ExtraFields {
 			matchedExtraFields[name] = false
 		}
-		for name := range extraShim.ExtraFieldPointers {
-			matchedExtraFields[name] = false
-		}
 
 		scope := pkg.Types.Scope()
 		for _, name := range scope.Names() {
@@ -426,10 +413,7 @@ func main() {
 					emitExtraStruct(name, structType)
 
 					for _, field := range extraShim.ExtraFields[name] {
-						emitFieldAccessor(&shimBuilder, named, field, false, qualifierOnlyPackageName)
-					}
-					for _, field := range extraShim.ExtraFieldPointers[name] {
-						emitFieldAccessor(&shimBuilder, named, field, true, qualifierOnlyPackageName)
+						emitFieldAccessor(&shimBuilder, named, field, qualifierOnlyPackageName)
 					}
 				}
 			case *types.Const:

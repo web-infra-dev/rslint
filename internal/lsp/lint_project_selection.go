@@ -88,7 +88,7 @@ func parseStandaloneLintProject(
 		&core.CompilerOptions{},
 		nil,
 		host,
-		utils.UncachedExtendedConfigs{},
+		nil,
 	)
 	if parsed == nil {
 		return nil, fmt.Errorf("no parsed config returned for %q", tsConfigPath)
