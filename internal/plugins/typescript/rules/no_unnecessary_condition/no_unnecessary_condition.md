@@ -92,6 +92,8 @@ field narrowing, as do undecorated private auto-accessors. A later optional
 spread may leave a getter already on the target in place; it remains an accessor.
 `Object.assign` also preserves target getters, including those on class instances
 and parameter objects; writing through a setter does not replace the getter.
+An unknown target typed as `object` may also contain a getter, so its structural
+type alone does not establish an ordinary data copy.
 Initializer types never narrow a getter's public read type, which also covers
 values supplied by later spreads or descriptor changes. Calls resolve the
 applicable overload of each possible function through the checker.
@@ -117,8 +119,9 @@ property and parameter markers still protect nullish fallbacks. For example, wit
 `options.title ?? 'Untitled'` remains necessary.
 After an assignment of a statically known value, such as
 `options.title = 'set'`, the fallback is reported as unnecessary. Unrelated
-variable declarations with no side effects in their initializers preserve this
-proof. Other optional
+simple variable declarations initialized by literals or identifiers preserve this
+proof. Destructuring, object spread, and other expressions may invoke user code,
+so they stop this proof. Other optional
 property and parameter fallbacks are retained conservatively: without strict null checking,
 the compiler also erases nullish values from assignment sources. For example,
 assigning an optional parameter with `options.title = title` does not prove the

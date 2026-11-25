@@ -903,7 +903,7 @@ func (conditionTypes *conditionTypeChecker) getConditionType(node, accessor *ast
 		// The checker handles overload selection and generic instantiation.
 		readCalleeType := tc.GetNonNullableType(expressionType)
 		flowCalleeType = tc.GetNonNullableType(flowCalleeType)
-		if readCalleeType != flowCalleeType {
+		if readCalleeType != flowCalleeType || readCalleeType.IsUnion() {
 			calleeType := checker.Checker_getApparentType(tc, tc.GetNonNullableType(expressionType))
 			flowType = getReadCallType(tc, node, calleeType)
 			if constraint := checker.Checker_getBaseConstraintOfType(tc, flowType); constraint != nil {
@@ -1059,6 +1059,20 @@ func (conditionTypes *conditionTypeChecker) memberReadSymbol(node *ast.Node, sym
 			if property := checker.Checker_getPropertyOfType(tc, targetType, symbol.Name); property != nil && typeHasAccessorProperty(tc, targetType, property) {
 				return property, flags | ast.SymbolFlagsAccessor
 			}
+			// A structural target type does not prove a data field. Even new
+			// expressions may create proxies or call an unknown constructor.
+			if ast.IsNewExpression(origin) {
+				constructor := conditionTypes.resolveInitializer(origin.Expression())
+				if constructor != nil {
+					if ast.IsClassExpression(constructor) {
+						return symbol, flags
+					}
+					if class := tc.GetSymbolAtLocation(constructor); class != nil && class.Flags&ast.SymbolFlagsClass != 0 {
+						return symbol, flags
+					}
+				}
+			}
+			return symbol, flags | ast.SymbolFlagsAccessor
 		}
 		return symbol, flags
 	}
@@ -1188,9 +1202,12 @@ func (conditionTypes *conditionTypeChecker) receiverObjectOrigin(node *ast.Node)
 		if ast.IsObjectLiteralExpression(node) {
 			for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
 				if ast.IsPropertyAssignment(property) && ast.IsProtoSetter(property.Name()) {
-					return assignedTarget
+					return nil
 				}
 			}
+			return node
+		}
+		if assignedTarget != nil && ast.IsNewExpression(node) {
 			return node
 		}
 		if !ast.IsCallExpression(node) || len(node.Arguments()) == 0 || seen[node] {
@@ -1304,10 +1321,16 @@ func hasKnownNonNullishAssignment(tc *checker.Checker, node *ast.Node, evaluator
 	flow := reference.FlowNodeData().FlowNode
 	for flow != nil && flow.Flags&ast.FlowFlagsAssignment != 0 && flow.Node != nil &&
 		!checker.Checker_isMatchingReference(tc, reference, flow.Node) {
-		// A separate variable declaration cannot invalidate this write unless
-		// it resets a receiver or its initializer can have side effects.
-		if !ast.IsVariableDeclaration(flow.Node) || checker.Checker_containsMatchingReference(tc, reference, flow.Node) ||
-			evaluator.HasSideEffect(flow.Node.Initializer(), true) {
+		// Only cross simple declarations. Destructuring, spread, coercion and
+		// resource initialization can invoke user code without an explicit call.
+		if !ast.IsVariableDeclaration(flow.Node) || !ast.IsIdentifier(flow.Node.Name()) ||
+			ast.IsVarUsing(flow.Node.Parent) || ast.IsVarAwaitUsing(flow.Node.Parent) ||
+			checker.Checker_containsMatchingReference(tc, reference, flow.Node) {
+			return false
+		}
+		initializer := ast.SkipOuterExpressions(flow.Node.Initializer(), ast.OEKAll)
+		if initializer != nil && !ast.IsIdentifier(initializer) && initializer.Kind != ast.KindNullKeyword &&
+			!ast.IsPrimitiveLiteralValue(initializer, true) {
 			return false
 		}
 		flow = flow.Antecedent
