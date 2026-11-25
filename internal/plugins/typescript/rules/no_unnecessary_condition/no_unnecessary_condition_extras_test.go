@@ -667,6 +667,15 @@ func TestNoUnnecessaryConditionAccessorObservations(t *testing.T) {
 		"function read(target: object, source: { value: true }) { const copy = Object.assign(target, source); copy.value = true; if (copy.value) {} }",
 		"type Item = { ready: true }; function read(target: object, source: { item: Item }) { const copy = Object.assign(target, source); copy.item = { ready: true }; if (copy.item?.ready) {} }",
 		"type Item = { id: number }; interface Store { get item(): Item | undefined; set item(value: Item | undefined); } class Target { declare item: Item | undefined; constructor() { return new Proxy(this, { get() { return undefined; }, set() { return true; } }); } } function read(source: Store) { const target: Store = new Target(); const copy = Object.assign(target, source); copy.item = { id: 1 }; return copy.item?.id; }",
+		"type Item = { id: number }; interface Store { get item(): Item | undefined; set item(value: Item | undefined); } class Target { declare item: Item | undefined; constructor() { return new Proxy(this, { get() { return undefined; }, set() { return true; } }); } } function read(source: Store) { const target: Store = Object.assign(new Target(), {}); const copy = Object.assign(target, source); copy.item = { id: 1 }; return copy.item?.id; }",
+		"type Item = { id: number }; interface Store { [key: string]: Item | undefined; } class Target { [key: string]: Item; constructor() { return new Proxy(this, { get() { return undefined; }, set() { return true; } }); } } function read(source: Record<string, Item>, key: string) { const target: Store = Object.assign(new Target(), {}); const copy = Object.assign(target, source); copy[key] = { id: 1 }; return copy[key]?.id; }",
+		"type Item = { id: number }; function read(target: object, source: { item: Item }) { const copy = Object.assign(target, source); const item = copy.item; return item?.id; }",
+		"type Item = { ready: true }; function read(target: object, source: { item: Item }) { const copy = Object.assign(target, source); const first = copy.item; const item = first; if (item?.ready) {} }",
+		"type Item = { id: number }; function read(target: object, source: { make: () => Item }) { const copy = Object.assign(target, source); const make = copy.make; const item = make(); return item?.id; }",
+		"type Item = { id: number }; function read(target: object, source: { item: Item }) { const copy = Object.assign(target, source); const { item: first = { id: 0 } } = copy; const item = first; return item?.id; }",
+		"type Item = { id: number }; interface Store { get item(): Item | undefined; set item(value: Item); } function read(store: Store) { store.item = { id: 1 }; const item = store.item; return item?.id; }",
+		"interface Store { get value(): boolean; set value(value: boolean); } function read(store: Store) { store.value = true; const value = store.value; if (value) {} }",
+		"type Item = { id: number }; interface Store { get item(): Item | undefined; set item(value: Item | undefined); } function read(source: Store) { const target: Store = Object.assign(() => 0, { item: undefined }); Object.defineProperty(target, 'item', { get() { return undefined; }, set(value) {} }); const copy = Object.assign(target, source); copy.item = { id: 1 }; return copy.item?.id; }",
 	} {
 		valid = append(valid, rule_tester.ValidTestCase{Code: code})
 	}
@@ -698,8 +707,20 @@ func TestNoUnnecessaryConditionAccessorObservations(t *testing.T) {
 	invalid = append(invalid, rule_tester.InvalidTestCase{Code: "interface Store { get value(): number | undefined; set value(value: number); } class Target { value: number | undefined; } function read(source: Store) { const target = new Target(); const copy = Object.assign(target, source); copy.value = 1; return copy.value ?? 42; }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
 	invalid = append(invalid, rule_tester.InvalidTestCase{Code: "interface Store { get value(): number | undefined; set value(value: number); } function read<T extends Store>(source: T) { const first = { ...source }; const copy = Object.assign(first, {}); copy.value = 1; return copy.value ?? 42; }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
 	invalid = append(invalid, rule_tester.InvalidTestCase{Code: "type Item = { id: number }; function read(source: { item: Item | undefined }) { const copy = Object.assign({ __proto__: source, item: undefined as Item | undefined }, source); copy.item = { id: 1 }; return copy.item ?? { id: 2 }; }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
+	for _, code := range []string{
+		"const copy = Object.assign(() => 0, { version: 1 }); function read() { return copy.version ?? 42; }",
+		"function target() {} const copy = Object.assign(target, { version: 1 }); function read() { return copy.version ?? 42; }",
+		"interface Store { get value(): number | undefined; set value(value: number); } function read(source: Store) { const copy = Object.assign([], source); copy.value = 1; return copy.value ?? 42; }",
+		"interface Store { get value(): number | undefined; set value(value: number); } function read(source: Store) { const copy = Object.assign({ __proto__: null }, source); copy.value = 1; return copy.value ?? 42; }",
+		"type Item = { id: number }; function read(target: object, source: { item: Item }) { const copy = Object.assign(target, source); const item = copy.item; if (item != null) { return item ?? { id: 0 }; } }",
+		"type Item = { id: number }; interface Store { get item(): Item | undefined; set item(value: Item); } function read(store: Store) { store.item = { id: 1 }; const item = store.item; item?.id; if (item) { item ?? { id: 0 }; } return item?.id; }",
+		"type Item = { id: number }; interface Store { get item(): Item | undefined; set item(value: Item); } function read(store: Store) { store.item = { id: 1 }; const { item = { id: 0 } } = store; return item ?? { id: 0 }; }",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
+	}
 	for _, test := range []struct{ code, message string }{
 		{"interface Store { get callback(): (() => true) | ((value: number) => true); } function read(store: Store) { if (store.callback(1)) {} }", "alwaysTruthy"},
+		{"interface Store { get callback(): (() => true) | { (value: number): true; (value: string): true }; } function read(store: Store) { if (store.callback(1)) {} }", "alwaysTruthy"},
 		{"type Read = { (key: 'yes'): true; (key: 'no'): false }; type Write = (key: 'yes' | 'no') => true; interface Store { get callback(): Read | Write; set callback(value: Write); } function read(store: Store) { if (store.callback('yes')) {} }", "alwaysTruthy"},
 		{"type Read = { (key: 'yes'): true; (key: 'no'): false }; type Write = (key: 'yes' | 'no') => true; interface Store { get callback(): Read | Write; set callback(value: Write); } function read(store: Store) { store.callback = () => true; if (store.callback('yes')) {} }", "alwaysTruthy"},
 		{"type Read = <T>(value: T) => T; type Write = (value: true) => true; interface Store { get callback(): Read | Write; set callback(value: Write); } function read(store: Store) { store.callback = () => true; if (store.callback(true)) {} }", "alwaysTruthy"},

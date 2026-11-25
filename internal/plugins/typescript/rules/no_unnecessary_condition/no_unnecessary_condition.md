@@ -98,6 +98,14 @@ source uses ordinary fields or index signatures: its write types do not establis
 the target getters' read types. A target with `__proto__` can inherit a getter and
 setter that handle the assignment. A target's declared getter contract is preserved
 before inspecting its constructor, which can return a different object.
+This also applies through nested `Object.assign` calls and index signatures.
+Reading an unknown target
+into a stable local, such as `const item = copy.item`, does not prove that
+`item?.id` is redundant. Destructured reads retain the same uncertainty; subsequent
+guards on the captured value can still make a fallback unnecessary. Captured
+getter values also preserve the getter's read type rather than a preceding setter
+argument. Fresh arrays, functions, and objects with a `null` prototype retain
+ordinary data-copy narrowing unless the target has an explicit getter contract.
 Initializer types never narrow a getter's public read type, which also covers
 values supplied by later spreads or descriptor changes. Calls resolve the
 applicable overload of each possible function through the checker.
