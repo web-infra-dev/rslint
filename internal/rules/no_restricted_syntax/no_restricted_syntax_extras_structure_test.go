@@ -1239,3 +1239,47 @@ func TestNoRestrictedSyntaxTSAssertionExpressions(t *testing.T) {
 			},
 		})
 }
+
+// Attribute paths look through assertions, but a trailing non-null assertion
+// on an optional chain (`o?.x!`) is the ChainExpression itself in ESTree, so
+// the field must resolve to ChainExpression rather than the inner member.
+func TestNoRestrictedSyntaxNonNullChainFields(t *testing.T) {
+	const decl = "declare const o: { x?: { y: number }; f?: () => number } | undefined;\n"
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			{Code: decl + "const a = o?.x!;\n", Options: []any{"VariableDeclarator[init.type='MemberExpression']"}},
+			{Code: decl + "function f() { return o?.x!; }\n", Options: []any{"ReturnStatement[argument.type='MemberExpression']"}},
+			{Code: decl + "(o?.f!)();\n", Options: []any{"CallExpression[callee.type='MemberExpression']"}},
+			{Code: decl + "(o?.x!).y;\n", Options: []any{"MemberExpression[object.type='MemberExpression']"}},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    decl + "const a = o?.x!;\n",
+				Options: []any{"VariableDeclarator[init.type='ChainExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 7, EndLine: 2, EndColumn: 16},
+				},
+			},
+			{
+				Code:    decl + "function f() { return o?.x!; }\n",
+				Options: []any{"ReturnStatement[argument.type='ChainExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 16, EndLine: 2, EndColumn: 29},
+				},
+			},
+			{
+				Code:    decl + "(o?.f!)();\n",
+				Options: []any{"CallExpression[callee.type='ChainExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 10},
+				},
+			},
+			{
+				Code:    decl + "(o?.x!).y;\n",
+				Options: []any{"MemberExpression[object.type='ChainExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 10},
+				},
+			},
+		})
+}

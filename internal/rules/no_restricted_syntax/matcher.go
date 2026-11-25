@@ -1678,8 +1678,18 @@ func indexInNodeList(node *ast.Node, list []*ast.Node) (int, int) {
 // shapes that esquery still walks. Without this, a real-world selector
 // like `MemberExpression[object.name='console']` would silently miss
 // `(console).log`, `(console as any).log`, `console!.log`.
+//
+// A trailing non-null assertion on an optional chain (`o?.x!`) is kept: it is
+// the root of the ESTree ChainExpression, so stripping it would expose the
+// inner member instead of the chain.
 func unwrapExpression(node *ast.Node) *ast.Node {
-	return utils.SkipAssertionsAndParens(node)
+	for node != nil && ast.IsOuterExpression(node, ast.OEKParentheses|ast.OEKAssertions) {
+		if isChainRoot(node) {
+			return node
+		}
+		node = node.Expression()
+	}
+	return node
 }
 
 func unwrapEstreeNode(node *ast.Node) *ast.Node {
