@@ -77,7 +77,6 @@
     ],
     "TupleType": ["combinedFlags", "minLength"],
     "LiteralType": ["freshType", "regularType"],
-    "UnionType": ["regularType"],
     "Relation": ["results"],
     "IndexInfo": ["components"],
     "TypeReference": ["node"],
@@ -90,7 +89,6 @@
       "subtypeRelation",
       "strictSubtypeRelation",
       "patternForType",
-      "cachedTypes",
       "unresolvedType",
       "regularTrueType",
       "regularFalseType",
@@ -112,12 +110,10 @@
       "constraintType",
       "templateType",
       "modifiersType"
-    ],
-    "ValueSymbolLinks": ["resolvedType"]
+    ]
   },
   "ExtraFieldPointers": {
-    "Checker": ["apparentArgumentCount", "valueSymbolLinks.store"],
-    "CachedTypeKey": ["kind", "typeId"],
+    "Checker": ["apparentArgumentCount"],
     "IndexInfo": ["keyType", "valueType", "isReadonly", "declaration"]
   }
 }

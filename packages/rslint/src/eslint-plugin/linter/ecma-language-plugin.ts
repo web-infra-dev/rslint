@@ -181,10 +181,7 @@ type ParserServices = object &
 export function lintFile(
   req: LintFileRequest,
   loadedPlugins: LoadedPlugins,
-  services?: (
-    frame: ReturnType<typeof decodeFrame>,
-    parserOptions: LanguageOptions['parserOptions'],
-  ) => ParserServices,
+  services?: (frame: ReturnType<typeof decodeFrame>) => ParserServices,
 ): LintFileResult {
   const result: LintFileResult = {
     filePath: req.filePath,
@@ -198,7 +195,7 @@ export function lintFile(
   let parserServices: ParserServices | undefined;
   try {
     parsed = readFrame(req);
-    parserServices = services?.(parsed, req.languageOptions?.parserOptions);
+    parserServices = services?.(parsed);
   } catch (err) {
     if (err instanceof FrameCancelled) result.cancelled = true;
     else
@@ -234,9 +231,6 @@ export function lintFile(
     impliedStrict: ecmaFeatures?.impliedStrict,
     globalReturn: ecmaFeatures?.globalReturn,
     parserServices,
-    lib: languageOptions?.parserOptions?.lib,
-    jsxPragma: languageOptions?.parserOptions?.jsxPragma,
-    jsxFragmentName: languageOptions?.parserOptions?.jsxFragmentName,
   });
   const scopeManagerFactory = () => {
     const sm = createScopeManager();

@@ -524,7 +524,7 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 	switch op {
 	case "type", "fromTypeNode", "context", "constraint", "apparent", "baseLiteral", "nonNullable", "void", "declaredType", "symbolType", "returnType", "numberIndexType", "typeArguments",
 		"stringIndexType", "awaited", "widened", "baseTypes", "defaultType", "typeOfSymbol", "indexInfo", "indexInfos", "typePredicate", "parameterType", "propertyType",
-		"mappedFields", "classThisType", "contextualArgument", "symbolLinkType":
+		"mappedFields", "classThisType", "contextualArgument":
 		kind = "typeRecord"
 	case "symbol", "aliasedSymbol", "property", "properties", "resolveName",
 		"apparentProperties", "exportSymbol", "immediateAliasedSymbol", "shorthandValueSymbol":
@@ -1008,20 +1008,13 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			}
 			slices.SortFunc(entries, func(a, b NamedSymbol) int { return strings.Compare(a.Name, b.Name) })
 			return entries, nil
-		case "freshLiteral", "regularType", "evolvingElement", "finalArray", "simplifiedForReading", "simplifiedForWriting", "typeParameterConstraint":
+		case "freshLiteral", "evolvingElement", "finalArray", "typeParameterConstraint":
 			t := s.typeByID(r.ID)
 			var value *checker.Type
 			switch r.Op {
 			case "freshLiteral":
 				if t.Flags()&(checker.TypeFlagsLiteral|checker.TypeFlagsEnum) != 0 {
 					value = t.AsLiteralType().FreshType()
-				}
-			case "regularType":
-				switch {
-				case t.Flags()&checker.TypeFlagsUnion != 0:
-					value = checker.UnionType_regularType(t.AsUnionType())
-				case t.ObjectFlags()&checker.ObjectFlagsFreshLiteral != 0:
-					value = cachedType(c, t, checker.CachedTypeKindRegularObjectLiteral)
 				}
 			case "evolvingElement", "finalArray":
 				if t.ObjectFlags()&checker.ObjectFlagsEvolvingArray != 0 {
@@ -1031,14 +1024,6 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 					} else {
 						value = checker.EvolvingArrayType_finalArrayType(arr)
 					}
-				}
-			case "simplifiedForReading", "simplifiedForWriting":
-				if t.Flags()&checker.TypeFlagsIndexedAccess != 0 {
-					kind := checker.CachedTypeKindIndexedAccessForReading
-					if r.Op == "simplifiedForWriting" {
-						kind = checker.CachedTypeKindIndexedAccessForWriting
-					}
-					value = cachedType(c, t, kind)
 				}
 			case "typeParameterConstraint":
 				if t.Flags()&checker.TypeFlagsTypeParameter != 0 {
@@ -1203,8 +1188,6 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return s.namedSymbols(exports), nil
 		case "fullyQualifiedName":
 			return Text(c.GetFullyQualifiedName(s.symbolByID(r.ID))), nil
-		case "symbolLinkType":
-			return Handle(s.typeID(cachedSymbolType(c, s.symbolByID(r.ID)))), nil
 		case "symbolMembers", "symbolExports", "symbolGlobalExports":
 			symbol := s.symbolByID(r.ID)
 			table := symbol.Members

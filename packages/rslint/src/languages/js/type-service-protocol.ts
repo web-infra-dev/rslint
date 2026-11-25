@@ -183,11 +183,8 @@ type PrintArgs = IDArgs & {
 export interface QueryArguments {
   conditionalInstantiations: IDArgs;
   freshLiteral: IDArgs;
-  regularType: IDArgs;
   evolvingElement: IDArgs;
   finalArray: IDArgs;
-  simplifiedForReading: IDArgs;
-  simplifiedForWriting: IDArgs;
   typeParameterConstraint: IDArgs;
   typeDetails: IDArgs;
   declaredMembers: IDArgs;
@@ -315,7 +312,6 @@ export interface QueryArguments {
   classThisType: IDArgs;
   fullyQualifiedName: IDArgs;
   symbolMembers: IDArgs;
-  symbolLinkType: IDArgs;
   aliasedSymbol: IDArgs;
   immediateAliasedSymbol: IDArgs;
   isUnknownSymbol: IDArgs;
@@ -348,11 +344,8 @@ export interface QueryArguments {
 export interface QueryResults {
   conditionalInstantiations: readonly NamedSymbolFact[];
   freshLiteral: number;
-  regularType: number;
   evolvingElement: number;
   finalArray: number;
-  simplifiedForReading: number;
-  simplifiedForWriting: number;
   typeParameterConstraint: number;
   typeDetails: TypeDetailFact;
   declaredMembers: DeclaredMembersFact | undefined;
@@ -463,7 +456,6 @@ export interface QueryResults {
   classThisType: number;
   fullyQualifiedName: string;
   symbolMembers: readonly NamedSymbolFact[];
-  symbolLinkType: number;
   aliasedSymbol: number;
   immediateAliasedSymbol: number;
   isUnknownSymbol: boolean;
@@ -510,7 +502,6 @@ export function isCacheableTypeQuery(query: TypeServiceQuery): boolean {
     case 'semanticDiagnostics':
     case 'declarationDiagnostics':
     case 'resolvedSignatureWithOptions':
-    case 'symbolLinkType':
     case 'symbolCount':
     case 'typeCount':
     case 'instantiationCount':
@@ -518,11 +509,8 @@ export function isCacheableTypeQuery(query: TypeServiceQuery): boolean {
     case 'declaredMembers':
     case 'conditionalInstantiations':
     case 'freshLiteral':
-    case 'regularType':
     case 'typeParameterConstraint':
     case 'finalArray':
-    case 'simplifiedForReading':
-    case 'simplifiedForWriting':
     case 'resolvedTrueType':
     case 'resolvedFalseType':
     case 'mappedFields':
@@ -659,11 +647,8 @@ export type ScalarOperation = Exclude<
 export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   conditionalInstantiations: 11,
   freshLiteral: 1,
-  regularType: 1,
   evolvingElement: 1,
   finalArray: 1,
-  simplifiedForReading: 1,
-  simplifiedForWriting: 1,
   typeParameterConstraint: 1,
   typeDetails: 19,
   declaredMembers: 20,
@@ -765,7 +750,6 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   classThisType: 1,
   fullyQualifiedName: 3,
   symbolMembers: 11,
-  symbolLinkType: 1,
   isArray: 2,
   isArrayLike: 2,
   isTuple: 2,

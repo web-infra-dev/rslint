@@ -44,16 +44,6 @@ type AssignmentTarget = checker.AssignmentTarget
 type CacheHashKey = checker.CacheHashKey
 type CachedSignatureKey = checker.CachedSignatureKey
 type CachedTypeKey = checker.CachedTypeKey
-type extra_CachedTypeKey struct {
-  kind checker.CachedTypeKind
-  typeId checker.TypeId
-}
-func CachedTypeKey_kindPtr(v *checker.CachedTypeKey) *checker.CachedTypeKind {
-  return &((*extra_CachedTypeKey)(unsafe.Pointer(v))).kind
-}
-func CachedTypeKey_typeIdPtr(v *checker.CachedTypeKey) *checker.TypeId {
-  return &((*extra_CachedTypeKey)(unsafe.Pointer(v))).typeId
-}
 type CachedTypeKind = checker.CachedTypeKind
 const CachedTypeKindApparentType = checker.CachedTypeKindApparentType
 const CachedTypeKindArrayLiteralType = checker.CachedTypeKindArrayLiteralType
@@ -539,9 +529,6 @@ func Checker_strictSubtypeRelation(v *checker.Checker) *checker.Relation {
 func Checker_patternForType(v *checker.Checker) map[*checker.Type]*ast.Node {
   return ((*extra_Checker)(unsafe.Pointer(v))).patternForType
 }
-func Checker_cachedTypes(v *checker.Checker) map[checker.CachedTypeKey]*checker.Type {
-  return ((*extra_Checker)(unsafe.Pointer(v))).cachedTypes
-}
 func Checker_unresolvedType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).unresolvedType
 }
@@ -565,9 +552,6 @@ func Checker_couldContainTypeVariables(v *checker.Checker) func(*checker.Type) b
 }
 func Checker_apparentArgumentCountPtr(v *checker.Checker) **int {
   return &((*extra_Checker)(unsafe.Pointer(v))).apparentArgumentCount
-}
-func Checker_valueSymbolLinks_storePtr(v *checker.Checker) *core.PagedLinkStore[*checker.ValueSymbolLinks] {
-  return &((*extra_Checker)(unsafe.Pointer(v))).valueSymbolLinks.store
 }
 //go:linkname CompareTypes github.com/microsoft/TypeScript/tsc/internal/checker.CompareTypes
 func CompareTypes(t1 *checker.Type, t2 *checker.Type) int
@@ -1498,34 +1482,11 @@ const UnionReductionLiteral = checker.UnionReductionLiteral
 const UnionReductionNone = checker.UnionReductionNone
 const UnionReductionSubtype = checker.UnionReductionSubtype
 type UnionType = checker.UnionType
-type extra_UnionType struct {
-  checker.UnionOrIntersectionType
-  resolvedReducedType *checker.Type
-  regularType *checker.Type
-  origin *checker.Type
-  keyPropertyName string
-  constituentMap map[*checker.Type]*checker.Type
-}
-func UnionType_regularType(v *checker.UnionType) *checker.Type {
-  return ((*extra_UnionType)(unsafe.Pointer(v))).regularType
-}
 type UniqueESSymbolType = checker.UniqueESSymbolType
 type UnusedKind = checker.UnusedKind
 const UnusedKindLocal = checker.UnusedKindLocal
 const UnusedKindParameter = checker.UnusedKindParameter
 type ValueSymbolLinks = checker.ValueSymbolLinks
-type extra_ValueSymbolLinks struct {
-  resolvedType *checker.Type
-  writeType *checker.Type
-  target *ast.Symbol
-  mapper *checker.TypeMapper
-  nameType *checker.Type
-  containingType *checker.Type
-  functionOrConstructorChecked bool
-}
-func ValueSymbolLinks_resolvedType(v *checker.ValueSymbolLinks) *checker.Type {
-  return ((*extra_ValueSymbolLinks)(unsafe.Pointer(v))).resolvedType
-}
 //go:linkname ValueToString github.com/microsoft/TypeScript/tsc/internal/checker.ValueToString
 func ValueToString(value any) string
 type VarianceFlags = checker.VarianceFlags

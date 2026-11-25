@@ -28,7 +28,6 @@
  */
 
 import { makeFixer } from './fixer.js';
-import type { ParserOptions } from '../../config/define-config.js';
 import { applyOptionDefaults, type RuleSchema } from './options-defaults.js';
 import type { SourceCode } from '../source-code/source-code.js';
 import type { ESTreeNode, GlobalsConfig } from '../../languages/js/types.js';
@@ -58,7 +57,14 @@ export interface LanguageOptions {
   /** Module / script / commonjs — top-level in ESLint v10. Same rationale as `ecmaVersion`. */
   sourceType?: 'module' | 'script' | 'commonjs';
   globals?: GlobalsConfig;
-  parserOptions?: ParserOptions & {
+  /**
+   * Parser-specific extras. Only `ecmaFeatures` lives here in v10
+   * (rules that gate on `jsx` / `globalReturn` / `impliedStrict` read
+   * via `ctx.languageOptions.parserOptions.ecmaFeatures.*`). Custom
+   * `parser` instances aren't supported by the runner, so we don't
+   * include that field.
+   */
+  parserOptions?: {
     ecmaFeatures?: {
       jsx?: boolean;
       globalReturn?: boolean;

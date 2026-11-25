@@ -114,12 +114,12 @@ const cases: Case[] = [
     reports: 1,
   },
   {
-    name: 'a local type shadows a project library type',
+    name: 'local declarations shadow project library types and values',
     plugin: typedPlugin,
     rule: 'no-shadow',
     options: [{ builtinGlobals: true, ignoreTypeValueShadow: false }],
-    code: 'export function f() { type RequestInit = string; let item: RequestInit; }',
-    reports: 1,
+    code: 'export function f() { type RequestInit = string; const URL = 1; return URL as unknown as RequestInit; }',
+    reports: 2,
   },
   {
     name: 'JSX factories count as uses of their imports',
@@ -1779,7 +1779,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
       'export const grow = () => 1; grow.item = 1;',
       'declare const computedKey: string;',
       "export * from './external';",
-      'declare const condition: boolean; condition;',
     ].join('\r\n') + '\r\n';
   writeFileSync(file, code);
   const external = resolve(dir, 'external.ts');
@@ -1874,11 +1873,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
       const computed = c.getTypeAtLocation(
         (enm as ts.EnumDeclaration).members[2].name,
       ) as ts.EnumType;
-      const boolean = c.getBooleanType();
-      const regularBefore = Reflect.get(boolean, 'regularType') === boolean;
-      c.getTypeAtLocation(
-        (src.statements.at(-1) as ts.ExpressionStatement).expression,
-      );
       return {
         additional: (() => {
           const fnSymbol = c.getSymbolAtLocation(decl.name!)!;
@@ -1990,7 +1984,6 @@ test('public checker, Program and source reads match TypeScript', async () => {
         })(),
         shape: [
           computed.regularType?.freshType === computed,
-          [regularBefore, Reflect.get(boolean, 'regularType') === boolean],
           'types' in literal,
           'target' in c.getStringType(),
           'target' in literal,

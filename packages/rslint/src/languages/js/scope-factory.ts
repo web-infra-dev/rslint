@@ -30,7 +30,7 @@ import type { ScopeManager as EslintScopeManager } from 'eslint-scope';
 // (reading 'analyze')") while .js (eslint-scope) silently kept working.
 import * as tsScopeManagerPkg from '@typescript-eslint/scope-manager';
 import * as eslintScopePkg from 'eslint-scope';
-import { ScriptTarget } from '@rslint/api';
+import { ScriptTarget } from '@rslint/api/src/script-target.ts';
 
 import { getVisitorKeys, VISITOR_KEYS } from './visitor-keys.js';
 import {
@@ -73,9 +73,8 @@ export interface ScopeFactoryOptions {
    * `nodejsScope` to eslint-scope.
    */
   globalReturn?: boolean;
-  jsxPragma?: string | null;
-  jsxFragmentName?: string | null;
-  lib?: readonly string[];
+  jsxPragma?: string;
+  jsxFragmentName?: string;
   parserServices?: {
     program?: {
       getCompilerOptions(): {
@@ -125,22 +124,9 @@ export function makeScopeManagerFactory(
 
 function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
   const ecmaVersion = normalizeEcmaVersion(opts.ecmaVersion);
-  const { lib, jsxPragma, jsxFragmentName } = opts;
   const program = opts.parserServices?.program;
-  const tsFile = shouldUseTsScopeManager(opts.filePath);
-  if (
-    tsFile ||
-    program !== undefined ||
-    lib !== undefined ||
-    jsxPragma !== undefined ||
-    jsxFragmentName !== undefined
-  ) {
-    const compiler =
-      lib === undefined ||
-      jsxPragma === undefined ||
-      jsxFragmentName === undefined
-        ? program?.getCompilerOptions()
-        : undefined;
+  if (shouldUseTsScopeManager(opts.filePath) || program !== undefined) {
+    const compiler = program?.getCompilerOptions();
     const tsScope = tsScopeManagerPkg as unknown as {
       analyze: (ast: object, options?: object) => unknown;
     };
@@ -165,18 +151,14 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
       // names` and similar in legacy bundles.
       impliedStrict: opts.impliedStrict ?? false,
       // A factory such as preact.h references the binding named preact.
-      jsxPragma:
-        jsxPragma === undefined
-          ? compiler?.jsxFactory?.split('.')[0].trim()
-          : jsxPragma,
+      jsxPragma: opts.jsxPragma ?? compiler?.jsxFactory?.split('.')[0].trim(),
       // TypeScript files on the ordinary CLI historically use Fragment.
       jsxFragmentName:
-        jsxFragmentName !== undefined
-          ? jsxFragmentName
-          : program === undefined && tsFile
-            ? 'Fragment'
-            : compiler?.jsxFragmentFactory?.split('.')[0].trim(),
-      lib: lib ?? (compiler && scopeLibs(compiler.lib, compiler.target)),
+        opts.jsxFragmentName ??
+        (program === undefined
+          ? 'Fragment'
+          : compiler?.jsxFragmentFactory?.split('.')[0].trim()),
+      lib: compiler && scopeLibs(compiler.lib, compiler.target),
     });
     return scopeManager;
   }
@@ -489,20 +471,15 @@ export function seedEcmaGlobals(
   if (!gs) return;
 
   const normalizedVersion = normalizeEcmaVersion(ecmaVersion);
-  const selectedNames = new Set<string>();
+  // The project library owns host globals such as URL. ecmaVersion governs
+  // only ECMAScript globals, and explicit languageOptions.globals apply last.
   for (const [name, introducedIn] of ECMASCRIPT_GLOBALS) {
     if (introducedIn <= normalizedVersion) {
-      selectedNames.add(name);
+      ensureGlobal(gs, name, 'readonly');
+      continue;
     }
-  }
-
-  // The TypeScript analyzer needs lib data for type bindings, but its value
-  // catalog must not bypass languageOptions.ecmaVersion (or introduce esnext
-  // proposals that native rules do not know). Demote only the value side;
-  // type-only references remain resolved against the lib variable.
-  for (const variable of gs.variables) {
-    if (!isTypeScriptImplicitLibVariable(variable)) continue;
-    if (selectedNames.has(variable.name)) continue;
+    const variable = gs.set?.get(name);
+    if (!variable || !isTypeScriptImplicitLibVariable(variable)) continue;
     if (hasRuntimeDefinition(variable)) {
       variable.isValueVariable = true;
       clearGlobalMode(variable);
@@ -510,7 +487,6 @@ export function seedEcmaGlobals(
       demoteTypeScriptValueGlobal(gs, variable);
     }
   }
-  for (const name of selectedNames) ensureGlobal(gs, name, 'readonly');
   resolveThroughReferences(gs);
 }
 

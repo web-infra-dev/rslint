@@ -1,5 +1,4 @@
 import type { TypeServiceCompilerData } from './type-service-compiler-data.js';
-import type { ParserOptions } from '../../config/define-config.js';
 import type ts from 'typescript';
 import { SyntaxKind as nativeSyntaxKind } from '@rslint/api';
 import type { DecodedFrame } from './frame.js';
@@ -60,8 +59,8 @@ interface DeclaredMemberViews {
 }
 export interface TypeView extends Partial<Readonly<DeclaredMemberViews>> {
   readonly checker: CheckerView;
-  readonly simplifiedForReading: TypeView | undefined;
-  readonly simplifiedForWriting: TypeView | undefined;
+  readonly simplifiedForReading?: TypeView;
+  readonly simplifiedForWriting?: TypeView;
   readonly elementType: TypeView | undefined;
   readonly finalArrayType: TypeView | undefined;
   readonly root: ConditionalRootView | undefined;
@@ -1911,18 +1910,11 @@ export class TypeServiceClient {
         const index = mappedFieldIndex[key];
         return this.type(mappedFields(index)?.[index] ?? 0);
       };
-      let fresh = 0,
-        regular = 0;
+      let fresh = 0;
       const freshId = () =>
         flag(tf.Literal | tf.Enum)
           ? (fresh ||= this.query({ op: 'freshLiteral', args: { id } }))
           : 0;
-      const regularId = () => {
-        if (flag(tf.Literal | tf.Enum)) return details().regular;
-        if (flag(tf.Union) || objectFlag(of.FreshLiteral))
-          return (regular ||= this.query({ op: 'regularType', args: { id } }));
-        return 0;
-      };
       let memberFact: QueryResults['declaredMembers'];
       const declared = () =>
         objectFlag(of.ClassOrInterface | of.Tuple)
@@ -2030,18 +2022,7 @@ export class TypeServiceClient {
               flag(tf.Literal | tf.Enum) && (includePending || !!freshId())
             );
           case 'regularType':
-            return (
-              (includePending &&
-                (flag(tf.Literal | tf.Enum | tf.Union) ||
-                  objectFlag(of.FreshLiteral))) ||
-              !!regularId()
-            );
-          case 'simplifiedForReading':
-          case 'simplifiedForWriting':
-            return (
-              flag(tf.IndexedAccess) &&
-              (includePending || !!this.query({ op: key, args: { id } }))
-            );
+            return flag(tf.Literal | tf.Enum);
           case 'resolvedTrueType':
           case 'resolvedFalseType':
             return (
@@ -2160,18 +2141,8 @@ export class TypeServiceClient {
         get finalArrayType() {
           return client.type(client.query({ op: 'finalArray', args: { id } }));
         },
-        get simplifiedForReading() {
-          return client.type(
-            client.query({ op: 'simplifiedForReading', args: { id } }),
-          );
-        },
-        get simplifiedForWriting() {
-          return client.type(
-            client.query({ op: 'simplifiedForWriting', args: { id } }),
-          );
-        },
         get regularType() {
-          return client.type(regularId());
+          return client.type(details().regular);
         },
         get baseType() {
           const d = details();
@@ -2360,7 +2331,7 @@ export class TypeServiceClient {
             },
             get type() {
               return client.type(
-                client.query({ op: 'symbolLinkType', args: { id } }),
+                client.query({ op: 'typeOfSymbol', args: { id } }),
               );
             },
           });
@@ -2471,17 +2442,17 @@ type NodeMaps = Pick<
   'esTreeNodeToTSNodeMap' | 'tsNodeToESTreeNodeMap'
 >;
 
-export function syntaxOnlyParserServices(
-  { esTreeNodeToTSNodeMap, tsNodeToESTreeNodeMap }: NodeMaps,
-  options?: ParserOptions,
-) {
+export function syntaxOnlyParserServices({
+  esTreeNodeToTSNodeMap,
+  tsNodeToESTreeNodeMap,
+}: NodeMaps) {
   return {
     esTreeNodeToTSNodeMap,
     tsNodeToESTreeNodeMap,
     program: null,
-    emitDecoratorMetadata: options?.emitDecoratorMetadata === true,
-    experimentalDecorators: options?.experimentalDecorators === true,
-    isolatedDeclarations: options?.isolatedDeclarations === true,
+    emitDecoratorMetadata: false,
+    experimentalDecorators: false,
+    isolatedDeclarations: false,
   };
 }
 
@@ -2502,12 +2473,11 @@ export class TypeServiceFile {
     frame: DecodedFrame,
     projection: TypeServiceProjection,
     sourceFileName = this.binding.sourceFileName,
-    parserOptions?: ParserOptions,
   ) {
     if (this.closed) throw new Error('file type services are closed');
     this.syntax.attach(frame, projection, sourceFileName);
     if (this.owner.descriptor.syntaxOnly)
-      return syntaxOnlyParserServices(this.syntax, parserOptions);
+      return syntaxOnlyParserServices(this.syntax);
     const toTS = this.syntax.esTreeNodeToTSNodeMap.get;
     const options = this.owner.descriptor.compilerOptions;
     return {

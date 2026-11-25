@@ -23,24 +23,20 @@ type ExtraShim struct {
 	ExtraFunctions []string            `json:"ExtraFunctions"`
 	ExtraMethods   map[string][]string `json:"ExtraMethods"`
 	ExtraFields    map[string][]string `json:"ExtraFields"`
-	// Field pointers preserve the identity of checker state and embedded stores.
-	// A dotted selector names a field inside a mirrored private struct.
+	// Field pointers preserve the identity of checker state.
 	ExtraFieldPointers map[string][]string `json:"ExtraFieldPointers"`
 	IgnoreFunctions    []string            `json:"IgnoreFunctions"`
 }
 
 func emitFieldAccessor(out *strings.Builder, receiver *types.Named, selector string, pointer bool, qualifier types.Qualifier) {
-	var fieldType types.Type = receiver
-	for part := range strings.SplitSeq(selector, ".") {
-		member, _, _ := types.LookupFieldOrMethod(fieldType, true, receiver.Obj().Pkg(), part)
-		field, ok := member.(*types.Var)
-		if !ok || !field.IsField() {
-			log.Fatalf("expected %s to contain field %s", receiver.Obj().Name(), selector)
-		}
-		fieldType = field.Type()
+	member, _, _ := types.LookupFieldOrMethod(receiver, true, receiver.Obj().Pkg(), selector)
+	field, ok := member.(*types.Var)
+	if !ok || !field.IsField() {
+		log.Fatalf("expected %s to contain field %s", receiver.Obj().Name(), selector)
 	}
+	fieldType := field.Type()
 	name := receiver.Obj().Name()
-	accessor := name + "_" + strings.ReplaceAll(selector, ".", "_")
+	accessor := name + "_" + selector
 	address := ""
 	if pointer {
 		accessor += "Ptr"
