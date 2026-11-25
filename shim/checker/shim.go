@@ -87,6 +87,12 @@ func Checker_getTypeOfExpression(recv *checker.Checker, node *ast.Node) *checker
 func Checker_isForInVariableForNumericPropertyNames(recv *checker.Checker, expr *ast.Node) bool
 //go:linkname Checker_getResolvedSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSignature
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
+//go:linkname Checker_resolveCall github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).resolveCall
+func Checker_resolveCall(recv *checker.Checker, node *ast.Node, signatures []*checker.Signature, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode, callChainFlags checker.SignatureFlags, headMessage *diagnostics.Message) *checker.Signature
+//go:linkname Checker_hasCorrectArity github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).hasCorrectArity
+func Checker_hasCorrectArity(recv *checker.Checker, node *ast.Node, args []*ast.Node, signature *checker.Signature, signatureHelpTrailingComma bool) bool
+//go:linkname Checker_isSignatureApplicable github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isSignatureApplicable
+func Checker_isSignatureApplicable(recv *checker.Checker, node *ast.Node, args []*ast.Node, signature *checker.Signature, relation *checker.Relation, checkMode checker.CheckMode, reportErrors bool, diagnosticOutput *[]*ast.Diagnostic) bool
 //go:linkname Checker_isConstContext github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isConstContext
 func Checker_isConstContext(recv *checker.Checker, node *ast.Node) bool
 //go:linkname Checker_getResolvedSymbolOrNil github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSymbolOrNil
@@ -151,14 +157,20 @@ func Checker_propagateOptionalTypeMarker(recv *checker.Checker, t *checker.Type,
 func Checker_getContextualType(recv *checker.Checker, node *ast.Node, contextFlags checker.ContextFlags) *checker.Type
 //go:linkname Checker_getContextualTypeForArgumentAtIndex github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getContextualTypeForArgumentAtIndex
 func Checker_getContextualTypeForArgumentAtIndex(recv *checker.Checker, callTarget *ast.Node, argIndex int) *checker.Type
+//go:linkname Checker_getEffectiveCallArguments github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getEffectiveCallArguments
+func Checker_getEffectiveCallArguments(recv *checker.Checker, node *ast.Node) []*ast.Node
 //go:linkname Checker_getApparentTypeOfContextualType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getApparentTypeOfContextualType
 func Checker_getApparentTypeOfContextualType(recv *checker.Checker, node *ast.Node, contextFlags checker.ContextFlags) *checker.Type
 //go:linkname Checker_getAwaitedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAwaitedType
 func Checker_getAwaitedType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getFlowTypeOfReference github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getFlowTypeOfReference
 func Checker_getFlowTypeOfReference(recv *checker.Checker, reference *ast.Node, declaredType *checker.Type) *checker.Type
+//go:linkname Checker_isMatchingReference github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isMatchingReference
+func Checker_isMatchingReference(recv *checker.Checker, source *ast.Node, target *ast.Node) bool
 //go:linkname Checker_getAccessedPropertyName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAccessedPropertyName
 func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (string, bool)
+//go:linkname Checker_isConstantReference github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isConstantReference
+func Checker_isConstantReference(recv *checker.Checker, node *ast.Node) bool
 //go:linkname Checker_getPropertyNameForKnownSymbolName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertyNameForKnownSymbolName
 func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName string) string
 //go:linkname Checker_isTypeIdenticalTo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeIdenticalTo
@@ -492,8 +504,8 @@ type extra_Checker struct {
   mu sync.Mutex
   tracer *checker.Tracer
 }
-func Checker_autoType(v *checker.Checker) *checker.Type {
-  return ((*extra_Checker)(unsafe.Pointer(v))).autoType
+func Checker_assignableRelation(v *checker.Checker) *checker.Relation {
+  return ((*extra_Checker)(unsafe.Pointer(v))).assignableRelation
 }
 func Checker_numberType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).numberType

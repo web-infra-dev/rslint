@@ -3,6 +3,7 @@ package no_unnecessary_condition
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -624,6 +625,35 @@ func TestNoUnnecessaryConditionAccessorObservations(t *testing.T) {
 		{Code: "declare const source: { get value(): number | undefined };\nconst copy = { ...source };\nconst key = 'value';\ncopy.value = 1;\ncopy[(key)] ?? 42;\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}},
 		{Code: "interface Store { get callback(): (() => true) | ((value?: string) => true); set callback(value: () => true); }\nfunction read(store: Store) { store.callback = () => true; if (store.callback()) {} }\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
 	}
+	for _, config := range []string{"tsconfig.json", "tsconfig.noUncheckedIndexedAccess.json", "tsconfig.exactOptionalPropertyTypes.json"} {
+		for _, code := range []string{
+			"function read(extra: { value?: { id: number } }) { const store = { get value(): { id: number } | undefined { return undefined; }, set value(value: { id: number } | undefined) {}, ...extra }; store.value = { id: 1 }; return store.value?.id; }",
+			"declare const source: { value: number; other: number }; const copy = Object.assign({ get value(): number | undefined { return undefined; }, set value(value: number | undefined) {}, other: 1 }, source); function read(key: 'value' | 'other') { copy[key] = 1; return copy[key] ?? 42; }",
+			"interface Store { get value(): number | undefined; set value(value: number); } function read<T extends Store>(source: T) { let copy = { ...source }; copy = source; copy.value = 1; return copy.value ?? 42; }",
+			"interface Store { get value(): number | undefined; set value(value: number); } function read(source: Store) { const Object = { assign(target: object, value: Store) { return value; } }; const copy = Object.assign({}, source); copy.value = 1; return copy.value ?? 42; }",
+			"interface Store { get value(): number | undefined; set value(value: number); } function read(source: Store) { const copy = { __proto__: source } as unknown as Store; copy.value = 1; return copy.value ?? 42; }",
+			"type Read = (value: { value: true }) => true; type Write = (value: { other: number }) => true; interface Store { get callback(): Read | Write; set callback(value: Write); } function read(store: Store, callback: Write) { store.callback = callback; if (store.callback({ other: 1 })) {} }",
+			"type Read = <T extends { value: true }>(value: T) => true; type Write = <T extends { other: number }>(value: T) => true; interface Store { get callback(): Read | Write; set callback(value: Write); } function read(store: Store, callback: Write) { store.callback = callback; if (store.callback<{ other: number }>({ other: 1 })) {} }",
+			"interface Tree { next: Tree; ready: true; } interface Store { get head(): Tree | undefined; set head(value: Tree); } function read(store: Store, value: Tree) { store.head = value; if (store.head?." + strings.Repeat("next.", 24) + "ready) {} }",
+		} {
+			valid = append(valid, rule_tester.ValidTestCase{Code: code, TSConfig: config})
+		}
+		for _, access := range []string{"store.value", "store['value']", "store[(key)]"} {
+			code := "function read(extra: { value?: number }) { const key = 'value'; const store = { get value(): number | undefined { return undefined; }, set value(value: number | undefined) {}, ...extra }; store.value = 1; return " + access + " ?? 42; }"
+			valid = append(valid, rule_tester.ValidTestCase{Code: code, TSConfig: config})
+		}
+		for _, creation := range []string{"const copy = { ...source };", "const first = { ...source }; const copy = first;", "const copy = Object.assign({}, source);", "const assign = Object.assign; const copy = assign({}, source);", "const Obj = Object; const copy = Obj.assign({}, source);", "const { tag, ...copy } = source;"} {
+			code := "interface Store { tag: string; get value(): number | undefined; set value(value: number); } function read<T extends Store>(source: T) { " + creation + " copy.value = 1; return copy.value ?? 42; }"
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
+		}
+		for _, test := range []struct{ code, message string }{
+			{"type Read = { (key: 'yes'): true; (key: 'no'): false }; type Write = (key: 'yes' | 'no') => true; interface Store { get callback(): Read | Write; set callback(value: Write); } function read(store: Store) { store.callback = () => true; if (store.callback('yes')) {} }", "alwaysTruthy"},
+			{"type Read = <T>(value: T) => T; type Write = (value: true) => true; interface Store { get callback(): Read | Write; set callback(value: Write); } function read(store: Store) { store.callback = () => true; if (store.callback(true)) {} }", "alwaysTruthy"},
+			{"type Read = <T>(value: T) => T; type Write = (value: 0) => 0; interface Store { get callback(): Read | Write; set callback(value: Write); } function read(store: Store) { store.callback = () => 0; if (store.callback(0)) {} }", "alwaysFalsy"},
+		} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: test.code, TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: test.message}}})
+		}
+	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, valid, invalid)
 }
 
@@ -637,8 +667,14 @@ func TestNoUnnecessaryConditionOptionalWithoutStrictNullChecks(t *testing.T) {
 			invalid = append(invalid, rule_tester.InvalidTestCase{Code: fmt.Sprintf("function name(options: { title: string }) { const key = 'title'; return %s %s 'Untitled'; }\n", access, operator), Options: options, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
 			invalid = append(invalid, rule_tester.InvalidTestCase{Code: fmt.Sprintf("function name(options: { title?: string }) { const key = 'title'; options.title = 'set'; return %s %s 'Untitled'; }\n", access, operator), Options: options, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
 			valid = append(valid, rule_tester.ValidTestCase{Code: fmt.Sprintf("function name(options: { title?: string }, write: boolean) { const key = 'title'; if (write) options.title = 'set'; return %s %s 'Untitled'; }\n", access, operator), Options: options})
+			for _, source := range []string{"title", "source.title", "use ? 'yes' : undefined", "use ? null : 'yes'", "title ?? 'set'"} {
+				code := fmt.Sprintf("function name(options: { title?: string }, title?: string, source: { title?: string } = {}, use = false) { const key = 'title'; options.title = %s; return %s %s 'Untitled'; }\n", source, access, operator)
+				valid = append(valid, rule_tester.ValidTestCase{Code: code, Options: options})
+			}
 		}
 	}
+	valid = append(valid, rule_tester.ValidTestCase{Code: "function name(title?: string) { return title ?? 'Untitled'; }", Options: options})
+	invalid = append(invalid, rule_tester.InvalidTestCase{Code: "function name(title?: string) { title = 'set'; return title ?? 'Untitled'; }", Options: options, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.unstrict.json", t, &NoUnnecessaryConditionRule, valid, invalid)
 }
 

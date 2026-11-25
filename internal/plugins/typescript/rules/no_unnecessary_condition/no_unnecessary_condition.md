@@ -87,8 +87,9 @@ Logical assignments check the value being read. Ordinary fields retain
 control-flow narrowing. Accessors use the getter's declared type: a setter can
 transform its argument, and each getter call can return a different value.
 The same protection applies to properties of an object returned by a getter.
-Values copied by object spread and undecorated private auto-accessors retain
-ordinary field narrowing.
+Values copied by object spread, object rest, or `Object.assign` retain ordinary
+field narrowing, as do undecorated private auto-accessors. A later optional
+spread may leave a getter already on the target in place; it remains an accessor.
 For a union of keys, the read type includes all selected properties. Setter types
 and write intersections must not determine whether the condition is necessary.
 For example, this `??=` remains necessary even after the setter receives `null`:
@@ -106,11 +107,15 @@ function reset(box: Box) {
 ```
 
 When `allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing` is enabled, optional
-property markers still protect nullish fallbacks. For example, with
+property and parameter markers still protect nullish fallbacks. For example, with
 `strictNullChecks` disabled, `options: { title?: string }` can be `{}`, so
 `options.title ?? 'Untitled'` remains necessary.
-After a definite assignment such as `options.title = 'set'`, the fallback is
-reported as unnecessary.
+After a directly reaching assignment of a statically known value, such as
+`options.title = 'set'`, the fallback is reported as unnecessary. Other optional
+property and parameter fallbacks are retained conservatively: without strict null checking,
+the compiler also erases nullish values from assignment sources. For example,
+assigning an optional parameter with `options.title = title` does not prove the
+property is present.
 
 A non-null assertion inside an optional chain does not cancel an earlier short
 circuit. For example, the final `?.` remains necessary here because `root` can be
