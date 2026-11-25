@@ -676,3 +676,99 @@ func assertNoCycleDepthOneReports(t *testing.T, reports []rule.RuleDiagnostic, w
 		t.Fatalf("reported source ranges = %q, want %q", got, want)
 	}
 }
+
+func TestNoCycleDemandDrivenSkipsUnreachableAndTypeOnlyFiles(t *testing.T) {
+	root, roots := noCycleDepthOneRoot(t, map[string]string{
+		"a.ts":             "import { b } from './b'; import type { T } from './type-target'; export const a: T = b;",
+		"b.ts":             "export const b = 'ok';",
+		"type-target.ts":   "export type T = string; define(['no-cycle-demand-probe'], () => {});",
+		"unrelated.ts":     "define(['no-cycle-demand-probe'], () => {});",
+		"external/skip.ts": "import '../a'; define(['no-cycle-demand-probe'], () => {});",
+	})
+	root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
+		tspath.ResolvePath(root.Dir, "node_modules/no-cycle-demand-probe/package.json"): `{"name":"no-cycle-demand-probe","types":"index.d.ts"}`,
+		tspath.ResolvePath(root.Dir, "node_modules/no-cycle-demand-probe/index.d.ts"):   "export {};",
+	})
+	probe := &noCycleDepthOneProbeFS{FS: root.FS}
+	root.FS = probe
+	p := noCycleDepthOneProgram(t, root, roots)
+	probe.probes.Store(0)
+
+	// Default maxDepth (unlimited): linting a.ts must not collect or resolve
+	// unreachable files (unrelated.ts, external/skip.ts) or type-only targets.
+	options := map[string]interface{}{"amd": true}
+	reports := noCycleDepthOneReports(t, p, root, "a.ts", options, nil, rule.EditDemandNone)
+	if len(reports) != 0 {
+		t.Fatalf("unexpected reports for acyclic a.ts: %v", reports)
+	}
+	if got := probe.probes.Load(); got != 0 {
+		t.Fatalf("unreachable or type-only files caused %d module-resolution probes", got)
+	}
+
+	// Positive control: linting unrelated.ts triggers its AMD probe.
+	noCycleDepthOneReports(t, p, root, "unrelated.ts", options, nil, rule.EditDemandNone)
+	if probe.probes.Load() == 0 {
+		t.Fatal("linting unrelated.ts did not resolve its AMD probe")
+	}
+}
+
+func TestNoCycleDeclarationFileRuntimeCycle(t *testing.T) {
+	root, roots := noCycleDepthOneRoot(t, map[string]string{
+		"a.ts":   "import { b } from './b'; export const a = b;",
+		"b.d.ts": "import { a } from './a'; export declare const b: typeof a;",
+	})
+	p := noCycleDepthOneProgram(t, root, roots)
+	reports := noCycleDepthOneReports(t, p, root, "a.ts", map[string]interface{}{}, nil, rule.EditDemandNone)
+	assertNoCycleDepthOneReports(t, reports, []string{"import { b } from './b';"})
+}
+
+func TestNoCycleConcurrentFullGraphQueries(t *testing.T) {
+	t.Parallel()
+	root, roots := noCycleDepthOneRoot(t, map[string]string{
+		"entry.ts": "import './a';",
+		"a.ts":     "import './b';",
+		"b.ts":     "import './c';",
+		"c.ts":     "import './a';",
+		"d.ts":     "import './e';",
+		"e.ts":     "import './d'; import('./d');",
+		"leaf.ts":  "export const leaf = 1;",
+	})
+	p := noCycleDepthOneProgram(t, root, roots)
+
+	type expectation struct {
+		file      string
+		wantCount int
+		wantDesc  string
+	}
+	for index := range 24 {
+		t.Run(strconv.Itoa(index), func(t *testing.T) {
+			t.Parallel()
+			unsafe := index%2 == 0
+			options := map[string]interface{}{"allowUnsafeDynamicCyclicDependency": unsafe}
+			wantDCount := 1
+			if unsafe {
+				wantDCount = 0
+			}
+			cases := []expectation{
+				{file: "entry.ts", wantCount: 0},
+				{file: "a.ts", wantCount: 1, wantDesc: "Dependency cycle via ./c:1"},
+				{file: "b.ts", wantCount: 1, wantDesc: "Dependency cycle via ./a:1"},
+				{file: "c.ts", wantCount: 1, wantDesc: "Dependency cycle via ./b:1"},
+				{file: "d.ts", wantCount: wantDCount, wantDesc: messageDetected},
+				{file: "leaf.ts", wantCount: 0},
+			}
+			// Rotate starting order per goroutine to stress concurrent exploration.
+			offset := index % len(cases)
+			for i := range cases {
+				tc := cases[(i+offset)%len(cases)]
+				reports := noCycleDepthOneReports(t, p, root, tc.file, options, nil, rule.EditDemandNone)
+				if len(reports) != tc.wantCount {
+					t.Fatalf("file %s (unsafe=%t): got %d reports (%v), want %d", tc.file, unsafe, len(reports), reports, tc.wantCount)
+				}
+				if tc.wantCount > 0 && reports[0].Message.Description != tc.wantDesc {
+					t.Fatalf("file %s (unsafe=%t): description = %q, want %q", tc.file, unsafe, reports[0].Message.Description, tc.wantDesc)
+				}
+			}
+		})
+	}
+}

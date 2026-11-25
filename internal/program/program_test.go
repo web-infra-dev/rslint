@@ -304,11 +304,339 @@ type typedNilCompilerHost struct {
 	compiler.CompilerHost
 }
 
+type caseSensitiveFS struct {
+	vfs.FS
+}
+
+func (caseSensitiveFS) UseCaseSensitiveFileNames() bool { return true }
+
 type caseInsensitiveFS struct {
 	vfs.FS
 }
 
 func (caseInsensitiveFS) UseCaseSensitiveFileNames() bool { return false }
+
+func TestSourceFileLookupFastPathCaseSensitivityAndConcurrency(t *testing.T) {
+	t.Parallel()
+
+	const root = "/program-lookup-fast-path"
+	upperPath := tspath.ResolvePath(root, "SubDir/Target.ts")
+	lowerPath := tspath.ResolvePath(root, "subdir/target.ts")
+	importerPath := tspath.ResolvePath(root, "SubDir/Importer.ts")
+	missingPath := tspath.ResolvePath(root, "SubDir/Missing.ts")
+
+	for _, caseSensitive := range []bool{true, false} {
+		t.Run(fmt.Sprintf("caseSensitive=%t", caseSensitive), func(t *testing.T) {
+			t.Parallel()
+			files := map[string]string{
+				importerPath: `import { value } from "./Target"; export const out = value;`,
+				upperPath:    `export const value = 1;`,
+			}
+			baseFS := bundled.WrapFS(osvfs.FS())
+			if caseSensitive {
+				baseFS = caseSensitiveFS{FS: baseFS}
+			} else {
+				baseFS = caseInsensitiveFS{FS: baseFS}
+			}
+			fs := utils.NewOverlayVFS(baseFS, files)
+			host := utils.CreateCompilerHost(root, fs)
+
+			raw, err := utils.CreateProgramFromOptions(true, &core.CompilerOptions{
+				Module: core.ModuleKindESNext,
+				NoLib:  core.TSTrue,
+			}, []string{importerPath, upperPath}, host)
+			if err != nil {
+				t.Fatalf("CreateProgramFromOptions: %v", err)
+			}
+			rootProg, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames:   []string{importerPath, upperPath},
+				Host:            host,
+				CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext, NoLib: core.TSTrue},
+				SingleThreaded:  true,
+			})
+			if err != nil {
+				t.Fatalf("NewFromRoots: %v", err)
+			}
+
+			for name, prog := range map[string]*lintprogram.Program{
+				"compiler": lintprogram.NewFromCompiler(raw),
+				"roots":    rootProg,
+			} {
+				t.Run(name, func(t *testing.T) {
+					wantTarget := prog.GetSourceFile(upperPath)
+					if wantTarget == nil || wantTarget.FileName() != upperPath {
+						t.Fatalf("exact lookup(%q) = %v, want Target.ts", upperPath, wantTarget)
+					}
+
+					var wg sync.WaitGroup
+					for range 16 {
+						wg.Go(func() {
+							for range 4 {
+								if got := prog.GetSourceFile(upperPath); got != wantTarget {
+									t.Errorf("GetSourceFile(exact) = %v, want %v", got, wantTarget)
+								}
+								if got := prog.GetSourceFileForResolvedModule(upperPath); got != wantTarget {
+									t.Errorf("GetSourceFileForResolvedModule(exact) = %v, want %v", got, wantTarget)
+								}
+								gotLower := prog.GetSourceFile(lowerPath)
+								gotResolvedLower := prog.GetSourceFileForResolvedModule(lowerPath)
+								if caseSensitive {
+									if gotLower != nil || gotResolvedLower != nil {
+										t.Errorf("case-sensitive lookup(%q) = (%v, %v), want (nil, nil)", lowerPath, gotLower, gotResolvedLower)
+									}
+								} else {
+									if gotLower != wantTarget || gotResolvedLower != wantTarget {
+										t.Errorf("case-insensitive lookup(%q) = (%v, %v), want %v", lowerPath, gotLower, gotResolvedLower, wantTarget)
+									}
+								}
+								// Unnormalized relative path falls back cleanly.
+								if got := prog.GetSourceFile("SubDir/Target.ts"); got != wantTarget {
+									t.Errorf("GetSourceFile(relative) = %v, want %v", got, wantTarget)
+								}
+								// Missing path returns nil consistently across cached misses.
+								if got := prog.GetSourceFileForResolvedModule(missingPath); got != nil {
+									t.Errorf("GetSourceFileForResolvedModule(missing) = %v, want nil", got)
+								}
+								importer := prog.GetSourceFile(importerPath)
+								refs := prog.ModuleGraph().References(importer, lintprogram.ESModuleReferences)
+								if len(refs) != 1 || refs[0].Target != wantTarget {
+									t.Errorf("ModuleGraph.References = %+v, want Target=%v", refs, wantTarget)
+								}
+							}
+						})
+					}
+					wg.Wait()
+				})
+			}
+		})
+	}
+}
+
+func TestResolvedModuleFileCacheIsolatesProgramGenerations(t *testing.T) {
+	files := specifierCacheFiles(false)
+	fs := utils.NewOverlayVFS(caseInsensitiveFS{FS: bundled.WrapFS(osvfs.FS())}, files)
+	host := utils.CreateCompilerHost("/", fs)
+	raw, err := utils.CreateProgramFromOptions(
+		true,
+		&core.CompilerOptions{AllowJs: core.TSTrue},
+		[]string{specifierCacheImporter},
+		host,
+	)
+	if err != nil {
+		t.Fatalf("CreateProgramFromOptions: %v", err)
+	}
+	raw.BindSourceFiles()
+
+	caseFoldedTarget := strings.ToUpper(specifierCacheTarget)
+	beforeProg := lintprogram.NewFromCompiler(raw)
+	beforeTarget := beforeProg.GetSourceFileForResolvedModule(specifierCacheTarget)
+	if beforeTarget == nil {
+		t.Fatal("initial program missing target")
+	}
+	// Exercise resolvedModuleFiles via a case-folded spelling that misses both
+	// sourceFileByPath and sourceFilesByFileName.
+	if got := beforeProg.GetSourceFileForResolvedModule(caseFoldedTarget); got != beforeTarget {
+		t.Fatalf("case-folded lookup before update = %v, want %v", got, beforeTarget)
+	}
+	if got := beforeProg.GetSourceFileForResolvedModule(caseFoldedTarget); got != beforeTarget {
+		t.Fatalf("cached case-folded lookup before update = %v, want %v", got, beforeTarget)
+	}
+	// Warm the negative cache on a non-existent path as well.
+	const missingPath = "/specifier-cache-fixture/nonexistent.ts"
+	if beforeProg.GetSourceFileForResolvedModule(missingPath) != nil {
+		t.Fatal("missing path resolved unexpectedly")
+	}
+
+	files[specifierCacheTarget] = "export const value = 2;\n"
+	changed := tspath.ToPath(specifierCacheTarget, raw.GetCurrentDirectory(), fs.UseCaseSensitiveFileNames())
+	updated, _, reused := raw.UpdateProgram(changed, raw.Host(), nil)
+	if updated == nil || !reused {
+		t.Fatalf("UpdateProgram reused=%v, want true", reused)
+	}
+	updated.BindSourceFiles()
+
+	afterProg := lintprogram.NewFromCompiler(updated)
+	afterTarget := afterProg.GetSourceFileForResolvedModule(specifierCacheTarget)
+	if afterTarget == nil || afterTarget == beforeTarget {
+		t.Fatal("updated program reused stale target from previous generation")
+	}
+	if got := afterProg.GetSourceFileForResolvedModule(caseFoldedTarget); got != afterTarget {
+		t.Fatalf("case-folded lookup after update = %v, want %v (reused stale resolvedModuleFiles entry?)", got, afterTarget)
+	}
+	if got := beforeProg.GetSourceFileForResolvedModule(caseFoldedTarget); got != beforeTarget {
+		t.Fatalf("previous generation case-folded lookup = %v, want %v", got, beforeTarget)
+	}
+	if beforeProg.GetSourceFileForResolvedModule(specifierCacheTarget) != beforeTarget {
+		t.Fatal("previous generation lost its original target")
+	}
+}
+
+type countingCaseFS struct {
+	vfs.FS
+	caseSensitive bool
+	calls         atomic.Int64
+}
+
+func (f *countingCaseFS) UseCaseSensitiveFileNames() bool {
+	f.calls.Add(1)
+	return f.caseSensitive
+}
+
+func TestCaseInsensitiveResolvedModuleLookupOrder(t *testing.T) {
+	t.Parallel()
+
+	const root = "/program-case-insensitive-lookup-order"
+	mixedPath := tspath.ResolvePath(root, "SubDir/Target.ts")
+	lowerPath := tspath.ResolvePath(root, "subdir/target.ts")
+	upperPath := strings.ToUpper(mixedPath)
+	missingPath := tspath.ResolvePath(root, "SubDir/Missing.ts")
+
+	t.Run("case-insensitive", func(t *testing.T) {
+		t.Parallel()
+		counter := &countingCaseFS{FS: bundled.WrapFS(osvfs.FS()), caseSensitive: false}
+		fs := utils.NewOverlayVFS(counter, map[string]string{
+			mixedPath: `export const value = 1;`,
+		})
+		host := utils.CreateCompilerHost(root, fs)
+		rootProg, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+			RootFileNames:   []string{mixedPath},
+			Host:            host,
+			CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext, NoLib: core.TSTrue},
+			SingleThreaded:  true,
+		})
+		if err != nil {
+			t.Fatalf("NewFromRoots: %v", err)
+		}
+		raw, err := utils.CreateProgramFromOptions(true, &core.CompilerOptions{
+			Module: core.ModuleKindESNext,
+			NoLib:  core.TSTrue,
+		}, []string{mixedPath}, host)
+		if err != nil {
+			t.Fatalf("CreateProgramFromOptions: %v", err)
+		}
+		compilerProg := lintprogram.NewFromCompiler(raw)
+
+		wantTarget := rootProg.SourceFiles()[0]
+		if wantTarget.FileName() != mixedPath || string(wantTarget.Path()) != lowerPath {
+			t.Fatalf("unexpected fixture fileName=%q path=%q", wantTarget.FileName(), wantTarget.Path())
+		}
+
+		// Mixed-case exact FileName hits sourceFilesByFileName without fallback.
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFileForResolvedModule(mixedPath); got != wantTarget {
+			t.Fatalf("GetSourceFileForResolvedModule(%q) = %v, want %v", mixedPath, got, wantTarget)
+		}
+		if calls := counter.calls.Load(); calls != 1 {
+			t.Fatalf("mixed-case lookup made %d UseCaseSensitiveFileNames calls, want 1 (no fallback)", calls)
+		}
+
+		// Canonical lowercase path misses sourceFilesByFileName and hits sourceFileByPath without fallback.
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFileForResolvedModule(lowerPath); got != wantTarget {
+			t.Fatalf("GetSourceFileForResolvedModule(%q) = %v, want %v", lowerPath, got, wantTarget)
+		}
+		if calls := counter.calls.Load(); calls != 1 {
+			t.Fatalf("canonical-lowercase lookup made %d UseCaseSensitiveFileNames calls, want 1 (no fallback)", calls)
+		}
+
+		// Alternate casing misses both fast paths and falls back once, then hits resolvedModuleFiles.
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFileForResolvedModule(upperPath); got != wantTarget {
+			t.Fatalf("GetSourceFileForResolvedModule(%q) = %v, want %v", upperPath, got, wantTarget)
+		}
+		if calls := counter.calls.Load(); calls != 2 {
+			t.Fatalf("first case-folded lookup made %d UseCaseSensitiveFileNames calls, want 2 (fallback)", calls)
+		}
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFileForResolvedModule(upperPath); got != wantTarget {
+			t.Fatalf("cached GetSourceFileForResolvedModule(%q) = %v, want %v", upperPath, got, wantTarget)
+		}
+		if calls := counter.calls.Load(); calls != 1 {
+			t.Fatalf("cached case-folded lookup made %d UseCaseSensitiveFileNames calls, want 1 (cache hit)", calls)
+		}
+
+		// Missing path falls back once and caches nil.
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFileForResolvedModule(missingPath); got != nil {
+			t.Fatalf("GetSourceFileForResolvedModule(%q) = %v, want nil", missingPath, got)
+		}
+		if calls := counter.calls.Load(); calls != 2 {
+			t.Fatalf("first missing lookup made %d UseCaseSensitiveFileNames calls, want 2", calls)
+		}
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFileForResolvedModule(missingPath); got != nil {
+			t.Fatalf("cached GetSourceFileForResolvedModule(%q) = %v, want nil", missingPath, got)
+		}
+		if calls := counter.calls.Load(); calls != 1 {
+			t.Fatalf("cached missing lookup made %d UseCaseSensitiveFileNames calls, want 1", calls)
+		}
+
+		// GetSourceFile skips sourceFileByPath on case-insensitive FS and delegates to sourceFile.
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFile(mixedPath); got != wantTarget {
+			t.Fatalf("GetSourceFile(%q) = %v, want %v", mixedPath, got, wantTarget)
+		}
+		if calls := counter.calls.Load(); calls != 2 {
+			t.Fatalf("case-insensitive GetSourceFile made %d UseCaseSensitiveFileNames calls, want 2", calls)
+		}
+
+		wantCompilerTarget := compilerProg.GetSourceFile(mixedPath)
+		if wantCompilerTarget == nil {
+			t.Fatal("compiler program missing target")
+		}
+		for _, probe := range []string{mixedPath, lowerPath, upperPath} {
+			if got := compilerProg.GetSourceFileForResolvedModule(probe); got != wantCompilerTarget {
+				t.Fatalf("compiler GetSourceFileForResolvedModule(%q) = %v, want %v", probe, got, wantCompilerTarget)
+			}
+		}
+		if got := compilerProg.GetSourceFileForResolvedModule(missingPath); got != nil {
+			t.Fatalf("compiler GetSourceFileForResolvedModule(%q) = %v, want nil", missingPath, got)
+		}
+	})
+
+	t.Run("case-sensitive", func(t *testing.T) {
+		t.Parallel()
+		counter := &countingCaseFS{FS: bundled.WrapFS(osvfs.FS()), caseSensitive: true}
+		fs := utils.NewOverlayVFS(counter, map[string]string{
+			mixedPath: `export const value = 1;`,
+		})
+		host := utils.CreateCompilerHost(root, fs)
+		rootProg, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+			RootFileNames:   []string{mixedPath},
+			Host:            host,
+			CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext, NoLib: core.TSTrue},
+			SingleThreaded:  true,
+		})
+		if err != nil {
+			t.Fatalf("NewFromRoots: %v", err)
+		}
+		wantTarget := rootProg.SourceFiles()[0]
+
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFileForResolvedModule(mixedPath); got != wantTarget {
+			t.Fatalf("GetSourceFileForResolvedModule(%q) = %v, want %v", mixedPath, got, wantTarget)
+		}
+		if calls := counter.calls.Load(); calls != 1 {
+			t.Fatalf("case-sensitive resolved lookup made %d calls, want 1", calls)
+		}
+
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFile(mixedPath); got != wantTarget {
+			t.Fatalf("GetSourceFile(%q) = %v, want %v", mixedPath, got, wantTarget)
+		}
+		if calls := counter.calls.Load(); calls != 1 {
+			t.Fatalf("case-sensitive GetSourceFile made %d calls, want 1", calls)
+		}
+
+		counter.calls.Store(0)
+		if got := rootProg.GetSourceFileForResolvedModule(lowerPath); got != nil {
+			t.Fatalf("case-sensitive GetSourceFileForResolvedModule(%q) = %v, want nil", lowerPath, got)
+		}
+		if calls := counter.calls.Load(); calls != 2 {
+			t.Fatalf("case-sensitive miss made %d calls, want 2", calls)
+		}
+	})
+}
 
 type typedNilFS struct {
 	vfs.FS

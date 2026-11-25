@@ -3,9 +3,17 @@ package no_cycle
 import (
 	"reflect"
 	"slices"
+	"sync/atomic"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // The rule's fixtures can only describe graphs someone is willing to write out
@@ -19,14 +27,34 @@ import (
 // artifact of the order the traversal happens to finish in, and nothing reads
 // the numbers for anything but equality.
 
-// graphFor builds the part of a moduleGraph that computeGroups reads. -1 stands
+// graphFor builds the part of a moduleGraph that tarjanVisit reads. -1 stands
 // for a reference that resolves to nothing the rule follows.
 func graphFor(adjacency [][]int32) *moduleGraph {
-	graph := &moduleGraph{nodes: make([]moduleNode, len(adjacency))}
+	count := len(adjacency)
+	graph := &moduleGraph{
+		nodes:    make([]moduleNode, count),
+		group:    make([]int32, count),
+		explored: make([]atomic.Bool, count),
+		tarjan: tarjanState{
+			visitIndex: make([]int32, count),
+			lowLink:    make([]int32, count),
+			onStack:    make([]bool, count),
+			pending:    make([]groupFrame, 0, 32),
+			groups:     1,
+		},
+	}
 	for node, edges := range adjacency {
 		graph.nodes[node].edge = edges
 	}
 	return graph
+}
+
+func computeGroups(graph *moduleGraph) {
+	for root := range len(graph.nodes) {
+		if graph.tarjan.visitIndex[root] == 0 {
+			graph.tarjanVisit(int32(root), nil)
+		}
+	}
 }
 
 // componentsOf reads a numbering back as the partition it describes: each
@@ -140,7 +168,7 @@ func TestComputeGroups(t *testing.T) {
 			t.Parallel()
 
 			graph := graphFor(tt.adjacency)
-			graph.computeGroups()
+			computeGroups(graph)
 
 			if len(graph.group) != len(tt.adjacency) {
 				t.Fatalf("numbered %d files, want %d", len(graph.group), len(tt.adjacency))
@@ -173,7 +201,7 @@ func TestComputeGroupsHandlesADeepChain(t *testing.T) {
 	}
 
 	graph := graphFor(adjacency)
-	graph.computeGroups()
+	computeGroups(graph)
 
 	seen := make(map[int32]bool, files)
 	for _, number := range graph.group {
@@ -230,4 +258,135 @@ func TestWithheldDynamicEdges(t *testing.T) {
 			t.Fatalf("expand = %v, want [-1 2]", got)
 		}
 	})
+}
+
+func TestTarjanVisitIncrementalOrderIndependence(t *testing.T) {
+	t.Parallel()
+
+	// Classic Tarjan graph plus a disconnected component {8, 9} that should
+	// remain unvisited until explicitly requested.
+	adjacency := [][]int32{
+		{1},
+		{2},
+		{0},
+		{1, 2, 4},
+		{3, 5},
+		{2, 6},
+		{5},
+		{4, 6, 7},
+		{9},
+		{8},
+	}
+	wantAll := [][]int{{0, 1, 2}, {3, 4}, {5, 6}, {7}, {8, 9}}
+
+	for name, order := range map[string][]int32{
+		"reverse":      {7, 6, 5, 4, 3, 2, 1, 0},
+		"middle-first": {3, 7, 0, 5},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			graph := graphFor(adjacency)
+			for _, root := range order {
+				graph.tarjanVisit(root, nil)
+			}
+			for node := range 8 {
+				if !graph.explored[node].Load() || graph.group[node] == 0 {
+					t.Fatalf("reachable node %d was not finalized (explored=%t, group=%d)", node, graph.explored[node].Load(), graph.group[node])
+				}
+			}
+			// Disconnected nodes 8 and 9 must remain unexplored until requested.
+			for _, node := range []int32{8, 9} {
+				if graph.tarjan.visitIndex[node] != 0 || graph.explored[node].Load() || graph.group[node] != 0 {
+					t.Fatalf("disconnected node %d was visited prematurely (visitIndex=%d, explored=%t, group=%d)", node, graph.tarjan.visitIndex[node], graph.explored[node].Load(), graph.group[node])
+				}
+			}
+			graph.tarjanVisit(8, nil)
+			for _, node := range []int32{8, 9} {
+				if !graph.explored[node].Load() || graph.group[node] == 0 {
+					t.Fatalf("node %d was not finalized after visiting root 8 (explored=%t, group=%d)", node, graph.explored[node].Load(), graph.group[node])
+				}
+			}
+			if got := componentsOf(graph.group); !reflect.DeepEqual(got, wantAll) {
+				t.Fatalf("incremental components = %v, want %v", got, wantAll)
+			}
+		})
+	}
+}
+
+func TestEnsureExploredReleasesTarjanScratchWhenComplete(t *testing.T) {
+	t.Parallel()
+
+	const root = "/no-cycle-tarjan-release"
+	fileA := tspath.ResolvePath(root, "a.ts")
+	fileB := tspath.ResolvePath(root, "b.ts")
+	fileC := tspath.ResolvePath(root, "c.ts")
+	fileIgnored := tspath.ResolvePath(root, "ignored.ts")
+
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		fileA:       `import "./b"; export const a = 1;`,
+		fileB:       `import "./a"; export const b = 1;`,
+		fileC:       `export const c = 1;`,
+		fileIgnored: `export const ignored = 1;`,
+	})
+	p, err := program.NewFromRoots(program.RootOptions{
+		RootFileNames: []string{fileA, fileB, fileC, fileIgnored},
+		Host:          utils.CreateCompilerHost(root, fs),
+		CompilerOptions: &core.CompilerOptions{
+			NoLib:            core.TSTrue,
+			Module:           core.ModuleKindESNext,
+			ModuleResolution: core.ModuleResolutionKindBundler,
+		},
+		SingleThreaded: true,
+	})
+	if err != nil {
+		t.Fatalf("NewFromRoots: %v", err)
+	}
+
+	settings := import_utils.SettingsFor((rule.RuleContext{
+		Settings: map[string]interface{}{
+			"import/ignore": []interface{}{`/ignored\.ts$`},
+		},
+	}).WithProgram(p))
+	opts := ruleOptions{
+		maxDepth:       unlimitedDepth,
+		referenceKinds: program.ESModuleReferences,
+	}
+	sourceGraph := p.ModuleGraph()
+	graph := newModuleGraph(sourceGraph, settings, opts)
+
+	if len(graph.index) != 3 {
+		t.Fatalf("included node count = %d, want 3", len(graph.index))
+	}
+	idxA := graph.index[p.GetSourceFile(fileA)]
+	idxB := graph.index[p.GetSourceFile(fileB)]
+	idxC := graph.index[p.GetSourceFile(fileC)]
+
+	// Exploring component {a, b} leaves c unexplored, so scratch buffers remain live.
+	graph.ensureExplored(sourceGraph, idxA)
+	if graph.tarjan.visitIndex == nil {
+		t.Fatal("tarjan scratch was released while included node c was still unexplored")
+	}
+	if !graph.explored[idxA].Load() || !graph.explored[idxB].Load() || graph.explored[idxC].Load() {
+		t.Fatalf("unexpected explored flags: a=%t b=%t c=%t", graph.explored[idxA].Load(), graph.explored[idxB].Load(), graph.explored[idxC].Load())
+	}
+
+	// Exploring the final included node c releases all 5 Tarjan scratch slices,
+	// even though ignored.ts is excluded from graph.index.
+	graph.ensureExplored(sourceGraph, idxC)
+	if graph.tarjan.visitIndex != nil ||
+		graph.tarjan.lowLink != nil ||
+		graph.tarjan.onStack != nil ||
+		graph.tarjan.component != nil ||
+		graph.tarjan.pending != nil {
+		t.Fatalf("tarjan scratch slices were not released after exploring all included nodes: %+v", graph.tarjan)
+	}
+	if graph.group[idxA] == 0 || graph.group[idxA] != graph.group[idxB] || graph.group[idxC] == 0 || graph.group[idxC] == graph.group[idxA] {
+		t.Fatalf("unexpected SCC groups: a=%d b=%d c=%d", graph.group[idxA], graph.group[idxB], graph.group[idxC])
+	}
+
+	// Subsequent ensureExplored and direct tarjanVisit calls remain safe no-ops.
+	for _, idx := range []int32{idxA, idxB, idxC} {
+		graph.ensureExplored(sourceGraph, idx)
+		graph.tarjanVisit(idx, nil)
+	}
 }

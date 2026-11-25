@@ -136,15 +136,20 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 
 	// Every report sits on a reference this file wrote, so a file that wrote
 	// none has no answer to look up. Asking that of the file alone, before the
-	// graph, is what keeps an import-free file off the build: the graph spans
-	// the whole effective source set, and the editor discards it on every keystroke, so
-	// there is no run to amortize it over on that path.
+	// graph, is what keeps an import-free or type-only file off the build: the
+	// graph spans the effective source set, and the editor discards it on every
+	// keystroke, so there is no run to amortize it over on that path.
 	sourceGraph := ctx.Program().ModuleGraph()
-	if len(sourceGraph.References(ctx.SourceFile, opts.referenceKinds)) == 0 {
+	refs := sourceGraph.References(ctx.SourceFile, opts.referenceKinds)
+	if !hasPotentialCycleRef(ctx.SourceFile, refs, opts) {
+		return
+	}
+	settings := import_utils.SettingsFor(ctx)
+	if fileIsExcluded(settings, opts, ctx.SourceFile) {
 		return
 	}
 
-	graph := moduleGraphFor(ctx, sourceGraph, opts)
+	graph := moduleGraphFor(ctx, sourceGraph, settings, opts)
 	if graph == nil {
 		return
 	}
@@ -152,6 +157,7 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 	if !ok {
 		return
 	}
+	graph.ensureExplored(sourceGraph, self)
 
 	// A reference is only reportable when its target reaches this file again,
 	// which puts the two in one strongly connected group. Files holding no
@@ -180,6 +186,23 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 	}
 }
 
+func hasPotentialCycleRef(self *ast.SourceFile, refs []program.ModuleReference, opts ruleOptions) bool {
+	for i := range refs {
+		ref := &refs[i]
+		if ref.TypeOnly || ref.Target == nil || ref.Target == self {
+			continue
+		}
+		if opts.allowUnsafeDynamicCyclicDependency && ref.Dynamic() {
+			continue
+		}
+		if !import_utils.HasAuthoredModuleView(ref.Source()) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 func checkDirectCycles(ctx rule.RuleContext, opts ruleOptions) {
 	if ctx.SourceFile == nil || !ctx.Program().IsValid() {
 		return
@@ -190,7 +213,7 @@ func checkDirectCycles(ctx rule.RuleContext, opts ruleOptions) {
 	}
 	sourceGraph := ctx.Program().ModuleGraph()
 	refs := sourceGraph.References(ctx.SourceFile, opts.referenceKinds)
-	if len(refs) == 0 {
+	if !hasPotentialCycleRef(ctx.SourceFile, refs, opts) {
 		return
 	}
 	settings := import_utils.SettingsFor(ctx)

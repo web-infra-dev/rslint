@@ -38,8 +38,8 @@ type ModuleReference struct {
 	// ResolvedPath is the path the specifier resolves to, empty when it
 	// resolves nowhere.
 	ResolvedPath string
-	Kind         ModuleReferenceKind
 	source       modules.Source
+	Kind         ModuleReferenceKind
 	// TypeOnly reports that the syntax cannot survive into emitted
 	// JavaScript: `import type`, `export type *`, and a named import clause
 	// whose every specifier is type-only.
@@ -136,17 +136,26 @@ func (graph ModuleGraph) resolveAll(file *ast.SourceFile, specifiers []modules.S
 		return nil
 	}
 	var references []ModuleReference
-	for _, source := range specifiers {
+	for i, source := range specifiers {
 		specifier := ast.SkipParentheses(source.Specifier())
 		if specifier == nil || !ast.IsStringLiteralLike(specifier) {
 			continue
 		}
-		reference := ModuleReference{
-			Specifier: specifier, Declaration: source.Declaration(),
-			From: file, Kind: source.Kind(), TypeOnly: source.TypeOnly(), source: source.WithSpecifier(specifier),
+		if references == nil {
+			references = make([]ModuleReference, 0, len(specifiers)-i)
 		}
-		reference.ResolvedPath, reference.Target, _ = graph.program.ResolveModule(file, source.WithSpecifier(specifier))
-		references = append(references, reference)
+		resolvedSource := source.WithSpecifier(specifier)
+		resolvedPath, target, _ := graph.program.resolveOwnedModuleNameAt(file, specifier.Text(), specifier)
+		references = append(references, ModuleReference{
+			Specifier:    specifier,
+			Declaration:  source.Declaration(),
+			From:         file,
+			Target:       target,
+			ResolvedPath: resolvedPath,
+			source:       resolvedSource,
+			Kind:         source.Kind(),
+			TypeOnly:     source.TypeOnly(),
+		})
 	}
 	return references
 }
