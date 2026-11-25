@@ -12,6 +12,8 @@
       "getIndexedAccessTypeOrUndefined",
       "getFlowTypeOfReference",
       "getSyntheticElementAccess",
+      "getParentElementAccess",
+      "getDestructuringPropertyName",
       "getIntersectionType",
       "getTypeWithFacts",
       "checkExpressionCached",

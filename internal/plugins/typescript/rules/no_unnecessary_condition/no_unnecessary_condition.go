@@ -895,7 +895,7 @@ func (conditionTypes *conditionTypeChecker) getConditionType(node, accessor *ast
 			readType, propertyFlags = conditionTypes.getDeclaredMemberReadType(node, nil)
 		} else if hasUnionOrConstrainedKey(tc, node) {
 			readType, propertyFlags = conditionTypes.getDeclaredMemberReadType(node, nil)
-		} else if origin, dataCopy, _ := conditionTypes.receiverObjectOrigin(node.Expression()); origin != nil && !dataCopy {
+		} else if origin := conditionTypes.receiverObjectOrigin(node); origin.node != nil && !origin.dataCopy {
 			readType, propertyFlags = conditionTypes.getDeclaredMemberReadType(node, nil)
 		}
 		isAccessor := propertyFlags&ast.SymbolFlagsAccessor != 0
@@ -1045,19 +1045,22 @@ func (conditionTypes *conditionTypeChecker) getDeclaredMemberReadType(node *ast.
 	// With no access node, this query computes a read type without using the
 	// assignment target's write context or changing its cached resolution.
 	readType := checker.Checker_getIndexedAccessTypeOrUndefined(tc, objectType, keyType, checker.AccessFlagsExpressionPosition, nil, nil)
-	if origin, dataCopy, readTarget := conditionTypes.receiverObjectOrigin(node.Expression()); origin != nil && !dataCopy {
+	if origin := conditionTypes.receiverObjectOrigin(node); origin.node != nil && !origin.dataCopy {
 		// Index signatures have no property symbol. The target's read contract
 		// still applies, and an undeclared target property may invoke a getter.
-		if ast.IsArrayLiteralExpression(origin) || ast.IsFunctionLike(origin) {
+		if origin.unknownRead {
 			return tc.GetUnknownType(), propertyFlags | ast.SymbolFlagsAccessor
 		}
-		if readTarget != nil {
-			origin = readTarget
-		}
-		targetType := tc.GetNonNullableType(utils.GetConstrainedTypeAtLocation(tc, origin))
+		targetType := tc.GetNonNullableType(utils.GetConstrainedTypeAtLocation(tc, origin.node))
 		targetReadType := checker.Checker_getIndexedAccessTypeOrUndefined(tc, targetType, keyType, checker.AccessFlagsExpressionPosition, nil, nil)
 		if targetReadType == nil {
 			return tc.GetUnknownType(), propertyFlags | ast.SymbolFlagsAccessor
+		}
+		if origin.readTarget != nil {
+			contractType := tc.GetNonNullableType(utils.GetConstrainedTypeAtLocation(tc, origin.readTarget))
+			if contractRead := checker.Checker_getIndexedAccessTypeOrUndefined(tc, contractType, keyType, checker.AccessFlagsExpressionPosition, nil, nil); contractRead != nil {
+				targetReadType = tc.GetUnionType([]*checker.Type{targetReadType, contractRead})
+			}
 		}
 		if readType == nil {
 			return targetReadType, propertyFlags | ast.SymbolFlagsAccessor
@@ -1107,13 +1110,14 @@ func (conditionTypes *conditionTypeChecker) memberReadSymbol(node *ast.Node, sym
 			return symbol, nil, flags
 		}
 	}
-	if origin, dataCopy, readTarget := conditionTypes.receiverObjectOrigin(node.Expression()); origin != nil {
+	if result := conditionTypes.receiverObjectOrigin(node); result.node != nil {
+		origin, dataCopy, readTarget := result.node, result.dataCopy, result.readTarget
 		// Intersections returned by Object.assign may narrow the public
 		// property type even though the target still uses its own getter.
+		if result.unknownRead {
+			return nil, nil, flags | ast.SymbolFlagsAccessor
+		}
 		if !ast.IsObjectBindingPattern(origin) {
-			if !dataCopy && (ast.IsArrayLiteralExpression(origin) || ast.IsFunctionLike(origin)) {
-				return nil, nil, flags | ast.SymbolFlagsAccessor
-			}
 			if dataCopy && readTarget == nil && !ast.IsObjectLiteralExpression(origin) &&
 				(ast.IsArrayLiteralExpression(origin) || ast.IsFunctionLike(origin)) {
 				return symbol, nil, flags
@@ -1315,11 +1319,21 @@ func (conditionTypes *conditionTypeChecker) resolveInitializer(node *ast.Node) (
 	return resolved.node, readTarget
 }
 
-func (conditionTypes *conditionTypeChecker) receiverObjectOrigin(node *ast.Node) (origin *ast.Node, dataCopy bool, readTarget *ast.Node) {
+type receiverOrigin struct {
+	node, readTarget      *ast.Node
+	dataCopy, unknownRead bool
+}
+
+func (conditionTypes *conditionTypeChecker) receiverObjectOrigin(access *ast.Node) receiverOrigin {
 	tc := conditionTypes.context.TypeChecker
-	receiver := node
+	node := access.Expression()
+	var readTarget *ast.Node
 	var seen map[*ast.Node]bool
 	var assignedTarget *ast.Node
+	finish := func(origin, allocation *ast.Node, dataCopy bool) receiverOrigin {
+		unknownRead := assignedTarget != nil && allocation != nil && conditionTypes.copyHasDescriptorMutation(allocation, access, seen)
+		return receiverOrigin{node: origin, readTarget: readTarget, dataCopy: dataCopy && !unknownRead, unknownRead: unknownRead}
+	}
 	for {
 		resolved, declaredReadTarget := conditionTypes.resolveInitializer(node)
 		node = resolved
@@ -1327,7 +1341,7 @@ func (conditionTypes *conditionTypeChecker) receiverObjectOrigin(node *ast.Node)
 			readTarget = declaredReadTarget
 		}
 		if node == nil {
-			return nil, false, readTarget
+			return finish(nil, nil, false)
 		}
 		if ast.IsIdentifier(node) {
 			symbol := checker.Checker_getResolvedSymbolOrNil(tc, node)
@@ -1337,47 +1351,47 @@ func (conditionTypes *conditionTypeChecker) receiverObjectOrigin(node *ast.Node)
 			if symbol != nil && symbol.ValueDeclaration != nil {
 				declaration := symbol.ValueDeclaration
 				if assignedTarget != nil && ast.IsFunctionDeclaration(declaration) && declaration.Body() != nil {
-					return declaration, !conditionTypes.copyHasDescriptorMutation(declaration, receiver, seen), readTarget
+					return finish(declaration, declaration, true)
 				}
 				if ast.IsBindingElement(declaration) && declaration.AsBindingElement().DotDotDotToken != nil && ast.IsObjectBindingPattern(declaration.Parent) && checker.Checker_isConstantReference(tc, node) {
-					return declaration.Parent, true, readTarget
+					return finish(declaration.Parent, declaration, true)
 				}
 			}
-			return assignedTarget, false, readTarget
+			return finish(assignedTarget, nil, false)
 		}
 		if assignedTarget != nil && (ast.IsArrayLiteralExpression(node) || ast.IsFunctionExpressionOrArrowFunction(node)) {
-			return node, !conditionTypes.copyHasDescriptorMutation(node, receiver, seen), readTarget
+			return finish(node, node, true)
 		}
 		if ast.IsObjectLiteralExpression(node) {
-			origin = node
+			origin := node
 			if assignedTarget != nil {
 				origin = assignedTarget
 			}
-			return origin, conditionTypes.literalCreatesDataProperties(node), readTarget
+			return finish(origin, node, conditionTypes.literalCreatesDataProperties(node))
 		}
 		if assignedTarget != nil && ast.IsNewExpression(node) {
 			// Keep the target's public read contract before inspecting its
 			// initializer: a constructor may return a different object.
-			return assignedTarget, false, readTarget
+			return finish(assignedTarget, nil, false)
 		}
 		if !ast.IsCallExpression(node) || len(node.Arguments()) == 0 || seen[node] {
-			return assignedTarget, false, readTarget
+			return finish(assignedTarget, nil, false)
 		}
 		callee, _ := conditionTypes.resolveInitializer(node.Expression())
 		if callee == nil || !ast.IsAccessExpression(callee) {
-			return assignedTarget, false, readTarget
+			return finish(assignedTarget, nil, false)
 		}
 		name, ok := checker.Checker_getAccessedPropertyName(tc, callee)
 		if !ok || name != "assign" {
-			return assignedTarget, false, readTarget
+			return finish(assignedTarget, nil, false)
 		}
 		object, _ := conditionTypes.resolveInitializer(callee.Expression())
 		if object == nil {
-			return assignedTarget, false, readTarget
+			return finish(assignedTarget, nil, false)
 		}
 		symbol := tc.GetSymbolAtLocation(object)
 		if symbol == nil || symbol.Name != "Object" || !utils.IsSymbolFromDefaultLibrary(conditionTypes.context.Program(), symbol) {
-			return assignedTarget, false, readTarget
+			return finish(assignedTarget, nil, false)
 		}
 		// Object.assign writes values into its target; source accessors do
 		// not become accessors there. Existing target accessors still apply.
@@ -1390,7 +1404,7 @@ func (conditionTypes *conditionTypeChecker) receiverObjectOrigin(node *ast.Node)
 	}
 }
 
-func (conditionTypes *conditionTypeChecker) copyHasDescriptorMutation(origin, receiver *ast.Node, copies map[*ast.Node]bool) bool {
+func (conditionTypes *conditionTypeChecker) copyHasDescriptorMutation(origin, access *ast.Node, copies map[*ast.Node]bool) bool {
 	tc := conditionTypes.context.TypeChecker
 	for call := range copies {
 		for _, source := range call.Arguments()[1:] {
@@ -1416,10 +1430,12 @@ func (conditionTypes *conditionTypeChecker) copyHasDescriptorMutation(origin, re
 		conditionTypes.mutationEvaluator = utils.NewStaticStringEvaluatorWithCallEscapes(ctx.TypeChecker, ctx.SourceFile, references)
 	}
 	evaluator := conditionTypes.mutationEvaluator
-	if receiver = ast.SkipOuterExpressions(receiver, ast.OEKAll); ast.IsIdentifier(receiver) && evaluator.HasPropertyShapeMutation(receiver, copies) {
+	allocation := origin
+	receiver := ast.SkipOuterExpressions(access.Expression(), ast.OEKAll)
+	if ast.IsIdentifier(receiver) && evaluator.HasPropertyShapeMutation(receiver, allocation, access, copies) {
 		return true
 	}
-	if ast.IsFunctionLike(origin) && origin.Name() != nil && evaluator.HasPropertyShapeMutation(origin.Name(), copies) {
+	if (ast.IsFunctionLike(origin) || ast.IsBindingElement(origin)) && origin.Name() != nil && evaluator.HasPropertyShapeMutation(origin.Name(), allocation, access, copies) {
 		return true
 	}
 	// Follow only transparent wrappers and this copy chain to the binding
@@ -1429,7 +1445,7 @@ func (conditionTypes *conditionTypeChecker) copyHasDescriptorMutation(origin, re
 	}
 	if origin.Parent != nil && ast.IsVariableDeclaration(origin.Parent) {
 		if name := ast.GetAssignedName(origin); name != nil {
-			return evaluator.HasPropertyShapeMutation(name, copies)
+			return evaluator.HasPropertyShapeMutation(name, allocation, access, copies)
 		}
 	}
 	return false
@@ -1482,7 +1498,24 @@ func (conditionTypes *conditionTypeChecker) getCapturedReadType(node *ast.Node) 
 	// Cache the stable initializer read, not the type at a use site. Guards
 	// are still evaluated by the checker for each individual reference.
 	conditionTypes.capturedReadTypes[symbol] = nil
-	defer func() { conditionTypes.capturedReadTypes[symbol] = captured }()
+	defer func() {
+		if captured != nil {
+			root := ast.GetRootDeclaration(declaration)
+			if ast.IsVariableDeclaration(root) && root.Type() != nil {
+				contract := checker.Checker_getTypeOfSymbol(tc, symbol)
+				if utils.IsTypeAnyType(contract) || utils.IsTypeUnknownType(contract) {
+					captured = contract
+				} else {
+					// Capturing an object does not freeze its fields. Preserve
+					// annotated object contracts without widening the captured
+					// primitive value or adding nullish values from an annotation.
+					objects := checker.Checker_getTypeWithFacts(tc, tc.GetNonNullableType(contract), checker.TypeFactsTypeofEQObject|checker.TypeFactsTypeofEQFunction)
+					captured = tc.GetUnionType([]*checker.Type{captured, objects})
+				}
+			}
+		}
+		conditionTypes.capturedReadTypes[symbol] = captured
+	}()
 	if ast.IsBindingElement(declaration) {
 		root := ast.GetRootDeclaration(declaration)
 		if !ast.IsVariableDeclaration(root) || root.Initializer() == nil ||
@@ -1491,7 +1524,7 @@ func (conditionTypes *conditionTypeChecker) getCapturedReadType(node *ast.Node) 
 		}
 		// Use the checker's equivalent read instead of reimplementing binding
 		// names, nesting, and their original control-flow points.
-		reference := checker.Checker_getSyntheticElementAccess(tc, declaration)
+		reference := getBindingReadReference(tc, declaration)
 		if reference == nil {
 			return nil
 		}
@@ -1533,6 +1566,45 @@ func (conditionTypes *conditionTypeChecker) getCapturedReadType(node *ast.Node) 
 	return readType
 }
 
+func getBindingReadReference(tc *checker.Checker, declaration *ast.Node) *ast.Node {
+	if reference := checker.Checker_getSyntheticElementAccess(tc, declaration); reference != nil {
+		return reference
+	}
+	// The checker's flow helper omits calls and other initializers without a
+	// flow node. Reuse its binding paths and keys for a plain declared read.
+	parent := checker.Checker_getParentElementAccess(tc, declaration)
+	if parent == nil && ast.IsBindingElement(declaration.Parent.Parent) {
+		parent = getBindingReadReference(tc, declaration.Parent.Parent)
+	}
+	if parent == nil {
+		return nil
+	}
+	var factory ast.NodeFactory
+	var key *ast.Node
+	if name, known := checker.Checker_getDestructuringPropertyName(tc, declaration); known {
+		key = factory.NewStringLiteral(name, ast.TokenFlagsNone)
+		key.Loc = declaration.Loc
+	} else if name := declaration.PropertyName(); name != nil && ast.IsComputedPropertyName(name) {
+		key = name.Expression()
+	} else {
+		return nil
+	}
+	if !ast.IsLeftHandSideExpression(parent) {
+		parent = factory.NewParenthesizedExpression(parent)
+		parent.Loc = declaration.Loc
+	}
+	reference := factory.NewElementAccessExpression(parent, nil, key, ast.NodeFlagsNone)
+	reference.Loc, reference.Parent = declaration.Loc, declaration
+	// Preserve the parsed expression parents and their lexical bindings.
+	if key.Parent == nil {
+		key.Parent = reference
+	}
+	if parent.Parent == nil {
+		parent.Parent = reference
+	}
+	return reference
+}
+
 // A getter in the receiver can return a different object on the next read.
 // Assignments to a property of the previous object do not narrow the new one.
 func (conditionTypes *conditionTypeChecker) hasAccessorRead(node *ast.Node) bool {
@@ -1563,7 +1635,7 @@ func (conditionTypes *conditionTypeChecker) findAccessorRead(node *ast.Node) *as
 			_, _, flags = conditionTypes.memberReadSymbol(node, symbol, nil)
 		} else if hasUnionOrConstrainedKey(tc, node) {
 			_, flags = conditionTypes.getDeclaredMemberReadType(node, nil)
-		} else if origin, dataCopy, _ := conditionTypes.receiverObjectOrigin(node.Expression()); origin != nil && !dataCopy {
+		} else if origin := conditionTypes.receiverObjectOrigin(node); origin.node != nil && !origin.dataCopy {
 			_, flags = conditionTypes.getDeclaredMemberReadType(node, nil)
 		}
 		if flags&ast.SymbolFlagsAccessor != 0 {

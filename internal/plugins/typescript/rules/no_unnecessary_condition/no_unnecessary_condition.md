@@ -104,14 +104,22 @@ into a stable local, such as `const item = copy.item`, does not prove that
 `item?.id` is redundant. Destructured reads retain the same uncertainty; subsequent
 guards on the captured value can still make a fallback unnecessary. Captured
 getter values also preserve the getter's read type rather than a preceding setter
-argument, including explicitly typed locals and destructuring defaults. Ordinary
-fields on a captured object retain their own control-flow narrowing.
-Fresh arrays and functions retain ordinary data-copy narrowing when no descriptor
+argument, including explicitly typed locals and destructuring defaults. Named
+and computed bindings, including nested patterns and direct call results, use
+the same read contracts. Calls in a destructuring initializer precede those reads.
+Ordinary fields on a captured object retain their own control-flow narrowing and explicitly
+declared field types, so a wider mutable field can still become `undefined`.
+Fresh objects, arrays, and functions retain ordinary data-copy narrowing when no descriptor
 changes or unaccounted calls are visible through their aliases. Deleting properties,
-changing the prototype, or copying a possible own `__proto__` key prevents that
-assumption. Objects with a `null` prototype also retain ordinary copy narrowing.
+changing a target or built-in prototype, or copying a possible own `__proto__` key prevents
+that assumption. This includes targets created by object rest. Objects with a
+`null` prototype also retain ordinary copy narrowing.
+Read-only operations such as `Object.keys` and calls after a read of a fresh local
+do not invalidate that read. Loops and objects shared across function invocations
+remain conservative. An unchanged array `push` method also preserves unrelated
+named properties.
 Initializer types never narrow a getter's public read type, and an annotation on
-the copy cannot erase the target getter's actual read type. This also covers values
+the copy cannot erase the target getter's or index signature's actual read type. This also covers values
 supplied by later spreads or descriptor changes. Calls resolve the applicable
 overload of each possible function through the checker. A function with one fixed
 signature can ignore extra arguments accepted by another member of a callable union.

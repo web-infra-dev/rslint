@@ -16,6 +16,9 @@ type staticEscapeFacts struct {
 	captures    map[*ast.Symbol]staticEvalResult
 	capturing   map[*ast.Symbol]bool
 	ownCaptures map[*ast.Symbol]*staticObjectValue
+	// Completed per-file facts for property-read queries; never cache a
+	// read-position-dependent result here.
+	constructorMutations map[*ast.Symbol]bool
 }
 
 func newStaticEscapeFacts() *staticEscapeFacts {

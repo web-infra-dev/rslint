@@ -1939,9 +1939,10 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 // HasPropertyShapeMutation conservatively detects changes that can invalidate
 // a data-property assumption, including unknown calls through aliases. Ordinary
 // writes to a known property name are allowed. The caller may exclude specific
-// calls whose writes it has already accounted for. Call-escape tracking is
-// required; without it, this query cannot establish that an object is unchanged.
-func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node *ast.Node, accountedCalls map[*ast.Node]bool) bool {
+// calls whose writes it has already accounted for. With a proven fresh origin
+// and an access, later calls in the same invocation and harmless built-ins do
+// not invalidate this read. Call-escape tracking is required.
+func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, origin, access *ast.Node, accountedCalls map[*ast.Node]bool) bool {
 	if !staticEvaluator.trackCallEscapes || staticEvaluator.sourceFile == nil {
 		return true
 	}
@@ -1952,12 +1953,185 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node *ast
 	if staticEvaluator.referenceFlagsFor(symbol)&(staticReferenceWrite|staticReferencePropertyShapeMutation) != 0 {
 		return true
 	}
-	for site := range staticEvaluator.escapeFacts.sites[symbol] {
-		if !accountedCalls[site] {
-			return true
+	if origin != nil && staticEvaluator.typeChecker != nil {
+		constructors := []string{"Object"}
+		if ast.IsArrayLiteralExpression(origin) {
+			constructors = append(constructors, "Array")
+		} else if ast.IsFunctionLike(origin) {
+			constructors = append(constructors, "Function")
+		}
+		for _, name := range constructors {
+			constructor := staticEvaluator.typeChecker.ResolveName(name, &staticEvaluator.sourceFile.Node, ast.SymbolFlagsValue, false)
+			if constructor != nil && staticEvaluator.hasConstructorMutation(constructor) {
+				// A fresh target can inherit a setter installed on a built-in
+				// prototype. Object.assign does not create a data field over it.
+				return true
+			}
 		}
 	}
+	for site := range staticEvaluator.escapeFacts.sites[symbol] {
+		if accountedCalls[site] || origin != nil && access != nil &&
+			(propertyCallFollowsRead(site, origin, access) || staticEvaluator.callPreservesPropertyShape(site, origin, access, symbol)) {
+			continue
+		}
+		return true
+	}
 	return false
+}
+
+func propertyCallFollowsRead(call, origin, access *ast.Node) bool {
+	root := executionRoot(access)
+	// Invocation follows argument evaluation, including an enclosing call
+	// which consumes this read. Other argument calls are checked separately.
+	if root == nil || executionRoot(origin.Parent) != root || executionRoot(call) != root || call.End() <= access.End() {
+		return false
+	}
+	if access.Parent != nil && ast.IsBindingElement(access.Parent) {
+		declaration := ast.GetRootDeclaration(access.Parent)
+		if ast.IsVariableDeclaration(declaration) && declaration.Initializer() != nil {
+			initializer := declaration.Initializer()
+			if initializer.Pos() <= call.Pos() && call.End() <= initializer.End() {
+				// Synthetic destructuring reads carry the binding's location,
+				// but its initializer executes before any binding is read.
+				return false
+			}
+		}
+	}
+	// A later iteration can observe a mutation from the previous iteration.
+	for parent := access.Parent; parent != nil && parent != root; parent = parent.Parent {
+		if ast.IsIterationStatement(parent, false) {
+			return false
+		}
+	}
+	return true
+}
+
+func (staticEvaluator *StaticStringEvaluator) callPreservesPropertyShape(call, origin, access *ast.Node, symbol *ast.Symbol) bool {
+	if !ast.IsCallExpression(call) {
+		return false
+	}
+	name, known := staticEvaluator.builtinMethodName(call.Expression(), "Object", make(map[*ast.Symbol]bool))
+	if !known {
+		return !staticEvaluator.escapeFacts.explicit[symbol] && staticEvaluator.arrayPushPreservesProperty(call, origin, access)
+	}
+	if staticEvaluator.typeChecker == nil {
+		return false
+	}
+	object := staticEvaluator.typeChecker.ResolveName("Object", &staticEvaluator.sourceFile.Node, ast.SymbolFlagsValue, false)
+	if object == nil || staticEvaluator.hasConstructorMutation(object) {
+		return false
+	}
+	arguments := call.Arguments()
+	for _, argument := range arguments {
+		if ast.IsSpreadElement(argument) {
+			return false
+		}
+	}
+	switch name {
+	case "keys", "getOwnPropertyNames", "getOwnPropertySymbols", "getOwnPropertyDescriptors":
+		// The caller established a fresh non-Proxy target. These operations
+		// inspect keys or descriptors without invoking its own getters.
+		return true
+	case "assign":
+		if len(arguments) == 0 {
+			return false
+		}
+		for _, source := range arguments[1:] {
+			value := staticEvaluator.evalValue(source)
+			if !value.ok {
+				return false
+			}
+			switch object := value.value.(type) {
+			case staticNullValue, staticUndefinedValue:
+			case *staticObjectValue:
+				if object.propertyCount != 0 {
+					return false
+				}
+			default:
+				return false
+			}
+		}
+		return true
+	case "defineProperty":
+		if len(arguments) != 3 {
+			return false
+		}
+		key, known := staticEvaluator.evalAccessExpressionKey(access)
+		name := staticEvaluator.evalValue(arguments[1])
+		if !known || !name.ok || !IsPrimitiveStaticValue(name.value) {
+			return false
+		}
+		definedKey, known := staticValueToString(name.value)
+		if !known || key == definedKey || ast.IsArrayLiteralExpression(origin) && definedKey == "push" {
+			return false
+		}
+		// ToPropertyDescriptor can invoke getters, including inherited ones.
+		// Only an independently folded plain data descriptor is harmless.
+		descriptor := staticEvaluator.evalValue(arguments[2])
+		object, ok := descriptor.value.(*staticObjectValue)
+		return descriptor.ok && ok && (!object.prototypeSet || object.prototype == nil)
+	}
+	return false
+}
+
+func (staticEvaluator *StaticStringEvaluator) hasConstructorMutation(symbol *ast.Symbol) bool {
+	facts := staticEvaluator.escapeFacts
+	if changed, cached := facts.constructorMutations[symbol]; cached {
+		return changed
+	}
+	changed := staticEvaluator.hasWrites(symbol) || facts.explicit[symbol]
+	for site, flags := range facts.sites[symbol] {
+		if flags&staticReferenceCallReceiver != 0 {
+			continue
+		}
+		// Aliased read-only methods still refer to the constructor. Reuse the
+		// built-in resolver without treating those calls as constructor escapes.
+		if ast.IsCallExpression(site) {
+			name, known := staticEvaluator.builtinMethodName(site.Expression(), "Object", make(map[*ast.Symbol]bool))
+			if known && (name == "keys" || name == "getOwnPropertyNames" || name == "getOwnPropertySymbols" || name == "getOwnPropertyDescriptors") {
+				continue
+			}
+		}
+		changed = true
+		break
+	}
+	if facts.constructorMutations == nil {
+		facts.constructorMutations = make(map[*ast.Symbol]bool)
+	}
+	facts.constructorMutations[symbol] = changed
+	return changed
+}
+
+func (staticEvaluator *StaticStringEvaluator) arrayPushPreservesProperty(call, origin, access *ast.Node) bool {
+	if !ast.IsArrayLiteralExpression(origin) || staticEvaluator.arrayPrototypeMutated || staticEvaluator.typeChecker == nil {
+		return false
+	}
+	callee := SkipAssertionsAndParens(call.Expression())
+	method, known := staticEvaluator.evalAccessExpressionKey(callee)
+	key, keyKnown := staticEvaluator.evalAccessExpressionKey(access)
+	if !known || method != "push" || !keyKnown || key == "length" {
+		return false
+	}
+	if _, index := staticArrayIndex(key); index {
+		return false
+	}
+	for _, argument := range call.Arguments() {
+		if ast.IsSpreadElement(argument) {
+			return false
+		}
+	}
+	receiver := staticEvaluator.referenceSymbol(SkipAssertionsAndParens(AccessExpressionObject(callee)))
+	if receiver == nil || staticEvaluator.escapeFacts.explicit[receiver] || staticEvaluator.hasWrites(receiver) {
+		return false
+	}
+	tc := staticEvaluator.typeChecker
+	methodSymbol := tc.GetSymbolAtLocation(callee)
+	arrayMethod := checker.Checker_getPropertyOfType(tc, tc.GetTypeAtLocation(origin), method)
+	// An Object.assign source can replace push. Reuse the checker's property
+	// declarations to require the original array method, including through an
+	// instantiated array type. Explicit method writes are excluded above.
+	return methodSymbol != nil && arrayMethod != nil && len(methodSymbol.Declarations) != 0 &&
+		slices.Equal(methodSymbol.Declarations, arrayMethod.Declarations)
 }
 
 func (staticEvaluator *StaticStringEvaluator) referenceFlagsFor(symbol *ast.Symbol) staticReferenceFlags {

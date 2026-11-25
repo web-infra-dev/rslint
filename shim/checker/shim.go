@@ -103,6 +103,8 @@ func Checker_getResolvedSymbolOrNil(recv *checker.Checker, node *ast.Node) *ast.
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 //go:linkname Checker_getSyntheticElementAccess github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getSyntheticElementAccess
 func Checker_getSyntheticElementAccess(recv *checker.Checker, node *ast.Node) *ast.Node
+//go:linkname Checker_getParentElementAccess github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getParentElementAccess
+func Checker_getParentElementAccess(recv *checker.Checker, node *ast.Node) *ast.Node
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType
 func Checker_getWidenedType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getPropertiesOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertiesOfType
@@ -177,6 +179,8 @@ func Checker_getFlowTypeOfReference(recv *checker.Checker, reference *ast.Node, 
 func Checker_isMatchingReference(recv *checker.Checker, source *ast.Node, target *ast.Node) bool
 //go:linkname Checker_getAccessedPropertyName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAccessedPropertyName
 func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (string, bool)
+//go:linkname Checker_getDestructuringPropertyName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getDestructuringPropertyName
+func Checker_getDestructuringPropertyName(recv *checker.Checker, node *ast.Node) (string, bool)
 //go:linkname Checker_isConstantReference github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isConstantReference
 func Checker_isConstantReference(recv *checker.Checker, node *ast.Node) bool
 //go:linkname Checker_containsMatchingReference github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).containsMatchingReference

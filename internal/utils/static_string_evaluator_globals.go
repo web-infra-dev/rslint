@@ -31,8 +31,12 @@ func BuiltinNumberConstant(object, property string) (float64, bool) {
 
 func staticGlobalNumber(object *ast.Node, key string) (float64, bool) {
 	object = SkipAssertionsAndParens(object)
-	if object == nil || !ast.IsIdentifier(object) || IsShadowed(object, object.Text()) {
+	if object == nil || !ast.IsIdentifier(object) {
 		return 0, false
 	}
-	return BuiltinNumberConstant(object.Text(), key)
+	number, known := BuiltinNumberConstant(object.Text(), key)
+	if !known || IsShadowed(object, object.Text()) {
+		return 0, false
+	}
+	return number, true
 }
