@@ -1024,7 +1024,10 @@ export class GenerationSyntaxViews {
       owner = 'owner' in ref ? ref.owner : ref,
       { file, config } = owner;
     if (key === 'symbol')
-      return real && !config && !this.descriptor.syntaxOnly
+      return real &&
+        !config &&
+        !this.descriptor.syntaxOnly &&
+        scalarFields[publicSyntaxKind(this.rawNode(real))]?.includes(key)
         ? this.readDeclarationSymbol(real)
         : undefined;
     if (key === 'getSourceFile') {
