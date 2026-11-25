@@ -3,12 +3,11 @@ package no_unnecessary_condition
 import (
 	_ "embed"
 	"fmt"
-	"math"
-	"strconv"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
@@ -45,39 +44,7 @@ func isPossiblyNullish(t *checker.Type) bool {
 	return utils.IsTypeFlagSetWithUnion(t, possiblyNullishFlag)
 }
 
-// Sentinel types for distinguishing null and undefined in comparisons.
-type jsNullType struct{}
-type jsUndefinedType struct{}
-
-var jsNull = jsNullType{}
-var jsUndefined = jsUndefinedType{}
-
-type staticValue struct {
-	value interface{}
-	ok    bool
-}
-
-func toStaticValue(t *checker.Type) staticValue {
-	if utils.IsTrueLiteralType(t) {
-		return staticValue{value: true, ok: true}
-	}
-	if utils.IsFalseLiteralType(t) {
-		return staticValue{value: false, ok: true}
-	}
-	flags := checker.Type_flags(t)
-	if flags == checker.TypeFlagsUndefined {
-		return staticValue{value: jsUndefined, ok: true}
-	}
-	if flags == checker.TypeFlagsNull {
-		return staticValue{value: jsNull, ok: true}
-	}
-	if t.IsStringLiteral() || t.IsNumberLiteral() || t.IsBigIntLiteral() {
-		return staticValue{value: t.AsLiteralType().Value(), ok: true}
-	}
-	return staticValue{ok: false}
-}
-
-func boolOperatorText(kind ast.Kind) (string, bool) {
+func isBoolOperator(kind ast.Kind) bool {
 	switch kind {
 	case ast.KindLessThanToken,
 		ast.KindGreaterThanToken,
@@ -87,149 +54,19 @@ func boolOperatorText(kind ast.Kind) (string, bool) {
 		ast.KindEqualsEqualsEqualsToken,
 		ast.KindExclamationEqualsToken,
 		ast.KindExclamationEqualsEqualsToken:
-		return scanner.TokenToString(kind), true
+		return true
 	default:
-		return "", false
+		return false
 	}
 }
 
-// booleanComparison mimics JavaScript comparison semantics for literal types.
-func booleanComparison(left interface{}, operator string, right interface{}) bool {
-	switch operator {
-	case "===":
-		return strictEqual(left, right)
-	case "!==":
-		return !strictEqual(left, right)
-	case "==":
-		return looseEqual(left, right)
-	case "!=":
-		return !looseEqual(left, right)
-	case "<", "<=", ">", ">=":
-		cmp, ok := relationalCompare(left, right)
-		if !ok {
-			return false
-		}
-		switch operator {
-		case "<":
-			return cmp < 0
-		case "<=":
-			return cmp <= 0
-		case ">":
-			return cmp > 0
-		case ">=":
-			return cmp >= 0
-		}
-	}
-	return false
-}
-
-func isJSNullish(v interface{}) bool {
-	_, isNull := v.(jsNullType)
-	_, isUndef := v.(jsUndefinedType)
-	return isNull || isUndef
-}
-
-// valueString returns a canonical string for comparing literal values.
+// valueString returns a property name from a literal type value.
 // Uses fmt.Stringer for named types (Number, PseudoBigInt).
 func valueString(v interface{}) string {
 	if s, ok := v.(fmt.Stringer); ok {
 		return s.String()
 	}
 	return fmt.Sprintf("%v", v)
-}
-
-func strictEqual(a, b interface{}) bool {
-	// null === null, undefined === undefined, but null !== undefined
-	_, aNull := a.(jsNullType)
-	_, bNull := b.(jsNullType)
-	_, aUndef := a.(jsUndefinedType)
-	_, bUndef := b.(jsUndefinedType)
-	if aNull && bNull {
-		return true
-	}
-	if aUndef && bUndef {
-		return true
-	}
-	if aNull || bNull || aUndef || bUndef {
-		return false
-	}
-	// JS strict equality requires same type — different Go types means different JS types
-	if fmt.Sprintf("%T", a) != fmt.Sprintf("%T", b) {
-		return false
-	}
-	return valueString(a) == valueString(b)
-}
-
-func looseEqual(a, b interface{}) bool {
-	// null == undefined is true in JS
-	if isJSNullish(a) && isJSNullish(b) {
-		return true
-	}
-	// null/undefined != anything else
-	if isJSNullish(a) || isJSNullish(b) {
-		return false
-	}
-	return valueString(a) == valueString(b)
-}
-
-// relationalCompare compares two literal values for <, <=, >, >=.
-// JS uses numeric comparison for numbers/bigints/booleans, and
-// lexicographic comparison when both operands are strings.
-func relationalCompare(a, b interface{}) (int, bool) {
-	// String vs string: lexicographic comparison
-	sa, aStr := a.(string)
-	sb, bStr := b.(string)
-	if aStr && bStr {
-		if sa < sb {
-			return -1, true
-		}
-		if sa > sb {
-			return 1, true
-		}
-		return 0, true
-	}
-
-	na, aOK := toNumber(a)
-	nb, bOK := toNumber(b)
-	if !aOK || !bOK || math.IsNaN(na) || math.IsNaN(nb) {
-		return 0, false
-	}
-	if na < nb {
-		return -1, true
-	}
-	if na > nb {
-		return 1, true
-	}
-	return 0, true
-}
-
-// toNumber converts a literal type value to float64 for relational comparison.
-// tsgo stores number literals as Number (a named float64 type) and bigint
-// literals as PseudoBigInt — both implement fmt.Stringer.
-func toNumber(v interface{}) (float64, bool) {
-	switch val := v.(type) {
-	case float64:
-		return val, true
-	case bool:
-		if val {
-			return 1, true
-		}
-		return 0, true
-	case string:
-		// Strings can't be numerically compared — use stringCompare instead
-		return 0, false
-	default:
-		// Handle Number and PseudoBigInt via fmt.Stringer
-		if s, ok := v.(fmt.Stringer); ok {
-			str := s.String()
-			f, err := strconv.ParseFloat(str, 64)
-			if err != nil {
-				return 0, false
-			}
-			return f, true
-		}
-		return 0, false
-	}
 }
 
 type allowConstantLoopConditionsOption string
@@ -357,11 +194,14 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 		// --- Helper functions ---
 
 		isArrayIndexExpression := func(node *ast.Node) bool {
+			node = ast.SkipParentheses(node)
 			if !ast.IsElementAccessExpression(node) {
 				return false
 			}
 			elem := node.AsElementAccessExpression()
-			isDynamicIndex := !ast.IsLiteralExpression(elem.ArgumentExpression)
+			property := ast.SkipParentheses(elem.ArgumentExpression)
+			// ESTree represents template literals separately from literal keys.
+			isDynamicIndex := !ast.IsLiteralExpression(property) || property.Kind == ast.KindNoSubstitutionTemplateLiteral
 			objectType := utils.GetConstrainedTypeAtLocation(tc, elem.Expression)
 			for _, part := range utils.UnionTypeParts(objectType) {
 				if checker.Checker_isArrayType(tc, part) || (isDynamicIndex && checker.IsTupleType(part)) {
@@ -376,7 +216,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			return utils.Some(utils.UnionTypeParts(t), func(part *checker.Type) bool {
 				return utils.IsTypeAnyType(part) ||
 					utils.IsTypeUnknownType(part) ||
-					utils.IsTypeFlagSet(part, checker.TypeFlagsTypeVariable)
+					utils.IsTypeFlagSet(part, checker.TypeFlagsTypeVariable|checker.TypeFlagsConditional)
 			})
 		}
 
@@ -387,7 +227,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			objectType := ctx.TypeChecker.GetTypeAtLocation(node.Expression())
 			if ast.IsElementAccessExpression(node) {
 				propertyType := ctx.TypeChecker.GetTypeAtLocation(node.AsElementAccessExpression().ArgumentExpression)
-				return isNullablePropertyType(tc, objectType, propertyType)
+				return isNullablePropertyType(tc, objectType, propertyType, false)
 			}
 			// PropertyAccessExpression — use Checker_getAccessedPropertyName for
 			// correct handling of private fields (#prop) and computed properties
@@ -434,7 +274,9 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				binExpr := expression.AsBinaryExpression()
 				op := binExpr.OperatorToken.Kind
 				if op == ast.KindAmpersandAmpersandToken || op == ast.KindBarBarToken {
-					checkNode(binExpr.Right, false, nil)
+					if isOnlyUsedForTruthiness(expression) {
+						checkNode(binExpr.Right, false, nil)
+					}
 					return
 				}
 			}
@@ -475,7 +317,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			t := utils.GetConstrainedTypeAtLocation(tc, node)
 
 			// Conditional is always necessary if it involves any, unknown, or type parameter
-			if utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsTypeParameter|checker.TypeFlagsTypeVariable) {
+			if utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsTypeParameter|checker.TypeFlagsTypeVariable|checker.TypeFlagsConditional) {
 				return
 			}
 
@@ -501,21 +343,18 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if isAlwaysNullish(t) {
+			if isAlwaysNullish(t) && !hasPossiblyNonNullishComputedMemberProperty(tc, node) {
 				ctx.ReportNode(node, buildAlwaysNullishMessage())
 				return
 			}
 		}
 
-		checkIfBoolExpressionIsNecessaryConditional := func(node *ast.Node, left *ast.Node, right *ast.Node, operator string) {
+		checkIfBoolExpressionIsNecessaryConditional := func(node *ast.Node, left *ast.Node, right *ast.Node, operatorToken ast.Kind) {
 			leftType := utils.GetConstrainedTypeAtLocation(tc, left)
 			rightType := utils.GetConstrainedTypeAtLocation(tc, right)
+			operator := scanner.TokenToString(operatorToken)
 
-			leftStatic := toStaticValue(leftType)
-			rightStatic := toStaticValue(rightType)
-
-			if leftStatic.ok && rightStatic.ok {
-				conditionIsTrue := booleanComparison(leftStatic.value, operator, rightStatic.value)
+			if conditionIsTrue, known := utils.CompareLiteralTypes(leftType, rightType, operatorToken); known {
 				trueOrFalse := "false"
 				if conditionIsTrue {
 					trueOrFalse = "true"
@@ -532,7 +371,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			// Workaround for TypeScript issue #37160
 			if isStrictNullChecks {
 				isComparable := func(t *checker.Type, flag checker.TypeFlags) bool {
-					flag |= checker.TypeFlagsAny | checker.TypeFlagsUnknown | checker.TypeFlagsTypeParameter | checker.TypeFlagsTypeVariable
+					flag |= checker.TypeFlagsAny | checker.TypeFlagsUnknown | checker.TypeFlagsTypeParameter | checker.TypeFlagsTypeVariable | checker.TypeFlagsConditional
 					if operator == "==" || operator == "!=" {
 						flag |= checker.TypeFlagsNull | checker.TypeFlagsUndefined | checker.TypeFlagsVoid
 					}
@@ -575,6 +414,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			if test == nil {
 				return
 			}
+			test = ast.SkipParentheses(test)
 
 			if opts.allowConstantLoopConditions == loopConditionOnlyAllowedLiteral {
 				if test.Kind == ast.KindTrueKeyword || test.Kind == ast.KindFalseKeyword {
@@ -627,19 +467,23 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 		}
 
 		isMemberExpressionNullableOriginFromObject := func(node *ast.Node) bool {
-			prevType := utils.GetConstrainedTypeAtLocation(tc, node.Expression())
-			if !prevType.IsUnion() {
-				return false
-			}
-
 			isComputed := ast.IsElementAccessExpression(node)
 			// Match upstream's `isIdentifier(node.property)` guard: a computed
 			// access is only attributed to its object when the key is an
 			// identifier (`a[k]`). For literal keys (`a[0]`, `a['x']`) the element
 			// type, e.g. `T | undefined` under noUncheckedIndexedAccess, is the
 			// access's own nullability and must not be blamed on the object.
-			if isComputed && !ast.IsIdentifier(node.AsElementAccessExpression().ArgumentExpression) {
+			// ESTree removes parentheses around identifiers.
+			if isComputed && !ast.IsIdentifier(ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)) {
 				return false
+			}
+			prevType := utils.GetConstrainedTypeAtLocation(tc, node.Expression())
+			if !prevType.IsUnion() {
+				return false
+			}
+			var propertyType *checker.Type
+			if isComputed {
+				propertyType = utils.GetConstrainedTypeAtLocation(tc, node.AsElementAccessExpression().ArgumentExpression)
 			}
 			propName := ""
 			if !isComputed {
@@ -654,8 +498,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 
 			isOwnNullable := utils.Some(prevType.Types(), func(partType *checker.Type) bool {
 				if isComputed {
-					propertyType := utils.GetConstrainedTypeAtLocation(tc, node.AsElementAccessExpression().ArgumentExpression)
-					return isNullablePropertyType(tc, partType, propertyType)
+					return isNullablePropertyType(tc, partType, propertyType, isNoUncheckedIndexedAccess)
 				}
 				propType := tc.GetTypeOfPropertyOfType(partType, propName)
 				if propType != nil {
@@ -688,13 +531,19 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 
 		isOptionableExpression := func(node *ast.Node) bool {
 			t := utils.GetConstrainedTypeAtLocation(tc, node)
-			isOwnNullable := true
-			if ast.IsAccessExpression(node) {
-				isOwnNullable = !isMemberExpressionNullableOriginFromObject(node)
-			} else if ast.IsCallExpression(node) {
-				isOwnNullable = !isCallExpressionNullableOriginFromCallee(node)
+			if isConditionalAlwaysNecessary(t) {
+				return true
 			}
-			return isConditionalAlwaysNecessary(t) || (isOwnNullable && utils.IsNullableType(t))
+			if !utils.IsNullableType(t) {
+				return false
+			}
+			if ast.IsAccessExpression(node) {
+				return !isMemberExpressionNullableOriginFromObject(node)
+			}
+			if ast.IsCallExpression(node) {
+				return !isCallExpressionNullableOriginFromCallee(node)
+			}
+			return true
 		}
 
 		checkOptionalChain := func(node *ast.Node, fix string) {
@@ -866,8 +715,8 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Boolean comparison operators
-				if opStr, ok := boolOperatorText(op); ok {
-					checkIfBoolExpressionIsNecessaryConditional(node, binExpr.Left, binExpr.Right, opStr)
+				if isBoolOperator(op) {
+					checkIfBoolExpressionIsNecessaryConditional(node, binExpr.Left, binExpr.Right, op)
 					return
 				}
 			},
@@ -911,7 +760,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 					caseClause.Expression,
 					switchStmt.Expression,
 					caseClause.Expression,
-					"===",
+					ast.KindEqualsEqualsEqualsToken,
 				)
 			},
 		}
@@ -920,10 +769,60 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 
 // Helper functions
 
-func isNullablePropertyType(tc *checker.Checker, objType *checker.Type, propertyType *checker.Type) bool {
+func hasPossiblyNonNullishComputedMemberProperty(tc *checker.Checker, node *ast.Node) bool {
+	if !ast.IsElementAccessExpression(node) || ast.IsOptionalChain(node) {
+		return false
+	}
+	element := node.AsElementAccessExpression()
+	objectType := utils.GetConstrainedTypeAtLocation(tc, element.Expression)
+	propertyType := utils.GetConstrainedTypeAtLocation(tc, element.ArgumentExpression)
+	possiblyNonNullish := false
+	for _, keyType := range utils.UnionTypeParts(propertyType) {
+		if !keyType.IsStringLiteral() && !keyType.IsNumberLiteral() {
+			return false
+		}
+		selectedType := tc.GetTypeOfPropertyOfType(objectType, valueString(keyType.AsLiteralType().Value()))
+		if selectedType == nil {
+			return false
+		}
+		possiblyNonNullish = possiblyNonNullish || !utils.Every(utils.UnionTypeParts(selectedType), func(part *checker.Type) bool {
+			return utils.IsTypeFlagSet(part, possiblyNullishFlag)
+		})
+	}
+	return possiblyNonNullish
+}
+
+func isOnlyUsedForTruthiness(node *ast.Node) bool {
+	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	switch parent.Kind {
+	case ast.KindIfStatement:
+		return ast.SkipParentheses(parent.AsIfStatement().Expression) == node
+	case ast.KindConditionalExpression:
+		return ast.SkipParentheses(parent.AsConditionalExpression().Condition) == node
+	case ast.KindWhileStatement:
+		return ast.SkipParentheses(parent.AsWhileStatement().Expression) == node
+	case ast.KindDoStatement:
+		return ast.SkipParentheses(parent.AsDoStatement().Expression) == node
+	case ast.KindForStatement:
+		return ast.SkipParentheses(parent.AsForStatement().Condition) == node
+	case ast.KindPrefixUnaryExpression:
+		return parent.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
+	case ast.KindBinaryExpression:
+		binary := parent.AsBinaryExpression()
+		switch binary.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken:
+			return ast.SkipParentheses(binary.Left) == node || isOnlyUsedForTruthiness(parent)
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+			return isOnlyUsedForTruthiness(parent)
+		}
+	}
+	return false
+}
+
+func isNullablePropertyType(tc *checker.Checker, objType *checker.Type, propertyType *checker.Type, includeUncheckedIndex bool) bool {
 	if propertyType.IsUnion() {
 		return utils.Some(propertyType.Types(), func(part *checker.Type) bool {
-			return isNullablePropertyType(tc, objType, part)
+			return isNullablePropertyType(tc, objType, part, includeUncheckedIndex)
 		})
 	}
 	if propertyType.IsNumberLiteral() || propertyType.IsStringLiteral() {
@@ -932,21 +831,26 @@ func isNullablePropertyType(tc *checker.Checker, objType *checker.Type, property
 		if propType != nil {
 			return utils.IsNullableType(propType)
 		}
+		// A missing indexed property contributes its own undefined under
+		// noUncheckedIndexedAccess, including an identifier with a literal type.
+		if includeUncheckedIndex && len(tc.GetIndexInfosOfType(objType)) > 0 {
+			return true
+		}
 		// tsgo's GetTypeOfPropertyOfType doesn't resolve index signatures for
 		// non-array object types (e.g., { [key: number]: T }). For these types,
-		// if the literal key matches an index signature, treat the property as
-		// potentially missing (matching original behavior).
+		// Preserve nullability from the index signature's value type. String
+		// keys also match the string index by type name in upstream's fallback.
 		// Skip arrays — they are handled by the fallthrough getTypeName comparison.
 		if !checker.Checker_isArrayType(tc, objType) && !checker.IsTupleType(objType) {
 			var keyType *checker.Type
-			if propertyType.IsNumberLiteral() {
+			if propertyType.IsNumberLiteral() || jsnum.FromString(propName).String() == propName {
 				keyType = tc.GetNumberType()
 			} else {
 				keyType = tc.GetStringType()
 			}
 			indexType := checker.Checker_getIndexTypeOfType(tc, objType, keyType)
 			if indexType != nil {
-				return true
+				return keyType == tc.GetStringType() || utils.IsNullableType(indexType)
 			}
 		}
 	}

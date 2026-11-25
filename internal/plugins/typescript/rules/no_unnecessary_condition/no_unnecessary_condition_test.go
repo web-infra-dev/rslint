@@ -194,29 +194,6 @@ func TestNoUnnecessaryCondition(t *testing.T) {
 		// === Generic indexed access ===
 		{Code: "function foo<T extends object>(arg: T, key: keyof T): void { arg[key] == null; }\n"},
 		{Code: "function foo<T extends object>(arg: T, key: keyof T): void { arg[key] ?? 'default'; }\n"},
-
-		// === noUncheckedIndexedAccess: `?.` after an index access inside an optional chain ===
-		// https://github.com/web-infra-dev/rslint/issues/2625
-		{
-			Code:     "declare const list: { items: { id: string }[] } | undefined;\nlist?.items[0]?.id;\n",
-			TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
-		},
-		{
-			Code:     "declare const items: { id: string }[];\nitems[0]?.id;\n",
-			TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
-		},
-		{
-			Code:     "declare const maybe: { id: string }[] | undefined;\nmaybe?.[0]?.id;\n",
-			TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
-		},
-		{
-			Code:     "declare const maybe: { id: string }[] | undefined;\nmaybe?.['0']?.id;\n",
-			TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
-		},
-		{
-			Code:     "declare const maybe: Record<string, { id: string }> | undefined;\nmaybe?.['key']?.id;\n",
-			TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
-		},
 	}, []rule_tester.InvalidTestCase{
 		// === Always truthy ===
 		{

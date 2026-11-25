@@ -3,9 +3,61 @@
 package utils
 
 import (
+	"math/big"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+// CompareLiteralTypes evaluates a JavaScript comparison between singleton
+// primitive types using the same coercions as static expression evaluation.
+func CompareLiteralTypes(left, right *checker.Type, operator ast.Kind) (value, known bool) {
+	l, leftOK := staticValueFromLiteralType(left)
+	r, rightOK := staticValueFromLiteralType(right)
+	if !leftOK || !rightOK {
+		return false, false
+	}
+	if operator == ast.KindEqualsEqualsEqualsToken || operator == ast.KindExclamationEqualsEqualsToken {
+		equal, ok := staticValuesStrictEqual(l, r)
+		if operator == ast.KindExclamationEqualsEqualsToken {
+			equal = !equal
+		}
+		return equal, ok
+	}
+	var evaluator StaticStringEvaluator
+	result := evaluator.evalBinaryValues(operator, l, r)
+	value, isBoolean := result.value.(bool)
+	return value, result.ok && isBoolean
+}
+
+func staticValueFromLiteralType(t *checker.Type) (any, bool) {
+	if IsTrueLiteralType(t) {
+		return true, true
+	}
+	if IsFalseLiteralType(t) {
+		return false, true
+	}
+	switch checker.Type_flags(t) {
+	case checker.TypeFlagsNull:
+		return staticNullValue{}, true
+	case checker.TypeFlagsUndefined:
+		return staticUndefinedValue{}, true
+	}
+	if t.IsBigIntLiteral() {
+		value, ok := t.AsLiteralType().Value().(jsnum.PseudoBigInt)
+		if !ok {
+			return nil, false
+		}
+		integer, ok := new(big.Int).SetString(value.String(), 10)
+		return integer, ok
+	}
+	if t.IsStringLiteral() || t.IsNumberLiteral() {
+		return t.AsLiteralType().Value(), true
+	}
+	return nil, false
+}
 
 // Supplement tsgo's literal arithmetic with JavaScript coercions and comparisons.
 // Number operators still use tsgo's jsnum methods; BigInt keeps its own type rules.
