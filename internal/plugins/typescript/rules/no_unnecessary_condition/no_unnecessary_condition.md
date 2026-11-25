@@ -93,7 +93,11 @@ spread may leave a getter already on the target in place; it remains an accessor
 `Object.assign` also preserves target getters, including those on class instances
 and parameter objects; writing through a setter does not replace the getter.
 An unknown target typed as `object` may also contain a getter, so its structural
-type alone does not establish an ordinary data copy.
+type alone does not establish an ordinary data copy. This also applies when the
+source uses ordinary fields or index signatures: its write types do not establish
+the target getters' read types. A target with `__proto__` can inherit a getter and
+setter that handle the assignment. A target's declared getter contract is preserved
+before inspecting its constructor, which can return a different object.
 Initializer types never narrow a getter's public read type, which also covers
 values supplied by later spreads or descriptor changes. Calls resolve the
 applicable overload of each possible function through the checker.
@@ -119,8 +123,9 @@ property and parameter markers still protect nullish fallbacks. For example, wit
 `options.title ?? 'Untitled'` remains necessary.
 After an assignment of a statically known value, such as
 `options.title = 'set'`, the fallback is reported as unnecessary. Unrelated
-simple variable declarations initialized by literals or identifiers preserve this
-proof. Destructuring, object spread, and other expressions may invoke user code,
+simple variable declarations initialized by primitive literals, identifiers, empty
+objects or arrays, or function expressions preserve this proof. Destructuring,
+object spread, and other expressions may invoke user code,
 so they stop this proof. Other optional
 property and parameter fallbacks are retained conservatively: without strict null checking,
 the compiler also erases nullish values from assignment sources. For example,

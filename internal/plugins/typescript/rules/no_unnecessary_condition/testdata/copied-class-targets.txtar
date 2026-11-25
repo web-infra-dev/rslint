@@ -1,0 +1,18 @@
+-- target-class.ts --
+export class Target { value: number | undefined; }
+-- cases/named.ts --
+import { Target } from '../target-class';
+interface Store { get value(): number | undefined; set value(value: number | undefined); }
+function read(source: Store) {
+  const copy = Object.assign(new Target(), source);
+  copy.value = 1;
+  return copy.value ?? 42;
+}
+-- cases/namespace.ts --
+import * as model from '../target-class';
+interface Store { get value(): number | undefined; set value(value: number | undefined); }
+function read(source: Store) {
+  const copy = Object.assign(new model.Target(), source);
+  copy.value = 1;
+  return copy.value ?? 42;
+}
