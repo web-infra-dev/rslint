@@ -580,3 +580,51 @@ func TestNoUnnecessaryConditionAccessorAssignments(t *testing.T) {
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, valid, invalid)
 }
+
+func TestNoUnnecessaryConditionAccessorObservations(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	for _, access := range []string{"store.value", "store['value']", "store[(key)]"} {
+		for _, statement := range []string{access + " ?? 42;", access + " ??= 42;"} {
+			valid = append(valid, rule_tester.ValidTestCase{Code: "class Store {\n  private stored?: number;\n  get value(): number | undefined { return this.stored; }\n  set value(value: number | undefined) { this.stored = value === 0 ? undefined : value; }\n}\nconst store = new Store();\nconst key = 'value';\nstore.value = 0;\n" + statement})
+		}
+	}
+	valid = append(valid,
+		rule_tester.ValidTestCase{Code: "class Switch { attempts = 0; private on = false; get enabled(): boolean { return this.on; } set enabled(value: boolean) { this.on = value && ++this.attempts > 1; } }\nconst store = new Switch();\nstore.enabled = true;\nstore.enabled ||= true;\n"},
+		rule_tester.ValidTestCase{Code: "const queue = [7];\nconst feed = { get first(): number | undefined { return queue.shift(); } };\nconst value = feed['first'] !== undefined ? feed['first'] ?? 42 : null;\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get value(): number | undefined; set value(value: number); }\nfunction reset(store: Store) { if (store.value !== undefined) store['value'] ??= 42; }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get value(): number | undefined; set value(value: number); }\nfunction reset(store: Store | { value?: number }) { store.value = 0; store['value'] ??= 42; }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get value(): { id: number } | undefined; }\nfunction read(store: Store) { if (store.value) return store.value?.id; }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get ready(): true; }\nfunction read(store: Store | undefined) { if (store?.ready) {} }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get callback(): (() => number) | undefined; }\nfunction read(store: Store | undefined) { return store?.callback?.(); }\n"},
+		rule_tester.ValidTestCase{Code: "declare const key: unique symbol;\ninterface Store { get [key](): boolean; set [key](value: boolean); }\nfunction reset(store: Store) { store[key] = true; store[key] ||= true; }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get ready(): boolean; set ready(value: boolean); }\nfunction read(store: Store) { store.ready = true; if (store.ready satisfies boolean) {} }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get value(): number | undefined; }\nfunction read<K extends 'value'>(store: Store, key: K) { if (store[key] !== undefined) return store[key] ?? 42; }\n"},
+	)
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, valid, nil)
+}
+
+func TestNoUnnecessaryConditionOptionalWithoutStrictNullChecks(t *testing.T) {
+	options := map[string]any{"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing": true}
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+	for _, access := range []string{"options.title", "options['title']", "options[(key)]"} {
+		for _, operator := range []string{"??", "??="} {
+			valid = append(valid, rule_tester.ValidTestCase{Code: fmt.Sprintf("function name(options: { title?: string }) { const key = 'title'; return %s %s 'Untitled'; }\n", access, operator), Options: options})
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: fmt.Sprintf("function name(options: { title: string }) { const key = 'title'; return %s %s 'Untitled'; }\n", access, operator), Options: options, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.unstrict.json", t, &NoUnnecessaryConditionRule, valid, invalid)
+}
+
+func TestNoUnnecessaryConditionForInIndex(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+	for _, key := range []string{"key", "((key))"} {
+		for _, test := range []struct{ operator, message string }{{"&&=", "alwaysFalsy"}, {"||=", "alwaysFalsy"}, {"??=", "alwaysNullish"}} {
+			prefix := "type Cells = { [index: number]: null; [name: string]: string | null };\ndeclare const cells: Cells;\ndeclare function update(): null;\n"
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: prefix + fmt.Sprintf("for (const key in [123]) cells[%s] %s update();\n", key, test.operator), Errors: []rule_tester.InvalidTestCaseError{{MessageId: test.message}}})
+			valid = append(valid, rule_tester.ValidTestCase{Code: prefix + fmt.Sprintf("for (const key in { name: 123 }) cells[%s] %s update();\n", key, test.operator)})
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, valid, invalid)
+}

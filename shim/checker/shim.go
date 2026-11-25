@@ -83,10 +83,14 @@ type Checker = checker.Checker
 func Checker_getIterationTypeOfIterable(recv *checker.Checker, use checker.IterationUse, typeKind checker.IterationTypeKind, inputType *checker.Type, errorNode *ast.Node) *checker.Type
 //go:linkname Checker_getTypeOfExpression github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfExpression
 func Checker_getTypeOfExpression(recv *checker.Checker, node *ast.Node) *checker.Type
+//go:linkname Checker_isForInVariableForNumericPropertyNames github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isForInVariableForNumericPropertyNames
+func Checker_isForInVariableForNumericPropertyNames(recv *checker.Checker, expr *ast.Node) bool
 //go:linkname Checker_getResolvedSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSignature
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
 //go:linkname Checker_isConstContext github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isConstContext
 func Checker_isConstContext(recv *checker.Checker, node *ast.Node) bool
+//go:linkname Checker_getResolvedSymbolOrNil github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSymbolOrNil
+func Checker_getResolvedSymbolOrNil(recv *checker.Checker, node *ast.Node) *ast.Symbol
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType
@@ -137,6 +141,10 @@ func Checker_getWidenedLiteralLikeTypeForContextualType(recv *checker.Checker, t
 func Checker_getIndexedAccessTypeOrUndefined(recv *checker.Checker, objectType *checker.Type, indexType *checker.Type, accessFlags checker.AccessFlags, accessNode *ast.Node, alias *checker.TypeAlias) *checker.Type
 //go:linkname Checker_getBaseConstraintOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseConstraintOfType
 func Checker_getBaseConstraintOfType(recv *checker.Checker, t *checker.Type) *checker.Type
+//go:linkname Checker_getOptionalExpressionType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getOptionalExpressionType
+func Checker_getOptionalExpressionType(recv *checker.Checker, exprType *checker.Type, expression *ast.Node) *checker.Type
+//go:linkname Checker_propagateOptionalTypeMarker github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).propagateOptionalTypeMarker
+func Checker_propagateOptionalTypeMarker(recv *checker.Checker, t *checker.Type, node *ast.Node, wasOptional bool) *checker.Type
 //go:linkname Checker_getContextualType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getContextualType
 func Checker_getContextualType(recv *checker.Checker, node *ast.Node, contextFlags checker.ContextFlags) *checker.Type
 //go:linkname Checker_getContextualTypeForArgumentAtIndex github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getContextualTypeForArgumentAtIndex

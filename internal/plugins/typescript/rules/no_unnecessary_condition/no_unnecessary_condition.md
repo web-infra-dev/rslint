@@ -83,10 +83,12 @@ Async and generator callbacks return objects, regardless of the value in their
 element. rslint reports the callback as always truthy instead of reporting its
 body as always falsy.
 
-Logical assignments check the value being read, including control-flow narrowing.
-For accessors, this is the getter's type; for a union of keys, it is the union of
-the selected read types. Setter types and write intersections must not determine
-whether the condition is necessary. For example, this `??=` remains necessary:
+Logical assignments check the value being read. Ordinary fields retain
+control-flow narrowing. Accessors use the getter's declared type: a setter can
+transform its argument, and each getter call can return a different value.
+For a union of keys, the read type includes all selected properties. Setter types
+and write intersections must not determine whether the condition is necessary.
+For example, this `??=` remains necessary even after the setter receives `null`:
 
 ```typescript
 interface Box {
@@ -95,9 +97,15 @@ interface Box {
 }
 
 function reset(box: Box) {
+  box['value'] = null;
   box['value'] ??= null;
 }
 ```
+
+When `allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing` is enabled, optional
+property markers still protect nullish fallbacks. For example, with
+`strictNullChecks` disabled, `options: { title?: string }` can be `{}`, so
+`options.title ?? 'Untitled'` remains necessary.
 
 ## Original Documentation
 
