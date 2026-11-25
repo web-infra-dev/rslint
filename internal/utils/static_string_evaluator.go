@@ -2002,6 +2002,23 @@ func propertyCallFollowsRead(call, origin, access *ast.Node) bool {
 		if ast.IsIterationStatement(parent, false) {
 			return false
 		}
+		if ast.IsPropertyDeclaration(parent) && !ast.HasStaticModifier(parent) &&
+			parent.Initializer() != nil && ast.IsNodeDescendantOf(access, parent.Initializer()) {
+			// Instance initializers run during construction, after the class
+			// declaration and possibly after later statements in this function.
+			return false
+		}
+		if ast.IsClassLike(parent) && ast.IsNodeDescendantOf(call, parent) {
+			// Computed names are evaluated before static field initializers.
+			return false
+		}
+	}
+	for child := call; child.Parent != nil && child.Parent != root; child = child.Parent {
+		if ast.IsCaseClause(child.Parent) && child.Parent.Expression() == child &&
+			ast.IsNodeDescendantOf(access, child.Parent.Parent) {
+			// A later case selector can execute before an earlier default body.
+			return false
+		}
 	}
 	return true
 }
@@ -2027,11 +2044,10 @@ func (staticEvaluator *StaticStringEvaluator) callPreservesPropertyShape(call, o
 			return false
 		}
 	}
-	switch name {
-	case "keys", "getOwnPropertyNames", "getOwnPropertySymbols", "getOwnPropertyDescriptors":
-		// The caller established a fresh non-Proxy target. These operations
-		// inspect keys or descriptors without invoking its own getters.
+	if staticEvaluator.isReadOnlyObjectCall(call, name) {
 		return true
+	}
+	switch name {
 	case "assign":
 		if len(arguments) == 0 {
 			return false
@@ -2065,11 +2081,46 @@ func (staticEvaluator *StaticStringEvaluator) callPreservesPropertyShape(call, o
 		if !known || key == definedKey || ast.IsArrayLiteralExpression(origin) && definedKey == "push" {
 			return false
 		}
+		if ast.IsArrayLiteralExpression(origin) && definedKey == "length" {
+			number, known := ecmascript.StringToNumber(key)
+			index := ecmascript.NumberToUint32(number)
+			if known && index != math.MaxUint32 && ecmascript.NumberToString(float64(index)) == key {
+				// ArraySetLength deletes indexed elements when it truncates.
+				// Its uint32 boundary is independent of the host's int width.
+				return false
+			}
+		}
 		// ToPropertyDescriptor can invoke getters, including inherited ones.
 		// Only an independently folded plain data descriptor is harmless.
 		descriptor := staticEvaluator.evalValue(arguments[2])
 		object, ok := descriptor.value.(*staticObjectValue)
 		return descriptor.ok && ok && (!object.prototypeSet || object.prototype == nil)
+	}
+	return false
+}
+
+// The caller establishes a non-Proxy target and an unchanged built-in.
+// Key/descriptor inspection does not invoke the target's getters, but converting
+// an object-valued property key can execute arbitrary user code.
+func (staticEvaluator *StaticStringEvaluator) isReadOnlyObjectCall(call *ast.Node, name string) bool {
+	switch name {
+	case "keys", "getOwnPropertyNames", "getOwnPropertySymbols", "getOwnPropertyDescriptors":
+		return true
+	case "hasOwn", "getOwnPropertyDescriptor":
+		arguments := call.Arguments()
+		if len(arguments) < 2 {
+			return false
+		}
+		key := SkipAssertionsAndParens(arguments[1])
+		if value := staticEvaluator.evalValue(key); value.ok {
+			return IsPrimitiveStaticValue(value.value)
+		}
+		if staticEvaluator.typeChecker != nil {
+			keyType := GetConstrainedTypeAtLocation(staticEvaluator.typeChecker, key)
+			return !slices.ContainsFunc(UnionTypeParts(keyType), func(part *checker.Type) bool {
+				return part.Flags()&checker.TypeFlagsPrimitive == 0
+			})
+		}
 	}
 	return false
 }
@@ -2088,7 +2139,7 @@ func (staticEvaluator *StaticStringEvaluator) hasConstructorMutation(symbol *ast
 		// built-in resolver without treating those calls as constructor escapes.
 		if ast.IsCallExpression(site) {
 			name, known := staticEvaluator.builtinMethodName(site.Expression(), "Object", make(map[*ast.Symbol]bool))
-			if known && (name == "keys" || name == "getOwnPropertyNames" || name == "getOwnPropertySymbols" || name == "getOwnPropertyDescriptors") {
+			if known && staticEvaluator.isReadOnlyObjectCall(site, name) {
 				continue
 			}
 		}

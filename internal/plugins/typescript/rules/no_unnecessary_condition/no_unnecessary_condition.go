@@ -1530,8 +1530,58 @@ func (conditionTypes *conditionTypeChecker) getCapturedReadType(node *ast.Node) 
 		}
 		originalType := utils.GetConstrainedTypeAtLocation(tc, reference)
 		readType := conditionTypes.getConditionType(reference, nil)
+		if ast.IsArrayBindingPattern(declaration.Parent) {
+			if readType != originalType && utils.IsTypeUnknownType(readType) {
+				// A visible descriptor mutation can also replace the iterator.
+				if origin := conditionTypes.receiverObjectOrigin(reference); origin.unknownRead {
+					return readType
+				}
+			}
+			parentType := utils.GetConstrainedTypeAtLocation(tc, reference.Expression())
+			hasCustomIterator := func(t *checker.Type) bool {
+				iterator := utils.GetWellKnownSymbolPropertyOfType(t, "iterator", tc)
+				return iterator != nil && slices.ContainsFunc(iterator.Declarations, func(declaration *ast.Node) bool {
+					return !conditionTypes.context.Program().IsSourceFileDefaultLibrary(ast.GetSourceFileOfNode(declaration))
+				})
+			}
+			if !tc.IsArrayLikeType(parentType) || hasCustomIterator(parentType) {
+				// Iterable destructuring reads the iterator, not an indexed getter.
+				// An Object.assign intersection can hide a replacement iterator's
+				// nullable yield type, just as it can hide a getter's read type.
+				var iteratedTypes []*checker.Type
+				for _, variant := range utils.UnionTypeParts(parentType) {
+					parts := utils.IntersectionTypeParts(variant)
+					custom := slices.ContainsFunc(parts, hasCustomIterator)
+					for _, part := range parts {
+						if custom && !hasCustomIterator(part) {
+							continue
+						}
+						if iterated := checker.Checker_getIterationTypeOfIterable(tc, checker.IterationUseDestructuring, checker.IterationTypeKindYield, part, nil); iterated != nil {
+							iteratedTypes = append(iteratedTypes, iterated)
+						} else if custom {
+							iteratedTypes = append(iteratedTypes, tc.GetUnknownType())
+						}
+					}
+				}
+				if len(iteratedTypes) != 0 {
+					readType = tc.GetUnionType(iteratedTypes)
+				}
+			}
+		}
 		if readType == originalType {
 			return nil
+		}
+		for parent := declaration.Parent.Parent; ast.IsBindingElement(parent); parent = parent.Parent.Parent {
+			if parent.Initializer() != nil {
+				parentRead := getBindingReadReference(tc, parent)
+				if parentRead != nil && checker.Checker_getTypeWithFacts(tc, conditionTypes.getConditionType(parentRead, nil), checker.TypeFactsEQUndefined).Flags()&checker.TypeFlagsNever != 0 {
+					continue
+				}
+				// The synthetic access omits enclosing defaults. Keep the
+				// checker's binding contract, which includes those alternatives.
+				readType = tc.GetUnionType([]*checker.Type{readType, checker.Checker_getTypeOfSymbol(tc, symbol)})
+				break
+			}
 		}
 		if declaration.Initializer() != nil &&
 			checker.Checker_getTypeWithFacts(tc, readType, checker.TypeFactsEQUndefined).Flags()&checker.TypeFlagsNever == 0 {

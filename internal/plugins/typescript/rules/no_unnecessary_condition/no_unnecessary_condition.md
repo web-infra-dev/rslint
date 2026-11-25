@@ -107,6 +107,9 @@ getter values also preserve the getter's read type rather than a preceding sette
 argument, including explicitly typed locals and destructuring defaults. Named
 and computed bindings, including nested patterns and direct call results, use
 the same read contracts. Calls in a destructuring initializer precede those reads.
+Enclosing defaults remain possible: in `const {box: {item} = fallback} = copy`,
+`item` can come from `fallback` when the getter returns `undefined`. Array bindings
+also preserve custom iterator result types.
 Ordinary fields on a captured object retain their own control-flow narrowing and explicitly
 declared field types, so a wider mutable field can still become `undefined`.
 Fresh objects, arrays, and functions retain ordinary data-copy narrowing when no descriptor
@@ -114,10 +117,14 @@ changes or unaccounted calls are visible through their aliases. Deleting propert
 changing a target or built-in prototype, or copying a possible own `__proto__` key prevents
 that assumption. This includes targets created by object rest. Objects with a
 `null` prototype also retain ordinary copy narrowing.
-Read-only operations such as `Object.keys` and calls after a read of a fresh local
-do not invalidate that read. Loops and objects shared across function invocations
-remain conservative. An unchanged array `push` method also preserves unrelated
-named properties.
+Read-only operations such as `Object.keys` and `Object.hasOwn` preserve ordinary
+data reads; property-key coercions that can run user code remain conservative.
+Calls after a read of a fresh local do not invalidate that read. Class instance
+fields read during construction, and `switch` selectors run before the selected
+body. Loops and objects shared across function invocations remain conservative.
+An unchanged array `push` method also preserves unrelated named properties.
+Defining an array's `length` can delete indexed elements, so those reads retain
+their guards after a possible truncation.
 Initializer types never narrow a getter's public read type, and an annotation on
 the copy cannot erase the target getter's or index signature's actual read type. This also covers values
 supplied by later spreads or descriptor changes. Calls resolve the applicable
