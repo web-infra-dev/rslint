@@ -126,13 +126,23 @@ Read-only operations such as `Object.keys` and `Object.hasOwn` preserve ordinary
 data reads; property-key coercions that can run user code remain conservative.
 Calls after a read of a fresh local do not invalidate that read. Class instance
 fields read during construction, and `switch` selectors run before the selected
-body. Class computed names and decorator expressions run before static
-initializers; static fields and blocks themselves run in source order. Loops
-and objects shared across function invocations remain conservative.
+body. Class computed names and standard decorator expressions run before static
+initializers. With `experimentalDecorators`, legacy decorator expressions run
+after static initialization instead. Static fields and blocks themselves run in
+source order. These orders also apply to aliases assigned in computed names.
+Instance initializers can run when a static initializer constructs the class.
+Loops and objects shared across function invocations remain conservative.
 An unchanged array `push` method also preserves unrelated named properties.
 Assigning or defining an array's `length` can delete indexed elements, so those
 reads retain their guards after a possible truncation, including through aliases.
-Named properties and values captured before the truncation retain their types.
+This also covers an enumerable `length` copied by `Object.assign`. Named
+properties and values captured before truncation retain their types. A directly
+preceding assignment to the same index restores ordinary narrowing, using the
+native control-flow graph.
+Length writes and aggregate aliases remain conservative: `xs.length++` may
+retain an indexed guard, as may `holder.other.length = 0` when `holder` also
+stores `xs`. Instance initializer mutations also remain conservative when the
+analysis cannot prove whether the class is constructed before a read.
 Initializer types never narrow a getter's public read type, and an annotation on
 the copy cannot erase the target getter's or index signature's actual read type. This also covers values
 supplied by later spreads or descriptor changes. Calls resolve the applicable

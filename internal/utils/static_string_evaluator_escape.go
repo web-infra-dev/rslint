@@ -101,7 +101,6 @@ func (staticEvaluator *StaticStringEvaluator) isKnownObjectOperation(call, calle
 			return false
 		}
 		staticEvaluator.markMutationArgument(call.Arguments(), 0)
-		staticEvaluator.recordBuiltinTransfers(call, builtin, name)
 		if builtin == "Reflect" && name == "set" {
 			staticEvaluator.markMutationArgument(call.Arguments(), 3)
 		}
@@ -289,7 +288,7 @@ func (staticEvaluator *StaticStringEvaluator) recordStoredReferences(target, val
 			staticEvaluator.storedReferences[symbol] = append(staticEvaluator.storedReferences[symbol], staticReferenceTransfer{value: value, site: site, copied: copied})
 			latest := staticEvaluator.latestBindingAt(symbol, site)
 			for _, transfer := range staticEvaluator.storedReferences[symbol] {
-				if transfer.binding && transferAvailableAt(transfer, site) && (latest == nil || transfer.site.End() >= latest.End()) {
+				if transfer.binding && staticEvaluator.transferAvailableAt(transfer, site) && (latest == nil || transfer.site.End() >= latest.End()) {
 					visit(transfer.value, nested)
 				}
 			}

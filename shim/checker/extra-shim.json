@@ -73,6 +73,7 @@
     "Signature": ["parameters", "declaration"],
     "Checker": [
       "assignableRelation",
+      "legacyDecorators",
       "numberType",
       "booleanType",
       "globalRegExpType",

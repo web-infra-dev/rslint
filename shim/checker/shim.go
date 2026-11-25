@@ -521,6 +521,9 @@ type extra_Checker struct {
 func Checker_assignableRelation(v *checker.Checker) *checker.Relation {
   return ((*extra_Checker)(unsafe.Pointer(v))).assignableRelation
 }
+func Checker_legacyDecorators(v *checker.Checker) bool {
+  return ((*extra_Checker)(unsafe.Pointer(v))).legacyDecorators
+}
 func Checker_numberType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).numberType
 }

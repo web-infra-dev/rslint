@@ -1928,9 +1928,11 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 		if staticEvaluator.escapeFacts.explicit[symbol] {
 			return flags&staticReferencePropertyMutation != 0
 		}
-		for site := range staticEvaluator.escapeFacts.sites[symbol] {
-			if executionRoot(site) != executionRoot(staticEvaluator.capturePoint) || site.End() <= staticEvaluator.capturePoint.Pos() {
-				return true
+		for _, sites := range [...]map[*ast.Node]staticReferenceFlags{staticEvaluator.escapeFacts.sites[symbol], staticEvaluator.escapeFacts.lengthWrites[symbol]} {
+			for site := range sites {
+				if staticEvaluator.transferAvailableAt(staticReferenceTransfer{site: site}, staticEvaluator.capturePoint) {
+					return true
+				}
 			}
 		}
 		return false
@@ -1971,42 +1973,111 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 			}
 		}
 	}
-	for site, flags := range staticEvaluator.escapeFacts.sites[symbol] {
-		if flags&staticReferenceArrayLengthMutation != 0 && origin != nil && access != nil {
-			key, known := staticEvaluator.evalAccessExpressionKey(access)
-			if !ast.IsArrayLiteralExpression(origin) || known && !isArrayIndexProperty(key) {
-				continue
-			}
-		}
+	for site := range staticEvaluator.escapeFacts.sites[symbol] {
 		if accountedCalls[site] || origin != nil && access != nil &&
-			(propertyMutationFollowsRead(site, origin, access) || staticEvaluator.callPreservesPropertyShape(site, origin, access, symbol)) {
+			(staticEvaluator.propertyMutationFollowsRead(site, origin, access) || staticEvaluator.callPreservesPropertyShape(site, origin, access, symbol)) {
 			continue
 		}
 		return true
 	}
+	if origin != nil && ast.IsArrayLiteralExpression(origin) && access != nil {
+		key, known := staticEvaluator.evalAccessExpressionKey(access)
+		if !known || isArrayIndexProperty(key) {
+			for call := range accountedCalls {
+				for _, source := range call.Arguments()[1:] {
+					// Object.assign copies an own enumerable length property too.
+					// The resulting intersection type does not describe deleted indices.
+					if staticEvaluator.typeChecker == nil || slices.ContainsFunc(UnionTypeParts(GetConstrainedTypeAtLocation(staticEvaluator.typeChecker, source)), func(part *checker.Type) bool {
+						return IsTypeAnyType(part) || IsTypeUnknownType(part) || checker.Checker_getPropertyOfType(staticEvaluator.typeChecker, part, "length") != nil
+					}) {
+						write := staticEvaluator.arrayIndexWriteAtRead(access)
+						if write == nil || !staticEvaluator.propertyMutationFollowsRead(write, origin, call) {
+							return true
+						}
+					}
+				}
+			}
+		}
+	}
+	if sites := staticEvaluator.escapeFacts.lengthWrites[symbol]; len(sites) != 0 {
+		if origin == nil || access == nil {
+			return true
+		}
+		if !ast.IsArrayLiteralExpression(origin) {
+			return false
+		}
+		// Length writes cannot change named properties. Keep their sites
+		// separate so these reads do not scan every truncation in the file.
+		key, known := staticEvaluator.evalAccessExpressionKey(access)
+		if known && !isArrayIndexProperty(key) {
+			return false
+		}
+		write := staticEvaluator.arrayIndexWriteAtRead(access)
+		for site := range sites {
+			if staticEvaluator.propertyMutationFollowsRead(site, origin, access) ||
+				write != nil && staticEvaluator.propertyMutationFollowsRead(write, origin, site) {
+				continue
+			}
+			return true
+		}
+	}
 	return false
 }
 
-func propertyMutationFollowsRead(mutation, origin, access *ast.Node) bool {
+// Reuse the native flow graph's immediately preceding write. No branch or loop
+// traversal is needed to prove that this exact indexed reference was restored.
+func (staticEvaluator *StaticStringEvaluator) arrayIndexWriteAtRead(access *ast.Node) *ast.Node {
+	if staticEvaluator.typeChecker == nil || access.FlowNodeData() == nil || access.FlowNodeData().FlowNode == nil {
+		return nil
+	}
+	flow := access.FlowNodeData().FlowNode
+	var assignment *ast.Node
+	if flow.Flags&ast.FlowFlagsArrayMutation != 0 && ast.IsBinaryExpression(flow.Node) {
+		assignment = flow.Node
+	} else if flow.Flags&ast.FlowFlagsAssignment != 0 && ast.IsAccessExpression(flow.Node) {
+		assignment = ast.GetAssignmentTarget(flow.Node)
+	}
+	if assignment != nil && ast.IsBinaryExpression(assignment) && assignment.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken &&
+		checker.Checker_isMatchingReference(staticEvaluator.typeChecker, access, assignment.AsBinaryExpression().Left) {
+		return assignment
+	}
+	return nil
+}
+
+func (staticEvaluator *StaticStringEvaluator) propertyMutationFollowsRead(mutation, origin, access *ast.Node) bool {
 	root := executionRoot(access)
 	// Invocation and assignment follow argument and right-hand-side evaluation,
 	// including an enclosing operation which consumes this read.
 	if root == nil || executionRoot(origin.Parent) != root || executionRoot(mutation) != root || mutation.End() <= access.End() {
 		return false
 	}
-	if access.Parent != nil && ast.IsBindingElement(access.Parent) {
-		declaration := ast.GetRootDeclaration(access.Parent)
-		if ast.IsVariableDeclaration(declaration) && declaration.Initializer() != nil {
-			initializer := declaration.Initializer()
-			if initializer.Pos() <= mutation.Pos() && mutation.End() <= initializer.End() {
-				// Synthetic destructuring reads carry the binding's location,
-				// but its initializer executes before any binding is read.
+	if (ast.IsCallExpression(mutation) || ast.IsNewExpression(mutation) || ast.IsTaggedTemplateExpression(mutation) ||
+		ast.IsBinaryExpression(mutation) && ast.IsAccessExpression(SkipAssertionsAndParens(mutation.AsBinaryExpression().Left))) &&
+		ast.IsNodeDescendantOf(access, mutation) {
+		return true
+	}
+	// A later iteration can observe a mutation from the previous iteration.
+	legacyDecorators := staticEvaluator.typeChecker == nil || checker.Checker_legacyDecorators(staticEvaluator.typeChecker)
+	inDecorator := false
+	for parent := access.Parent; parent != nil && parent != root; parent = parent.Parent {
+		if ast.IsBindingElement(parent) {
+			declaration := ast.GetRootDeclaration(parent)
+			if ast.IsVariableDeclaration(declaration) && declaration.Initializer() != nil && ast.IsNodeDescendantOf(mutation, declaration.Initializer()) {
+				// Both synthetic reads and explicit defaults carry the binding's
+				// location, but the initializer executes before either is read.
 				return false
 			}
 		}
-	}
-	// A later iteration can observe a mutation from the previous iteration.
-	for parent := access.Parent; parent != nil && parent != root; parent = parent.Parent {
+		if ast.IsDecorator(parent) {
+			inDecorator = true
+		}
+		if inDecorator && ast.IsClassLike(parent) {
+			// Legacy decorator expressions run after static initialization.
+			if legacyDecorators && ast.IsNodeDescendantOf(mutation, parent) {
+				return false
+			}
+			inDecorator = false
+		}
 		if ast.IsIterationStatement(parent, false) {
 			return false
 		}
@@ -2018,11 +2089,17 @@ func propertyMutationFollowsRead(mutation, origin, access *ast.Node) bool {
 		}
 	}
 	for child := mutation; child.Parent != nil && child.Parent != root; child = child.Parent {
-		if (ast.IsComputedPropertyName(child) || ast.IsDecorator(child)) &&
+		if (ast.IsComputedPropertyName(child) || !legacyDecorators && ast.IsDecorator(child)) &&
 			ast.IsClassElement(child.Parent) && ast.IsClassLike(child.Parent.Parent) &&
 			ast.IsNodeDescendantOf(access, child.Parent.Parent) {
 			// Computed names and decorator expressions run before static
 			// initializers. Static fields and blocks themselves run in order.
+			return false
+		}
+		if ast.IsPropertyDeclaration(child.Parent) && !ast.HasStaticModifier(child.Parent) && child.Parent.Initializer() == child &&
+			ast.IsNodeDescendantOf(access, child.Parent.Parent) {
+			// An earlier static initializer can construct this class before
+			// another static field reads the affected property.
 			return false
 		}
 		if ast.IsCaseClause(child.Parent) && child.Parent.Expression() == child &&
@@ -2331,6 +2408,24 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 			}
 		}
 	}
+	// Complete the store graph before propagating any invocation through it.
+	// A computed class name can execute before an earlier static block.
+	for _, call := range calls {
+		if !ast.IsCallExpression(call) || len(call.Arguments()) < 2 {
+			continue
+		}
+		for _, builtin := range []string{"Object", "Reflect"} {
+			if name, known := staticEvaluator.builtinMethodName(call.Expression(), builtin, make(map[*ast.Symbol]bool)); known {
+				staticEvaluator.recordBuiltinTransfers(call, builtin, name)
+				break
+			}
+		}
+	}
+	if staticEvaluator.escapeFacts != nil {
+		// Early mutation flags prevented unsound constant folding while
+		// collecting syntax. Replay their sites against the complete graph.
+		clear(staticEvaluator.escapeFacts.sites)
+	}
 	// First collect all explicit writes, so a call cannot be classified using
 	// a binding whose reassignment appears later in the file.
 	staticEvaluator.evaluation = &staticEvaluationState{
@@ -2401,6 +2496,8 @@ func (staticEvaluator *StaticStringEvaluator) markMutationArgument(arguments []*
 
 func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag staticReferenceFlags) {
 	node = SkipAssertionsAndParens(node)
+	followTransfers := flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 ||
+		flag&staticReferencePropertyMutation != 0 && staticEvaluator.escapeFacts != nil && staticEvaluator.escapeFacts.call != nil
 	if flag&staticReferenceCallEscape != 0 && node != nil {
 		value := staticEvaluator.evalValue(node)
 		if value.ok && IsPrimitiveStaticValue(value.value) {
@@ -2439,15 +2536,22 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 					return
 				}
 			} else {
-				if facts.sites[symbol] == nil {
-					facts.sites[symbol] = make(map[*ast.Node]staticReferenceFlags)
+				sites := facts.sites
+				if flag&staticReferenceArrayLengthMutation != 0 {
+					if facts.lengthWrites == nil {
+						facts.lengthWrites = make(map[*ast.Symbol]map[*ast.Node]staticReferenceFlags)
+					}
+					sites = facts.lengthWrites
+				}
+				if sites[symbol] == nil {
+					sites[symbol] = make(map[*ast.Node]staticReferenceFlags)
 				}
 				// Each mutation must reach the entire alias chain, even if a
 				// prior mutation already marked the same symbols as mutable.
-				if facts.sites[symbol][facts.call]&flag == flag {
+				if sites[symbol][facts.call]&flag == flag {
 					return
 				}
-				facts.sites[symbol][facts.call] |= flag
+				sites[symbol][facts.call] |= flag
 			}
 		} else if staticEvaluator.referenceFlags[symbol]&flag == flag {
 			return
@@ -2460,7 +2564,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			staticEvaluator.invalidateMutationValues()
 		}
 		latestBinding := staticEvaluator.latestBindingTransfer(symbol)
-		if flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
+		if followTransfers {
 			for _, transfer := range staticEvaluator.storedReferences[symbol] {
 				if flag&staticReferenceCallEscape == 0 && !transfer.binding && flag&staticReferenceNestedMutation == 0 {
 					continue
@@ -2475,7 +2579,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 				}
 			}
 		}
-		if latestBinding != nil && flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
+		if latestBinding != nil && followTransfers {
 			return
 		}
 		if flag&staticReferencePropertyMutation == 0 || len(symbol.Declarations) != 1 {
@@ -2504,7 +2608,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			declaration = root
 		}
 		if declaration.Kind != ast.KindVariableDeclaration {
-			if flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
+			if followTransfers {
 				staticEvaluator.markReturnedReferences(declaration, flag)
 			}
 			return
@@ -2548,7 +2652,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 				case ast.KindSpreadAssignment:
 					staticEvaluator.markCopiedReferences(property.Expression(), flag)
 				case ast.KindMethodDeclaration, ast.KindGetAccessor:
-					if flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
+					if followTransfers {
 						staticEvaluator.markReturnedReferences(property, flag)
 					}
 				}
@@ -2611,7 +2715,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			staticEvaluator.markReference(node.Expression(), flag)
 		}
 	case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindClassExpression:
-		if flag&(staticReferenceCallEscape|staticReferenceArrayLengthMutation) != 0 {
+		if followTransfers {
 			staticEvaluator.markReturnedReferences(node, flag)
 		}
 	}

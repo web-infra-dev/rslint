@@ -147,6 +147,12 @@ func TestStaticPropertyReadShapeMutations(t *testing.T) {
 		{"length write removes large index", "copy.length = 0;", "", "copy['4294967294']", true},
 		{"length write in earlier static block", "class C {static {copy.length = 0;} static {", "}}", "copy[0]", true},
 		{"length write in later static block", "class C {static {", "} static {copy.length = 0;}}", "copy[0]", false},
+		{"restored index", "copy.length = 0; copy[0] = 2;", "", "copy[0]", false},
+		{"restored before truncation", "copy[0] = 2; copy.length = 0;", "", "copy[0]", true},
+		{"conditionally restored index", "copy.length = 0; if (Math.random()) { copy[0] = 2; }", "", "copy[0]", true},
+		{"restored other index", "copy.length = 0; copy[1] = 2;", "", "copy[0]", true},
+		{"computed alias before static block", "let alias: number[] = []; class C { static { Object.defineProperty(alias, 'value', {value: undefined}); } [(alias = copy, 'method')]() {} }", "", "copy.value", true},
+		{"computed store before static block", "const holder = {items: [] as number[]}; class C { static { Object.defineProperty(holder.items, 'value', {value: undefined}); } [(Object.assign(holder, {items: copy}), 'method')]() {} }", "", "copy.value", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := fixtures.GetRootDir()

@@ -9,13 +9,14 @@ type staticReferenceTransfer struct {
 }
 
 type staticEscapeFacts struct {
-	call        *ast.Node
-	collecting  bool
-	explicit    map[*ast.Symbol]bool
-	sites       map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
-	captures    map[*ast.Symbol]staticEvalResult
-	capturing   map[*ast.Symbol]bool
-	ownCaptures map[*ast.Symbol]*staticObjectValue
+	call         *ast.Node
+	collecting   bool
+	explicit     map[*ast.Symbol]bool
+	sites        map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
+	lengthWrites map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
+	captures     map[*ast.Symbol]staticEvalResult
+	capturing    map[*ast.Symbol]bool
+	ownCaptures  map[*ast.Symbol]*staticObjectValue
 	// Completed per-file facts for property-read queries; never cache a
 	// read-position-dependent result here.
 	constructorMutations map[*ast.Symbol]bool
@@ -157,7 +158,7 @@ func (e *StaticStringEvaluator) latestBindingAt(symbol *ast.Symbol, point *ast.N
 	var latest *ast.Node
 	for _, transfer := range e.storedReferences[symbol] {
 		node := transfer.site
-		if transfer.binding && transferAvailableAt(transfer, point) && node.Kind == ast.KindBinaryExpression &&
+		if transfer.binding && node.End() <= point.Pos() && e.transferAvailableAt(transfer, point) && node.Kind == ast.KindBinaryExpression &&
 			node.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken && node.Parent.Kind == ast.KindExpressionStatement &&
 			node.Parent.Parent == statementContainer(point) && (latest == nil || latest.End() < node.End()) {
 			latest = node
@@ -167,10 +168,13 @@ func (e *StaticStringEvaluator) latestBindingAt(symbol *ast.Symbol, point *ast.N
 }
 
 func (e *StaticStringEvaluator) transferAvailable(transfer staticReferenceTransfer) bool {
-	return transferAvailableAt(transfer, e.escapeFacts.call)
+	return e.transferAvailableAt(transfer, e.escapeFacts.call)
 }
 
-func transferAvailableAt(transfer staticReferenceTransfer, point *ast.Node) bool {
+func (e *StaticStringEvaluator) transferAvailableAt(transfer staticReferenceTransfer, point *ast.Node) bool {
+	if transfer.site == point {
+		return false
+	}
 	if point == nil || executionRoot(point) != executionRoot(transfer.site) {
 		return true
 	}
@@ -181,7 +185,13 @@ func transferAvailableAt(transfer staticReferenceTransfer, point *ast.Node) bool
 		// Do not include the invocation's own stores as earlier transfers.
 		end = point.End()
 	}
-	return transfer.site != point && transfer.site.End() <= end
+	if transfer.site.End() <= end {
+		return true
+	}
+	// A non-call receiver is evaluated before its right-hand side. For
+	// separate expressions, reuse the execution-order proof instead of
+	// assuming that later source positions always execute later.
+	return transfer.site.Pos() >= point.End() && !e.propertyMutationFollowsRead(transfer.site, point, point)
 }
 
 func (e *StaticStringEvaluator) recordBuiltinTransfers(call *ast.Node, builtin, name string) {
