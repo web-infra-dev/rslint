@@ -215,11 +215,21 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			if !ast.IsAccessExpression(node) {
 				return false
 			}
-			declaredType, propertyFlags := getDeclaredMemberReadType(tc, node)
+			var objectType *checker.Type
+			if hasAccessorRead(tc, node.Expression()) {
+				objectType = tc.GetNonNullableType(getConstrainedConditionType(tc, node.Expression()))
+			}
+			declaredType, propertyFlags := getDeclaredMemberReadType(tc, node, objectType)
 			// Optional symbols retain information erased from types when
 			// strictNullChecks is disabled.
 			if !isStrictNullChecks && propertyFlags&ast.SymbolFlagsOptional != 0 {
-				return true
+				if objectType != nil || propertyFlags&ast.SymbolFlagsAccessor != 0 {
+					return true
+				}
+				// Infer writes with the checker's auto type: an absent property
+				// stays unknown, while a definite assignment supplies its value.
+				flowType := getConditionFlowType(tc, node, checker.Checker_autoType(tc))
+				return isConditionalAlwaysNecessary(flowType) || isPossiblyNullish(flowType)
 			}
 			if !ast.IsElementAccessExpression(node) {
 				return false
@@ -230,7 +240,9 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 			element := node.AsElementAccessExpression()
-			objectType := utils.GetConstrainedTypeAtLocation(tc, element.Expression)
+			if objectType == nil {
+				objectType = utils.GetConstrainedTypeAtLocation(tc, element.Expression)
+			}
 			propertyType := utils.GetConstrainedTypeAtLocation(tc, element.ArgumentExpression)
 			return isNullablePropertyType(tc, objectType, propertyType, false)
 		}
@@ -791,57 +803,92 @@ func getConstrainedConditionType(tc *checker.Checker, node *ast.Node) *checker.T
 		return getConstrainedConditionType(tc, node.Expression())
 	}
 	if ast.IsNonNullExpression(node) {
-		operand := ast.SkipParentheses(node.Expression())
-		if ast.IsAccessExpression(operand) || ast.IsNonNullExpression(operand) {
-			return tc.GetNonNullableType(getConstrainedConditionType(tc, operand))
+		expressionType := getConstrainedConditionType(tc, node.Expression())
+		if ast.IsOptionalChain(node) {
+			// The assertion excludes a nullish value on the reached path,
+			// but it does not cancel an earlier optional-chain short circuit.
+			nonOptionalType := checker.Checker_getOptionalExpressionType(tc, expressionType, node.Expression())
+			return checker.Checker_propagateOptionalTypeMarker(tc, tc.GetNonNullableType(nonOptionalType), node, expressionType != nonOptionalType)
 		}
+		return tc.GetNonNullableType(expressionType)
 	}
 	// Resolve the expression first so the checker supplies its selected property
 	// symbol. Ordinary reads can then keep their existing flow type directly.
-	flowType := utils.GetConstrainedTypeAtLocation(tc, node)
+	originalType := utils.GetConstrainedTypeAtLocation(tc, node)
+	flowType := originalType
+	needsOptionalPropagation := false
 	if ast.IsAccessExpression(node) {
 		target := ast.GetAssignmentTarget(node)
 		isLogicalAssignment := target != nil && ast.IsBinaryExpression(target) && ast.IsLogicalOrCoalescingAssignmentOperator(target.AsBinaryExpression().OperatorToken.Kind)
+		needsReadType := isLogicalAssignment
+		if ast.IsElementAccessExpression(node) {
+			key := node.AsElementAccessExpression().ArgumentExpression
+			needsReadType = needsReadType || ast.SkipParentheses(key) != key
+		}
+		varyingReceiver := hasAccessorRead(tc, node.Expression())
 		var readType *checker.Type
 		var propertyFlags ast.SymbolFlags
-		if symbol := checker.Checker_getResolvedSymbolOrNil(tc, node); symbol != nil {
-			propertyFlags = memberPropertyFlags(symbol)
-			if isLogicalAssignment || propertyFlags&ast.SymbolFlagsAccessor != 0 {
+		if varyingReceiver {
+			objectType := tc.GetNonNullableType(getConstrainedConditionType(tc, node.Expression()))
+			readType, propertyFlags = getDeclaredMemberReadType(tc, node, objectType)
+		} else if symbol := checker.Checker_getResolvedSymbolOrNil(tc, node); symbol != nil {
+			propertyFlags = memberPropertyFlags(tc, node, symbol, nil)
+			if needsReadType || propertyFlags&ast.SymbolFlagsAccessor != 0 || symbol.Flags&ast.SymbolFlagsAccessor != 0 {
 				readType = checker.Checker_getTypeOfSymbol(tc, symbol)
 			}
-		} else if isLogicalAssignment {
-			readType, propertyFlags = getDeclaredMemberReadType(tc, node)
-		} else if ast.IsElementAccessExpression(node) {
-			keyType := tc.GetTypeAtLocation(node.AsElementAccessExpression().ArgumentExpression)
-			constraint := checker.Checker_getBaseConstraintOfType(tc, keyType)
-			// Key unions and generic constraints may select accessors without
-			// giving the expression a single resolved property symbol.
-			if keyType.IsUnion() || constraint != nil && constraint != keyType {
-				readType, propertyFlags = getDeclaredMemberReadType(tc, node)
-			}
+		} else if needsReadType {
+			readType, propertyFlags = getDeclaredMemberReadType(tc, node, nil)
+		} else if hasUnionOrConstrainedKey(tc, node) {
+			readType, propertyFlags = getDeclaredMemberReadType(tc, node, nil)
 		}
 		isAccessor := propertyFlags&ast.SymbolFlagsAccessor != 0
-		if readType != nil && (isLogicalAssignment || isAccessor) {
-			if !isAccessor {
-				readType = checker.Checker_getFlowTypeOfReference(tc, node, readType)
-			}
-			if ast.IsOptionalChain(node) {
-				expressionType := getConstrainedConditionType(tc, node.Expression())
-				nonOptionalType := checker.Checker_getOptionalExpressionType(tc, expressionType, node.Expression())
-				readType = checker.Checker_propagateOptionalTypeMarker(tc, readType, node, expressionType != nonOptionalType)
+		needsOptionalPropagation = varyingReceiver || readType != nil
+		if readType != nil {
+			if !isAccessor && !varyingReceiver {
+				readType = getConditionFlowType(tc, node, readType)
 			}
 			if constraint := checker.Checker_getBaseConstraintOfType(tc, readType); constraint != nil {
-				return constraint
+				readType = constraint
 			}
-			return readType
+			flowType = readType
+		}
+	}
+	if ast.IsCallExpression(node) && hasAccessorRead(tc, node.Expression()) {
+		needsOptionalPropagation = true
+		calleeType := getConstrainedConditionType(tc, node.Expression())
+		flowCalleeType := utils.GetConstrainedTypeAtLocation(tc, node.Expression())
+		// A setter may narrow the callee to one function from the getter's
+		// union. Retain all possible returns, but preserve instantiated generic
+		// signatures when only the callee's optionality changed.
+		if tc.GetNonNullableType(calleeType) != tc.GetNonNullableType(flowCalleeType) {
+			if returnTypes := collectReturnTypes(tc, calleeType); len(returnTypes) != 0 {
+				flowType = tc.GetUnionType(returnTypes)
+				if constraint := checker.Checker_getBaseConstraintOfType(tc, flowType); constraint != nil {
+					flowType = constraint
+				}
+			}
+		}
+	}
+	if needsOptionalPropagation && ast.IsOptionalChain(node) {
+		// The short circuit also reaches ordinary properties and calls after
+		// an accessor, even when their cached flow type lost that possibility.
+		expressionType := getConstrainedConditionType(tc, node.Expression())
+		if flowType != originalType || expressionType != utils.GetConstrainedTypeAtLocation(tc, node.Expression()) {
+			nonOptionalType := checker.Checker_getOptionalExpressionType(tc, expressionType, node.Expression())
+			flowType = checker.Checker_propagateOptionalTypeMarker(tc, flowType, node, expressionType != nonOptionalType)
 		}
 	}
 	return flowType
 }
 
-func getDeclaredMemberReadType(tc *checker.Checker, node *ast.Node) (*checker.Type, ast.SymbolFlags) {
+func getDeclaredMemberReadType(tc *checker.Checker, node *ast.Node, objectType *checker.Type) (*checker.Type, ast.SymbolFlags) {
 	if symbol := checker.Checker_getResolvedSymbolOrNil(tc, node); symbol != nil {
-		return checker.Checker_getTypeOfSymbol(tc, symbol), memberPropertyFlags(symbol)
+		if objectType != nil {
+			symbol = checker.Checker_getPropertyOfType(tc, objectType, symbol.Name)
+		}
+		if symbol != nil {
+			return checker.Checker_getTypeOfSymbol(tc, symbol), memberPropertyFlags(tc, node, symbol, objectType)
+		}
 	}
 	var keyType *checker.Type
 	if ast.IsElementAccessExpression(node) {
@@ -853,7 +900,12 @@ func getDeclaredMemberReadType(tc *checker.Checker, node *ast.Node) (*checker.Ty
 	} else {
 		// Symbol lookup also resolves private fields and inherited accessors.
 		if symbol := tc.GetSymbolAtLocation(node); symbol != nil {
-			return checker.Checker_getTypeOfSymbol(tc, symbol), memberPropertyFlags(symbol)
+			if objectType != nil {
+				symbol = checker.Checker_getPropertyOfType(tc, objectType, symbol.Name)
+			}
+			if symbol != nil {
+				return checker.Checker_getTypeOfSymbol(tc, symbol), memberPropertyFlags(tc, node, symbol, objectType)
+			}
 		}
 		name, ok := checker.Checker_getAccessedPropertyName(tc, node)
 		if !ok {
@@ -861,12 +913,14 @@ func getDeclaredMemberReadType(tc *checker.Checker, node *ast.Node) (*checker.Ty
 		}
 		keyType = checker.Checker_getStringLiteralType(tc, name)
 	}
-	objectType := tc.GetNonNullableType(utils.GetConstrainedTypeAtLocation(tc, node.Expression()))
+	if objectType == nil {
+		objectType = tc.GetNonNullableType(utils.GetConstrainedTypeAtLocation(tc, node.Expression()))
+	}
 	var propertyFlags ast.SymbolFlags
 	for _, key := range utils.UnionTypeParts(keyType) {
 		if checker.IsTypeUsableAsPropertyName(key) {
 			if symbol := checker.Checker_getPropertyOfType(tc, objectType, checker.GetPropertyNameFromType(key)); symbol != nil {
-				propertyFlags |= memberPropertyFlags(symbol)
+				propertyFlags |= memberPropertyFlags(tc, node, symbol, objectType)
 			}
 		}
 	}
@@ -875,18 +929,154 @@ func getDeclaredMemberReadType(tc *checker.Checker, node *ast.Node) (*checker.Ty
 	return checker.Checker_getIndexedAccessTypeOrUndefined(tc, objectType, keyType, checker.AccessFlagsExpressionPosition, nil, nil), propertyFlags
 }
 
-func memberPropertyFlags(symbol *ast.Symbol) ast.SymbolFlags {
-	flags := symbol.Flags
-	// A union of fields and accessors can be represented by a property symbol.
-	if flags&ast.SymbolFlagsAccessor == 0 {
-		for _, declaration := range symbol.Declarations {
-			if ast.IsAccessor(declaration) || ast.IsAutoAccessorPropertyDeclaration(declaration) {
-				flags |= ast.SymbolFlagsAccessor
-				break
-			}
+func memberPropertyFlags(tc *checker.Checker, node *ast.Node, symbol *ast.Symbol, objectType *checker.Type) ast.SymbolFlags {
+	flags := symbol.Flags &^ ast.SymbolFlagsAccessor
+	if symbolHasAccessor(symbol) {
+		if objectType == nil {
+			objectType = tc.GetNonNullableType(utils.GetConstrainedTypeAtLocation(tc, node.Expression()))
+		}
+		if typeHasAccessorProperty(tc, objectType, symbol) {
+			flags |= ast.SymbolFlagsAccessor
 		}
 	}
 	return flags
+}
+
+func symbolHasAccessor(symbol *ast.Symbol) bool {
+	if len(symbol.Declarations) == 1 && ast.IsAutoAccessorPropertyDeclaration(symbol.Declarations[0]) {
+		declaration := symbol.Declarations[0]
+		isPrivate := ast.IsPrivateIdentifier(declaration.Name()) || ast.HasSyntacticModifier(declaration, ast.ModifierFlagsPrivate)
+		return !isPrivate || ast.HasDecorators(declaration)
+	}
+	if symbol.Flags&ast.SymbolFlagsAccessor != 0 {
+		return true
+	}
+	for _, declaration := range symbol.Declarations {
+		if ast.IsAutoAccessorPropertyDeclaration(declaration) {
+			// An undecorated private auto-accessor cannot be overridden and
+			// reads exactly the value written to its backing field.
+			isPrivate := ast.IsPrivateIdentifier(declaration.Name()) || ast.HasSyntacticModifier(declaration, ast.ModifierFlagsPrivate)
+			if !isPrivate || ast.HasDecorators(declaration) {
+				return true
+			}
+		}
+		// A union or mapped property can retain real accessor declarations.
+		// A copied spread property instead has an ordinary property symbol.
+		if symbol.CheckFlags&(ast.CheckFlagsSyntheticProperty|ast.CheckFlagsMapped) != 0 && ast.IsAccessor(declaration) {
+			return true
+		}
+	}
+	return false
+}
+
+func typeHasAccessorProperty(tc *checker.Checker, objectType *checker.Type, symbol *ast.Symbol) bool {
+	if objectType.ObjectFlags()&checker.ObjectFlagsMapped != 0 {
+		// Resolve mapped properties back to the checker-provided source type,
+		// preserving the distinction between a getter and a copied data field.
+		sourceType := checker.Checker_getModifiersTypeFromMappedType(tc, objectType)
+		if sourceType != objectType && !utils.IsTypeUnknownType(sourceType) {
+			found := false
+			for _, root := range tc.GetRootSymbols(symbol) {
+				if property := checker.Checker_getPropertyOfType(tc, sourceType, root.Name); property != nil {
+					found = true
+					if typeHasAccessorProperty(tc, sourceType, property) {
+						return true
+					}
+				}
+			}
+			if found {
+				return false
+			}
+		}
+	}
+	if objectType.IsUnion() || objectType.IsIntersection() {
+		for _, part := range objectType.Types() {
+			property := checker.Checker_getPropertyOfType(tc, part, symbol.Name)
+			if property != nil && typeHasAccessorProperty(tc, part, property) {
+				return true
+			}
+		}
+		return false
+	}
+	if owner := objectType.Symbol(); owner != nil && owner.ValueDeclaration != nil && ast.IsObjectLiteralExpression(owner.ValueDeclaration) {
+		// Spreading invokes source getters and stores their values. The
+		// checker can reuse source symbols, so retain only accessors declared
+		// on this object literal itself, including after type widening.
+		for _, declaration := range symbol.Declarations {
+			if declaration.Parent == owner.ValueDeclaration && ast.IsAccessor(declaration) {
+				return true
+			}
+		}
+		return false
+	}
+	return symbolHasAccessor(symbol)
+}
+
+// A getter in the receiver can return a different object on the next read.
+// Assignments to a property of the previous object do not narrow the new one.
+func hasAccessorRead(tc *checker.Checker, node *ast.Node) bool {
+	for {
+		node = ast.SkipOuterExpressions(node, ast.OEKAll)
+		if ast.IsCallExpression(node) {
+			node = node.Expression()
+			continue
+		}
+		if !ast.IsAccessExpression(node) {
+			return false
+		}
+		symbol := checker.Checker_getResolvedSymbolOrNil(tc, node)
+		if symbol == nil {
+			tc.GetTypeAtLocation(node)
+			symbol = checker.Checker_getResolvedSymbolOrNil(tc, node)
+		}
+		var flags ast.SymbolFlags
+		if symbol != nil {
+			flags = memberPropertyFlags(tc, node, symbol, nil)
+		} else if hasUnionOrConstrainedKey(tc, node) {
+			_, flags = getDeclaredMemberReadType(tc, node, nil)
+		}
+		if flags&ast.SymbolFlagsAccessor != 0 {
+			return true
+		}
+		node = node.Expression()
+	}
+}
+
+func hasUnionOrConstrainedKey(tc *checker.Checker, node *ast.Node) bool {
+	if !ast.IsElementAccessExpression(node) {
+		return false
+	}
+	// These keys can select accessors without a single resolved symbol.
+	keyType := tc.GetTypeAtLocation(node.AsElementAccessExpression().ArgumentExpression)
+	constraint := checker.Checker_getBaseConstraintOfType(tc, keyType)
+	return keyType.IsUnion() || constraint != nil && constraint != keyType
+}
+
+func getConditionFlowType(tc *checker.Checker, node *ast.Node, declaredType *checker.Type) *checker.Type {
+	if ast.IsElementAccessExpression(node) {
+		element := node.AsElementAccessExpression()
+		key := ast.SkipParentheses(element.ArgumentExpression)
+		if key != element.ArgumentExpression {
+			// Query an equivalent reference without changing the parsed tree.
+			// Keep its original flow point and surrounding assertion context.
+			var factory ast.NodeFactory
+			reference := factory.UpdateElementAccessExpression(element, element.Expression, element.QuestionDotToken, key, node.Flags)
+			reference.Parent = node.Parent
+			reference.FlowNodeData().FlowNode = element.FlowNode
+			if reference.FlowNodeData().FlowNode == nil {
+				// The binder may not attach flow to a parenthesized key. Its
+				// identifier, or the receiver before a literal key, has that point.
+				for _, part := range []*ast.Node{key, ast.SkipParentheses(element.Expression)} {
+					if flow := part.FlowNodeData(); flow != nil && flow.FlowNode != nil {
+						reference.FlowNodeData().FlowNode = flow.FlowNode
+						break
+					}
+				}
+			}
+			node = reference
+		}
+	}
+	return checker.Checker_getFlowTypeOfReference(tc, node, declaredType)
 }
 
 func isOnlyUsedForTruthiness(node *ast.Node, tc *checker.Checker, checkTypePredicates bool) bool {

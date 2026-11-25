@@ -86,6 +86,9 @@ body as always falsy.
 Logical assignments check the value being read. Ordinary fields retain
 control-flow narrowing. Accessors use the getter's declared type: a setter can
 transform its argument, and each getter call can return a different value.
+The same protection applies to properties of an object returned by a getter.
+Values copied by object spread and undecorated private auto-accessors retain
+ordinary field narrowing.
 For a union of keys, the read type includes all selected properties. Setter types
 and write intersections must not determine whether the condition is necessary.
 For example, this `??=` remains necessary even after the setter receives `null`:
@@ -106,6 +109,22 @@ When `allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing` is enabled, option
 property markers still protect nullish fallbacks. For example, with
 `strictNullChecks` disabled, `options: { title?: string }` can be `{}`, so
 `options.title ?? 'Untitled'` remains necessary.
+After a definite assignment such as `options.title = 'set'`, the fallback is
+reported as unnecessary.
+
+A non-null assertion inside an optional chain does not cancel an earlier short
+circuit. For example, the final `?.` remains necessary here because `root` can be
+`undefined`:
+
+```typescript
+interface Leaf {
+  get item(): { id: number };
+}
+
+function read(root: { middle: Leaf } | undefined) {
+  return (root?.middle!.item)?.id;
+}
+```
 
 ## Original Documentation
 

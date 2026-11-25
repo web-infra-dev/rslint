@@ -45,6 +45,7 @@
       "getIterationTypeOfIterable",
       "getMinArgumentCount",
       "getTypeParameterFromMappedType",
+      "getModifiersTypeFromMappedType",
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",
       "getTemplateTypeFromMappedType"
@@ -58,6 +59,7 @@
     "LiteralType": ["freshType", "regularType"],
     "Signature": ["parameters", "declaration"],
     "Checker": [
+      "autoType",
       "numberType",
       "booleanType",
       "globalRegExpType",

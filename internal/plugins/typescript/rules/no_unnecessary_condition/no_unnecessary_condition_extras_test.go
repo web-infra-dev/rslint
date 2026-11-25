@@ -599,8 +599,32 @@ func TestNoUnnecessaryConditionAccessorObservations(t *testing.T) {
 		rule_tester.ValidTestCase{Code: "declare const key: unique symbol;\ninterface Store { get [key](): boolean; set [key](value: boolean); }\nfunction reset(store: Store) { store[key] = true; store[key] ||= true; }\n"},
 		rule_tester.ValidTestCase{Code: "interface Store { get ready(): boolean; set ready(value: boolean); }\nfunction read(store: Store) { store.ready = true; if (store.ready satisfies boolean) {} }\n"},
 		rule_tester.ValidTestCase{Code: "interface Store { get value(): number | undefined; }\nfunction read<K extends 'value'>(store: Store, key: K) { if (store[key] !== undefined) return store[key] ?? 42; }\n"},
+		rule_tester.ValidTestCase{Code: "export {};\ninterface Store {get value():{ready:true}|undefined;set value(v:{ready:true});} function read(store:Store) {store.value={ready:true}; if(store.value?.ready) {}}\n"},
+		rule_tester.ValidTestCase{Code: "export {};\ninterface Store {get value():{ready:true}|undefined;set value(v:{ready:true});} function read(store:Store) {store.value={ready:true}; return store.value?.ready ?? false;}\n"},
+		rule_tester.ValidTestCase{Code: "export {};\ninterface Store {get value():{ready:true}|undefined;set value(v:{ready:true});} function read(store:Store) {store.value={ready:true}; return store.value?.ready === true;}\n"},
+		rule_tester.ValidTestCase{Code: "export {};\ninterface Store {get callback():(()=>true)|undefined;set callback(v:()=>true);} function read(store:Store) {store.callback=()=>true; if(store.callback?.()) {}}\n"},
+		rule_tester.ValidTestCase{Code: "interface Leaf {get item():{id:number};} function f(root:{middle:Leaf}|undefined) {return (root?.middle!.item)?.id;}\n"},
+		rule_tester.ValidTestCase{Code: "declare const source: { extra: number };\nconst store = { ...source, get value(): number | undefined { return undefined; }, set value(value: number) {} };\nstore.value = 1;\nstore.value ?? 42;\n"},
+		rule_tester.ValidTestCase{Code: "function empty(value: unknown, context: unknown) { return { get(): number | undefined { return undefined; }, set(value: number | undefined) {} }; }\nclass Box { @empty accessor #value: number | undefined; read() { this.#value = 1; return this.#value ?? 42; } }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get child(): { value?: number }; }\nfunction read(store: Store) { store.child.value = 1; return store.child.value ?? 42; }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get child(): { nested: { value?: number } }; }\nfunction read(store: Store) { store.child.nested.value = 1; return store.child.nested.value ?? 42; }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get child(): { value: true } | { value: false }; set child(value: { value: true }); }\nfunction read(store: Store) { store.child = { value: true }; if (store.child.value) {} }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get callback(): (() => true) | (() => false); set callback(value: () => true); }\nfunction read(store: Store) { store.callback = () => true; if (store.callback()) {} }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get callback(): (() => { ready: true }) | (() => { ready: false }); set callback(value: () => { ready: true }); }\nfunction read(store: Store) { store.callback = () => ({ ready: true }); if (store.callback().ready) {} }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get callback(): (() => { ready: true }) | (() => { ready: false }) | undefined; set callback(value: () => { ready: true }); }\nfunction read(store: Store) { store.callback = () => ({ ready: true }); return store.callback?.().ready ?? false; }\n"},
+		rule_tester.ValidTestCase{Code: "interface Store { get callback(): (<T>(value: T) => T) | undefined; set callback(value: <T>(value: T) => T); }\nfunction read(store: Store) { store.callback = value => value; if (store.callback?.({})) {} }\n"},
 	)
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, valid, nil)
+	invalid := []rule_tester.InvalidTestCase{
+		{Code: "declare const source: { get value(): number | undefined };\nconst copy = { ...source };\ncopy.value = 1;\ncopy.value ?? 42;\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}},
+		{Code: "declare const source: { get value(): number | undefined; set value(value: number) };\nconst copy = { ...source };\ncopy.value = 1;\ncopy['value'] ?? 42;\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}},
+		{Code: "class Box { accessor #value: number | undefined; read() { this.#value = 1; return this.#value ?? 42; } }\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}},
+		{Code: "class Box { private accessor value: number | undefined; read() { this.value = 1; return this.value ?? 42; } }\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}},
+		{Code: "declare const source: { get value(): number | undefined };\nconst copy = { ...source };\nfunction read(value: Pick<typeof copy, 'value'>) { value.value = 1; return value.value ?? 42; }\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}},
+		{Code: "declare const source: { get value(): number | undefined; set value(value: number) };\nconst copy = { ...source };\nfunction read(value: Pick<typeof copy, 'value'>) { value.value = 1; return value.value ?? 42; }\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}},
+		{Code: "declare const source: { get value(): number | undefined };\nconst copy = { ...source };\nconst key = 'value';\ncopy.value = 1;\ncopy[(key)] ?? 42;\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}},
+		{Code: "interface Store { get callback(): (() => true) | ((value?: string) => true); set callback(value: () => true); }\nfunction read(store: Store) { store.callback = () => true; if (store.callback()) {} }\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, valid, invalid)
 }
 
 func TestNoUnnecessaryConditionOptionalWithoutStrictNullChecks(t *testing.T) {
@@ -611,6 +635,8 @@ func TestNoUnnecessaryConditionOptionalWithoutStrictNullChecks(t *testing.T) {
 		for _, operator := range []string{"??", "??="} {
 			valid = append(valid, rule_tester.ValidTestCase{Code: fmt.Sprintf("function name(options: { title?: string }) { const key = 'title'; return %s %s 'Untitled'; }\n", access, operator), Options: options})
 			invalid = append(invalid, rule_tester.InvalidTestCase{Code: fmt.Sprintf("function name(options: { title: string }) { const key = 'title'; return %s %s 'Untitled'; }\n", access, operator), Options: options, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: fmt.Sprintf("function name(options: { title?: string }) { const key = 'title'; options.title = 'set'; return %s %s 'Untitled'; }\n", access, operator), Options: options, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}})
+			valid = append(valid, rule_tester.ValidTestCase{Code: fmt.Sprintf("function name(options: { title?: string }, write: boolean) { const key = 'title'; if (write) options.title = 'set'; return %s %s 'Untitled'; }\n", access, operator), Options: options})
 		}
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.unstrict.json", t, &NoUnnecessaryConditionRule, valid, invalid)

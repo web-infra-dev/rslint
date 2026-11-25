@@ -141,6 +141,8 @@ func Checker_getWidenedLiteralLikeTypeForContextualType(recv *checker.Checker, t
 func Checker_getIndexedAccessTypeOrUndefined(recv *checker.Checker, objectType *checker.Type, indexType *checker.Type, accessFlags checker.AccessFlags, accessNode *ast.Node, alias *checker.TypeAlias) *checker.Type
 //go:linkname Checker_getBaseConstraintOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseConstraintOfType
 func Checker_getBaseConstraintOfType(recv *checker.Checker, t *checker.Type) *checker.Type
+//go:linkname Checker_getModifiersTypeFromMappedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getModifiersTypeFromMappedType
+func Checker_getModifiersTypeFromMappedType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getOptionalExpressionType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getOptionalExpressionType
 func Checker_getOptionalExpressionType(recv *checker.Checker, exprType *checker.Type, expression *ast.Node) *checker.Type
 //go:linkname Checker_propagateOptionalTypeMarker github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).propagateOptionalTypeMarker
@@ -489,6 +491,9 @@ type extra_Checker struct {
   typeToStringNodebuilder *checker.NodeBuilder
   mu sync.Mutex
   tracer *checker.Tracer
+}
+func Checker_autoType(v *checker.Checker) *checker.Type {
+  return ((*extra_Checker)(unsafe.Pointer(v))).autoType
 }
 func Checker_numberType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).numberType
