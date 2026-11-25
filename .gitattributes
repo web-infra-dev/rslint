@@ -1,0 +1,3 @@
+# Keep CLI shebangs executable when packing from Windows.
+packages/rslint/bin/rslint.js text eol=lf
+packages/tsgo/bin/tsgo.cjs text eol=lf
