@@ -583,9 +583,6 @@ func ConditionalRoot_extendsType(v *checker.ConditionalRoot) *checker.Type {
 func ConditionalRoot_isDistributive(v *checker.ConditionalRoot) bool {
   return ((*extra_ConditionalRoot)(unsafe.Pointer(v))).isDistributive
 }
-func ConditionalRoot_instantiations(v *checker.ConditionalRoot) map[checker.CacheHashKey]*checker.Type {
-  return ((*extra_ConditionalRoot)(unsafe.Pointer(v))).instantiations
-}
 func ConditionalRoot_inferTypeParameters(v *checker.ConditionalRoot) []*checker.Type {
   return ((*extra_ConditionalRoot)(unsafe.Pointer(v))).inferTypeParameters
 }

@@ -526,7 +526,7 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 		"stringIndexType", "awaited", "widened", "baseTypes", "defaultType", "typeOfSymbol", "indexInfo", "indexInfos", "typePredicate", "parameterType", "propertyType",
 		"mappedFields", "classThisType", "contextualArgument":
 		kind = "typeRecord"
-	case "symbol", "aliasedSymbol", "property", "properties", "resolveName",
+	case "symbol", "declarationSymbol", "aliasedSymbol", "property", "properties", "resolveName",
 		"apparentProperties", "exportSymbol", "immediateAliasedSymbol", "shorthandValueSymbol":
 		kind = "symbolRecord"
 	case "signature", "resolvedSignature", "resolvedSignatureWithOptions", "signatures":
@@ -848,6 +848,8 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				return Handle(0), nil
 			}
 			return Handle(s.typeID(c.GetContextualType(native, checker.ContextFlagsNone))), nil
+		case "declarationSymbol":
+			return Handle(s.symbolID(native.Symbol())), nil
 		case "symbol":
 			if native.Kind == ast.KindSourceFile && !ast.IsExternalModule(native.AsSourceFile()) {
 				return Handle(0), nil
@@ -999,15 +1001,6 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return s.typeIDs(c.GetBaseTypes(t)), nil
 		case "defaultType":
 			return Handle(s.typeID(c.GetDefaultFromTypeParameter(s.typeByID(r.ID)))), nil
-		case "conditionalInstantiations":
-			root := checker.ConditionalType_root(s.typeByID(r.ID).AsConditionalType())
-			table := checker.ConditionalRoot_instantiations(root)
-			entries := make(NamedSymbols, 0, len(table))
-			for key, typ := range table {
-				entries = append(entries, NamedSymbol{Name: fmt.Sprintf("%016x%016x", key.Hi, key.Lo), ID: s.typeID(typ)})
-			}
-			slices.SortFunc(entries, func(a, b NamedSymbol) int { return strings.Compare(a.Name, b.Name) })
-			return entries, nil
 		case "freshLiteral", "evolvingElement", "finalArray", "typeParameterConstraint":
 			t := s.typeByID(r.ID)
 			var value *checker.Type

@@ -263,7 +263,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	}
 	var request Request
 	switch wire.Op {
-	case "conditionalInstantiations", "freshLiteral", "evolvingElement", "finalArray", "typeParameterConstraint":
+	case "freshLiteral", "evolvingElement", "finalArray", "typeParameterConstraint":
 		request = &TypeRequest{Op: wire.Op}
 	case "typeDetails", "resolvedTrueType", "resolvedFalseType", "declaredMembers":
 		request = &TypeRequest{Op: wire.Op}
@@ -306,7 +306,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 		request = &NodeRequest{Op: wire.Op}
 	case "typeArgumentsForResolvedSignature":
 		request = &SignatureRequest{Op: wire.Op}
-	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature", "nodeRecord", "shorthandValueSymbol", "suggestionDiagnostics":
+	case "type", "fromTypeNode", "context", "symbol", "declarationSymbol", "signature", "resolvedSignature", "nodeRecord", "shorthandValueSymbol", "suggestionDiagnostics":
 		request = &NodeRequest{Op: wire.Op}
 	case "contextualArgument":
 		request = &ContextualArgumentRequest{}

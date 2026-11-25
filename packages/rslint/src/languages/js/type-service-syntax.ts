@@ -121,6 +121,8 @@ function publicSyntaxKind(node: Node): SyntaxKind {
 
 // The compiler's child table excludes scalar fields exposed by the JS AST.
 const scalarFields: Partial<Record<SyntaxKind, readonly string[]>> = {
+  [SyntaxKind.MethodDeclaration]: ['symbol'],
+  [SyntaxKind.MethodSignature]: ['symbol'],
   [SyntaxKind.Identifier]: ['escapedText'],
   [SyntaxKind.StringLiteral]: ['hasExtendedUnicodeEscape'],
   [SyntaxKind.PrivateIdentifier]: ['escapedText'],
@@ -536,6 +538,9 @@ export class GenerationSyntaxViews {
     private readonly maxSourceBytes: number,
     private readonly maxSummaryBytes: number,
     private readonly readConfig: (id: string) => Uint8Array,
+    private readonly readDeclarationSymbol: (
+      node: NodeRef,
+    ) => object | undefined,
   ) {
     for (const [index, source] of descriptor.sources.entries()) {
       this.sourceOrdinals.set(source.fileName, index + 1);
@@ -1018,6 +1023,10 @@ export class GenerationSyntaxViews {
     const real = 'owner' in ref ? undefined : ref,
       owner = 'owner' in ref ? ref.owner : ref,
       { file, config } = owner;
+    if (key === 'symbol')
+      return real && !config && !this.descriptor.syntaxOnly
+        ? this.readDeclarationSymbol(real)
+        : undefined;
     if (key === 'getSourceFile') {
       if (!args) return syntaxMethod(key);
       return config

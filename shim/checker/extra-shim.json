@@ -70,7 +70,6 @@
       "checkType",
       "extendsType",
       "isDistributive",
-      "instantiations",
       "inferTypeParameters",
       "outerTypeParameters",
       "alias"

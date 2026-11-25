@@ -233,6 +233,19 @@ const cases: Case[] = [
     reports: 1,
   },
   {
+    name: 'method declarations are readonly when requested',
+    plugin: typedPlugin,
+    rule: 'prefer-readonly-parameter-types',
+    options: [{ treatMethodsAsReadonly: true }],
+    code: `
+      interface Methods { run(): void; optional?(): void; }
+      class Runner { run() {} }
+      const object = { run() {} };
+      function read(a: Methods, b: Runner, c: typeof object, d: { run: () => void }) {}
+    `,
+    reports: 1,
+  },
+  {
     name: 'readonly properties inherited through mapped and const generic types',
     plugin: typedPlugin,
     rule: 'prefer-readonly-parameter-types',
@@ -1812,10 +1825,29 @@ test('public checker, Program and source reads match TypeScript', async () => {
       { ...ts.sys, onUnRecoverableConfigFileDiagnostic() {} },
     )!;
     const reference = ts.createProgram(parsed.fileNames, parsed.options);
+    const statement = (source: ts.SourceFile, name: string) => {
+      const found = source.statements.find((node) => {
+        const declaration = ts.isVariableStatement(node)
+          ? node.declarationList.declarations[0]
+          : (node as ts.DeclarationStatement);
+        const candidate = ts.getNameOfDeclaration(declaration);
+        return (
+          candidate && ts.isIdentifier(candidate) && candidate.text === name
+        );
+      });
+      expect(found, name).toBeDefined();
+      return found!;
+    };
     const exercise = (p: ts.Program) => {
       const c = p.getTypeChecker(),
         src = p.getSourceFile(file)!;
-      const [enm, pair, fn, result, , dict, guard, select] = src.statements;
+      const enm = statement(src, 'Values');
+      const pair = statement(src, 'Pair');
+      const fn = statement(src, 'id');
+      const result = statement(src, 'result');
+      const dict = statement(src, 'Dictionary');
+      const guard = statement(src, 'isString');
+      const select = statement(src, 'Select');
       const decl = fn as ts.FunctionDeclaration,
         sig = c.getSignatureFromDeclaration(decl)!;
       const generatedSignature = c.signatureToSignatureDeclaration(
@@ -1876,11 +1908,15 @@ test('public checker, Program and source reads match TypeScript', async () => {
       return {
         additional: (() => {
           const fnSymbol = c.getSymbolAtLocation(decl.name!)!;
-          const box = src.statements[8] as ts.ClassDeclaration;
-          const ctor = box.members[1] as ts.ConstructorDeclaration;
+          const box = statement(src, 'Box') as ts.ClassDeclaration;
+          const ctor = box.members.find(ts.isConstructorDeclaration)!;
           const access = (
-            (box.members[2] as ts.MethodDeclaration).body!
-              .statements[0] as ts.ReturnStatement
+            box.members.find(
+              (member): member is ts.MethodDeclaration =>
+                ts.isMethodDeclaration(member) &&
+                ts.isIdentifier(member.name) &&
+                member.name.text === 'read',
+            )!.body!.statements[0] as ts.ReturnStatement
           ).expression as ts.PropertyAccessExpression;
           const left = c.getTypeAtLocation(access.expression);
           const fileSymbol = c.getSymbolAtLocation(src)!;
@@ -1890,8 +1926,17 @@ test('public checker, Program and source reads match TypeScript', async () => {
             param.name,
           );
           const exportSpec = (
-            (src.statements[9] as ts.ExportDeclaration)
-              .exportClause as ts.NamedExports
+            (
+              src.statements.find(
+                (node) =>
+                  ts.isExportDeclaration(node) &&
+                  node.exportClause &&
+                  ts.isNamedExports(node.exportClause) &&
+                  node.exportClause.elements.some(
+                    (element) => element.name.text === 'alias',
+                  ),
+              ) as ts.ExportDeclaration
+            ).exportClause as ts.NamedExports
           ).elements[0];
           const dictionary = c.getSymbolAtLocation(
             (dict as ts.TypeAliasDeclaration).name,
@@ -1901,7 +1946,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
             .getSymbol()!
             .members!.get('__index' as ts.__String)!;
           const computed = c.getSymbolAtLocation(box.members[3].name!)!;
-          const grow = (src.statements[14] as ts.VariableStatement)
+          const grow = (statement(src, 'grow') as ts.VariableStatement)
             .declarationList.declarations[0].initializer!;
           return {
             ambient: c.getAmbientModules().length,
@@ -2080,7 +2125,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
 
     const moduleModes = (p: ts.Program) => {
       const src = p.getSourceFile(file)!;
-      const imp = src.statements[12] as ts.ImportDeclaration;
+      const imp = src.statements.find(ts.isImportDeclaration)!;
       return [
         imp.attributes?.elements[0].value.getText(src),
         p.getModeForUsageLocation(src, imp.moduleSpecifier as ts.StringLiteral),
@@ -2125,7 +2170,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
     expect(() => owner.program.emit()).toThrow('Program.emit');
     const src = owner.program.getSourceFile(file) as ts.SourceFile;
     const dictionary = checker.getTypeFromTypeNode(
-      (src.statements[5] as ts.TypeAliasDeclaration).type,
+      (statement(src, 'Dictionary') as ts.TypeAliasDeclaration).type,
     )!;
     const index = checker.getIndexInfoOfType(dictionary, ts.IndexKind.String)!;
     expect(Reflect.set(index, 'type', literal)).toBe(false);

@@ -41,7 +41,6 @@ export type {
 } from './type-service-protocol.js';
 
 export interface ConditionalRootView {
-  readonly instantiations?: ReadonlyMap<string, TypeView>;
   node: object;
   checkType: TypeView;
   extendsType: TypeView;
@@ -631,42 +630,6 @@ function readCompilerOptions(
   }
   return compilerOptions;
 }
-// A retained checker cache reflects later queries in the same generation.
-class LiveTypeMap implements ReadonlyMap<string, TypeView> {
-  constructor(private readonly snapshot: () => Map<string, TypeView>) {}
-  get size() {
-    return this.snapshot().size;
-  }
-  get(key: string) {
-    return this.snapshot().get(key);
-  }
-  has(key: string) {
-    return this.snapshot().has(key);
-  }
-  keys() {
-    return this.snapshot().keys();
-  }
-  values() {
-    return this.snapshot().values();
-  }
-  entries() {
-    return this.snapshot().entries();
-  }
-  [Symbol.iterator]() {
-    return this.entries();
-  }
-  forEach(
-    cb: (
-      value: TypeView,
-      key: string,
-      map: ReadonlyMap<string, TypeView>,
-    ) => void,
-    thisArg?: unknown,
-  ) {
-    for (const [key, value] of this.entries())
-      cb.call(thisArg, value, key, this);
-  }
-}
 export interface TypeServiceClientOptions {
   maxFactsBytes: number;
   maxSyntaxBytes?: number;
@@ -734,6 +697,8 @@ export class TypeServiceClient {
       options.maxSyntaxBytes ?? 16 << 20,
       options.maxSyntaxFactsBytes ?? 1 << 20,
       (config) => this.query({ op: 'configSyntax', args: { config } }).tree,
+      (node) =>
+        this.symbol(this.query({ op: 'declarationSymbol', args: { node } })),
     );
     const errorType = () => this.query({ op: 'errorType', args: {} });
     const atParseTreeNode = <T>(
@@ -1845,17 +1810,6 @@ export class TypeServiceClient {
           outerTypeParameters: typeList(d.rootOuter),
           aliasSymbol: this.symbol(d.rootAlias),
           aliasTypeArguments: typeList(d.rootArguments),
-          instantiations: d.rootOuter?.length
-            ? new LiveTypeMap(
-                () =>
-                  new Map(
-                    this.query({
-                      op: 'conditionalInstantiations',
-                      args: { id },
-                    }).map((entry) => [entry.name, this.type(entry.id)!]),
-                  ),
-              )
-            : undefined,
         };
         readonlyDataFields(root);
         this.conditionalRoots.set(node, root);

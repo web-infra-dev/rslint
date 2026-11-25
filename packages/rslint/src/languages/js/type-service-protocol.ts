@@ -181,7 +181,6 @@ type PrintArgs = IDArgs & {
   flags: number | undefined;
 };
 export interface QueryArguments {
-  conditionalInstantiations: IDArgs;
   freshLiteral: IDArgs;
   evolvingElement: IDArgs;
   finalArray: IDArgs;
@@ -278,6 +277,7 @@ export interface QueryArguments {
   contextualArgument: NodeArgs & { index: number };
   suggestionDiagnostics: NodeArgs;
   symbol: NodeArgs;
+  declarationSymbol: NodeArgs;
   signature: NodeArgs;
   resolvedSignature: NodeArgs;
   resolvedSignatureWithOptions: NodeArgs & {
@@ -342,7 +342,6 @@ export interface QueryArguments {
   };
 }
 export interface QueryResults {
-  conditionalInstantiations: readonly NamedSymbolFact[];
   freshLiteral: number;
   evolvingElement: number;
   finalArray: number;
@@ -425,6 +424,7 @@ export interface QueryResults {
   contextualArgument: number;
   suggestionDiagnostics: DiagnosticFact[];
   symbol: number;
+  declarationSymbol: number;
   signature: number;
   resolvedSignature: number;
   resolvedSignatureWithOptions: readonly [number, ...number[]];
@@ -507,7 +507,6 @@ export function isCacheableTypeQuery(query: TypeServiceQuery): boolean {
     case 'instantiationCount':
     case 'relationCacheSizes':
     case 'declaredMembers':
-    case 'conditionalInstantiations':
     case 'freshLiteral':
     case 'typeParameterConstraint':
     case 'finalArray':
@@ -600,6 +599,7 @@ export function typeQueryKey(q: TypeServiceQuery): string {
     case 'fromTypeNode':
     case 'context':
     case 'symbol':
+    case 'declarationSymbol':
     case 'signature':
     case 'resolvedSignature':
     case 'shorthandValueSymbol':
@@ -645,7 +645,6 @@ export type ScalarOperation = Exclude<
   'typeRecord' | 'symbolRecord' | 'signatureRecord' | 'nodeRecord'
 >;
 export const SCALAR_KINDS: Record<ScalarOperation, number> = {
-  conditionalInstantiations: 11,
   freshLiteral: 1,
   evolvingElement: 1,
   finalArray: 1,
@@ -727,6 +726,7 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   contextualArgument: 1,
   suggestionDiagnostics: 15,
   symbol: 1,
+  declarationSymbol: 1,
   signature: 1,
   resolvedSignature: 1,
   resolvedSignatureWithOptions: 4,
