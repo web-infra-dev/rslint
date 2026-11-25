@@ -300,6 +300,7 @@ export interface ViewHost {
   readonly typescript: TypeServiceCompilerData;
   readonly checker: CheckerView;
   ensure(): void;
+  withReplyRecords<T>(run: () => T): T;
   query<Q extends ScalarRequest>(request: Q): QueryResults[Q['op']];
   typeFact(id: number): TypeFact;
   symbolFact(id: number): SymbolFact;
@@ -312,6 +313,7 @@ export interface ViewHost {
   indexInfo(fact: IndexInfoFact): IndexInfoView;
   nodeRef(ref: NodeRef | undefined): object | undefined;
   sourceView(file: string): object | undefined;
+  diagnosticSourceView(file: string): object | undefined;
   conditionalRootFor(
     node: object,
     create: () => ConditionalRootView,
@@ -663,7 +665,9 @@ export function createTypeView(
     (targetId === 0 || targetId === id)
   ) {
     const thisType = memo(ensure, () =>
-      host.type(host.query({ op: 'classThisType', args: { id } })),
+      host.withReplyRecords(() =>
+        host.type(host.query({ op: 'classThisType', args: { id } })),
+      ),
     );
     defineReadonlyGetter(view, 'typeParameters', typeParameters);
     defineReadonlyGetter(view, 'outerTypeParameters', () =>
@@ -673,12 +677,14 @@ export function createTypeView(
       typeList(details().local),
     );
     defineReadonlyGetter(view, 'thisType', thisType);
-    defineReadonlyGetter(view, 'declaredIndexInfos', () => {
-      const infos = host.query({ op: 'declaredIndexInfos', args: { id } });
-      return infos
-        ? Object.freeze(infos.map((info) => host.indexInfo(info)))
-        : undefined;
-    });
+    defineReadonlyGetter(view, 'declaredIndexInfos', () =>
+      host.withReplyRecords(() => {
+        const infos = host.query({ op: 'declaredIndexInfos', args: { id } });
+        return infos
+          ? Object.freeze(infos.map((info) => host.indexInfo(info)))
+          : undefined;
+      }),
+    );
   }
   if (tuple !== undefined) {
     defineReadonlyGetter(view, 'combinedFlags', () => {
@@ -704,10 +710,11 @@ export function createTypeView(
     });
   }
   if (hasObjectFlag(of.Mapped)) {
-    const readMapped = (key: keyof typeof mappedFieldIndex) => {
-      const ids = host.query({ op: 'mappedFields', args: { id } });
-      return host.type(ids[mappedFieldIndex[key]] ?? 0);
-    };
+    const readMapped = (key: keyof typeof mappedFieldIndex) =>
+      host.withReplyRecords(() => {
+        const ids = host.query({ op: 'mappedFields', args: { id } });
+        return host.type(ids[mappedFieldIndex[key]] ?? 0);
+      });
     defineReadonlyGetter(view, 'typeParameter', () =>
       readMapped('typeParameter'),
     );
@@ -811,7 +818,9 @@ export function createSymbolView(
           return checkFlags;
         },
         get type() {
-          return host.type(host.query({ op: 'typeOfSymbol', args: { id } }));
+          return host.withReplyRecords(() =>
+            host.type(host.query({ op: 'typeOfSymbol', args: { id } })),
+          );
         },
       });
     },
@@ -875,7 +884,9 @@ export function createSignatureView(
   const thisParameter = memo(ensure, () => host.symbol(fact().thisParameter));
   const minArgumentCount = memo(ensure, () => fact().minArgumentCount);
   const returnType = memo(ensure, () =>
-    host.type(host.query({ op: 'returnType', args: { id } })),
+    host.withReplyRecords(() =>
+      host.type(host.query({ op: 'returnType', args: { id } })),
+    ),
   );
   const documentation = memo(ensure, () =>
     Object.freeze(host.query({ op: 'signatureDocumentation', args: { id } })),
@@ -904,7 +915,9 @@ export function createSignatureView(
     getParameters: parameters,
     getTypeParameters: typeParameters,
     getTypeParameterAtPosition: (position) =>
-      host.type(host.query({ op: 'parameterType', args: { id, position } })),
+      host.withReplyRecords(() =>
+        host.type(host.query({ op: 'parameterType', args: { id, position } })),
+      ),
     getDeclaration: declaration,
     getReturnType: returnType,
     getDocumentationComment: documentation,
@@ -943,7 +956,7 @@ export function createDiagnosticView(
   d: DiagnosticFact,
 ): DiagnosticView {
   return {
-    file: d.fileName ? host.sourceView(d.fileName) : undefined,
+    file: d.fileName ? host.diagnosticSourceView(d.fileName) : undefined,
     start: d.fileName ? d.start : undefined,
     length: d.fileName ? d.length : undefined,
     code: d.code,

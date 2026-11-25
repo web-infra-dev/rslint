@@ -174,6 +174,61 @@ function readFrame(req: LintFileRequest): ReturnType<typeof decodeFrame> {
 type ParserServices = object &
   NonNullable<ScopeFactoryOptions['parserServices']>;
 
+type ParserOptions = NonNullable<
+  LintFileRequest['languageOptions']
+>['parserOptions'];
+
+/**
+ * Wrap a syntax-only parserServices object with per-file boolean overrides
+ * without mutating it or dropping prototype getters, methods, or private fields.
+ */
+function withSyntaxParserServiceOverrides(
+  target: Record<string, unknown>,
+  overrides: Readonly<Record<string, boolean>>,
+): Record<string, unknown> {
+  return new Proxy<Record<string, unknown>>(
+    {},
+    {
+      get(_shadow, prop) {
+        if (typeof prop === 'string' && Object.hasOwn(overrides, prop)) {
+          return overrides[prop];
+        }
+        const value: unknown = Reflect.get(target, prop, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+      has(_shadow, prop) {
+        if (typeof prop === 'string' && Object.hasOwn(overrides, prop)) {
+          return true;
+        }
+        return Reflect.has(target, prop);
+      },
+      ownKeys() {
+        return Array.from(
+          new Set([...Reflect.ownKeys(target), ...Object.keys(overrides)]),
+        );
+      },
+      getOwnPropertyDescriptor(_shadow, prop) {
+        if (typeof prop === 'string' && Object.hasOwn(overrides, prop)) {
+          return {
+            configurable: true,
+            enumerable: true,
+            value: overrides[prop],
+            writable: false,
+          };
+        }
+        const desc = Reflect.getOwnPropertyDescriptor(target, prop);
+        if (!desc) return undefined;
+        // Return a configurable descriptor so non-configurable own properties
+        // on a frozen target never violate Proxy invariants on the shadow object.
+        return desc.configurable ? desc : { ...desc, configurable: true };
+      },
+      getPrototypeOf() {
+        return Reflect.getPrototypeOf(target);
+      },
+    },
+  );
+}
+
 /**
  * Lint a single file. Stateless — `loadedPlugins` is owned by the
  * Worker; this function does not mutate it.
@@ -181,7 +236,10 @@ type ParserServices = object &
 export function lintFile(
   req: LintFileRequest,
   loadedPlugins: LoadedPlugins,
-  services?: (frame: ReturnType<typeof decodeFrame>) => ParserServices,
+  services?: (
+    frame: ReturnType<typeof decodeFrame>,
+    parserOptions?: ParserOptions,
+  ) => ParserServices,
 ): LintFileResult {
   const result: LintFileResult = {
     filePath: req.filePath,
@@ -195,7 +253,7 @@ export function lintFile(
   let parserServices: ParserServices | undefined;
   try {
     parsed = readFrame(req);
-    parserServices = services?.(parsed);
+    parserServices = services?.(parsed, req.languageOptions?.parserOptions);
   } catch (err) {
     if (err instanceof FrameCancelled) result.cancelled = true;
     else
@@ -220,7 +278,7 @@ export function lintFile(
     effectiveParserServices.program === null &&
     rawParserOptions
   ) {
-    const overrides: Record<string, unknown> = {};
+    const overrides: Record<string, boolean> = {};
     for (const key of [
       'emitDecoratorMetadata',
       'experimentalDecorators',
@@ -234,7 +292,10 @@ export function lintFile(
       }
     }
     if (Object.keys(overrides).length > 0) {
-      effectiveParserServices = { ...effectiveParserServices, ...overrides };
+      effectiveParserServices = withSyntaxParserServiceOverrides(
+        effectiveParserServices,
+        overrides,
+      );
     }
   }
   const isolatedFromServices =

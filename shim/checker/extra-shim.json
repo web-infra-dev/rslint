@@ -73,8 +73,11 @@
       "numberType",
       "booleanType",
       "globalRegExpType",
-      "couldContainTypeVariables"
+      "couldContainTypeVariables",
+      "signatureLinks",
+      "resolvingSignature"
     ],
+    "SignatureLinks": ["resolvedSignature"],
     "InterfaceType": [
       "thisType",
       "declaredMembersResolved",

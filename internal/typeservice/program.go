@@ -8,7 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 )
 
-func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, node *ast.Node) (Result, error) {
+func programQuery(ctx context.Context, s *Session, p *program.Program, r *ProgramRequest, node *ast.Node) (Result, error) {
 	q := p.CompilerQueries()
 	if q == nil {
 		return nil, errors.New("program query requires a typed project")
@@ -27,7 +27,20 @@ func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, no
 	if !ok {
 		return nil, errors.New("unknown Program query")
 	}
-	return diagnosticFacts(q.Diagnostics(ctx, kind, file)), ctx.Err()
+	ds := q.Diagnostics(ctx, kind, file)
+	recordDiagnosticSources(s, p, ds)
+	return diagnosticFacts(ds), ctx.Err()
+}
+
+func recordDiagnosticSources(s *Session, p *program.Program, ds []*ast.Diagnostic) {
+	for _, d := range ds {
+		if f := d.File(); f != nil && p.GetSourceFile(f.FileName()) == nil {
+			s.recordExtraSource(f)
+		}
+		if related := d.RelatedInformation(); len(related) > 0 {
+			recordDiagnosticSources(s, p, related)
+		}
+	}
 }
 
 var diagnosticKinds = map[Operation]program.DiagnosticKind{

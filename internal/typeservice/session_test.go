@@ -269,3 +269,42 @@ func TestSyntaxOnlyDescriptorPreservesCompilerOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigDiagnosticSourceAvailableWithoutLeakingIntoProgramSources(t *testing.T) {
+	const root = "/type-service-config-diag"
+	fileName := tspath.ResolvePath(root, "input.ts")
+	configName := tspath.ResolvePath(root, "tsconfig.json")
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		configName: "{\n  \"compilerOptions\": {\n    \"noLib\": true,\n    \"inlineSources\": true\n  },\n  \"include\": [\"input.ts\"]\n}\n",
+		fileName:   "export const x = 1;\n",
+	})
+	raw, err := utils.CreateProgram(false, fs, root, configName, utils.CreateCompilerHost(root, fs))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := program.NewFromCompiler(raw)
+	file := p.GetSourceFile(fileName)
+	session, err := New(t.Context(), p, []*ast.SourceFile{file})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+
+	desc, err := session.Descriptor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, src := range desc.Sources {
+		if src.FileName == configName {
+			t.Fatalf("tsconfig %q should not be listed in Program Descriptor.Sources", configName)
+		}
+	}
+
+	cfgSrc, err := session.Source(desc.Generation, configName)
+	if err != nil {
+		t.Fatalf("Source(tsconfig): %v", err)
+	}
+	if cfgSrc == nil || cfgSrc.FileName() != configName {
+		t.Fatalf("expected tsconfig SourceFile %q, got %v", configName, cfgSrc)
+	}
+}

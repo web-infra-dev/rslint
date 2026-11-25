@@ -572,6 +572,12 @@ func Checker_globalRegExpType(v *checker.Checker) *checker.Type {
 func Checker_couldContainTypeVariables(v *checker.Checker) func(*checker.Type) bool {
 	return ((*extra_Checker)(unsafe.Pointer(v))).couldContainTypeVariables
 }
+func Checker_signatureLinks(v *checker.Checker) core.LinkStore[*ast.Node, checker.SignatureLinks] {
+	return ((*extra_Checker)(unsafe.Pointer(v))).signatureLinks
+}
+func Checker_resolvingSignature(v *checker.Checker) *checker.Signature {
+	return ((*extra_Checker)(unsafe.Pointer(v))).resolvingSignature
+}
 
 //go:linkname CompareTypes github.com/microsoft/TypeScript/tsc/internal/checker.CompareTypes
 func CompareTypes(t1 *checker.Type, t2 *checker.Type) int
@@ -1238,6 +1244,16 @@ const SignatureKindCall = checker.SignatureKindCall
 const SignatureKindConstruct = checker.SignatureKindConstruct
 
 type SignatureLinks = checker.SignatureLinks
+type extra_SignatureLinks struct {
+	resolvedSignature  *checker.Signature
+	effectsSignature   *checker.Signature
+	decoratorSignature *checker.Signature
+}
+
+func SignatureLinks_resolvedSignature(v *checker.SignatureLinks) *checker.Signature {
+	return ((*extra_SignatureLinks)(unsafe.Pointer(v))).resolvedSignature
+}
+
 type SignatureToSignatureDeclarationOptions = checker.SignatureToSignatureDeclarationOptions
 type SimpleTypeMapper = checker.SimpleTypeMapper
 

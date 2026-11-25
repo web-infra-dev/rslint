@@ -102,6 +102,11 @@ export interface TypeServiceClientOptions {
   readonly maxSyntaxFactsBytes?: number;
 }
 
+interface CancellationTokenLike {
+  readonly isCancellationRequested?: () => boolean;
+  readonly throwIfCancellationRequested?: () => void;
+}
+
 /**
  * One worker owns this client for one Program generation. File handles own
  * ESTree mappings; canonical semantic and syntax identities survive file close.
@@ -109,7 +114,8 @@ export interface TypeServiceClientOptions {
 export class TypeServiceClient {
   private closed = false;
   private readonly facts = new Map<string, TypePacketReader>();
-  private readonly pendingRecords = new Map<string, Uint8Array>();
+  private replyRecords: Map<string, Uint8Array> | undefined;
+  private cancellationToken: CancellationTokenLike | undefined;
   private readonly types = new WeakObjectCache<number, TypeView>();
   private readonly symbols = new WeakObjectCache<number, SymbolView>();
   private readonly signatures = new WeakObjectCache<number, SignatureView>();
@@ -168,11 +174,12 @@ export class TypeServiceClient {
     );
 
     const errorType = () => this.query({ op: 'errorType', args: {} });
-    const requiredType = (id: number): TypeView => {
-      const t = this.type(id);
-      if (!t) throw new Error('missing expected compiler type');
-      return t;
-    };
+    const requiredType = (readId: () => number): TypeView =>
+      this.withReplyRecords(() => {
+        const t = this.type(readId());
+        if (!t) throw new Error('missing expected compiler type');
+        return t;
+      });
     const nodeHandle = (
       op:
         | 'type'
@@ -201,42 +208,49 @@ export class TypeServiceClient {
         | 'stringIndexType'
         | 'numberIndexType',
       t: object,
-    ) => this.type(this.query({ op, args: { id: this.id(t, 'type') } }));
+    ) =>
+      this.withReplyRecords(() =>
+        this.type(this.query({ op, args: { id: this.id(t, 'type') } })),
+      );
 
     this.checker = {
-      getAnyType: () => requiredType(this.query({ op: 'anyType', args: {} })),
+      getAnyType: () =>
+        requiredType(() => this.query({ op: 'anyType', args: {} })),
       getUnknownType: () =>
-        requiredType(this.query({ op: 'unknownType', args: {} })),
+        requiredType(() => this.query({ op: 'unknownType', args: {} })),
       getStringType: () =>
-        requiredType(this.query({ op: 'stringType', args: {} })),
+        requiredType(() => this.query({ op: 'stringType', args: {} })),
       getNumberType: () =>
-        requiredType(this.query({ op: 'numberType', args: {} })),
+        requiredType(() => this.query({ op: 'numberType', args: {} })),
       getBooleanType: () =>
-        requiredType(this.query({ op: 'booleanType', args: {} })),
+        requiredType(() => this.query({ op: 'booleanType', args: {} })),
       getBigIntType: () =>
-        requiredType(this.query({ op: 'bigIntType', args: {} })),
+        requiredType(() => this.query({ op: 'bigIntType', args: {} })),
       getESSymbolType: () =>
-        requiredType(this.query({ op: 'eSSymbolType', args: {} })),
+        requiredType(() => this.query({ op: 'eSSymbolType', args: {} })),
       getNonPrimitiveType: () =>
-        requiredType(this.query({ op: 'nonPrimitiveType', args: {} })),
+        requiredType(() => this.query({ op: 'nonPrimitiveType', args: {} })),
       getNeverType: () =>
-        requiredType(this.query({ op: 'neverType', args: {} })),
-      getNullType: () => requiredType(this.query({ op: 'nullType', args: {} })),
+        requiredType(() => this.query({ op: 'neverType', args: {} })),
+      getNullType: () =>
+        requiredType(() => this.query({ op: 'nullType', args: {} })),
       getUndefinedType: () =>
-        requiredType(this.query({ op: 'undefinedType', args: {} })),
-      getTrueType: () => requiredType(this.query({ op: 'trueType', args: {} })),
+        requiredType(() => this.query({ op: 'undefinedType', args: {} })),
+      getTrueType: () =>
+        requiredType(() => this.query({ op: 'trueType', args: {} })),
       getFalseType: () =>
-        requiredType(this.query({ op: 'falseType', args: {} })),
-      getVoidType: () => requiredType(this.query({ op: 'void', args: {} })),
+        requiredType(() => this.query({ op: 'falseType', args: {} })),
+      getVoidType: () =>
+        requiredType(() => this.query({ op: 'void', args: {} })),
       getStringLiteralType: (value) =>
-        requiredType(
+        requiredType(() =>
           this.query({
             op: 'stringLiteralType',
             args: { value: nameToUnits(value) },
           }),
         ),
       getNumberLiteralType: (value) =>
-        requiredType(
+        requiredType(() =>
           this.query({
             op: 'numberLiteralType',
             args: Number.isNaN(value)
@@ -250,7 +264,7 @@ export class TypeServiceClient {
         ),
       getBigIntLiteralType: (value) => {
         const base10Value = value.base10Value || '0';
-        return requiredType(
+        return requiredType(() =>
           this.query({
             op: 'bigIntLiteralType',
             args: {
@@ -261,7 +275,7 @@ export class TypeServiceClient {
         );
       },
       getNullableType: (type, flags) =>
-        requiredType(
+        requiredType(() =>
           this.query({
             op: 'nullableType',
             args: { id: this.id(type, 'type'), flags: flags >>> 0 },
@@ -363,18 +377,32 @@ export class TypeServiceClient {
             )
           : [];
       },
-      runWithCancellationToken: (_token, cb) => {
+      runWithCancellationToken: (token, cb) => {
         ensure();
-        return cb(this.checker);
+        const previous = this.cancellationToken;
+        this.cancellationToken =
+          typeof token === 'object' && token !== null
+            ? (token as CancellationTokenLike)
+            : undefined;
+        try {
+          return cb(this.checker);
+        } finally {
+          this.cancellationToken = previous;
+        }
       },
-      getTypeAtLocation: (n) => this.type(nodeHandle('type', n)),
-      getTypeFromTypeNode: (n) => this.type(nodeHandle('fromTypeNode', n)),
-      getContextualType: (n) => this.type(nodeHandle('context', n)),
+      getTypeAtLocation: (n) =>
+        this.withReplyRecords(() => this.type(nodeHandle('type', n))),
+      getTypeFromTypeNode: (n) =>
+        this.withReplyRecords(() => this.type(nodeHandle('fromTypeNode', n))),
+      getContextualType: (n) =>
+        this.withReplyRecords(() => this.type(nodeHandle('context', n))),
       getContextualTypeForArgumentAtIndex: (n, index) => {
         const node = this.syntax.parseTreeLocation(n);
         return node
-          ? this.type(
-              this.query({ op: 'contextualArgument', args: { node, index } }),
+          ? this.withReplyRecords(() =>
+              this.type(
+                this.query({ op: 'contextualArgument', args: { node, index } }),
+              ),
             )
           : undefined;
       },
@@ -417,8 +445,10 @@ export class TypeServiceClient {
       getWidenedType: (t) => typeType('widened', t),
       getDefaultFromTypeParameter: (t) => typeType('defaultType', t),
       getBaseTypes: (t) =>
-        this.typesFor(
-          this.query({ op: 'baseTypes', args: { id: this.id(t, 'type') } }),
+        this.withReplyRecords(() =>
+          this.typesFor(
+            this.query({ op: 'baseTypes', args: { id: this.id(t, 'type') } }),
+          ),
         ),
       isTypeAssignableTo: (source, target) =>
         this.query({
@@ -522,27 +552,33 @@ export class TypeServiceClient {
       getShorthandAssignmentValueSymbol: (n) =>
         this.symbol(nodeHandle('shorthandValueSymbol', n)),
       getTypeOfSymbol: (s) =>
-        this.type(
-          this.query({
-            op: 'typeOfSymbol',
-            args: { id: this.id(s, 'symbol') },
-          }),
+        this.withReplyRecords(() =>
+          this.type(
+            this.query({
+              op: 'typeOfSymbol',
+              args: { id: this.id(s, 'symbol') },
+            }),
+          ),
         ),
       getTypeOfSymbolAtLocation: (s, n) => {
         const id = this.id(s, 'symbol');
         const node = this.syntax.parseTreeLocation(n);
-        return this.type(
-          node
-            ? this.query({ op: 'symbolType', args: { id, node } })
-            : errorType(),
+        return this.withReplyRecords(() =>
+          this.type(
+            node
+              ? this.query({ op: 'symbolType', args: { id, node } })
+              : errorType(),
+          ),
         );
       },
       getDeclaredTypeOfSymbol: (s) =>
-        this.type(
-          this.query({
-            op: 'declaredType',
-            args: { id: this.id(s, 'symbol') },
-          }),
+        this.withReplyRecords(() =>
+          this.type(
+            this.query({
+              op: 'declaredType',
+              args: { id: this.id(s, 'symbol') },
+            }),
+          ),
         ),
       getPropertiesOfType: (t) =>
         this.symbolsFor(
@@ -556,32 +592,39 @@ export class TypeServiceClient {
           }),
         ),
       getTypeOfPropertyOfType: (t, name) =>
-        this.type(
-          this.query({
-            op: 'propertyType',
-            args: { id: this.id(t, 'type'), name: nameToUnits(name) },
-          }),
+        this.withReplyRecords(() =>
+          this.type(
+            this.query({
+              op: 'propertyType',
+              args: { id: this.id(t, 'type'), name: nameToUnits(name) },
+            }),
+          ),
         ),
       getIndexTypeOfType: (t, kind) =>
         typeType(kind === 0 ? 'stringIndexType' : 'numberIndexType', t),
-      getIndexInfoOfType: (t, kind) => {
-        const [info] = this.query({
-          op: 'indexInfo',
-          args: { id: this.id(t, 'type'), kind },
-        });
-        return info && this.indexInfo(info);
-      },
+      getIndexInfoOfType: (t, kind) =>
+        this.withReplyRecords(() => {
+          const [info] = this.query({
+            op: 'indexInfo',
+            args: { id: this.id(t, 'type'), kind },
+          });
+          return info && this.indexInfo(info);
+        }),
       getIndexInfosOfType: (t) =>
-        this.query({
-          op: 'indexInfos',
-          args: { id: this.id(t, 'type') },
-        }).map((info) => this.indexInfo(info)),
-      getTypeArguments: (t) =>
-        this.typesFor(
+        this.withReplyRecords(() =>
           this.query({
-            op: 'typeArguments',
+            op: 'indexInfos',
             args: { id: this.id(t, 'type') },
-          }),
+          }).map((info) => this.indexInfo(info)),
+        ),
+      getTypeArguments: (t) =>
+        this.withReplyRecords(() =>
+          this.typesFor(
+            this.query({
+              op: 'typeArguments',
+              args: { id: this.id(t, 'type') },
+            }),
+          ),
         ),
       isArrayType: (t) =>
         this.query({ op: 'isArray', args: { id: this.id(t, 'type') } }),
@@ -615,19 +658,22 @@ export class TypeServiceClient {
         return this.signature(ids[0] ?? 0);
       },
       getReturnTypeOfSignature: (s) =>
-        this.type(
-          this.query({
-            op: 'returnType',
-            args: { id: this.id(s, 'signature') },
-          }),
+        this.withReplyRecords(() =>
+          this.type(
+            this.query({
+              op: 'returnType',
+              args: { id: this.id(s, 'signature') },
+            }),
+          ),
         ),
-      getTypePredicateOfSignature: (s) => {
-        const fact = this.query({
-          op: 'typePredicate',
-          args: { id: this.id(s, 'signature') },
-        });
-        return fact && { ...fact, type: this.type(fact.type) };
-      },
+      getTypePredicateOfSignature: (s) =>
+        this.withReplyRecords(() => {
+          const fact = this.query({
+            op: 'typePredicate',
+            args: { id: this.id(s, 'signature') },
+          });
+          return fact && { ...fact, type: this.type(fact.type) };
+        }),
       getSignaturesOfType: (t, kind) =>
         this.signaturesFor(
           this.query({
@@ -643,6 +689,7 @@ export class TypeServiceClient {
       typescript: this.typescript,
       checker: this.checker,
       ensure,
+      withReplyRecords: (run) => this.withReplyRecords(run),
       query: (req) => this.query(req),
       typeFact: (id) => this.typeFact(id),
       symbolFact: (id) => this.symbolFact(id),
@@ -655,6 +702,7 @@ export class TypeServiceClient {
       indexInfo: (fact) => this.indexInfo(fact),
       nodeRef: (ref) => this.syntax.nodeRef(ref),
       sourceView: (file) => this.syntax.sourceView(file),
+      diagnosticSourceView: (file) => this.syntax.diagnosticSourceView(file),
       conditionalRootFor: (node, create) => {
         const existing = this.conditionalRoots.get(node);
         if (existing) return existing;
@@ -753,7 +801,8 @@ export class TypeServiceClient {
     this.closed = true;
     for (const reader of this.facts.values()) reader.close();
     this.facts.clear();
-    this.pendingRecords.clear();
+    this.replyRecords = undefined;
+    this.cancellationToken = undefined;
     this.factBytes = 0;
     this.types.clear();
     this.symbols.clear();
@@ -765,11 +814,35 @@ export class TypeServiceClient {
     this.transport = undefined;
   }
 
+  private withReplyRecords<T>(run: () => T): T {
+    const outer = this.replyRecords;
+    this.replyRecords = new Map();
+    try {
+      return run();
+    } finally {
+      this.replyRecords = outer;
+    }
+  }
+
+  private checkCancellation(): void {
+    const token = this.cancellationToken;
+    if (!token) return;
+    if (typeof token.throwIfCancellationRequested === 'function') {
+      token.throwIfCancellationRequested();
+    } else if (
+      typeof token.isCancellationRequested === 'function' &&
+      token.isCancellationRequested()
+    ) {
+      throw new Error('Operation was canceled.');
+    }
+  }
+
   private read<K>(
     request: ServiceRequest,
     read: (packet: TypePacketReader) => K,
   ): K {
     this.ensure();
+    this.checkCancellation();
     const transport = this.transport;
     if (!transport) throw new Error('type service transport unavailable');
     const query: TypeServiceQuery = {
@@ -796,10 +869,10 @@ export class TypeServiceClient {
       this.facts.delete(key);
       this.facts.set(key, reader);
     } else {
-      const pending = this.pendingRecords.get(key);
-      if (pending) {
-        this.pendingRecords.delete(key);
-        const transient = new TypePacketReader(pending);
+      const transientBytes = this.replyRecords?.get(key);
+      if (transientBytes) {
+        this.replyRecords?.delete(key);
+        const transient = new TypePacketReader(transientBytes);
         try {
           return read(transient);
         } finally {
@@ -838,7 +911,6 @@ export class TypeServiceClient {
     bytes: Readonly<Uint8Array>,
     cacheKey?: string,
   ): TypePacketReader {
-    this.pendingRecords.clear();
     const reply = typeReplyPackets(bytes);
     for (const record of reply.records) {
       const key = typeQueryKey({
@@ -849,9 +921,11 @@ export class TypeServiceClient {
       const reader = this.store(key, record.packet);
       if (this.facts.get(key) !== reader) {
         reader.close();
-        // Retain uncached supplemental records only until consumed or replaced
-        // by the next transport reply, so zero-budget clients avoid re-querying.
-        this.pendingRecords.set(key, Uint8Array.from(record.packet));
+        // Keep uncached type records only for the enclosing eager view build
+        // so zero-budget clients avoid re-querying without retaining memory.
+        if (this.replyRecords && record.op === 'typeRecord') {
+          this.replyRecords.set(key, Uint8Array.from(record.packet));
+        }
       }
     }
     return cacheKey === undefined
@@ -1043,20 +1117,21 @@ export class TypeServiceFile {
     if (this.closed) throw new Error('file type services are closed');
     this.syntax.attach(frame, projection, sourceFileName);
     const options = this.owner.descriptor.compilerOptions;
-    const flags: ParserServiceOptions = {
-      emitDecoratorMetadata:
-        parserOptions?.emitDecoratorMetadata ??
-        options.emitDecoratorMetadata === true,
-      experimentalDecorators:
-        parserOptions?.experimentalDecorators ??
-        options.experimentalDecorators === true,
-      isolatedDeclarations:
-        parserOptions?.isolatedDeclarations ??
-        options.isolatedDeclarations === true,
-    };
     if (this.owner.descriptor.syntaxOnly) {
-      return syntaxOnlyParserServices(this.syntax, flags);
+      return syntaxOnlyParserServices(this.syntax, {
+        emitDecoratorMetadata:
+          parserOptions?.emitDecoratorMetadata ??
+          options.emitDecoratorMetadata === true,
+        experimentalDecorators:
+          parserOptions?.experimentalDecorators ??
+          options.experimentalDecorators === true,
+        isolatedDeclarations:
+          parserOptions?.isolatedDeclarations ??
+          options.isolatedDeclarations === true,
+      });
     }
+    // A typed Program is authoritative for project compiler flags; ignore
+    // per-file parserOptions overrides to match @typescript-eslint/parser.
     const toTS = this.syntax.esTreeNodeToTSNodeMap.get;
     return {
       program: this.owner.program,
@@ -1084,9 +1159,9 @@ export class TypeServiceFile {
         symbol: Readonly<SymbolView>,
         node: Readonly<ESTreeNode>,
       ) => this.owner.checker.getTypeOfSymbolAtLocation(symbol, toTS(node)),
-      emitDecoratorMetadata: flags.emitDecoratorMetadata === true,
-      experimentalDecorators: flags.experimentalDecorators === true,
-      isolatedDeclarations: flags.isolatedDeclarations === true,
+      emitDecoratorMetadata: options.emitDecoratorMetadata === true,
+      experimentalDecorators: options.experimentalDecorators === true,
+      isolatedDeclarations: options.isolatedDeclarations === true,
     };
   }
 }

@@ -587,6 +587,7 @@ export class GenerationSyntaxViews {
   >();
   private readonly sourceOrdinals = new Map<string, number>();
   private readonly metadataByName = new Map<string, SourceDescriptor>();
+  private readonly diagnosticMetadata = new Map<string, SourceDescriptor>();
   private sourceBytes = 0;
   private summaryBytes = 0;
 
@@ -728,9 +729,13 @@ export class GenerationSyntaxViews {
     return ref;
   }
 
+  private lookupMetadata(file: string): SourceDescriptor | undefined {
+    return this.metadataByName.get(file) ?? this.diagnosticMetadata.get(file);
+  }
+
   metadata(node: object): SourceDescriptor {
     const ref = this.location(node);
-    const metadata = this.metadataByName.get(ref.file);
+    const metadata = this.lookupMetadata(ref.file);
     if (!metadata) throw new Error('foreign source');
     return metadata;
   }
@@ -755,6 +760,36 @@ export class GenerationSyntaxViews {
       const reply = this.lookup(this.descriptor, file, true);
       metadata = reply && this.metadataByName.get(reply.fileName);
       if (metadata) this.metadataByName.set(file, metadata);
+    }
+    return metadata
+      ? this.nodeRef({ file: metadata.fileName, index: 1 })
+      : undefined;
+  }
+
+  diagnosticSourceView(file: string): object | undefined {
+    this.ensure();
+    const programSource = this.sourceView(file);
+    if (programSource) return programSource;
+    let metadata = this.diagnosticMetadata.get(file);
+    if (!metadata && this.lookup) {
+      const reply = this.lookup(this.descriptor, file, true);
+      if (reply) {
+        metadata = this.diagnosticMetadata.get(reply.fileName) ?? {
+          fileName: reply.fileName,
+          path: reply.fileName.toLowerCase(),
+          external: false,
+          defaultLibrary: false,
+          isDeclarationFile: false,
+        };
+        if (!this.sourceOrdinals.has(metadata.fileName)) {
+          this.sourceOrdinals.set(
+            metadata.fileName,
+            this.sourceOrdinals.size + 1,
+          );
+        }
+        this.diagnosticMetadata.set(metadata.fileName, metadata);
+        this.diagnosticMetadata.set(file, metadata);
+      }
     }
     return metadata
       ? this.nodeRef({ file: metadata.fileName, index: 1 })
@@ -822,7 +857,7 @@ export class GenerationSyntaxViews {
 
   source(file: string): RemoteSourceFile | undefined {
     this.ensure();
-    const metadata = this.metadataByName.get(file);
+    const metadata = this.lookupMetadata(file);
     if (!metadata) return undefined;
     const old = this.cachedSource(metadata.fileName);
     if (old) return old;
@@ -924,7 +959,7 @@ export class GenerationSyntaxViews {
   nodeRef(ref: NodeRef | undefined): object | undefined {
     this.ensure();
     if (!ref) return undefined;
-    const metadata = this.metadataByName.get(ref.file);
+    const metadata = this.lookupMetadata(ref.file);
     if (!metadata) throw new Error('foreign source');
     const identity: NodeRef = { file: metadata.fileName, index: ref.index };
     return this.wrapRef(identity, this.key(identity));
@@ -1077,10 +1112,10 @@ export class GenerationSyntaxViews {
     }
     if (key === 'getSourceFile') {
       if (!args) return syntaxMethod(key);
-      return this.sourceView(file);
+      return this.diagnosticSourceView(file);
     }
     if (real?.index === 1) {
-      const source = this.metadataByName.get(file);
+      const source = this.lookupMetadata(file);
       if (!source) throw new Error('foreign source');
       if (key === 'fileName' || key === 'path' || key === 'isDeclarationFile') {
         return source[key];
@@ -1531,6 +1566,7 @@ export class GenerationSyntaxViews {
     this.activeSources.clear();
     this.oversizedSource = undefined;
     this.sources.clear();
+    this.diagnosticMetadata.clear();
     this.summaries.clear();
     this.wrapped.clear();
     this.sourceBytes = 0;

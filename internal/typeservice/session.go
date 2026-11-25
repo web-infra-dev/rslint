@@ -65,10 +65,12 @@ var publicObjectFlags = [...]struct {
 type Session struct {
 	lifeMu       sync.RWMutex
 	checkMu      sync.Mutex
+	extraMu      sync.RWMutex
 	program      *program.Program
 	syntaxOnly   bool
 	anchor       *ast.SourceFile
 	eligible     map[*ast.SourceFile]bool
+	extraSources map[string]*ast.SourceFile
 	checker      *checker.Checker
 	generation   uint32
 	types        map[uint32]*checker.Type
@@ -138,10 +140,47 @@ func newSession(ctx context.Context, p *program.Program, eligible []*ast.SourceF
 		}
 		s.eligible[f] = true
 	}
+	if !syntaxOnly {
+		if q := p.CompilerQueries(); q != nil {
+			if cmd := q.CommandLine(); cmd != nil && cmd.ConfigFile != nil && cmd.ConfigFile.SourceFile != nil {
+				s.recordExtraSource(cmd.ConfigFile.SourceFile)
+			}
+		}
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+func (s *Session) recordExtraSource(f *ast.SourceFile) {
+	if f == nil {
+		return
+	}
+	s.extraMu.Lock()
+	defer s.extraMu.Unlock()
+	if s.extraSources == nil {
+		s.extraSources = make(map[string]*ast.SourceFile)
+	}
+	s.extraSources[f.FileName()] = f
+	if path := string(f.Path()); path != "" {
+		s.extraSources[path] = f
+	}
+	if norm := tspath.NormalizePath(f.FileName()); norm != "" {
+		s.extraSources[norm] = f
+	}
+}
+
+func (s *Session) extraSource(name string) *ast.SourceFile {
+	s.extraMu.RLock()
+	defer s.extraMu.RUnlock()
+	if s.extraSources == nil {
+		return nil
+	}
+	if f := s.extraSources[name]; f != nil {
+		return f
+	}
+	return s.extraSources[tspath.NormalizePath(name)]
 }
 
 // Close waits for any in-flight operations to finish before releasing references.
@@ -152,6 +191,9 @@ func (s *Session) Close() {
 	s.anchor = nil
 	s.checker = nil
 	s.eligible = nil
+	s.extraMu.Lock()
+	s.extraSources = nil
+	s.extraMu.Unlock()
 	s.types = nil
 	s.symbols = nil
 	s.signatures = nil
@@ -181,6 +223,9 @@ func (s *Session) Source(generation uint32, name string) (*ast.SourceFile, error
 		return nil, errors.New("stale type service generation")
 	}
 	file := s.program.GetSourceFile(name)
+	if file == nil && !s.syntaxOnly {
+		file = s.extraSource(name)
+	}
 	if s.syntaxOnly && !s.eligible[file] {
 		return nil, errors.New("foreign syntax service source")
 	}
@@ -380,7 +425,7 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	// the single-file exclusive checker lease while preserving request order.
 	for start := 0; start < len(queries); {
 		if r, ok := queries[start].Request.(*ProgramRequest); ok {
-			results[start], err = programQuery(ctx, p, r, natives[start])
+			results[start], err = programQuery(ctx, s, p, r, natives[start])
 			if err != nil {
 				return nil, err
 			}
@@ -869,10 +914,21 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		var sig *checker.Signature
 		var candidates []*checker.Signature
 		switch {
-		case r.ArgumentCount != nil:
+		case r.WithCandidates && r.ArgumentCount != nil:
 			sig, candidates = checker.Checker_getResolvedSignatureWorker(c, native, checker.CheckModeNormal, *r.ArgumentCount)
-			if !r.WithCandidates {
-				candidates = nil
+		case r.ArgumentCount != nil:
+			// Match TypeScript's getResolvedSignature(node, undefined, argCount):
+			// when candidatesOutArray is omitted and a resolved signature is already
+			// cached on the call node, return it without re-resolving or overwriting
+			// the cached signature.
+			links := checker.Checker_signatureLinks(c)
+			if entry := links.TryGet(native); entry != nil {
+				if cached := checker.SignatureLinks_resolvedSignature(entry); cached != nil && cached != checker.Checker_resolvingSignature(c) {
+					sig = cached
+				}
+			}
+			if sig == nil {
+				sig, _ = checker.Checker_getResolvedSignatureWorker(c, native, checker.CheckModeNormal, *r.ArgumentCount)
 			}
 		case r.WithCandidates:
 			sig = checker.Checker_getResolvedSignature(c, native, &candidates, checker.CheckModeNormal)
