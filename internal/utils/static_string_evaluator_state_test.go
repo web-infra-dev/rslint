@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/collections"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -91,13 +92,16 @@ func TestStaticPropertyShapeMutations(t *testing.T) {
 			typeChecker, done := program.GetTypeChecker(t.Context())
 			defer done()
 			result := findVariableInitializer(t, source, "result")
-			accounted := map[*ast.Node]bool{findVariableInitializer(t, source, "copy"): true}
+			var accounted collections.OrderedMap[*ast.Node, struct{}]
+			accounted.Set(findVariableInitializer(t, source, "copy"), struct{}{})
 			evaluator := NewStaticStringEvaluatorWithCallEscapes(typeChecker, source, nil)
 			for range 2 {
-				assert.Equal(t, evaluator.HasPropertyShapeMutation(result, nil, nil, accounted), test.changed)
+				descriptors, values := evaluator.PropertyReadMutations(result, nil, nil, &accounted)
+				assert.Equal(t, descriptors || values, test.changed)
 			}
 			ordinary := NewStaticStringEvaluatorWithSourceFile(typeChecker, source)
-			assert.Assert(t, ordinary.HasPropertyShapeMutation(result, nil, nil, accounted))
+			descriptors, values := ordinary.PropertyReadMutations(result, nil, nil, &accounted)
+			assert.Assert(t, descriptors || values)
 		})
 	}
 }
@@ -188,10 +192,57 @@ func TestStaticPropertyReadShapeMutations(t *testing.T) {
 			access := findVariableInitializer(t, source, "result")
 			copyCall := findVariableInitializer(t, source, "copy")
 			origin := findVariableInitializer(t, source, "target")
-			accounted := map[*ast.Node]bool{copyCall: true}
+			var accounted collections.OrderedMap[*ast.Node, struct{}]
+			accounted.Set(copyCall, struct{}{})
 			evaluator := NewStaticStringEvaluatorWithCallEscapes(typeChecker, source, nil)
 			for range 2 {
-				assert.Equal(t, evaluator.HasPropertyShapeMutation(copyCall.Arguments()[0], origin, access, accounted), test.changed)
+				descriptors, values := evaluator.PropertyReadMutations(copyCall.Arguments()[0], origin, access, &accounted)
+				assert.Equal(t, descriptors || values, test.changed)
+			}
+		})
+	}
+}
+
+func TestStaticPropertyAnonymousCopies(t *testing.T) {
+	for _, test := range []struct {
+		name, before, expression string
+		descriptors, values      bool
+	}{
+		{"plain object", "", "Object.assign({}, {value: 1}).value", false, false},
+		{"nullable overwrite", "", "Object.assign({}, {value: 1}, {value: undefined as number | undefined}).value", false, true},
+		{"truncated array", "", "Object.assign([] as number[], {0: 1}, {length: 0})[0]", false, true},
+		{"restored array", "", "Object.assign([] as number[], {length: 0}, {0: 1})[0]", false, false},
+		{"plain function", "", "Object.assign(() => 0, {value: 1}).value", false, false},
+		{"nullable function property", "", "Object.assign(() => 0, {value: 1}, {value: undefined as number | undefined}).value", false, true},
+		{"inherited setter", "Object.defineProperty(Object.prototype, 'value', {get() { return undefined; }, set(value: number) {}});", "Object.assign({}, {value: 1}).value", true, false},
+		{"setter in union", "", "Object.assign({}, {value: 1}, Math.random() ? {value: 2} : {set value(v: number) {}}).value", false, true},
+		{"setter without getter", "", "Object.assign({}, {value: 1}, {set value(v: number) {}}).value", false, true},
+		{"restored setter value", "", "Object.assign({}, {set value(v: number) {}}, {value: 1}).value", false, false},
+		{"getter deletes later index", "", "Object.assign([] as number[], {length: 0}, {...{get 0() { Reflect.deleteProperty(this, '1'); return 0; }, 1: 1}})[1]", true, false},
+		{"getter coerces object", "", "Object.assign([] as number[], {length: 0}, {...{get 0() { return +{valueOf: () => {Reflect.deleteProperty(this, '1'); return 0;}}; }, 1: 1}})[1]", true, false},
+		{"pure copied getter", "const value = 1;", "Object.assign({}, {get value() { return value; }}).value", false, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := fixtures.GetRootDir()
+			file := tspath.ResolvePath(root.Dir, "anonymous-copy.ts")
+			code := "function read() { " + test.before + " const result = " + test.expression + "; }"
+			fs := NewOverlayVFS(root.FS, map[string]string{file: code})
+			program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
+			assert.NilError(t, err)
+			source := program.GetSourceFile(file)
+			assert.Assert(t, source != nil)
+			typeChecker, done := program.GetTypeChecker(t.Context())
+			defer done()
+			access := findVariableInitializer(t, source, "result")
+			copyCall := access.Expression()
+			origin := SkipAssertionsAndParens(copyCall.Arguments()[0])
+			evaluator := NewStaticStringEvaluatorWithCallEscapes(typeChecker, source, nil)
+			var accounted collections.OrderedMap[*ast.Node, struct{}]
+			accounted.Set(copyCall, struct{}{})
+			for range 2 {
+				descriptors, values := evaluator.PropertyReadMutations(origin, origin, access, &accounted)
+				assert.Equal(t, descriptors, test.descriptors)
+				assert.Equal(t, values, test.values)
 			}
 		})
 	}

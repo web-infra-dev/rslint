@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/collections"
 	"github.com/microsoft/TypeScript/tsc/shim/evaluator"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -1942,22 +1943,31 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 	return flags&staticReferencePropertyMutation != 0
 }
 
-// HasPropertyShapeMutation conservatively detects changes that can invalidate
+// PropertyReadMutations conservatively detects changes that can invalidate
 // a data-property assumption, including unknown calls through aliases. Ordinary
 // writes to a known property name are allowed, except array truncation. The caller may exclude specific
 // calls whose writes it has already accounted for. With a proven fresh origin
 // and an access, later calls in the same invocation and harmless built-ins do
-// not invalidate this read. Call-escape tracking is required.
-func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, origin, access *ast.Node, accountedCalls map[*ast.Node]bool) bool {
+// not invalidate this read. A fresh literal can be its own reference when no
+// binding exists. Calls are recorded outermost first, preserving nested copy
+// order. Descriptor mutations can replace an iterator; value mutations only
+// invalidate the selected read. Call-escape tracking is required.
+func (staticEvaluator *StaticStringEvaluator) PropertyReadMutations(node, origin, access *ast.Node, accountedCalls *collections.OrderedMap[*ast.Node, struct{}]) (descriptorMutation, valueMutation bool) {
 	if !staticEvaluator.trackCallEscapes || staticEvaluator.sourceFile == nil {
-		return true
+		return true, false
 	}
-	symbol := staticEvaluator.referenceSymbol(SkipAssertionsAndParens(node))
+	node = SkipAssertionsAndParens(node)
+	symbol := staticEvaluator.referenceSymbol(node)
 	if symbol == nil {
-		return true
-	}
-	if staticEvaluator.referenceFlagsFor(symbol)&(staticReferenceWrite|staticReferencePropertyShapeMutation) != 0 {
-		return true
+		// An inline fresh target has no binding to follow, but its copy
+		// sources and built-in prototypes still affect the observed value.
+		if node != origin || staticEvaluator.typeChecker == nil ||
+			!ast.IsObjectLiteralExpression(node) && !ast.IsArrayLiteralExpression(node) && !ast.IsFunctionExpressionOrArrowFunction(node) {
+			return true, false
+		}
+		staticEvaluator.ensureReferenceFlags()
+	} else if staticEvaluator.referenceFlagsFor(symbol)&(staticReferenceWrite|staticReferencePropertyShapeMutation) != 0 {
+		return true, false
 	}
 	if origin != nil && staticEvaluator.typeChecker != nil {
 		constructors := []string{"Object"}
@@ -1971,71 +1981,84 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 			if constructor != nil && staticEvaluator.hasConstructorMutation(constructor) {
 				// A fresh target can inherit a setter installed on a built-in
 				// prototype. Object.assign does not create a data field over it.
-				return true
+				return true, false
 			}
 		}
 	}
 	for site := range staticEvaluator.escapeFacts.sites[symbol] {
-		if accountedCalls[site] || origin != nil && access != nil &&
+		if accountedCalls.Has(site) || origin != nil && access != nil &&
 			(staticEvaluator.propertyMutationFollowsRead(site, origin, access) || staticEvaluator.callPreservesPropertyShape(site, origin, access, symbol)) {
 			continue
 		}
-		return true
+		return true, false
 	}
-	if origin != nil && access != nil {
-		key, known := staticEvaluator.evalAccessExpressionKey(access)
-		for call := range accountedCalls {
-			invalidated, unknown := staticEvaluator.copyReadMutation(call, access, key, known, ast.IsArrayLiteralExpression(origin))
-			if unknown {
-				return true
+	for call := range accountedCalls.Keys() {
+		for _, source := range call.Arguments()[1:] {
+			info := staticEvaluator.copySource(source)
+			if info.hasEffects {
+				return true, false
 			}
-			if invalidated {
-				write := staticEvaluator.propertyWriteAtRead(access)
-				if write == nil || !staticEvaluator.propertyMutationFollowsRead(write, call, call) {
-					return true
+			if origin != nil && ast.IsArrayLiteralExpression(origin) && access != nil && info.unknown && staticEvaluator.typeChecker != nil {
+				key, known := staticEvaluator.evalAccessExpressionKey(access)
+				if (!known || isArrayIndexProperty(key)) && GetWellKnownSymbolPropertyOfType(GetConstrainedTypeAtLocation(staticEvaluator.typeChecker, source), "iterator", staticEvaluator.typeChecker) == nil {
+					// An opaque source can replace a target iterator absent from its
+					// public type. Its yielded values are then unknown as well, so a
+					// destructuring default cannot trust only the target's iterator.
+					return true, false
 				}
+			}
+		}
+	}
+	if origin != nil && access != nil && accountedCalls.Size() != 0 {
+		key, known := staticEvaluator.evalAccessExpressionKey(access)
+		invalidated, unknown := staticEvaluator.copyReadMutation(accountedCalls, access, key, known, ast.IsArrayLiteralExpression(origin))
+		if unknown {
+			return false, true
+		}
+		if invalidated {
+			call, _, _ := accountedCalls.EntryAt(0)
+			write := staticEvaluator.propertyWriteAtRead(access)
+			if write == nil || !staticEvaluator.propertyMutationFollowsRead(write, call, call) {
+				return false, true
 			}
 		}
 	}
 	if sites := staticEvaluator.escapeFacts.lengthWrites[symbol]; len(sites) != 0 {
 		if origin == nil || access == nil {
-			return true
+			return false, true
 		}
 		if !ast.IsArrayLiteralExpression(origin) {
-			return false
+			return false, false
 		}
 		// Length writes cannot change named properties. Keep their sites
 		// separate so these reads do not scan every truncation in the file.
 		key, known := staticEvaluator.evalAccessExpressionKey(access)
 		if known && !isArrayIndexProperty(key) {
-			return false
+			return false, false
 		}
 		write := staticEvaluator.propertyWriteAtRead(access)
 		if write != nil && staticEvaluator.lengthWritesInReadBlock(symbol, origin, access, write) {
-			return false
+			return false, false
 		}
 		for site := range sites {
 			if staticEvaluator.propertyMutationFollowsRead(site, origin, access) ||
 				write != nil && staticEvaluator.propertyMutationFollowsRead(write, origin, site) {
 				continue
 			}
-			return true
+			return false, true
 		}
 	}
-	return false
+	return false, false
 }
 
-func (staticEvaluator *StaticStringEvaluator) copyReadMutation(call, access *ast.Node, key string, keyKnown, arrayTarget bool) (invalidated, unknown bool) {
-	if !ast.IsCallExpression(call) || len(call.Arguments()) < 2 {
-		return false, true
-	}
+func (staticEvaluator *StaticStringEvaluator) copyReadMutation(calls *collections.OrderedMap[*ast.Node, struct{}], access *ast.Node, key string, keyKnown, arrayTarget bool) (invalidated, unknown bool) {
 	if !keyKnown && staticEvaluator.typeChecker != nil && ast.IsElementAccessExpression(access) {
 		keyType := GetConstrainedTypeAtLocation(staticEvaluator.typeChecker, access.AsElementAccessExpression().ArgumentExpression)
 		for _, part := range UnionTypeParts(keyType) {
 			if !checker.IsTypeUsableAsPropertyName(part) {
 				return false, true
 			}
-			invalidated, unknown := staticEvaluator.copyReadMutation(call, access, checker.GetPropertyNameFromType(part), true, arrayTarget)
+			invalidated, unknown := staticEvaluator.copyReadMutation(calls, access, checker.GetPropertyNameFromType(part), true, arrayTarget)
 			if invalidated || unknown {
 				return invalidated, unknown
 			}
@@ -2054,48 +2077,120 @@ func (staticEvaluator *StaticStringEvaluator) copyReadMutation(call, access *ast
 		}
 		return readType == nil || !checker.Checker_isTypeAssignableTo(tc, checker.Checker_getTypeWithFacts(tc, value, checker.TypeFactsEQUndefinedOrNull), readType)
 	}
-	index, _ := ecmascript.StringToNumber(key)
-	for _, source := range call.Arguments()[1:] {
-		info := staticEvaluator.copySource(source)
-		if arrayIndex && info.unknown {
-			// An opaque source can also copy __proto__ or invoke a getter.
-			// A later indexed write alone cannot prove a data property exists.
-			return false, true
-		}
-		if keyKnown && staticEvaluator.typeChecker != nil {
-			tc := staticEvaluator.typeChecker
-			sourceType := tc.GetTypeAtLocation(source)
-			if info.literal != nil {
-				sourceType = tc.GetTypeAtLocation(info.literal)
+	var index float64
+	if arrayIndex && keyKnown {
+		index, _ = ecmascript.StringToNumber(key)
+	}
+	for i := calls.Size() - 1; i >= 0; i-- {
+		call, _, _ := calls.EntryAt(i)
+		for _, source := range call.Arguments()[1:] {
+			info := staticEvaluator.copySource(source)
+			if arrayIndex && info.unknown {
+				// An opaque source can also copy __proto__ or invoke a getter.
+				// A later indexed write alone cannot prove a data property exists.
+				return false, true
 			}
-			property := checker.Checker_getPropertyOfType(tc, sourceType, key)
-			if property != nil {
-				if valueType := checker.Checker_getTypeOfSymbol(tc, property); IsNullableType(valueType) {
-					// Each later source can overwrite a restored value again.
-					invalidated = invalidated || addsNullish(valueType)
-				} else if info.literal != nil && !info.unknown && property.Flags&(ast.SymbolFlagsOptional|ast.SymbolFlagsAccessor) == 0 {
+			if keyKnown && staticEvaluator.typeChecker != nil {
+				tc := staticEvaluator.typeChecker
+				sourceType := staticEvaluator.copySourceReadType(source, info)
+				restores := info.literal != nil && !info.unknown
+				addsNullableValue := false
+				for _, part := range UnionTypeParts(sourceType) {
+					property := checker.Checker_getPropertyOfType(tc, part, key)
+					if property != nil {
+						valueType := constrainedCopyValueType(tc, checker.Checker_getTypeOfSymbol(tc, property))
+						if property.Flags&ast.SymbolFlagsAccessor == ast.SymbolFlagsSetAccessor {
+							// A setter without a getter reads undefined, regardless of its write type.
+							valueType = tc.GetUndefinedType()
+						} else if property.CheckFlags&ast.CheckFlagsSynthetic != 0 || slices.ContainsFunc(property.Declarations, ast.IsSetAccessorDeclaration) {
+							// Union and mapped properties can hide their accessor flags.
+							if slices.ContainsFunc(tc.GetRootSymbols(property), func(root *ast.Symbol) bool {
+								return root.Flags&ast.SymbolFlagsAccessor == ast.SymbolFlagsSetAccessor
+							}) {
+								valueType = tc.GetUnionType([]*checker.Type{valueType, tc.GetUndefinedType()})
+							}
+						}
+						if IsNullableType(valueType) {
+							addsNullableValue = addsNullableValue || addsNullish(valueType)
+							restores = false
+						} else if property.Flags&(ast.SymbolFlagsOptional|ast.SymbolFlagsAccessor) != 0 {
+							restores = false
+						}
+					} else {
+						restores = false
+						if info.hasProperties || info.unknown {
+							// An index signature can overwrite a key without exposing a
+							// property symbol. Empty literal arrays have no own elements.
+							if indexInfo := checker.Checker_getApplicableIndexInfo(tc, part, checker.Checker_getStringLiteralType(tc, key)); indexInfo != nil {
+								if valueType := constrainedCopyValueType(tc, indexInfo.ValueType()); IsNullableType(valueType) {
+									addsNullableValue = addsNullableValue || addsNullish(valueType)
+								}
+							}
+						}
+					}
+				}
+				if addsNullableValue {
+					invalidated = true
+				} else if restores {
 					invalidated = false
 				}
-			} else if info.hasProperties || info.unknown {
-				// Index signatures can overwrite a key without exposing a
-				// property symbol. Empty literal arrays have no own elements.
-				if indexInfo := checker.Checker_getApplicableIndexInfo(tc, sourceType, checker.Checker_getStringLiteralType(tc, key)); indexInfo != nil && IsNullableType(indexInfo.ValueType()) {
-					invalidated = invalidated || addsNullish(indexInfo.ValueType())
-				}
 			}
-		}
-		if arrayIndex && info.hasLength {
-			value := staticEvaluator.evalValue(info.length)
-			number, numeric := staticValueToNumber(value.value)
-			// Numeric keys are copied before length within one source, even
-			// when the object literal spells length first. Sources themselves
-			// are copied left to right, so a later source can restore an index.
-			if !keyKnown || !value.ok || !numeric || number != float64(ecmascript.NumberToUint32(number)) || number <= index {
-				invalidated = true
+			if arrayIndex && info.hasLength {
+				value := staticEvaluator.evalValue(info.length)
+				number, numeric := staticValueToNumber(value.value)
+				// Numeric keys are copied before length within one source, even
+				// when the object literal spells length first. Sources themselves
+				// are copied left to right, so a later source can restore an index.
+				if !keyKnown || !value.ok || !numeric || number != float64(ecmascript.NumberToUint32(number)) || number <= index {
+					invalidated = true
+				}
 			}
 		}
 	}
 	return invalidated, false
+}
+
+func constrainedCopyValueType(tc *checker.Checker, value *checker.Type) *checker.Type {
+	if constraint := checker.Checker_getBaseConstraintOfType(tc, value); constraint != nil {
+		value = constraint
+	}
+	if IsTypeFlagSetWithUnion(value, checker.TypeFlagsInstantiableNonPrimitive) {
+		return tc.GetUnknownType()
+	}
+	return value
+}
+
+func (staticEvaluator *StaticStringEvaluator) copySourceReadType(source *ast.Node, info staticCopySource) *checker.Type {
+	if info.sourceType != nil {
+		return info.sourceType
+	}
+	if info.literal != nil {
+		source = info.literal
+	}
+	if ast.IsObjectLiteralExpression(source) {
+		// Rechecking a wide literal for every union key is quadratic.
+		return checker.Checker_checkExpressionCached(staticEvaluator.typeChecker, source)
+	}
+	return GetConstrainedTypeAtLocation(staticEvaluator.typeChecker, source)
+}
+
+// Keep getter analysis deliberately narrow. HasSideEffect alone omits implicit
+// coercion calls, which can delete later source properties during enumeration.
+func (staticEvaluator *StaticStringEvaluator) copyGetterIsPure(getter *ast.Node) bool {
+	body := getter.Body()
+	if body == nil || !ast.IsBlock(body) || len(body.AsBlock().Statements.Nodes) != 1 {
+		return false
+	}
+	statement := body.AsBlock().Statements.Nodes[0]
+	if !ast.IsReturnStatement(statement) {
+		return false
+	}
+	expression := SkipAssertionsAndParens(statement.Expression())
+	if expression == nil || ast.IsIdentifier(expression) {
+		return true
+	}
+	_, known := staticEvaluator.EvalValueIfNoSideEffects(expression)
+	return known
 }
 
 func (staticEvaluator *StaticStringEvaluator) copySource(source *ast.Node) (info staticCopySource) {
@@ -2110,13 +2205,37 @@ func (staticEvaluator *StaticStringEvaluator) copySource(source *ast.Node) (info
 	if facts.copySources == nil {
 		facts.copySources = make(map[*ast.Node]staticCopySource)
 	}
-	// Cache immutable source syntax, with a conservative cycle sentinel.
+	// Cache immutable source syntax and its original branch contracts, with a conservative cycle sentinel.
 	facts.copySources[source] = staticCopySource{unknown: true}
 	defer func() { facts.copySources[source] = info }()
 	if ast.IsIdentifier(source) {
 		initializer, symbol, known := staticEvaluator.resolveIdentifierInitializer(source)
 		if known && staticEvaluator.referenceFlagsFor(symbol)&(staticReferenceWrite|staticReferencePropertyMutation) == 0 {
 			return staticEvaluator.copySource(initializer)
+		}
+	}
+	if staticEvaluator.typeChecker != nil {
+		var alternatives []*ast.Node
+		if ast.IsConditionalExpression(source) {
+			conditional := source.AsConditionalExpression()
+			alternatives = []*ast.Node{conditional.WhenTrue, conditional.WhenFalse}
+		} else if ast.IsLogicalOrCoalescingBinaryExpression(source) {
+			expression := source.AsBinaryExpression()
+			alternatives = []*ast.Node{expression.Left, expression.Right}
+		}
+		if alternatives != nil {
+			// Native conditional-expression subtype reduction can erase a
+			// setter branch that has the same write shape as a data property.
+			// Join the original alternatives without that reduction.
+			var types []*checker.Type
+			for _, alternative := range alternatives {
+				branch := staticEvaluator.copySource(alternative)
+				info.hasEffects = info.hasEffects || branch.hasEffects
+				types = append(types, staticEvaluator.copySourceReadType(alternative, branch))
+			}
+			info.sourceType = staticEvaluator.typeChecker.GetUnionType(types)
+			info.unknown = true
+			return info
 		}
 	}
 	if ast.IsArrayLiteralExpression(source) || ast.IsFunctionExpressionOrArrowFunction(source) {
@@ -2130,8 +2249,12 @@ func (staticEvaluator *StaticStringEvaluator) copySource(source *ast.Node) (info
 	if ast.IsObjectLiteralExpression(source) {
 		info.literal = source
 		for _, property := range source.AsObjectLiteralExpression().Properties.Nodes {
+			if ast.IsGetAccessorDeclaration(property) && !staticEvaluator.copyGetterIsPure(property) {
+				info.hasEffects = true
+			}
 			if ast.IsSpreadAssignment(property) {
 				spread := staticEvaluator.copySource(property.Expression())
+				info.hasEffects = info.hasEffects || spread.hasEffects
 				if spread.literal != nil && ast.IsArrayLiteralExpression(spread.literal) && staticEvaluator.typeChecker != nil {
 					tc := staticEvaluator.typeChecker
 					sourceType := tc.GetTypeAtLocation(spread.literal)
@@ -2139,14 +2262,14 @@ func (staticEvaluator *StaticStringEvaluator) copySource(source *ast.Node) (info
 					// without appearing in that property's native symbol type.
 					// Tuples expose their individual indices to the checker.
 					if checker.Checker_isArrayType(tc, sourceType) {
-						if elementType := checker.Checker_getIndexTypeOfType(tc, sourceType, tc.GetNumberType()); elementType != nil && IsNullableType(elementType) {
+						if elementType := checker.Checker_getIndexTypeOfType(tc, sourceType, tc.GetNumberType()); elementType != nil && IsNullableType(constrainedCopyValueType(tc, elementType)) {
 							spread.unknown = true
 						}
 					}
 				}
 				if spread.unknown {
 					info.unknown = true
-					break
+					continue
 				}
 				if spread.hasLength {
 					info.hasLength, info.length = true, spread.length
@@ -2158,7 +2281,7 @@ func (staticEvaluator *StaticStringEvaluator) copySource(source *ast.Node) (info
 			key, known := staticEvaluator.evalPropertyKey(property.Name())
 			if !known {
 				info.unknown = true
-				break
+				continue
 			}
 			if key == "length" {
 				info.hasLength, info.length = true, nil

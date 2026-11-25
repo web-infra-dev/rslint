@@ -155,10 +155,26 @@ applies to named properties and unions of property keys: for example,
 `Object.assign({}, {item}, {item: maybeItem}).item?.id` keeps its guard when
 `maybeItem` can be `undefined`. Plain literal object spreads retain the same source
 analysis, including nested spreads and their final `length` values.
+Direct reads such as `Object.assign({}, {item}, {item: maybeItem}).item?.id`
+and destructured copies apply these checks even without a binding for the target.
+The same applies to copied array lengths and visible built-in prototype changes.
+Nested copies follow their execution order, so an outer source can restore an
+inner copy's nullable value. Nullable generic constraints are preserved, including
+inside object spreads. Setter-only sources copy `undefined`, regardless of the
+setter parameter type, including union and mapped sources. Conditional and logical
+sources preserve their original alternatives before native subtype reduction;
+a nullable write in any possible source still matters. Getters can change later properties during enumeration:
+for example, `get 0() { Reflect.deleteProperty(this, "1"); return item; }` can
+remove the following `1: item` before it is copied. Such getters retain the guard;
+only a simple return of a local value or a statically safe expression establishes
+a harmless getter. This also covers implicit coercions that invoke user code.
 Opaque sources can contain an enumerable `length` absent from their declared
 type, so their indexed reads retain guards. For example, this also retains
 `xs[0] ?? fallback` after copying a class instance whose `length` getter is
 non-enumerable; the rule does not infer the instance's complete own shape.
+An opaque source can also replace `Symbol.iterator` without declaring it.
+Destructuring defaults then retain unknown yielded values, even when the target
+has a declared iterator; unrelated named fields keep their native narrowing.
 Ordinary array types also do not prove that an individual source index exists.
 For example, `Object.assign([] as Item[], {length: 0}, [item])[0] ?? fallback`
 retains its fallback, while a tuple source can prove the index was restored.

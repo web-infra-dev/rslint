@@ -1,6 +1,9 @@
 package utils
 
-import "github.com/microsoft/TypeScript/tsc/shim/ast"
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+)
 
 type staticReferenceTransfer struct {
 	value, site *ast.Node
@@ -9,9 +12,11 @@ type staticReferenceTransfer struct {
 }
 
 type staticCopySource struct {
+	sourceType      *checker.Type
 	literal, length *ast.Node
 	hasLength       bool
 	hasProperties   bool
+	hasEffects      bool
 	unknown         bool
 }
 
