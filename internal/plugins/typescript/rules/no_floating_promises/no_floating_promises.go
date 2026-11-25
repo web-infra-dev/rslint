@@ -106,6 +106,25 @@ func buildFloatingVoidMessage() rule.RuleMessage {
 	}
 }
 
+// Intrinsic types whose apparent type has no symbol, properties, or array/tuple
+// structure, so they can never be a Promise, thenable, or array/tuple of Promises.
+const nonPromiseTypeFlags = checker.TypeFlagsVoid |
+	checker.TypeFlagsUndefined |
+	checker.TypeFlagsNull |
+	checker.TypeFlagsNever |
+	checker.TypeFlagsAny
+
+func unionTypeParts(t *checker.Type, buf *[1]*checker.Type) []*checker.Type {
+	if t == nil {
+		return nil
+	}
+	if checker.Type_flags(t)&checker.TypeFlagsUnion != 0 {
+		return t.Types()
+	}
+	buf[0] = t
+	return buf[:]
+}
+
 var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 	Name:             "no-floating-promises",
 	Schema:           rule.NewSchema(schemaJSON),
@@ -164,12 +183,12 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			return false
 		}
 		isPromiseLike := func(node *ast.Node, t *checker.Type) bool {
-			if t == nil {
-				t = ctx.TypeChecker.GetTypeAtLocation(node)
+			if utils.IsTypeFlagSet(t, nonPromiseTypeFlags) {
+				return false
 			}
 
 			// The highest priority is to allow anything allowlisted
-			if utils.TypeMatchesSomeSpecifier(
+			if len(opts.AllowForKnownSafePromises) > 0 && utils.TypeMatchesSomeSpecifier(
 				t,
 				opts.AllowForKnownSafePromises,
 				nil,
@@ -179,11 +198,16 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			}
 
 			// Otherwise, we always consider the built-in Promise to be Promise-like...
-			typeParts := utils.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, t))
-			if utils.Some(typeParts, func(typePart *checker.Type) bool {
-				return utils.IsPromiseLike(ctx.Program(), ctx.TypeChecker, typePart)
-			}) {
-				return true
+			apparent := checker.Checker_getApparentType(ctx.TypeChecker, t)
+			var singlePart [1]*checker.Type
+			typeParts := unionTypeParts(apparent, &singlePart)
+			for _, typePart := range typeParts {
+				if utils.IsTypeFlagSet(typePart, nonPromiseTypeFlags) {
+					continue
+				}
+				if utils.IsPromiseLike(ctx.Program(), ctx.TypeChecker, typePart) {
+					return true
+				}
 			}
 
 			// ...and only check all Thenables if explicitly told to
@@ -196,6 +220,9 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			//
 			//   https://github.com/ajafff/tsutils/blob/49d0d31050b44b81e918eae4fbaf1dfe7b7286af/util/type.ts#L95-L125
 			for _, typePart := range typeParts {
+				if utils.IsTypeFlagSet(typePart, nonPromiseTypeFlags) {
+					continue
+				}
 				then := checker.Checker_getPropertyOfType(ctx.TypeChecker, typePart, "then")
 				if then == nil {
 					continue
@@ -213,9 +240,12 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 			}
 			return false
 		}
-		isPromiseArray := func(node *ast.Node) bool {
-			t := ctx.TypeChecker.GetTypeAtLocation(node)
-			for _, typePart := range utils.UnionTypeParts(t) {
+		isPromiseArray := func(node *ast.Node, t *checker.Type) bool {
+			var singlePart [1]*checker.Type
+			for _, typePart := range unionTypeParts(t, &singlePart) {
+				if utils.IsTypeFlagSet(typePart, nonPromiseTypeFlags) {
+					continue
+				}
 				apparent := checker.Checker_getApparentType(ctx.TypeChecker, typePart)
 
 				if checker.Checker_isArrayType(ctx.TypeChecker, apparent) {
@@ -237,7 +267,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 		}
 
 		isKnownSafePromiseReturn := func(node *ast.Node) bool {
-			if !ast.IsCallExpression(node) {
+			if len(opts.AllowForKnownSafeCalls) == 0 || !ast.IsCallExpression(node) {
 				return false
 			}
 
@@ -308,7 +338,10 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 				return isUnhandledPromise(expr.Right)
 			}
 
-			if !opts.IgnoreVoid && ast.IsVoidExpression(node) {
+			if ast.IsVoidExpression(node) {
+				if opts.IgnoreVoid {
+					return false, false, false
+				}
 				// Similarly, a `void` expression always returns undefined, so we need to
 				// see what's inside it without checking the type of the overall expression.
 				return isUnhandledPromise(node.Expression())
@@ -316,8 +349,12 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 
 			// Check the type. At this point it can't be unhandled if it isn't a promise
 			// or array thereof.
+			nodeType := ctx.TypeChecker.GetTypeAtLocation(node)
+			if utils.IsTypeFlagSet(nodeType, nonPromiseTypeFlags) {
+				return false, false, false
+			}
 
-			if isPromiseArray(node) {
+			if isPromiseArray(node, nodeType) {
 				return true, false, true
 			}
 
@@ -330,7 +367,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 				return false, false, false
 			}
 
-			if !isPromiseLike(node, nil) {
+			if !isPromiseLike(node, nodeType) {
 				return false, false, false
 			}
 
