@@ -74,7 +74,8 @@ Leave this rule disabled if your project has no syntax restrictions.
 ## Differences from upstream
 
 - Malformed selectors are ignored instead of rejecting the rule configuration. For example, `["error", "[", "WithStatement"]` still restricts `WithStatement` in rslint; ESLint rejects the malformed `[` selector.
-- TypeScript selectors are limited to the supported AST node mappings. Type nodes such as `TSUnknownKeyword` or `TSTypeReference`, type annotations and type-parameter wrappers are not exposed, so selectors on type-only syntax, such as `TSAsExpression[typeAnnotation.type="TSUnknownKeyword"]`, do not match. Receiver attribute paths also look through TypeScript assertions, such as `(console as any).log()`.
+- TypeScript selectors are limited to the supported AST node mappings. Type nodes such as `TSUnknownKeyword` or `TSTypeReference`, type annotations and type-parameter wrappers are not exposed. A positive filter on them never matches: `TSAsExpression[typeAnnotation.type="TSUnknownKeyword"]` does not report `v as unknown`. A negative filter can report too much: `TSAsExpression[typeAnnotation.type!="TSUnknownKeyword"]` reports `v as unknown`, which ESLint allows, because the missing field compares unequal.
+- Receiver and initializer attribute paths look through TypeScript assertions, such as `(console as any).log()`. For `const a = v as Foo`, `VariableDeclarator > TSAsExpression` matches, but `VariableDeclarator > TSAsExpression.init` does not, while ESLint reports both.
 - The bare `*` selector follows the underlying TypeScript AST traversal, starting at the program's children, and does not report additional ESTree wrappers. Named selectors such as `ClassBody` and `ChainExpression`, and other broad selectors, can match supported wrappers. Use `Program` or `Program:exit` to select the program itself.
 
 ## Original Documentation

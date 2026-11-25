@@ -692,8 +692,23 @@ func isEnumDeclarationNode(node *ast.Node) bool {
 func isChainRoot(node *ast.Node) bool {
 	// Only the receiver continues a chain. An optional chain in an argument
 	// or a computed key belongs to its own ChainExpression.
-	return node != nil && ast.IsOptionalChain(node) &&
-		(node.Parent == nil || !ast.IsOptionalChain(node.Parent) || node.Parent.Expression() != node)
+	return isChainMember(node) &&
+		(node.Parent == nil || !isChainMember(node.Parent) || node.Parent.Expression() != node)
+}
+
+// isChainMember reports whether node belongs to an ESTree ChainExpression.
+// tsgo only flags a non-null assertion as part of an optional chain when the
+// chain continues after it (`o?.x!.y`). A trailing assertion (`o?.x!`) is
+// still inside the ChainExpression in ESTree; a parenthesized receiver
+// (`(o?.x)!`) ends the chain first.
+func isChainMember(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if ast.IsOptionalChain(node) {
+		return true
+	}
+	return node.Kind == ast.KindNonNullExpression && isChainMember(node.Expression())
 }
 
 func childTarget(node *ast.Node) string {
