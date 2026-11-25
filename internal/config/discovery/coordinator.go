@@ -229,9 +229,6 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		}
 	}
 	for _, seed := range explicitSeeds {
-		if seed.usingFallback && rslintconfig.IsSupportedLintFile(seed.path) {
-			coordinator.draft.addFallbackFile(seed.path)
-		}
 		if seed.ownerDir == "" {
 			continue
 		}
@@ -252,7 +249,6 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			canonicalDirectory: seed.physicalDirectory,
 			ownerDir:           seed.ownerDir,
 			ownerPath:          seed.ownerPath,
-			usingFallback:      seed.usingFallback,
 			ignoreMatcher:      ignoreMatcher,
 			configReachable:    true,
 			gitCursor:          seed.gitCursor,
@@ -331,7 +327,6 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 		EslintPlugins:      eslintPlugins,
 		Scopes:             scopes,
 		Failures:           coordinator.modules.failures(),
-		fallbacks:          coordinator.draft.fallbacks,
 		Stats: ConfigDiscoveryStats{
 			DirectoriesVisited: coordinator.walkStats.directoriesVisited,
 			ConfigsRequested:   coordinator.modules.configsRequested,

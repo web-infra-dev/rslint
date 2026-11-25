@@ -1489,20 +1489,19 @@ in `internal/config/lint`, Program construction in `internal/program/loader`,
 the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
 
-For `--suppress-rule`, the Node wrapper parses the user's rule list and passes
-the rule IDs to Go as a JSON array. With an active bulk suppressions file, the
-CLI uses the final observation from the same lint or autofix run.
-Config discovery identifies inputs whose intended
-config failed to load. The native lint plan identifies syntax errors and rules
-skipped for lack of type information. Plugin dispatch identifies incomplete
-file or rule results. The CLI passes the final targets, their completeness
-and their diagnostics to `internal/suppressions`, including clean files with
-zero errors. Pruning uses those results for observed files and checks the
-filesystem for missing paths outside the observation.
-The package counts error-level lint findings by rule and by the selected
-target path relative to the physical working directory. It owns comparison
-and scoped updates, writing the complete JSON in the same directory before
-replacing the baseline. The CLI renders the remaining
+With an active bulk suppressions file, the CLI opens and validates the baseline
+before linting or autofixing, and applies it to the final observation from the
+same run. The native lint plan identifies syntax errors and rules skipped for
+lack of type information. Plugin dispatch identifies incomplete file or rule
+results. The CLI passes the final targets, their completeness, and their
+diagnostics to `internal/suppressions`, including clean files with zero errors.
+If a discovered configuration failed to load or plugin dispatch failed, record
+and prune modes refuse to modify the baseline. Pruning uses those results for
+observed files and checks the filesystem for missing paths outside the
+observation. The package counts error-level lint findings by rule and by the
+selected target path relative to the physical working directory. It owns
+comparison and scoped updates, writing the complete JSON to a temporary file in
+the same directory before replacing the baseline. The CLI renders the remaining
 diagnostics and sets the exit code. See the [bulk suppressions guide](website/docs/en/guide/bulk-suppressions.md)
 for how recording and pruning handle incomplete checks.
 

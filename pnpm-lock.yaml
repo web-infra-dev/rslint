@@ -144,9 +144,6 @@ catalogs:
     json-schema-to-typescript:
       specifier: ^15.0.4
       version: 15.0.4
-    levn:
-      specifier: 0.4.1
-      version: 0.4.1
     lucide-react:
       specifier: ^0.577.0
       version: 0.577.0
@@ -298,9 +295,6 @@ importers:
       json-schema-to-typescript:
         specifier: 'catalog:'
         version: 15.0.4
-      levn:
-        specifier: 'catalog:'
-        version: 0.4.1
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

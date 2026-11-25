@@ -65,9 +65,11 @@ func (f *File) Apply(ctx context.Context, results []FileResult, diagnostics []ru
 	// entire file requires a complete file result.
 	recordNamedRules := f.options.Mode == Record && f.options.Rules != nil
 	var uncheckedKeys []string
+	hasUnchecked := false
 	hasUpdatableFile := false
 	for _, result := range results {
 		if result.Unchecked {
+			hasUnchecked = true
 			if f.options.Mode == Prune {
 				uncheckedKeys = append(uncheckedKeys, f.fileKey(result.Path))
 			}
@@ -95,8 +97,9 @@ func (f *File) Apply(ctx context.Context, results []FileResult, diagnostics []ru
 		}
 		file.counts[diagnostic.RuleName]++
 	}
-	// An empty, successful target set can still create a baseline or prune deleted files.
-	if f.options.Mode != Check && (len(files) == 0 || hasUpdatableFile) {
+	// An empty target set can still create a baseline or prune deleted files,
+	// but a run whose only targets were unchecked must not mutate the baseline.
+	if f.options.Mode != Check && (hasUpdatableFile || (len(files) == 0 && !hasUnchecked)) {
 		err := f.update(ctx, func(latest entries) bool {
 			if f.options.Mode == Record {
 				return f.record(latest, files)

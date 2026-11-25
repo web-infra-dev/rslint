@@ -218,8 +218,8 @@ describe('CLI bulk suppressions', () => {
     );
     expect(invalid.exitCode).toBe(2);
     expect(invalid.stderr).toContain('invalid suppressions');
-    expect(await fs.readFile(path.join(cwd, 'ok.js'), 'utf8')).toContain(
-      'let a',
+    expect(await fs.readFile(path.join(cwd, 'ok.js'), 'utf8')).toBe(
+      'var a = 1;',
     );
   });
 
@@ -303,7 +303,7 @@ describe('CLI bulk suppressions', () => {
     });
   });
 
-  test('prunes only verified files when a nested config fails to load', async () => {
+  test('refuses to update suppressions when a discovered config fails to load', async () => {
     const count = { 'no-console': { count: 1 } };
     const cwd = await project({
       'rslint.config.mjs':
@@ -342,37 +342,7 @@ describe('CLI bulk suppressions', () => {
     expect(await readBaseline(cwd)).toEqual({
       'nested/a.js': count,
       'nested/skip.js': count,
-    });
-    await fs.writeFile(path.join(cwd, 'rslint-suppressions.json'), '{}');
-    const ignored = await runRslint(
-      ['--pass-on-unpruned-suppressions', 'nested/skip.js'],
-      cwd,
-    );
-    expect(ignored.exitCode).toBe(2);
-    expect(ignored.stderr).toContain('configuration failed');
-  });
-
-  test('keeps directory-scan counts when a literal file tries a different config', async () => {
-    const cwd = await project({
-      'rslint.config.mjs':
-        "export default [{ignores:['sub/rslint.config.js']},{rules:{'no-console':'error','no-debugger':'error'}}];",
-      'sub/rslint.config.js': 'throw Error("broken config");',
-      'sub/rslint.config.mjs':
-        "export default [{rules:{'no-debugger':'error'}}];",
-      'sub/a.js': 'console.log(1);',
-      'sub/b.js': 'debugger;',
-    });
-    const result = await runRslint(
-      ['--suppress-all', '--format', 'jsonline', '.', 'sub/a.js'],
-      cwd,
-    );
-    expect(result.exitCode).toBe(2);
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      filePath: 'sub/a.js',
-      ruleName: 'no-console',
-    });
-    expect(await readBaseline(cwd)).toEqual({
-      'sub/b.js': { 'no-debugger': { count: 1 } },
+      'nested/ok/b.js': count,
     });
   });
 

@@ -4,68 +4,96 @@ description: 'Enable lint rules on an existing project by recording error counts
 
 # Bulk suppressions
 
-Bulk suppressions let you enable a lint rule on an existing project and fix the current violations over time. The Rslint CLI records an error count per file and rule, following the same workflow and JSON format as [ESLint's bulk suppressions](https://eslint.org/docs/latest/use/suppressions).
+Bulk suppressions let you enable stricter lint rules on an existing project without fixing every legacy violation up front. Rslint records the current error count per file and rule in a JSON file (default `rslint-suppressions.json`), using the same workflow and format as [ESLint's bulk suppressions](https://eslint.org/docs/latest/use/suppressions).
 
-**Only lint rule errors are eligible.** A rule configured as `"warn"` still reports warnings, even if you name it with `--suppress-rule`. Warnings count toward `--max-warnings`. Rslint reports syntax errors and TypeScript compiler diagnostics independently of the baseline.
-
-With `--type-check-only`, Rslint skips the baseline and rejects recording and pruning.
+Existing violations up to the recorded count are suppressed, while new violations fail linting as usual.
 
 ## Record existing errors
 
-Enable the rules at `"error"` severity in your config, then record their current violations from the project directory.
+1. Enable the rules you want to adopt at `"error"` severity in your Rslint config.
+2. Run Rslint from your project root to record current violations:
 
 ```bash
+# Record specific rules
+rslint --suppress-rule no-var --suppress-rule no-debugger
+rslint --suppress-rule "no-var,no-debugger"
 rslint --suppress-rule "[no-var,no-debugger]"
+
+# Or record all current error-level rules
+rslint --suppress-all
+
+# Apply autofixes first, then record the remaining errors
+rslint --fix --suppress-all
 ```
 
-You can also repeat `--suppress-rule` or pass comma-separated IDs. To record all error-level rules, use `rslint --suppress-all`. Choose one of `--suppress-all`, `--suppress-rule`, or `--prune-suppressions` per run. Add `--fix` to apply available fixes before counting the remaining errors.
+3. Commit the generated `rslint-suppressions.json` alongside your config.
 
-Commit the generated `rslint-suppressions.json` with your config. Developers and CI can then run `rslint` from the same working directory to check against it.
-
-In a shared directory, an update can fail if Rslint cannot retain the existing file's ownership or access control list. The original baseline stays in place. If recording or pruning is interrupted, you can rerun the command even if a temporary file remains.
-
-To share an updatable baseline, use the same path or a symlink to it. Updating one hard link replaces only that directory entry.
+After that, running `rslint` from the same project directory automatically reads `rslint-suppressions.json` and suppresses the recorded errors.
 
 ## How the suppressions file works
 
-This baseline records two `no-debugger` errors in `src/app.js`.
+Each entry stores the allowed error count for a file and rule:
 
 ```json
 {
   "src/app.js": {
-    "no-debugger": { "count": 2 }
+    "no-debugger": {
+      "count": 2
+    }
   }
 }
 ```
 
-If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
-
-File keys use the target path selected by the CLI, relative to the physical working directory, with `/` as the separator. If the CLI selects `real.ts`, its count stays under `real.ts` even when `tsconfig.json` loads it through a symlink with a different name. A file on another Windows drive or UNC share uses its absolute path. On Windows, `D:/src/app.js` and `d:/src/app.js` share one entry.
-
-Use the physical checkout directory when sharing a baseline. From a sibling symlink `checkout-link` pointing to `checkout`, the CLI can display `src/app.js` and record `../checkout-link/src/app.js`. From `checkout`, the key is `src/app.js`. Rules can produce different findings for those paths. When the CLI deduplicates two inputs that name the same file, the baseline uses the path that was linted.
-
-To reuse an ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. Entries apply when the file path and rule ID match. On Windows, use consistent directory casing when importing an ESLint baseline. From `C:/repo`, ESLint records `C:/REPO/src/app.ts` as `src/app.ts`, while Rslint preserves its spelling as `../REPO/src/app.ts`.
-
-Pass `--suppressions-location` on every run that uses a custom location. Relative locations resolve from the same working directory as CLI file arguments. An existing directory or a path ending in a directory separator selects `rslint-suppressions_<hash>` inside that directory. This also applies when the default `rslint-suppressions.json` is a directory. Create the directory first. Rslint uses the same working-directory hash as ESLint. To reuse a file ESLint generated in that directory, pass its full filename.
+- **New errors are caught**: if `src/app.js` grows from 2 to 3 `no-debugger` errors, Rslint reports all 3 errors and exits with code `1`.
+- **Line moves don't break suppressions**: moving the 2 existing `no-debugger` calls to other lines keeps the count at 2.
+- **Paths are relative to the working directory**: run `rslint` from the same project directory locally and in CI so file paths match.
 
 ## Remove unused suppressions
 
-If the count in `src/app.js` falls from two to one, Rslint suppresses the remaining error and exits with code `2` because one recorded suppression is unused. Update the baseline and commit the change.
+When you fix legacy violations, the recorded count becomes higher than the actual error count. Rslint still suppresses the remaining errors, but exits with code `2` to remind you to update the baseline.
+
+Run `--prune-suppressions` to lower counts and remove entries that are no longer needed:
 
 ```bash
 rslint --prune-suppressions
 ```
 
-Pruning uses the final lint results to lower counts and remove entries that reach zero. For files outside those results, it removes paths that are missing from disk. Run it from a full checkout. If a Git sparse checkout includes only `packages/a`, running `--prune-suppressions packages/a` can remove entries for `packages/b` even though Git still tracks those files.
+Pruning lowers counts for fixed violations, deletes rules that reach zero, and removes entries for files that no longer exist on disk. Run it from a full checkout so files outside the current check are not treated as deleted.
 
-Pruning keeps entries for symlinks with unavailable targets, files in inaccessible directories, and Windows paths whose drive root is unavailable. Mount external volumes before pruning. If an unmounted volume leaves an accessible empty directory, Rslint treats the files below it as missing and removes their entries. Entries with UNC paths such as `//server/share/file.ts` are updated only when Rslint checks those files.
+If you want to defer cleanup temporarily (for example, while iterating locally), pass `--pass-on-unpruned-suppressions`:
 
-On a case-insensitive filesystem, a rename from `file.js` to `File.js` can leave the old spelling accessible. Remove its JSON entry if you no longer lint that spelling.
+```bash
+rslint --pass-on-unpruned-suppressions
+```
 
-Ignored files and files with syntax errors keep their entries. If a file moves outside its TypeScript project, Rslint keeps the counts for enabled rules that require type information. Other rules in that file can still be checked and pruned. If you turn a rule off or lower its severity to `"warn"`, pruning removes its old count the next time Rslint checks the file.
+## Custom location and ESLint migration
 
-If a plugin listener throws, Rslint reports the failure and any findings the listener already emitted. An incomplete rule keeps its recorded count, while completed rules can still record and prune theirs. If plugin results are missing for an entire file, `--suppress-all` and `--prune-suppressions` preserve that file's entries and update other files normally. `--suppress-rule` can still record a completed native rule in the affected file. The CLI exits with code `2` for incomplete file results. If a plugin batch request fails during the final check, the CLI leaves the baseline untouched.
+Use `--suppressions-location` to store the suppressions file somewhere else, or to reuse an existing ESLint suppressions file directly:
 
-When some configs load and others fail, a baseline check or update exits with code `2` if a selected file or directory loses its config or needs a fallback. This also applies to an empty `{}` baseline. A file ignored by the fallback might have been linted under the failed config. Affected files keep their entries and report any findings from the fallback. Files with a working config can still record and prune their counts. For example, checking just `sub/` can succeed if it has its own working config and the parent config fails to load.
+```bash
+# Reuse an ESLint suppressions file
+rslint --suppressions-location eslint-suppressions.json
 
-To defer cleanup, run `rslint --pass-on-unpruned-suppressions`. Lint errors and the configured warning limit still determine the exit status.
+# Store the suppressions file in a custom file or directory
+rslint --suppress-all --suppressions-location config/suppressions.json
+rslint --suppress-all --suppressions-location .cache/suppressions/
+```
+
+Pass `--suppressions-location` on every subsequent run that should use that file. When you pass an existing directory (or a path ending with `/` or `\`), Rslint stores a project-specific `rslint-suppressions_<hash>` file inside it.
+
+## Options
+
+| Flag                              | Description                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| `--suppress-all`                  | Record all current error-level lint violations                                   |
+| `--suppress-rule <rules>`         | Record error-level violations for specific rules (repeatable, comma/list)        |
+| `--suppressions-location <path>`  | Use a custom suppressions file or directory (default `rslint-suppressions.json`) |
+| `--prune-suppressions`            | Lower counts and remove unused entries from the suppressions file                |
+| `--pass-on-unpruned-suppressions` | Do not fail with exit code `2` when unused suppressions remain                   |
+
+## Notes
+
+- **Only lint errors are suppressed**: rules configured as `"warn"` are still reported and still count toward `--max-warnings`. Syntax errors and TypeScript compiler diagnostics (`--type-check`) are always reported.
+- **One mode per run**: choose at most one of `--suppress-all`, `--suppress-rule`, or `--prune-suppressions` in a single invocation.
+- **`--type-check-only`**: skips the suppressions file and cannot be combined with `--suppress-all`, `--suppress-rule`, or `--prune-suppressions`.
+- **Safe on incomplete runs**: ignored files, files with syntax errors, and rules or files that could not finish checking (such as during a config or plugin error) keep their existing suppression counts instead of being cleared unexpectedly.

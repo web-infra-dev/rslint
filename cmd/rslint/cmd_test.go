@@ -2740,17 +2740,28 @@ func TestReadPhysicalFileTextPreservesEncodingAndSourceBOM(t *testing.T) {
 
 func TestParseLintFlagsSuppressRuleList(t *testing.T) {
 	args, _, code := parseLintFlags([]string{
-		"--suppress-rule=[]", `--suppress-rule=["p/one,two","p/second"]`, `--suppress-rule=["p/third"]`,
+		"--suppress-rule=[]",
+		`--suppress-rule=['p/one,two', "no-\u0076ar"]`,
+		"--suppress-rule=p/second,p/third",
+		"--suppress-rule", "@typescript-eslint/no-explicit-any",
 	})
-	if code != 0 || !slices.Equal(args.Suppressions.Rules, []string{"p/one,two", "p/second", "p/third"}) {
-		t.Fatalf("bound rule selection = %q, exit code %d", args.Suppressions.Rules, code)
+	want := []string{"p/one,two", "no-var", "p/second", "p/third", "@typescript-eslint/no-explicit-any"}
+	if code != 0 || !slices.Equal(args.Suppressions.Rules, want) {
+		t.Fatalf("rule selection = %q, want %q, exit code %d", args.Suppressions.Rules, want, code)
 	}
-	empty, _, code := parseLintFlags([]string{"--suppress-rule=[]"})
-	if code != 0 || empty.Suppressions.Mode != suppressions.Record || empty.Suppressions.Rules == nil || len(empty.Suppressions.Rules) != 0 {
-		t.Fatalf("explicit empty selection = %+v, exit code %d", empty.Suppressions, code)
+	for _, raw := range []string{"[]", ""} {
+		empty, _, code := parseLintFlags([]string{"--suppress-rule=" + raw})
+		if code != 0 || empty.Suppressions.Mode != suppressions.Record || empty.Suppressions.Rules == nil || len(empty.Suppressions.Rules) != 0 {
+			t.Fatalf("explicit empty selection %q = %+v, exit code %d", raw, empty.Suppressions, code)
+		}
 	}
-	if _, help, code := parseLintFlags([]string{"--help", "--suppress-all", "--suppress-rule=[]"}); !help || code != 0 {
-		t.Fatalf("help with conflicting suppression modes: help=%t, exit code %d", help, code)
+	for _, invalid := range []string{"[p/first", "p/first]", "a,,b", ",a", "a,", "'unterminated", `"a"extra`, "[a,[b]]"} {
+		if _, _, code := parseLintFlags([]string{"--suppress-rule=" + invalid}); code != 2 {
+			t.Errorf("invalid --suppress-rule=%q returned exit code %d, want 2", invalid, code)
+		}
+	}
+	if _, help, code := parseLintFlags([]string{"--help", "--suppress-all", "--suppress-rule=[unclosed"}); !help || code != 0 {
+		t.Fatalf("help with invalid/conflicting suppression flags: help=%t, exit code %d", help, code)
 	}
 }
 

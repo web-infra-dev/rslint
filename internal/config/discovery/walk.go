@@ -18,7 +18,6 @@ type discoveryWalkNode struct {
 	ignoreMatcher      rslintconfig.GlobalIgnoreMatcher
 	configReachable    bool
 	gitEntryBlocked    bool
-	usingFallback      bool
 	gitCursor          gitignore.Cursor
 	targets            *discoveryTargetTrie
 	recursive          bool
@@ -29,27 +28,17 @@ type suspendedDiscoveryNode struct {
 }
 
 type discoveryWalkResult struct {
-	children            []discoveryWalkNode
-	files               []*DiscoveryFile
-	pending             *suspendedDiscoveryNode
-	candidateToAdopt    *configLoadState
-	fallbackDirectories []string
-	directoriesVisited  int
-	directoriesPruned   int
-	err                 error
+	children           []discoveryWalkNode
+	files              []string
+	pending            *suspendedDiscoveryNode
+	candidateToAdopt   *configLoadState
+	directoriesVisited int
+	directoriesPruned  int
+	err                error
 }
 type discoveryWalkStats struct {
 	directoriesVisited int
 	directoriesPruned  int
-}
-
-// A fallback config cannot establish that an otherwise selected subtree should
-// be ignored. Bounded walks carry their actual glob matches in the target trie.
-func (result *discoveryWalkResult) pruneDirectory(node *discoveryWalkNode, directory string, targets *discoveryTargetTrie) {
-	result.directoriesPruned++
-	if node.usingFallback && (node.recursive || targets == nil || targets.hasScannedLintFile()) {
-		result.fallbackDirectories = append(result.fallbackDirectories, directory)
-	}
 }
 
 func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNode, discoverConfigs bool) error {
@@ -76,13 +65,9 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 				return result.err
 			}
 			coordinator.walkStats.directoriesVisited += result.directoriesVisited
-			node := &queue[index]
-			for _, directory := range result.fallbackDirectories {
-				coordinator.draft.addFallbackDirectory(directory, node.ownerDir)
-			}
 			coordinator.walkStats.directoriesPruned += result.directoriesPruned
 			for _, file := range result.files {
-				coordinator.reachableFiles[file.Path] = true
+				coordinator.reachableFiles[file] = true
 			}
 			if result.candidateToAdopt != nil {
 				if err := coordinator.adoptCandidate(result.candidateToAdopt, false); err != nil {
@@ -91,7 +76,7 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 				candidate := result.candidateToAdopt.candidate
 				coordinator.draft.addDirectory(candidate.directory, rslintconfig.DirectoryIdentity{
 					LexicalPath: candidate.directory, CanonicalPath: candidate.physicalDirectory,
-				}, node.recursive)
+				}, queue[index].recursive)
 			}
 			next = append(next, result.children...)
 			if result.pending != nil {
@@ -114,7 +99,6 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 					}, item.node.recursive)
 					item.node.ownerDir = state.candidate.directory
 					item.node.ownerPath = state.candidate.path
-					item.node.usingFallback = false
 					item.node.ignoreMatcher = state.ignoreMatcher
 				}
 				next = append(next, item.node)
@@ -171,11 +155,10 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	if err := coordinator.ctx.Err(); err != nil {
 		return discoveryWalkResult{err: err}
 	}
-	result := discoveryWalkResult{}
 	if node.ignoreMatcher.BlocksDirectory(node.directory, node.canonicalDirectory) {
-		result.pruneDirectory(&node, node.directory, node.targets)
-		return result
+		return discoveryWalkResult{directoriesPruned: 1}
 	}
+	result := discoveryWalkResult{}
 
 	if discoverConfigs && node.configReachable {
 		if candidate, found := coordinator.findCandidateForOwner(
@@ -194,7 +177,6 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 				node.ownerPath = state.candidate.path
 				node.ignoreMatcher = state.ignoreMatcher
 			}
-			node.usingFallback = state.failure != nil
 		}
 	}
 	result.directoriesVisited = 1
@@ -204,21 +186,14 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	// traversal boundary. That ownership exception does not authorize searching
 	// its hidden children for another repository.
 	if node.gitEntryBlocked && !node.ignoreMatcher.MayReopenGitDescendants(node.directory, node.canonicalDirectory) {
-		result.pruneDirectory(&node, node.directory, node.targets)
+		result.directoriesPruned = 1
 		return result
 	}
 	walkTargets := node.targets
-	if node.usingFallback && (walkTargets == nil || node.recursive) {
-		result.fallbackDirectories = append(result.fallbackDirectories, node.directory)
-	}
 	if walkTargets != nil {
 		for _, file := range walkTargets.files {
-			if node.usingFallback && !file.Explicit && rslintconfig.IsSupportedLintFile(file.Path) {
-				// A bounded glob selects the caller's path, including its parent spelling.
-				result.fallbackDirectories = append(result.fallbackDirectories, tspath.GetDirectoryPath(file.Path))
-			}
-			if !node.gitEntryBlocked || node.ignoreMatcher.ReopensGitignoredFile(file.PathIdentity) {
-				result.files = append(result.files, file)
+			if !node.gitEntryBlocked || node.ignoreMatcher.ReopensGitignoredFile(*file) {
+				result.files = append(result.files, file.Path)
 			}
 		}
 	}
@@ -254,14 +229,14 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 			canonicalChild = tspath.CombinePaths(node.canonicalDirectory, name)
 		}
 		if node.ignoreMatcher.BlocksDirectory(child, canonicalChild) {
-			result.pruneDirectory(&node, child, childTargets)
+			result.directoriesPruned++
 			continue
 		}
 		nextCursor, entryBlocked := coordinator.git.Enter(node.gitCursor, canonicalChild)
 		gitBlocked := node.gitEntryBlocked || entryBlocked || !nextCursor.SourceReachable()
 		childConfigReachable := !gitBlocked || node.ignoreMatcher.ReopensDirectoryNode(child, canonicalChild)
 		if gitBlocked && !node.ignoreMatcher.MayReopenGitDescendants(child, canonicalChild) {
-			result.pruneDirectory(&node, child, childTargets)
+			result.directoriesPruned++
 			continue
 		}
 		children = append(children, discoveryWalkNode{
@@ -271,7 +246,6 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 			ownerPath:          node.ownerPath,
 			ignoreMatcher:      node.ignoreMatcher,
 			configReachable:    childConfigReachable,
-			usingFallback:      node.usingFallback,
 			gitEntryBlocked:    gitBlocked && !childConfigReachable,
 			gitCursor:          nextCursor,
 			targets:            childTargets,

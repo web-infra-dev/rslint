@@ -12,23 +12,26 @@ rslint [options] [files/directories...]
 
 ## Options
 
-| Flag                  | Description                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| `--init`              | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
-| `-c, --config <path>` | Specify which JS/TS module config file to use                                                  |
-| `--fix`               | Automatically fix problems                                                                     |
-| `--type-check`        | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
-| `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
-| `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
-| `--quiet`             | Report errors only, suppress warnings                                                          |
-| `--timing [all\|n]`   | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
-| `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
-| `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
-| `--no-color`          | Disable colored output ([details](/guide/environment-variables))                               |
-| `--force-color`       | Force colored output ([details](/guide/environment-variables))                                 |
-| `--help`, `-h`        | Show help information                                                                          |
-
-The [Bulk suppressions guide](/guide/bulk-suppressions) covers `--suppress-all`, `--suppress-rule`, `--suppressions-location`, `--prune-suppressions`, and `--pass-on-unpruned-suppressions`.
+| Flag                              | Description                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `--init`                          | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
+| `-c, --config <path>`             | Specify which JS/TS module config file to use                                                  |
+| `--fix`                           | Automatically fix problems                                                                     |
+| `--type-check`                    | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
+| `--type-check-only`               | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
+| `--format <format>`               | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
+| `--quiet`                         | Report errors only, suppress warnings                                                          |
+| `--timing [all\|n]`               | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
+| `--max-warnings <n>`              | Exit with error if warning count exceeds this number                                           |
+| `--rule <rule>`                   | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
+| `--suppress-all`                  | Record all current error-level lint violations ([details](/guide/bulk-suppressions))           |
+| `--suppress-rule <rules>`         | Record errors for specific rules ([details](/guide/bulk-suppressions))                         |
+| `--suppressions-location <path>`  | Use a custom suppressions file or directory ([details](/guide/bulk-suppressions))              |
+| `--prune-suppressions`            | Remove unused entries from the suppressions file ([details](/guide/bulk-suppressions))         |
+| `--pass-on-unpruned-suppressions` | Allow unused suppressions without failing ([details](/guide/bulk-suppressions))                |
+| `--no-color`                      | Disable colored output ([details](/guide/environment-variables))                               |
+| `--force-color`                   | Force colored output ([details](/guide/environment-variables))                                 |
+| `--help`, `-h`                    | Show help information                                                                          |
 
 ## File and Directory Arguments
 
@@ -150,10 +153,10 @@ The table is written to stderr, so machine-readable output formats such as `json
 
 ## Exit Codes
 
-| Code | Meaning                                                                                                                                   |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `0`  | No errors (warnings may be present)                                                                                                       |
-| `1`  | Linting could not start, errors were found, or warnings exceed `--max-warnings`                                                           |
-| `2`  | Invalid usage, a suppressions file error, unused suppressions, or a baseline check left incomplete by a config fallback or plugin failure |
+| Code | Meaning                                                                         |
+| ---- | ------------------------------------------------------------------------------- |
+| `0`  | No errors (warnings may be present)                                             |
+| `1`  | Linting could not start, errors were found, or warnings exceed `--max-warnings` |
+| `2`  | Invalid usage, a suppressions file error, or unused suppressions                |
 
 Terminating Rslint stops the current check even when output is paused. On macOS and Linux, `SIGHUP`, `SIGINT`, and `SIGTERM` exit with status `129`, `130`, and `143`, respectively.

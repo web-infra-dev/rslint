@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"slices"
 	"sort"
 	"sync/atomic"
 
@@ -108,16 +107,6 @@ type ConfigFailure struct {
 	Message   string
 }
 
-type fallbackDirectory struct {
-	path  string
-	owner string // Empty when this directory had no successful owner.
-}
-
-type configFallbacks struct {
-	literals    map[string]bool
-	directories map[fallbackDirectory]bool
-}
-
 type ConfigDiscoveryStats struct {
 	DirectoriesVisited int
 	ConfigsRequested   int
@@ -139,41 +128,10 @@ type ConfigCatalog struct {
 	EslintPlugins      []rslintconfig.EslintPluginEntry
 	Scopes             map[string]target.OwnerScope
 	Failures           []ConfigFailure
-	fallbacks          configFallbacks
 	Stats              ConfigDiscoveryStats
 	// Explicit reports that the catalog came from one explicitly selected
 	// invocation-wide flat config rather than hierarchical auto discovery.
 	Explicit bool
-}
-
-// FilesWithConfigFallback identifies planned files whose selected route used
-// a fallback. The boolean includes selected inputs left without a config owner,
-// which have no planned files. Literal files have their own config lookup.
-func (catalog *ConfigCatalog) FilesWithConfigFallback(plan target.Plan) (map[string]bool, bool) {
-	fallbacks := catalog.fallbacks
-	affected := len(fallbacks.directories) > 0
-	if !affected && len(fallbacks.literals) > 0 {
-		// A fallback's ignore rules can hide an existing input. Missing inputs
-		// participate in config lookup only so the CLI can report them.
-		affected = slices.ContainsFunc(plan.ExplicitFileOutcomes, func(input target.ExplicitFileOutcome) bool {
-			return input.Exists && fallbacks.literals[input.Path]
-		})
-	}
-	if !affected {
-		return nil, false
-	}
-	result := make(map[string]bool)
-	for _, file := range plan.Files {
-		_, literal := slices.BinarySearch(catalog.Scopes[file.ConfigDirectory].ExplicitFiles, file.Path)
-		failed := fallbacks.literals[file.Path]
-		if !literal {
-			failed = fallbacks.directories[fallbackDirectory{tspath.GetDirectoryPath(file.Path), file.ConfigDirectory}]
-		}
-		if failed {
-			result[file.Path] = true
-		}
-	}
-	return result, true
 }
 
 func (catalog *ConfigCatalog) ConfigDirectories() []string {

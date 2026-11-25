@@ -55,7 +55,6 @@ export function parseArgs(argv: string[]) {
   // When "--" is present, positionals before it and after it are tracked
   // separately so the rebuilt rest preserves their relative position to "--".
   const flags: string[] = [];
-  const suppressRuleValues: string[] = [];
   let argumentError: string | undefined;
   const positionalsBefore: string[] = [];
   const positionalsAfter: string[] = [];
@@ -97,12 +96,9 @@ export function parseArgs(argv: string[]) {
           const value = token.value;
           if (
             value == null ||
-            (token.inlineValue && value === '') ||
             (!token.inlineValue && value.startsWith('-') && value !== '-')
           ) {
             argumentError ??= `expected a value for ${token.rawName}`;
-          } else if (token.name === 'suppress-rule') {
-            suppressRuleValues.push(value);
           } else {
             flags.push(`${token.rawName}=${value}`);
           }
@@ -142,18 +138,6 @@ export function parseArgs(argv: string[]) {
     format: (values.format as string) ?? null,
     rest,
     positionals,
-    suppressRuleValues,
     argumentError,
   };
-}
-
-// ESLint uses levn's [String] type for each occurrence of --suppress-rule.
-export async function bindSuppressRuleArgs(
-  values: string[],
-): Promise<string[]> {
-  const { default: levn } = await import('levn');
-  return values.map((value) => {
-    const ids = levn.parse('[String]', value);
-    return `--suppress-rule=${JSON.stringify(ids)}`;
-  });
 }

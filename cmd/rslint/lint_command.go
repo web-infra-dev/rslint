@@ -181,11 +181,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 		return 0
 	}
-	var baseline *suppressions.File
-	var baselineErr error
-	if !typeCheckOnly {
-		baseline, baselineErr = suppressions.Open(args.Suppressions)
-	}
 	if configCatalog == nil {
 		fmt.Fprintln(os.Stderr, "error: config discovery did not produce a catalog")
 		return 1
@@ -265,6 +260,16 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			fmt.Fprintf(os.Stderr, "error: %s\n", optionError.Error())
 		}
 		return 1
+	}
+
+	var baseline *suppressions.File
+	if !typeCheckOnly {
+		var err error
+		baseline, err = suppressions.Open(workingDirectory, args.Suppressions)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 2
+		}
 	}
 
 	outputOptions := output.Options{
@@ -619,11 +624,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
 	var suppressionError string
-	switch {
-	case baselineErr != nil:
-		suppressionError = baselineErr.Error()
-	case baseline != nil:
-		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, targetPlan, allDiags, args)
+	if baseline != nil {
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, args)
 	}
 	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0

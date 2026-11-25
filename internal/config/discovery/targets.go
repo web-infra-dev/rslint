@@ -14,13 +14,13 @@ import (
 // leaf still visits that directory so its sources can govern files within it.
 type discoveryTargetTrie struct {
 	children map[tspath.Path]*discoveryTargetTrie
-	files    []*DiscoveryFile
+	files    []*rslintconfig.PathIdentity
 }
 
 func addDiscoveryTarget(
 	root *discoveryTargetTrie,
 	configDir string,
-	file *DiscoveryFile,
+	file *rslintconfig.PathIdentity,
 	useCaseSensitive bool,
 ) bool {
 	relative, within := rslintconfig.RelativePathWithinConfigRoot(
@@ -148,7 +148,7 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 			if trie == nil {
 				trie = &discoveryTargetTrie{}
 			}
-			if addDiscoveryTarget(trie, root, file, useCaseSensitive) {
+			if addDiscoveryTarget(trie, root, &file.PathIdentity, useCaseSensitive) {
 				tries[root] = trie
 			}
 		}
@@ -162,21 +162,6 @@ func (trie *discoveryTargetTrie) child(name string, useCaseSensitive bool) *disc
 	}
 	return trie.children[tspath.ToPath(name, "", useCaseSensitive)]
 }
-
-func (trie *discoveryTargetTrie) hasScannedLintFile() bool {
-	for _, file := range trie.files {
-		if !file.Explicit && rslintconfig.IsSupportedLintFile(file.Path) {
-			return true
-		}
-	}
-	for _, child := range trie.children {
-		if child.hasScannedLintFile() {
-			return true
-		}
-	}
-	return false
-}
-
 func splitDiscoveryPath(path string) []string {
 	path = strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 	var components []string

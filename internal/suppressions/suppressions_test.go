@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
-	"sync"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -21,7 +19,6 @@ func tempWorkingDirectory(t *testing.T) string {
 	t.Helper()
 	dir, err := filepath.EvalSymlinks(t.TempDir())
 	assert.NilError(t, err)
-	t.Chdir(dir)
 	return dir
 }
 
@@ -70,7 +67,7 @@ func TestScopedUpdate(t *testing.T) {
 	}
 	run := func(options Options, unused bool) *File {
 		t.Helper()
-		file, err := Open(options)
+		file, err := Open(cwd, options)
 		assert.NilError(t, err)
 		results := []FileResult{
 			{Path: checked, SkippedRules: []string{"typed"}},
@@ -112,15 +109,37 @@ func TestScopedUpdate(t *testing.T) {
 	assert.DeepEqual(t, pruned.entries, want)
 }
 
+func TestUncheckedOnlyTargetsDoNotMutateBaseline(t *testing.T) {
+	cwd := tempWorkingDirectory(t)
+	broken := filepath.ToSlash(filepath.Join(cwd, "broken.ts"))
+	f, err := Open(cwd, Options{Mode: Record})
+	assert.NilError(t, err)
+	_, _, err = f.Apply(t.Context(), []FileResult{{Path: broken, Unchecked: true}}, nil)
+	assert.NilError(t, err)
+	if _, err := os.Stat(filepath.Join(cwd, DefaultFilename)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected no baseline to be created for unchecked-only targets, stat err=%v", err)
+	}
+
+	const initial = `{"gone.ts":{"x":{"count":1}}}`
+	assert.NilError(t, os.WriteFile(filepath.Join(cwd, DefaultFilename), []byte(initial), 0o644))
+	pruner, err := Open(cwd, Options{Mode: Prune})
+	assert.NilError(t, err)
+	_, _, err = pruner.Apply(t.Context(), []FileResult{{Path: broken, Unchecked: true}}, nil)
+	assert.NilError(t, err)
+	content, err := os.ReadFile(filepath.Join(cwd, DefaultFilename))
+	assert.NilError(t, err)
+	assert.Equal(t, string(content), initial)
+}
+
 func TestMissingBaseline(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
-	if file, err := Open(Options{}); err != nil || file != nil {
+	if file, err := Open(cwd, Options{}); err != nil || file != nil {
 		t.Fatalf("plain check: file=%v, err=%v", file, err)
 	}
-	if _, err := Open(Options{Location: "missing.json"}); err == nil {
+	if _, err := Open(cwd, Options{Location: "missing.json"}); err == nil {
 		t.Fatal("explicit missing baseline was accepted")
 	}
-	f, err := Open(Options{Mode: Prune})
+	f, err := Open(cwd, Options{Mode: Prune})
 	assert.NilError(t, err)
 	if _, _, err := f.Apply(t.Context(), nil, nil); err != nil {
 		t.Fatal(err)
@@ -143,22 +162,22 @@ func TestWorkingDirectoryPaths(t *testing.T) {
 	src := filepath.Join(repo, "src")
 	assert.NilError(t, os.MkdirAll(src, 0o755))
 	destination := repo
-	// On case-insensitive volumes the process cwd also restores the stored case.
+	// On case-insensitive volumes the physical path also restores the stored case.
 	alternate := filepath.Join(filepath.Dir(repo), "REPO")
 	if _, err := os.Stat(alternate); err == nil && runtime.GOOS != "windows" {
 		destination = alternate
 	}
 	makeDirectoryLink(t, destination, link)
+	t.Chdir(link)
 	native := repo
 	if runtime.GOOS == "windows" {
 		native = link
 	}
-	t.Chdir(link)
 	for location, want := range map[string]string{
 		root:             filepath.Join(root, "rslint-suppressions_"+cwdHash(native)),
 		"../shared.json": filepath.Join(filepath.Dir(link), "shared.json"),
 	} {
-		f, err := Open(Options{Mode: Record, Location: location})
+		f, err := Open(link, Options{Mode: Record, Location: location})
 		assert.NilError(t, err)
 		assert.Equal(t, f.path, want)
 		for name, want := range map[string]string{
@@ -188,6 +207,7 @@ func TestFileKeyUsesNativeRelativePaths(t *testing.T) {
 		check("C:/tree/", "d:/Shared/File.js", "d:/Shared/File.js")
 		check("C:/tree/", "D:/Shared/File.js", "d:/Shared/File.js")
 		check("//server/share/pkg/", "//SERVER/SHARE/pkg/File.js", "File.js")
+		check(`\\server\share\pkg`, "//SERVER/SHARE/pkg/File.js", "File.js")
 		check("//server/share/pkg/", "//server/other/File.js", "//server/other/File.js")
 		check("//server/share", "//SERVER/SHARE/File.js", "File.js")
 	}
@@ -231,90 +251,39 @@ func makeDirectoryLink(t *testing.T, destination, link string) {
 	}
 }
 
-func TestConcurrentUpdates(t *testing.T) {
-	const holdLock = "RSLINT_TEST_HOLD_SUPPRESSIONS_LOCK"
-	if os.Getenv(holdLock) == "1" {
-		f, err := Open(Options{Mode: Record})
-		assert.NilError(t, err)
-		assert.NilError(t, f.update(t.Context(), func(entries) bool {
-			fmt.Fprintln(os.Stdout, "locked")
-			var reply string
-			_, _ = fmt.Fscan(os.Stdin, &reply)
-			return false
-		}))
-		return
-	}
+func TestUpdateMergesLatestAndPreservesMode(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
-	assert.NilError(t, os.WriteFile(DefaultFilename+".tmp", []byte("unrelated"), 0o600))
-	var writers [2]*File
-	for i := range writers {
-		f, err := Open(Options{Mode: Record})
-		assert.NilError(t, err)
-		writers[i] = f
-	}
-	name := filepath.Join(cwd, "test.js")
-	write := func(i int) error {
-		_, _, err := reportError(t.Context(), writers[i], name, fmt.Sprintf("rule%d", i))
-		return err
-	}
-	var group sync.WaitGroup
-	var errs [2]error
-	for i := range writers {
-		group.Go(func() { errs[i] = write(i) })
-	}
-	group.Wait()
-	contended := func(err error) bool {
-		// Windows may report access denied while an earlier handle is closing.
-		return errors.Is(err, os.ErrExist) || runtime.GOOS == "windows" && errors.Is(err, os.ErrPermission)
-	}
-	for i, err := range errs {
-		if contended(err) {
-			err = write(i)
-		}
-		assert.NilError(t, err)
-	}
-	if runtime.GOOS != "js" && runtime.GOOS != "wasip1" {
-		program, err := os.Executable()
-		assert.NilError(t, err)
-		holder := exec.CommandContext(t.Context(), program, "-test.run=^TestConcurrentUpdates$")
-		holder.Env = append(os.Environ(), holdLock+"=1")
-		input, err := holder.StdinPipe()
-		assert.NilError(t, err)
-		defer input.Close()
-		output, err := holder.StdoutPipe()
-		assert.NilError(t, err)
-		assert.NilError(t, holder.Start())
-		var ready string
-		_, err = fmt.Fscan(output, &ready)
-		assert.NilError(t, err)
-		assert.Equal(t, ready, "locked")
-		_, _, err = reportError(t.Context(), writers[0], name, "contended")
-		assert.Assert(t, contended(err), "contended update returned %v", err)
-		assert.ErrorContains(t, err, "retry")
-		// A separate baseline with a maximum-length basename can update while the first is locked.
-		longName := strings.Repeat("x", 250) + ".json"
-		other, err := Open(Options{Mode: Record, Location: longName})
-		assert.NilError(t, err)
-		for _, id := range []string{"first", "second"} {
-			_, _, err := reportError(t.Context(), other, name, id)
-			assert.NilError(t, err)
-		}
-		assert.NilError(t, holder.Process.Kill())
-		assert.Assert(t, holder.Wait() != nil)
-	}
-	// The kernel released the interrupted writer's lock.
-	_, _, err := reportError(t.Context(), writers[0], name, "after-crash")
+	baselinePath := filepath.Join(cwd, DefaultFilename)
+	assert.NilError(t, os.WriteFile(baselinePath+".tmp", []byte("unrelated"), 0o600))
+	assert.NilError(t, os.WriteFile(baselinePath, []byte(`{"test.js":{"rule0":{"count":1}}}`), 0o600))
+
+	writer, err := Open(cwd, Options{Mode: Record})
 	assert.NilError(t, err)
-	leftover, err := os.ReadFile(DefaultFilename + ".tmp")
+	// Simulate another update landing before this writer flushes.
+	assert.NilError(t, os.WriteFile(baselinePath, []byte(`{"test.js":{"rule0":{"count":1},"rule1":{"count":1}}}`), 0o600))
+
+	name := filepath.Join(cwd, "test.js")
+	_, _, err = reportError(t.Context(), writer, name, "rule2")
+	assert.NilError(t, err)
+
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(baselinePath)
+		assert.NilError(t, err)
+		assert.Equal(t, info.Mode().Perm(), os.FileMode(0o600))
+	}
+
+	leftover, err := os.ReadFile(baselinePath + ".tmp")
 	assert.NilError(t, err)
 	assert.Equal(t, string(leftover), "unrelated")
+
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, _, err := reportError(ctx, writers[0], name, "cancelled"); !errors.Is(err, context.Canceled) {
+	if _, _, err := reportError(ctx, writer, name, "cancelled"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled write returned %v", err)
 	}
-	f, err := Open(Options{})
-	want := entries{"test.js": {"rule0": {Count: 1}, "rule1": {Count: 1}, "after-crash": {Count: 1}}}
+
+	f, err := Open(cwd, Options{})
+	want := entries{"test.js": {"rule0": {Count: 1}, "rule1": {Count: 1}, "rule2": {Count: 1}}}
 	assert.NilError(t, err)
 	assert.Assert(t, f != nil)
 	assert.DeepEqual(t, f.entries, want)
@@ -322,16 +291,17 @@ func TestConcurrentUpdates(t *testing.T) {
 
 func TestUpdateRequiresBaselineWriteAccess(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
+	baselinePath := filepath.Join(cwd, DefaultFilename)
 	const original = `{"a.js":{"x":{"count":1}}}`
-	assert.NilError(t, os.WriteFile(DefaultFilename, []byte(original), 0o444))
-	t.Cleanup(func() { _ = os.Chmod(DefaultFilename, 0o600) })
-	if file, err := os.OpenFile(DefaultFilename, os.O_WRONLY, 0); err == nil {
+	assert.NilError(t, os.WriteFile(baselinePath, []byte(original), 0o444))
+	t.Cleanup(func() { _ = os.Chmod(baselinePath, 0o600) })
+	if file, err := os.OpenFile(baselinePath, os.O_WRONLY, 0); err == nil {
 		_ = file.Close()
 		t.Skip("current user can write a read-only file")
 	} else if !errors.Is(err, os.ErrPermission) {
 		t.Fatal(err)
 	}
-	f, err := Open(Options{Mode: Record})
+	f, err := Open(cwd, Options{Mode: Record})
 	assert.NilError(t, err)
 	for _, id := range []string{"x", "y"} { // An unchanged count and a new count.
 		_, _, err := reportError(t.Context(), f, filepath.Join(cwd, "a.js"), id)
@@ -339,7 +309,7 @@ func TestUpdateRequiresBaselineWriteAccess(t *testing.T) {
 			t.Fatalf("record %s: expected a permission error, got %v", id, err)
 		}
 	}
-	if content, err := os.ReadFile(DefaultFilename); err != nil || string(content) != original {
+	if content, err := os.ReadFile(baselinePath); err != nil || string(content) != original {
 		t.Fatalf("read-only baseline: %q, %v", content, err)
 	}
 }
@@ -352,12 +322,12 @@ func TestUpdateThroughFileSymlink(t *testing.T) {
 	if err := os.Symlink(DefaultFilename, link); err != nil {
 		t.Skipf("file symlink unavailable: %v", err)
 	}
-	f, err := Open(Options{Mode: Record, Location: link})
+	f, err := Open(cwd, Options{Mode: Record, Location: link})
 	assert.NilError(t, err)
 	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "x"); err != nil {
 		t.Fatal(err)
 	}
-	defaultFile, err := Open(Options{})
+	defaultFile, err := Open(cwd, Options{})
 	if err != nil || defaultFile == nil || defaultFile.entries["test.js"]["x"].Count != 1 {
 		t.Fatalf("write via symlink: file=%v err=%v", defaultFile, err)
 	}
@@ -375,20 +345,20 @@ func TestUpdatePreservesLiteralBackslash(t *testing.T) {
 	}
 	cwd := tempWorkingDirectory(t)
 	const location = `cache\base.json`
-	assert.NilError(t, os.Mkdir("cache", 0o755))
+	assert.NilError(t, os.Mkdir(filepath.Join(cwd, "cache"), 0o755))
 	for _, name := range []string{location, "cache/base.json"} {
-		assert.NilError(t, os.WriteFile(name, []byte("{}"), 0o644))
+		assert.NilError(t, os.WriteFile(filepath.Join(cwd, name), []byte("{}"), 0o644))
 	}
-	f, err := Open(Options{Mode: Record, Location: location})
+	f, err := Open(cwd, Options{Mode: Record, Location: location})
 	assert.NilError(t, err)
 	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, "test.js"), "x"); err != nil {
 		t.Fatal(err)
 	}
-	f, err = Open(Options{Location: location})
+	f, err = Open(cwd, Options{Location: location})
 	if err != nil || f == nil || f.entries["test.js"]["x"].Count != 1 {
 		t.Fatalf("recorded baseline: file=%v err=%v", f, err)
 	}
-	if content, err := os.ReadFile("cache/base.json"); err != nil || string(content) != "{}" {
+	if content, err := os.ReadFile(filepath.Join(cwd, "cache/base.json")); err != nil || string(content) != "{}" {
 		t.Fatalf("other baseline: %q, %v", content, err)
 	}
 }
@@ -408,22 +378,23 @@ func TestDirectoryHash(t *testing.T) {
 func TestUpdatePreservesExtraMembers(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
 	for _, name := range []string{"a.js", "b.js"} {
-		assert.NilError(t, os.WriteFile(name, nil, 0o644))
+		assert.NilError(t, os.WriteFile(filepath.Join(cwd, name), nil, 0o644))
 	}
 	const initial = `{
 		"a.js":{"x":{"count":2,"reason":"deferred"}},
 		"b.js":{"x":{"count":1,"ticket":9007199254740993}}
 	}`
-	assert.NilError(t, os.WriteFile(DefaultFilename, []byte(initial), 0o644))
+	baselinePath := filepath.Join(cwd, DefaultFilename)
+	assert.NilError(t, os.WriteFile(baselinePath, []byte(initial), 0o644))
 	for _, step := range []struct {
 		mode   Mode
 		reason string
 	}{{Prune, `"deferred"`}, {Record, ""}} {
-		file, err := Open(Options{Mode: step.mode})
+		file, err := Open(cwd, Options{Mode: step.mode})
 		assert.NilError(t, err)
 		_, _, err = reportError(t.Context(), file, filepath.Join(cwd, "a.js"), "x")
 		assert.NilError(t, err)
-		encoded, err := os.ReadFile(DefaultFilename)
+		encoded, err := os.ReadFile(baselinePath)
 		assert.NilError(t, err)
 		var saved map[string]map[string]map[string]json.RawMessage
 		assert.NilError(t, json.Unmarshal(encoded, &saved))

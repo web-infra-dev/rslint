@@ -323,7 +323,6 @@ lchmod
 ldflags
 ldquo
 LASTEXITCODE
-levn
 libasound
 libc
 libgbm

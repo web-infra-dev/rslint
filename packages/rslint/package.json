@@ -71,7 +71,6 @@
     "esquery": "catalog:",
     "globals": "catalog:",
     "json-schema-to-typescript": "catalog:",
-    "levn": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {

@@ -18,7 +18,6 @@ type discoverySeed struct {
 	explicitFile       bool
 	ownerDir           string
 	ownerPath          string
-	usingFallback      bool
 	gitCursor          gitignore.Cursor
 	done               bool
 }
@@ -115,7 +114,6 @@ func (coordinator *discoveryCoordinator) resolveDirectorySeedOwners(seeds []*dis
 		}
 		for _, resolution := range pending {
 			state := coordinator.modules.state(resolution.candidates[resolution.next].path)
-			resolution.seed.usingFallback = state != nil && state.failure != nil
 			if state != nil && state.failure == nil {
 				resolution.seed.ownerDir = state.candidate.directory
 				resolution.seed.ownerPath = state.candidate.path
@@ -276,7 +274,6 @@ func (coordinator *discoveryCoordinator) resolveSeedOwners(seeds []*discoverySee
 				continue
 			}
 			seed.searchDir = configDiscoveryParent(candidate.directory)
-			seed.usingFallback = true
 			if seed.searchDir == "" {
 				seed.done = true
 			}

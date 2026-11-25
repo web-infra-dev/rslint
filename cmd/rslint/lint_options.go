@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -153,6 +153,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var ruleFlags repeatedFlag
+	var suppressRuleFlags repeatedFlag
 	var suppressAll, prune bool
 
 	fs.StringVar(&args.Format, "format", "default", "output format")
@@ -178,26 +179,26 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	suppressionBoolFlag(fs, &prune, "prune-suppressions", "remove unused suppressions")
 	suppressionBoolFlag(fs, &args.PassOnUnpruned, "pass-on-unpruned-suppressions", "allow unused suppressions")
 	fs.StringVar(&args.Suppressions.Location, "suppressions-location", "", "suppressions file or directory")
-	fs.Func("suppress-rule", "rule IDs to record", func(value string) error {
-		// The Node file CLI sends one JSON array per occurrence, including [].
-		var ids []string
-		if err := json.Unmarshal([]byte(value), &ids); err != nil {
-			return err
-		}
-		if args.Suppressions.Rules == nil {
-			args.Suppressions.Rules = ids
-		} else {
-			args.Suppressions.Rules = append(args.Suppressions.Rules, ids...)
-		}
-		return nil
-	})
+	fs.Var(&suppressRuleFlags, "suppress-rule", "rule IDs to record (repeatable, a,b or \"[a,b]\")")
 
 	if err := fs.Parse(argv); err != nil {
 		// ContinueOnError: fs already printed the diagnostic to stderr.
 		return args, help, 2
 	}
 	args.RuleFlags = []string(ruleFlags)
-	suppressRuleSet := args.Suppressions.Rules != nil
+	if !help && len(suppressRuleFlags) > 0 {
+		rules := []string{}
+		for _, raw := range suppressRuleFlags {
+			parsed, err := parseSuppressRuleList(raw)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return args, help, 2
+			}
+			rules = append(rules, parsed...)
+		}
+		args.Suppressions.Rules = rules
+	}
+	suppressRuleSet := len(suppressRuleFlags) > 0
 	switch {
 	case help:
 		// The flag values were parsed above. Help does not run a suppression mode.
@@ -209,7 +210,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	case prune:
 		args.Suppressions.Mode = suppressions.Prune
 	}
-	if args.TypeCheckOnly && args.Suppressions.Mode != suppressions.Check {
+	if !help && args.TypeCheckOnly && args.Suppressions.Mode != suppressions.Check {
 		fmt.Fprintln(os.Stderr, "error: --type-check-only cannot record or prune lint suppressions")
 		return args, help, 2
 	}
@@ -243,4 +244,114 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	args.Positional = fs.Args()
 
 	return args, help, 0
+}
+
+// parseSuppressRuleList parses one --suppress-rule occurrence. It accepts a
+// single rule ID, a comma-separated list, or an ESLint-style bracketed list
+// such as "[no-var, no-debugger]", including single- or double-quoted entries.
+func parseSuppressRuleList(raw string) ([]string, error) {
+	s := ecmascript.StringTrim(raw)
+	if s == "" {
+		return []string{}, nil
+	}
+	if strings.HasPrefix(s, "[") {
+		if !strings.HasSuffix(s, "]") {
+			return nil, fmt.Errorf("invalid --suppress-rule value %q: missing closing ']'", raw)
+		}
+		s = ecmascript.StringTrim(s[1 : len(s)-1])
+		if s == "" {
+			return []string{}, nil
+		}
+	} else if strings.HasSuffix(s, "]") {
+		return nil, fmt.Errorf("invalid --suppress-rule value %q: unexpected ']'", raw)
+	}
+
+	rules := []string{}
+	rest := s
+	for {
+		rest = ecmascript.StringTrim(rest)
+		if rest == "" {
+			return nil, fmt.Errorf("invalid --suppress-rule value %q: empty rule ID", raw)
+		}
+		var item string
+		var after string
+		if rest[0] == '"' || rest[0] == '\'' {
+			var next int
+			var err error
+			item, next, err = parseQuotedRuleID(rest, 0, raw)
+			if err != nil {
+				return nil, err
+			}
+			after = ecmascript.StringTrim(rest[next:])
+			if after != "" && after[0] != ',' {
+				return nil, fmt.Errorf("invalid --suppress-rule value %q: unexpected %q after quoted rule ID", raw, after[0])
+			}
+		} else {
+			comma := strings.IndexByte(rest, ',')
+			head := rest
+			if comma >= 0 {
+				head = rest[:comma]
+				after = rest[comma:]
+			}
+			if idx := strings.IndexAny(head, "[]"); idx >= 0 {
+				return nil, fmt.Errorf("invalid --suppress-rule value %q: unexpected %q", raw, head[idx])
+			}
+			item = ecmascript.StringTrim(head)
+		}
+		if item == "" {
+			return nil, fmt.Errorf("invalid --suppress-rule value %q: empty rule ID", raw)
+		}
+		rules = append(rules, item)
+		if after == "" {
+			break
+		}
+		rest = after[1:] // skip ','
+	}
+	return rules, nil
+}
+
+func parseQuotedRuleID(s string, start int, raw string) (string, int, error) {
+	quote := s[start]
+	var out strings.Builder
+	for i := start + 1; i < len(s); i++ {
+		ch := s[i]
+		if ch == quote {
+			return out.String(), i + 1, nil
+		}
+		if ch != '\\' {
+			out.WriteByte(ch)
+			continue
+		}
+		i++
+		if i >= len(s) {
+			return "", 0, fmt.Errorf("invalid --suppress-rule value %q: unterminated escape", raw)
+		}
+		switch s[i] {
+		case '\\', '\'', '"':
+			out.WriteByte(s[i])
+		case 'n':
+			out.WriteByte('\n')
+		case 'r':
+			out.WriteByte('\r')
+		case 't':
+			out.WriteByte('\t')
+		case 'u':
+			if i+4 >= len(s) {
+				return "", 0, fmt.Errorf("invalid --suppress-rule value %q: incomplete unicode escape", raw)
+			}
+			code, err := strconv.ParseUint(s[i+1:i+5], 16, 32)
+			if err != nil {
+				return "", 0, fmt.Errorf("invalid --suppress-rule value %q: invalid unicode escape", raw)
+			}
+			r := rune(code)
+			if !utf8.ValidRune(r) {
+				return "", 0, fmt.Errorf("invalid --suppress-rule value %q: invalid unicode code point", raw)
+			}
+			out.WriteRune(r)
+			i += 4
+		default:
+			out.WriteByte(s[i])
+		}
+	}
+	return "", 0, fmt.Errorf("invalid --suppress-rule value %q: unterminated string", raw)
 }

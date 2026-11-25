@@ -1271,7 +1271,23 @@ func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T
 	}
 }
 
-func TestMalformedPluginFixKeepsOnlyPartialFileUnverified(t *testing.T) {
+func TestDispatchFailureMarksReadyFilesIncomplete(t *testing.T) {
+	text := "x"
+	rules := []rule.ConfiguredRule{pluginRule("plugin/check", nil, rule.SeverityError)}
+	task := pluginTask{collectFailures: true, inputs: pluginTestFrames([]EslintPluginFileInput{
+		{Path: "a.js", Text: &text, Rules: rules},
+		{Path: "b.js", Text: &text, Rules: rules},
+	})}
+	outcome := task.runRaw(t.Context(), EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		return nil, errors.New("worker crashed")
+	}))
+	failures, err := (ObservationResult{pluginOutcome: outcome}).PluginFailures()
+	if err == nil || len(failures) != 2 || !failures["a.js"].FileIncomplete || !failures["b.js"].FileIncomplete {
+		t.Fatalf("dispatch failure produced failures=%v, err=%v", failures, err)
+	}
+}
+
+func TestMalformedPluginFixReportsDispatchError(t *testing.T) {
 	text := "x"
 	rules := []rule.ConfiguredRule{pluginRule("plugin/check", nil, rule.SeverityError)}
 	task := pluginTask{collectFailures: true, inputs: pluginTestFrames([]EslintPluginFileInput{
@@ -1288,9 +1304,9 @@ func TestMalformedPluginFixKeepsOnlyPartialFileUnverified(t *testing.T) {
 			{FilePath: "partial.js", Diagnostics: []EslintPluginDiagnostic{finding, badFix}},
 		}}, nil
 	}))
-	failures, err := (ObservationResult{pluginOutcome: outcome}).PluginFailures()
-	if err == nil || len(outcome.Diagnostics) != 2 || len(failures) != 1 || !slices.Equal(failures["partial.js"].Rules, []string{"plugin/check"}) {
-		t.Fatalf("malformed fix produced %d findings, failures=%v, err=%v", len(outcome.Diagnostics), failures, err)
+	_, err := (ObservationResult{pluginOutcome: outcome}).PluginFailures()
+	if err == nil {
+		t.Fatalf("expected malformed fix panic to report a dispatch error")
 	}
 }
 

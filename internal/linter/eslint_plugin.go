@@ -738,6 +738,12 @@ func dispatchOneBatch(
 			if err := applyEslintPluginResults(failed, failures, timing, onDiagnostic, onNotice, onFailure); err != nil {
 				return err
 			}
+			for _, f := range ready {
+				onFailure.incomplete(f)
+			}
+			for _, f := range batch[offset:] {
+				onFailure.incomplete(f)
+			}
 			return dispatchErr
 		}
 		if res != nil {
@@ -852,19 +858,7 @@ func applyEslintPluginResults(
 	for i := range res.Results {
 		byPath[res.Results[i].FilePath] = &res.Results[i]
 	}
-	// A malformed response can panic while reconstructing a fix after earlier
-	// findings for the same file were emitted. Only that file is incomplete.
-	i := 0
-	if onFailure != nil {
-		defer func() {
-			if cause := recover(); cause != nil {
-				onFailure.incomplete(batch[i])
-				panic(cause)
-			}
-		}()
-	}
-	for ; i < len(batch); i++ {
-		f := batch[i]
+	for _, f := range batch {
 		fr, ok := byPath[f.Path]
 		if !ok {
 			if onNotice != nil {
