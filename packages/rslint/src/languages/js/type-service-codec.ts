@@ -1,4 +1,4 @@
-/* rslint-disable @typescript-eslint/no-unsafe-type-assertion -- Indexed generic return types follow the finite field switch and checked packet kind. */
+/* rslint-disable @typescript-eslint/no-unsafe-type-assertion -- Indexed generic scalar return types follow the checked packet kind. */
 import { SCALAR_KINDS } from './type-service-protocol.js';
 import type { JSDocTagInfo, SymbolDisplayPart } from 'typescript';
 import type {
@@ -20,8 +20,8 @@ const invalid = (): never => {
 };
 
 /**
- * Offset-addressed fields stay lazy. Only this disposable reader owns bytes;
- * semantic wrappers retain decoded values, never a reader or byte view.
+ * Decodes shallow binary records in one pass. Only this disposable reader owns
+ * bytes; semantic wrappers retain decoded values, never a reader or byte view.
  */
 export class TypePacketReader {
   private bytes: Buffer | undefined;
@@ -114,143 +114,86 @@ export class TypePacketReader {
     });
   }
 
-  typeField<K extends keyof TypeFact>(field: K): TypeFact[K] {
+  typeFact(): TypeFact {
     if (this.kind !== 5) return invalid();
-    let value: TypeFact[keyof TypeFact];
-    switch (field) {
-      case 'flags':
-        value = this.ids(this.word(8)).map((offset) => this.text(offset));
-        break;
-      case 'symbol':
-        value = this.word(12);
-        break;
-      case 'aliasSymbol':
-        value = this.word(16);
-        break;
-      case 'intrinsicName': {
-        const at = this.word(20);
-        value = at ? this.text(at) : undefined;
-        break;
-      }
-      case 'escapedName': {
-        const at = this.word(36);
-        value = at ? this.text(at) : undefined;
-        break;
-      }
-      case 'objectFlags': {
-        const at = this.word(40);
-        value = at
-          ? this.ids(at).map((offset) => this.text(offset))
-          : undefined;
-        break;
-      }
-      case 'typeOperands':
-        value = this.optionalIDs(32);
-        break;
-      case 'target':
-        value = this.word(44);
-        break;
-      case 'aliasTypeArguments':
-        value = this.optionalIDs(48);
-        break;
-      case 'typeParameters':
-        value = this.optionalIDs(52);
-        break;
-      case 'tuple': {
-        const at = this.word(56);
-        value = at
-          ? {
-              combinedFlags: this.word(at),
-              readonly: this.word(at + 4) !== 0,
-            }
-          : undefined;
-        break;
-      }
-      case 'value': {
-        const tag = this.word(24);
-        const at = this.word(28);
-        if (tag === 0) {
-          value = undefined;
-        } else if (tag === 1) {
-          value = this.text(at);
-        } else if (tag === 2) {
-          const bytes = this.buf();
-          if (at + 8 > bytes.length) return invalid();
-          value = bytes.readDoubleLE(at);
-        } else if (tag === 3) {
-          value = {
-            negative: this.word(at) !== 0,
-            base10Value: this.text(this.word(at + 4)),
-          };
-        } else {
-          return invalid();
-        }
-        break;
-      }
+    const intrinsicAt = this.word(20);
+    const escapedAt = this.word(36);
+    const objectFlagsAt = this.word(40);
+    const tupleAt = this.word(56);
+    const tag = this.word(24);
+    const valueAt = this.word(28);
+    let value: TypeFact['value'];
+    if (tag === 0) {
+      value = undefined;
+    } else if (tag === 1) {
+      value = this.text(valueAt);
+    } else if (tag === 2) {
+      const bytes = this.buf();
+      if (valueAt + 8 > bytes.length) return invalid();
+      value = bytes.readDoubleLE(valueAt);
+    } else if (tag === 3) {
+      value = {
+        negative: this.word(valueAt) !== 0,
+        base10Value: this.text(this.word(valueAt + 4)),
+      };
+    } else {
+      return invalid();
     }
-    return value as TypeFact[K];
+    return {
+      flags: this.ids(this.word(8)).map((offset) => this.text(offset)),
+      symbol: this.word(12),
+      aliasSymbol: this.word(16),
+      intrinsicName: intrinsicAt ? this.text(intrinsicAt) : undefined,
+      escapedName: escapedAt ? this.text(escapedAt) : undefined,
+      objectFlags: objectFlagsAt
+        ? this.ids(objectFlagsAt).map((offset) => this.text(offset))
+        : undefined,
+      value,
+      typeOperands: this.optionalIDs(32),
+      target: this.word(44),
+      aliasTypeArguments: this.optionalIDs(48),
+      typeParameters: this.optionalIDs(52),
+      tuple: tupleAt
+        ? {
+            combinedFlags: this.word(tupleAt),
+            readonly: this.word(tupleAt + 4) !== 0,
+          }
+        : undefined,
+    };
   }
 
-  symbolField<K extends keyof SymbolFact>(field: K): SymbolFact[K] {
+  symbolFact(): SymbolFact {
     if (this.kind !== 6) return invalid();
-    let value: SymbolFact[keyof SymbolFact];
-    switch (field) {
-      case 'name':
-        value = this.text(this.word(8));
-        break;
-      case 'escapedName':
-        value = this.text(this.word(12));
-        break;
-      case 'flags':
-        value = this.word(16);
-        break;
-      case 'valueDeclaration':
-        value = this.node(this.word(24));
-        break;
-      case 'checkFlags': {
-        const flags = this.word(28);
-        value = flags ? flags - 1 : undefined;
-        break;
-      }
-      case 'declarations': {
-        const at = this.word(20);
-        if (!at) {
-          value = undefined;
-        } else {
-          const bytes = this.buf();
-          const size = this.word(at);
-          if (at + 4 + size * 8 > bytes.length) return invalid();
-          value = Array.from({ length: size }, (_, i) =>
-            this.requiredNode(at + 4 + i * 8),
-          );
-        }
-        break;
-      }
+    const checkFlagsRaw = this.word(28);
+    const declsAt = this.word(20);
+    let declarations: NodeRef[] | undefined;
+    if (declsAt) {
+      const bytes = this.buf();
+      const size = this.word(declsAt);
+      if (declsAt + 4 + size * 8 > bytes.length) return invalid();
+      declarations = Array.from({ length: size }, (_, i) =>
+        this.requiredNode(declsAt + 4 + i * 8),
+      );
     }
-    return value as SymbolFact[K];
+    return {
+      name: this.text(this.word(8)),
+      escapedName: this.text(this.word(12)),
+      flags: this.word(16),
+      checkFlags: checkFlagsRaw ? checkFlagsRaw - 1 : undefined,
+      declarations,
+      valueDeclaration: this.node(this.word(24)),
+    };
   }
 
-  signatureField<K extends keyof SignatureFact>(field: K): SignatureFact[K] {
+  signatureFact(): SignatureFact {
     if (this.kind !== 7) return invalid();
-    let value: SignatureFact[keyof SignatureFact];
-    switch (field) {
-      case 'parameters':
-        value = this.ids(this.word(8));
-        break;
-      case 'declaration':
-        value = this.node(this.word(12));
-        break;
-      case 'typeParameters':
-        value = this.optionalIDs(16);
-        break;
-      case 'thisParameter':
-        value = this.word(20);
-        break;
-      case 'minArgumentCount':
-        value = this.word(24);
-        break;
-    }
-    return value as SignatureFact[K];
+    return {
+      parameters: this.ids(this.word(8)),
+      declaration: this.node(this.word(12)),
+      typeParameters: this.optionalIDs(16),
+      thisParameter: this.word(20),
+      minArgumentCount: this.word(24),
+    };
   }
 
   private indexInfos(at: number): readonly IndexInfoFact[] {

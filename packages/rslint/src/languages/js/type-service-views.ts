@@ -158,7 +158,13 @@ export interface CheckerView {
   getNeverType(): TypeView;
   getNullType(): TypeView;
   getUndefinedType(): TypeView;
+  getTrueType(): TypeView;
+  getFalseType(): TypeView;
   getVoidType(): TypeView;
+  getStringLiteralType(value: string): TypeView;
+  getNumberLiteralType(value: number): TypeView;
+  getBigIntLiteralType(value: Readonly<ts.PseudoBigInt>): TypeView;
+  getNullableType(type: object, flags: number): TypeView;
   getAmbientModules(): readonly SymbolView[];
   getAugmentedPropertiesOfType(t: object): readonly SymbolView[];
   getRootSymbols(s: object): readonly SymbolView[];
@@ -174,6 +180,16 @@ export interface CheckerView {
   getPropertySymbolOfDestructuringAssignment(n: object): SymbolView | undefined;
   getJsxIntrinsicTagNamesAt(n: object): readonly SymbolView[];
   getConstantValue(n: object): string | number | undefined;
+  isOptionalParameter(n: object): boolean;
+  isImplementationOfOverload(n: object): boolean | undefined;
+  getSymbolsOfParameterPropertyDeclaration(
+    parameter: object,
+    parameterName: string,
+  ): readonly SymbolView[];
+  runWithCancellationToken<T>(
+    token: unknown,
+    cb: (checker: CheckerView) => T,
+  ): T;
   getTypeAtLocation(n: object | undefined): TypeView | undefined;
   getTypeFromTypeNode(n: object | undefined): TypeView | undefined;
   getContextualType(n: object | undefined): TypeView | undefined;
@@ -204,6 +220,11 @@ export interface CheckerView {
   getDefaultFromTypeParameter(t: object): TypeView | undefined;
   isTypeAssignableTo(source: object, target: object): boolean;
   typeToString(t: object, enclosing?: object, flags?: number): string;
+  typePredicateToString(
+    predicate: Readonly<TypePredicateView>,
+    enclosing?: object,
+    flags?: number,
+  ): string;
   signatureToString(
     s: object,
     enclosing?: object,
@@ -243,13 +264,20 @@ export interface CheckerView {
   isArrayLikeType(t: object): boolean;
   isTupleType(t: object): boolean;
   getSignatureFromDeclaration(n: object): SignatureView | undefined;
-  getResolvedSignature(n: object | undefined): SignatureView | undefined;
+  getResolvedSignature(
+    n: object | undefined,
+    candidatesOutArray?: SignatureView[],
+    argumentCount?: number,
+  ): SignatureView | undefined;
   getReturnTypeOfSignature(s: object): TypeView | undefined;
   getTypePredicateOfSignature(s: object): TypePredicateView | undefined;
   getSignaturesOfType(t: object, kind: number): readonly SignatureView[];
 }
 
 export interface ProgramView {
+  getConfigFileParsingDiagnostics(): readonly DiagnosticView[];
+  getOptionsDiagnostics(): readonly DiagnosticView[];
+  getGlobalDiagnostics(): readonly DiagnosticView[];
   getSyntacticDiagnostics(source?: object): readonly DiagnosticView[];
   getSemanticDiagnostics(source?: object): readonly DiagnosticView[];
   getDeclarationDiagnostics(source?: object): readonly DiagnosticView[];
@@ -273,12 +301,9 @@ export interface ViewHost {
   readonly checker: CheckerView;
   ensure(): void;
   query<Q extends ScalarRequest>(request: Q): QueryResults[Q['op']];
-  typeField<K extends keyof TypeFact>(id: number, field: K): TypeFact[K];
-  symbolField<K extends keyof SymbolFact>(id: number, field: K): SymbolFact[K];
-  signatureField<K extends keyof SignatureFact>(
-    id: number,
-    field: K,
-  ): SignatureFact[K];
+  typeFact(id: number): TypeFact;
+  symbolFact(id: number): SymbolFact;
+  signatureFact(id: number): SignatureFact;
   type(id: number): TypeView | undefined;
   symbol(id: number, knownName?: string): SymbolView | undefined;
   signature(id: number): SignatureView | undefined;
@@ -487,30 +512,33 @@ export function createTypeView(
   const tf = host.typescript.TypeFlags;
   const of = host.typescript.ObjectFlags;
 
-  const flagsValue = host.typeField(id, 'flags').reduce((acc, name) => {
+  const fact = host.typeFact(id);
+  const flagsValue = fact.flags.reduce((acc, name) => {
     const flag: unknown = Reflect.get(tf, name);
     if (typeof flag !== 'number') unsupportedFlag(`TypeFlags.${name}`);
     return acc | flag;
   }, 0);
 
-  const objectFlagsRaw = host.typeField(id, 'objectFlags');
-  const objectFlagsValue = objectFlagsRaw?.reduce((acc, name) => {
+  const objectFlagsValue = fact.objectFlags?.reduce((acc, name) => {
     const flag: unknown = Reflect.get(of, name);
     if (typeof flag !== 'number') unsupportedFlag(`ObjectFlags.${name}`);
     return acc | flag;
   }, 0);
 
-  const symbolId = host.typeField(id, 'symbol');
-  const aliasId = host.typeField(id, 'aliasSymbol');
-  const targetId = host.typeField(id, 'target');
-  const intrinsicName = host.typeField(id, 'intrinsicName');
-  const escapedName = host.typeField(id, 'escapedName');
-  const literalRaw = host.typeField(id, 'value');
+  const symbolId = fact.symbol;
+  const aliasId = fact.aliasSymbol;
+  const targetId = fact.target;
+  const intrinsicName = fact.intrinsicName;
+  const escapedName = fact.escapedName;
+  const literalRaw = fact.value;
   const literalValue =
     typeof literalRaw === 'object'
       ? Object.freeze({ ...literalRaw })
       : literalRaw;
-  const tuple = host.typeField(id, 'tuple');
+  const tuple = fact.tuple;
+  const typeOperandIds = fact.typeOperands;
+  const aliasTypeArgumentIds = fact.aliasTypeArguments;
+  const typeParameterIds = fact.typeParameters;
 
   const hasFlag = (mask: number) => (flagsValue & mask) !== 0;
   const hasObjectFlag = (mask: number) =>
@@ -525,15 +553,9 @@ export function createTypeView(
   const symbol = memo(ensure, () => host.symbol(symbolId));
   const aliasSymbol = memo(ensure, () => host.symbol(aliasId));
   const target = memo(ensure, () => host.type(targetId));
-  const typeOperands = memo(ensure, () =>
-    typeList(host.typeField(id, 'typeOperands')),
-  );
-  const aliasTypeArguments = memo(ensure, () =>
-    typeList(host.typeField(id, 'aliasTypeArguments')),
-  );
-  const typeParameters = memo(ensure, () =>
-    typeList(host.typeField(id, 'typeParameters')),
-  );
+  const typeOperands = memo(ensure, () => typeList(typeOperandIds));
+  const aliasTypeArguments = memo(ensure, () => typeList(aliasTypeArgumentIds));
+  const typeParameters = memo(ensure, () => typeList(typeParameterIds));
   const conditionalRoot = memo(ensure, () => {
     const d = details();
     const node = host.nodeRef(d.root);
@@ -710,11 +732,12 @@ export function createSymbolView(
   const ensure = () => {
     host.ensure();
   };
-  const name = memo(ensure, () => knownName() ?? host.symbolField(id, 'name'));
-  const escapedName = memo(ensure, () => host.symbolField(id, 'escapedName'));
-  const flags = memo(ensure, () => host.symbolField(id, 'flags'));
+  const fact = memo(ensure, () => host.symbolFact(id));
+  const name = memo(ensure, () => knownName() ?? fact().name);
+  const escapedName = memo(ensure, () => fact().escapedName);
+  const flags = memo(ensure, () => fact().flags);
   const declarations = memo(ensure, () => {
-    const refs = host.symbolField(id, 'declarations');
+    const refs = fact().declarations;
     if (!refs) return undefined;
     const nodes: object[] = [];
     for (const ref of refs) {
@@ -724,7 +747,7 @@ export function createSymbolView(
     return Object.freeze(nodes);
   });
   const valueDeclaration = memo(ensure, () =>
-    host.nodeRef(host.symbolField(id, 'valueDeclaration')),
+    host.nodeRef(fact().valueDeclaration),
   );
   const readTable = (
     op: 'symbolMembers' | 'symbolExports',
@@ -780,7 +803,7 @@ export function createSymbolView(
     get links() {
       ensure();
       if (links) return links;
-      const checkFlags = host.symbolField(id, 'checkFlags');
+      const checkFlags = fact().checkFlags;
       if (checkFlags === undefined) return undefined;
       return (links = {
         get checkFlags() {
@@ -840,22 +863,17 @@ export function createSignatureView(
   const ensure = () => {
     host.ensure();
   };
+  const fact = memo(ensure, () => host.signatureFact(id));
   const parameters = memo(ensure, () =>
-    Object.freeze(host.symbolsFor(host.signatureField(id, 'parameters'))),
+    Object.freeze(host.symbolsFor(fact().parameters)),
   );
-  const declaration = memo(ensure, () =>
-    host.nodeRef(host.signatureField(id, 'declaration')),
-  );
+  const declaration = memo(ensure, () => host.nodeRef(fact().declaration));
   const typeParameters = memo(ensure, () => {
-    const ids = host.signatureField(id, 'typeParameters');
+    const ids = fact().typeParameters;
     return ids ? Object.freeze(host.typesFor(ids)) : undefined;
   });
-  const thisParameter = memo(ensure, () =>
-    host.symbol(host.signatureField(id, 'thisParameter')),
-  );
-  const minArgumentCount = memo(ensure, () =>
-    host.signatureField(id, 'minArgumentCount'),
-  );
+  const thisParameter = memo(ensure, () => host.symbol(fact().thisParameter));
+  const minArgumentCount = memo(ensure, () => fact().minArgumentCount);
   const returnType = memo(ensure, () =>
     host.type(host.query({ op: 'returnType', args: { id } })),
   );

@@ -135,6 +135,40 @@ type PrintRequest struct {
 	Kind  uint32    `json:"kind"` // Meaning for symbolString; SignatureKind for signatureString.
 }
 
+type ResolvedSignatureRequest struct {
+	Node           NodeRef `json:"node"`
+	WithCandidates bool    `json:"withCandidates,omitempty"`
+	ArgumentCount  *int    `json:"argumentCount,omitempty"`
+}
+
+type StringLiteralRequest struct {
+	Value Name `json:"value"`
+}
+
+type NumberLiteralRequest struct {
+	Value     float64 `json:"value"`
+	NonFinite string  `json:"nonFinite,omitempty"`
+}
+
+type BigIntLiteralRequest struct {
+	Negative    bool   `json:"negative"`
+	Base10Value string `json:"base10Value"`
+}
+
+type NullableTypeRequest struct {
+	ID    uint32 `json:"id"`
+	Flags uint32 `json:"flags"`
+}
+
+type TypePredicateStringRequest struct {
+	Kind           uint32   `json:"kind"`
+	ParameterName  *Name    `json:"parameterName,omitempty"`
+	ParameterIndex int32    `json:"parameterIndex,omitempty"`
+	Type           uint32   `json:"type"`
+	Node           *NodeRef `json:"node"`
+	Flags          *uint32  `json:"flags"`
+}
+
 type ResolveNameRequest struct {
 	Name           Name     `json:"name"`
 	Node           *NodeRef `json:"node"`
@@ -142,24 +176,30 @@ type ResolveNameRequest struct {
 	ExcludeGlobals bool     `json:"excludeGlobals"`
 }
 
-func (r *NodeRequest) operation() Operation             { return r.Op }
-func (*ContextualArgumentRequest) operation() Operation { return "contextualArgument" }
-func (r *NamedNodeRequest) operation() Operation        { return r.Op }
-func (r *ProgramRequest) operation() Operation          { return r.Op }
-func (r *CheckerRequest) operation() Operation          { return r.Op }
-func (r *TypeRequest) operation() Operation             { return r.Op }
-func (r *SymbolRequest) operation() Operation           { return r.Op }
-func (r *SymbolDocsRequest) operation() Operation       { return r.Op }
-func (r *SignatureRequest) operation() Operation        { return r.Op }
-func (r *PropertyRequest) operation() Operation         { return r.Op }
-func (*SymbolTypeRequest) operation() Operation         { return "symbolType" }
-func (*SignaturesRequest) operation() Operation         { return "signatures" }
-func (*AssignableRequest) operation() Operation         { return "isTypeAssignableTo" }
-func (*IndexInfoRequest) operation() Operation          { return "indexInfo" }
-func (*ScopeSymbolsRequest) operation() Operation       { return "symbolsInScope" }
-func (*ParameterTypeRequest) operation() Operation      { return "parameterType" }
-func (r *PrintRequest) operation() Operation            { return r.Op }
-func (*ResolveNameRequest) operation() Operation        { return "resolveName" }
+func (r *NodeRequest) operation() Operation              { return r.Op }
+func (*ContextualArgumentRequest) operation() Operation  { return "contextualArgument" }
+func (r *NamedNodeRequest) operation() Operation         { return r.Op }
+func (r *ProgramRequest) operation() Operation           { return r.Op }
+func (r *CheckerRequest) operation() Operation           { return r.Op }
+func (r *TypeRequest) operation() Operation              { return r.Op }
+func (r *SymbolRequest) operation() Operation            { return r.Op }
+func (r *SymbolDocsRequest) operation() Operation        { return r.Op }
+func (r *SignatureRequest) operation() Operation         { return r.Op }
+func (r *PropertyRequest) operation() Operation          { return r.Op }
+func (*SymbolTypeRequest) operation() Operation          { return "symbolType" }
+func (*SignaturesRequest) operation() Operation          { return "signatures" }
+func (*AssignableRequest) operation() Operation          { return "isTypeAssignableTo" }
+func (*IndexInfoRequest) operation() Operation           { return "indexInfo" }
+func (*ScopeSymbolsRequest) operation() Operation        { return "symbolsInScope" }
+func (*ParameterTypeRequest) operation() Operation       { return "parameterType" }
+func (r *PrintRequest) operation() Operation             { return r.Op }
+func (*ResolvedSignatureRequest) operation() Operation   { return "resolvedSignature" }
+func (*StringLiteralRequest) operation() Operation       { return "stringLiteralType" }
+func (*NumberLiteralRequest) operation() Operation       { return "numberLiteralType" }
+func (*BigIntLiteralRequest) operation() Operation       { return "bigIntLiteralType" }
+func (*NullableTypeRequest) operation() Operation        { return "nullableType" }
+func (*TypePredicateStringRequest) operation() Operation { return "typePredicateString" }
+func (*ResolveNameRequest) operation() Operation         { return "resolveName" }
 
 type Query struct {
 	Scope
@@ -177,21 +217,35 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	}
 	var request Request
 	switch wire.Op {
-	case "rootFileNames", "syntacticDiagnostics", "semanticDiagnostics", "declarationDiagnostics":
+	case "rootFileNames", "configFileParsingDiagnostics", "optionsDiagnostics",
+		"globalDiagnostics", "syntacticDiagnostics", "semanticDiagnostics", "declarationDiagnostics":
 		request = &ProgramRequest{Op: wire.Op}
 	case "errorType", "anyType", "unknownType", "stringType", "numberType", "booleanType",
 		"bigIntType", "eSSymbolType", "nonPrimitiveType", "neverType", "nullType",
-		"undefinedType", "void", "ambientModules":
+		"undefinedType", "trueType", "falseType", "void", "ambientModules":
 		request = &CheckerRequest{Op: wire.Op}
 	case "type", "fromTypeNode", "context", "symbol", "declarationSymbol", "signature",
-		"resolvedSignature", "nodeRecord", "shorthandValueSymbol", "suggestionDiagnostics",
+		"nodeRecord", "shorthandValueSymbol", "suggestionDiagnostics",
 		"exportSpecifierLocalTargetSymbol", "propertySymbolOfDestructuringAssignment",
-		"jsxIntrinsicTagNamesAt", "constantValue":
+		"jsxIntrinsicTagNamesAt", "constantValue", "isOptionalParameter",
+		"isImplementationOfOverload":
 		request = &NodeRequest{Op: wire.Op}
+	case "resolvedSignature":
+		request = &ResolvedSignatureRequest{}
 	case "contextualArgument":
 		request = &ContextualArgumentRequest{}
-	case "validPropertyAccess":
+	case "validPropertyAccess", "parameterPropertySymbols":
 		request = &NamedNodeRequest{Op: wire.Op}
+	case "stringLiteralType":
+		request = &StringLiteralRequest{}
+	case "numberLiteralType":
+		request = &NumberLiteralRequest{}
+	case "bigIntLiteralType":
+		request = &BigIntLiteralRequest{}
+	case "nullableType":
+		request = &NullableTypeRequest{}
+	case "typePredicateString":
+		request = &TypePredicateStringRequest{}
 	case "constraint", "apparent", "baseLiteral", "nonNullable", "properties",
 		"augmentedPropertiesOfType", "typeArguments", "isArray", "isArrayLike", "isTuple",
 		"numberIndexType", "stringIndexType", "typeRecord", "typeDetails", "declaredIndexInfos",
@@ -243,6 +297,8 @@ func requestNode(request Request) *NodeRef {
 		return &r.Node
 	case *NodeRequest:
 		return &r.Node
+	case *ResolvedSignatureRequest:
+		return &r.Node
 	case *ContextualArgumentRequest:
 		return &r.Node
 	case *SymbolTypeRequest:
@@ -250,6 +306,8 @@ func requestNode(request Request) *NodeRef {
 	case *ScopeSymbolsRequest:
 		return &r.Node
 	case *PrintRequest:
+		return r.Node
+	case *TypePredicateStringRequest:
 		return r.Node
 	case *ResolveNameRequest:
 		return r.Node

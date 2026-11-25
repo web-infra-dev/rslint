@@ -1887,3 +1887,416 @@ test('public checker, Program, mapped types and declared index infos match TypeS
     await host.close();
   }
 });
+
+test('syntax-only decorator metadata preserves runtime imports for consistent-type-imports', async () => {
+  const dir = mkdtempSync(resolve(temp, 'syntax-only-decorators-'));
+  const serviceFile = resolve(dir, 'service.ts');
+  const consumerFile = resolve(dir, 'consumer.ts');
+  const withDecoratorsConfig = resolve(dir, 'tsconfig.decorators.json');
+  const plainConfig = resolve(dir, 'tsconfig.plain.json');
+  const code = `import { Service } from './service';
+function Injectable(): ClassDecorator {
+  return () => {};
+}
+@Injectable()
+export class Consumer {
+  constructor(private readonly service: Service) {}
+}
+`;
+  writeFileSync(serviceFile, 'export class Service {}\n');
+  writeFileSync(consumerFile, code);
+  writeFileSync(
+    withDecoratorsConfig,
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: 'ES2022',
+        module: 'ESNext',
+        experimentalDecorators: true,
+        emitDecoratorMetadata: true,
+      },
+      include: ['service.ts', 'consumer.ts'],
+    }),
+  );
+  writeFileSync(
+    plainConfig,
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: 'ES2022',
+        module: 'ESNext',
+      },
+      include: ['service.ts', 'consumer.ts'],
+    }),
+  );
+
+  // Confirm upstream ESLint reports 0 findings when decorator metadata is enabled.
+  const eslint = new Linter({ cwd: dir });
+  const upstreamEnabled = eslint.verify(
+    code,
+    [
+      {
+        files: ['**/*.ts'],
+        languageOptions: {
+          parser: tsParser,
+          parserOptions: {
+            project: withDecoratorsConfig,
+            tsconfigRootDir: dir,
+          },
+        },
+        plugins: { '@typescript-eslint': typedPlugin as any },
+        rules: { '@typescript-eslint/consistent-type-imports': 'error' },
+      },
+    ],
+    { filename: consumerFile },
+  );
+  expect(upstreamEnabled).toEqual([]);
+
+  const runSyntaxOnly = async (
+    config: string,
+    parserOptions?: {
+      experimentalDecorators?: boolean;
+      emitDecoratorMetadata?: boolean;
+    },
+  ) => {
+    const host = new Host();
+    const descriptor = host.request({
+      method: 'init',
+      config,
+      syntaxOnly: true,
+    }) as TypeServiceDescriptor;
+    const client = new TypeServiceClient(
+      enums,
+      descriptor,
+      (query) =>
+        Buffer.from(host.request({ method: 'query', query }), 'base64'),
+      host.source,
+      { maxFactsBytes: 1 << 20 },
+    );
+    try {
+      const encoded = host.request({ method: 'project', file: consumerFile });
+      const frame = Buffer.from(encoded.frame, 'base64');
+      const projection = {
+        ...encoded,
+        tree: Buffer.from(encoded.tree, 'base64'),
+      };
+      const handle = client.file(projection.binding);
+      const rules = new Map([
+        [
+          '@typescript-eslint/consistent-type-imports',
+          typedPlugin.rules['consistent-type-imports'],
+        ],
+      ]);
+      const result = lintFile(
+        {
+          filePath: consumerFile,
+          frame,
+          languageOptions: parserOptions ? { parserOptions } : undefined,
+          rules: {
+            '@typescript-eslint/consistent-type-imports': { options: [] },
+          },
+          collectFixes: true,
+          suggestionsMode: 'eager',
+        },
+        { rules } as any,
+        (decoded) =>
+          handle.parserServices(
+            decoded,
+            projection,
+            projection.binding.sourceFileName,
+          ),
+      );
+      expect(result.parseError).toBeUndefined();
+      expect(result.ruleErrors).toBeUndefined();
+      return result;
+    } finally {
+      client.close();
+      await host.close();
+    }
+  };
+
+  // Path 1: tsconfig-backed syntax-only session propagates decorator flags.
+  const fromTsconfig = await runSyntaxOnly(withDecoratorsConfig);
+  expect(fromTsconfig.diagnostics).toEqual([]);
+
+  // Path 2: per-file parserOptions propagate into syntax-only parserServices.
+  const fromPerFile = await runSyntaxOnly(plainConfig, {
+    experimentalDecorators: true,
+    emitDecoratorMetadata: true,
+  });
+  expect(fromPerFile.diagnostics).toEqual([]);
+
+  // Path 3: without decorator metadata enabled, the rule flags the import.
+  const withoutDecorators = await runSyntaxOnly(plainConfig);
+  expect(withoutDecorators.diagnostics).toHaveLength(1);
+});
+
+test('ts.getPreEmitDiagnostics, overload candidates, core checker APIs, and zero-cache single-pass reads', async () => {
+  const dir = mkdtempSync(resolve(temp, 'pre-emit-overloads-'));
+  const file = resolve(dir, 'input.ts');
+  const config = resolve(dir, 'tsconfig.json');
+  writeFileSync(
+    file,
+    `export function pick(a: string): string;
+export function pick(a: number, b: boolean): number;
+export function pick(a: string | number, b?: boolean): string | number {
+  return b ? a : a;
+}
+export const call1 = pick('ok');
+export const call2 = pick(1, true);
+export class Holder {
+  constructor(public readonly value: number, opt?: string) {
+    void opt;
+  }
+}
+export function isNum(x: unknown): x is number {
+  return typeof x === 'number';
+}
+export function assertPresent(x: unknown): asserts x {
+  if (!x) throw new Error('missing');
+}
+export const bad: number = 'oops';
+`,
+  );
+  writeFileSync(
+    config,
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: 'ES2022',
+        module: 'ESNext',
+        skipLibCheck: true,
+      },
+      include: ['input.ts'],
+    }),
+  );
+
+  const parsed = ts.readConfigFile(config, ts.sys.readFile);
+  const cmd = ts.parseJsonConfigFileContent(parsed.config, ts.sys, dir);
+  const reference = ts.createProgram({
+    rootNames: cmd.fileNames,
+    options: cmd.options,
+    configFileParsingDiagnostics: cmd.errors,
+  });
+
+  const host = new Host();
+  const descriptor = host.request({
+    method: 'init',
+    config,
+  }) as TypeServiceDescriptor;
+  const owner = new TypeServiceClient(
+    enums,
+    descriptor,
+    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
+    host.source,
+    { maxFactsBytes: 1 << 20 },
+  );
+  // Zero-byte cache client to verify single-pass record reads + transient
+  // supplemental record delivery (1 round trip instead of 10 on getStringType).
+  let zeroCacheQueries = 0;
+  let zeroCacheRecordQueries = 0;
+  const zeroCacheClient = new TypeServiceClient(
+    enums,
+    descriptor,
+    (query) => {
+      zeroCacheQueries++;
+      if (
+        query.op === 'typeRecord' ||
+        query.op === 'symbolRecord' ||
+        query.op === 'signatureRecord'
+      ) {
+        zeroCacheRecordQueries++;
+      }
+      return Buffer.from(host.request({ method: 'query', query }), 'base64');
+    },
+    host.source,
+    { maxFactsBytes: 0 },
+  );
+
+  try {
+    const actualProgram = owner.program as unknown as ts.Program;
+
+    // 1. Native ts.getPreEmitDiagnostics(program) succeeds and matches TS 6.0.3.
+    const summarizeDiags = (diags: readonly ts.Diagnostic[]) =>
+      diags.map((d) => [d.code, d.start, d.length, d.file?.fileName]);
+    expect(summarizeDiags(ts.getPreEmitDiagnostics(actualProgram))).toEqual(
+      summarizeDiags(ts.getPreEmitDiagnostics(reference)),
+    );
+    expect(
+      ts.getPreEmitDiagnostics(actualProgram).some((d) => d.code === 2322),
+    ).toBe(true);
+
+    // 2. Overload resolution with candidatesOutArray + argumentCount + core checker APIs.
+    const exercise = (p: ts.Program) => {
+      const c = p.getTypeChecker();
+      const src = p.getSourceFile(file)!;
+      const callFor = (varName: string) => {
+        const stmt = src.statements.find(
+          (s): s is ts.VariableStatement =>
+            ts.isVariableStatement(s) &&
+            ts.isIdentifier(s.declarationList.declarations[0].name) &&
+            s.declarationList.declarations[0].name.text === varName,
+        )!;
+        return stmt.declarationList.declarations[0]
+          .initializer as ts.CallExpression;
+      };
+      const call1 = callFor('call1');
+      const call2 = callFor('call2');
+      const candidates1: ts.Signature[] = [];
+      const resolved1 = c.getResolvedSignature(call1, candidates1)!;
+      const candidatesWithArgCount: ts.Signature[] = [];
+      const resolvedWithArgCount = c.getResolvedSignature(
+        call1,
+        candidatesWithArgCount,
+        2,
+      )!;
+      const candidates2: ts.Signature[] = [];
+      const resolved2 = c.getResolvedSignature(call2, candidates2)!;
+
+      const pickDecls = src.statements.filter(
+        (s): s is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(s) && s.name?.text === 'pick',
+      );
+      const holder = src.statements.find(
+        (s): s is ts.ClassDeclaration =>
+          ts.isClassDeclaration(s) && s.name?.text === 'Holder',
+      )!;
+      const ctor = holder.members.find(ts.isConstructorDeclaration)!;
+      const isNum = src.statements.find(
+        (s): s is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(s) && s.name?.text === 'isNum',
+      )!;
+      const assertPresent = src.statements.find(
+        (s): s is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(s) && s.name?.text === 'assertPresent',
+      )!;
+      const pred = c.getTypePredicateOfSignature(
+        c.getSignatureFromDeclaration(isNum)!,
+      )!;
+      const assertsPred = c.getTypePredicateOfSignature(
+        c.getSignatureFromDeclaration(assertPresent)!,
+      )!;
+
+      return {
+        resolved1: c.signatureToString(resolved1),
+        candidates1: candidates1.map((s) => c.signatureToString(s)),
+        resolvedWithArgCount: c.signatureToString(resolvedWithArgCount),
+        candidatesWithArgCount: candidatesWithArgCount.map((s) =>
+          c.signatureToString(s),
+        ),
+        resolved2: c.signatureToString(resolved2),
+        candidates2: candidates2.map((s) => c.signatureToString(s)),
+        overloads: pickDecls.map((d) => c.isImplementationOfOverload(d)),
+        optionalParams: ctor.parameters.map((param) =>
+          c.isOptionalParameter(param),
+        ),
+        paramPropSymbols: c
+          .getSymbolsOfParameterPropertyDeclaration(
+            ctor.parameters[0] as ts.ParameterDeclaration,
+            'value',
+          )
+          .map((s) => [s.name, s.flags]),
+        literals: [
+          c.typeToString(c.getStringLiteralType('hello')),
+          c.typeToString(c.getNumberLiteralType(42)),
+          c.typeToString(c.getNumberLiteralType(Number.NaN)),
+          c.typeToString(c.getNumberLiteralType(Number.POSITIVE_INFINITY)),
+          c.typeToString(
+            c.getBigIntLiteralType({ negative: true, base10Value: '99' }),
+          ),
+          c.typeToString(
+            c.getBigIntLiteralType({ negative: true, base10Value: '0' }),
+          ),
+          c.typeToString(c.getTrueType()),
+          c.typeToString(c.getFalseType()),
+          c.typeToString(
+            c.getNullableType(c.getStringType(), ts.TypeFlags.Undefined),
+          ),
+        ],
+        predicateString: c.typePredicateToString(pred, isNum),
+        assertsPredicateString: c.typePredicateToString(
+          assertsPred,
+          assertPresent,
+        ),
+        withToken: c.runWithCancellationToken(
+          {
+            isCancellationRequested: () => false,
+            throwIfCancellationRequested() {},
+          },
+          (inner) => inner.typeToString(inner.getTrueType()),
+        ),
+      };
+    };
+
+    expect(exercise(actualProgram)).toEqual(exercise(reference));
+
+    // 3. Zero-byte cache single-pass record reads (1 query, not 10).
+    const zc = zeroCacheClient.program.getTypeChecker();
+    zeroCacheQueries = 0;
+    zeroCacheRecordQueries = 0;
+    const zString = zc.getStringType();
+    expect(zString.flags).toBe(ts.TypeFlags.String);
+    expect(zString.intrinsicName).toBe('string');
+    expect(zeroCacheQueries).toBe(1);
+    expect(zeroCacheRecordQueries).toBe(0);
+
+    // Reading all shallow fields of a SymbolView / SignatureView with maxFactsBytes=0
+    // performs at most 1 record round trip (not 5-6).
+    const zSrc = zeroCacheClient.program.getSourceFile(file) as ts.SourceFile;
+    const zIsNum = zSrc.statements.find(
+      (s): s is ts.FunctionDeclaration =>
+        ts.isFunctionDeclaration(s) && s.name?.text === 'isNum',
+    )!;
+    zeroCacheQueries = 0;
+    zeroCacheRecordQueries = 0;
+    const zSym = zc.getSymbolAtLocation(zIsNum.name!)!;
+    void zSym.name;
+    void zSym.escapedName;
+    void zSym.flags;
+    void zSym.declarations;
+    void zSym.valueDeclaration;
+    void zSym.links;
+    expect(zeroCacheQueries).toBe(1);
+    expect(zeroCacheRecordQueries).toBe(0);
+
+    zeroCacheQueries = 0;
+    zeroCacheRecordQueries = 0;
+    const zSig = zc.getSignatureFromDeclaration(zIsNum)!;
+    void zSig.parameters;
+    void zSig.declaration;
+    void zSig.typeParameters;
+    void zSig.thisParameter;
+    void zSig.minArgumentCount;
+    expect(zeroCacheQueries).toBe(1);
+    expect(zeroCacheRecordQueries).toBe(0);
+
+    // Multi-handle replies (overload candidates) also deliver bundled records
+    // without extra record round trips when maxFactsBytes is 0.
+    const zCall1Stmt = zSrc.statements.find(
+      (s): s is ts.VariableStatement =>
+        ts.isVariableStatement(s) &&
+        ts.isIdentifier(s.declarationList.declarations[0].name) &&
+        s.declarationList.declarations[0].name.text === 'call1',
+    )!;
+    const zCall1 = zCall1Stmt.declarationList.declarations[0]
+      .initializer as ts.CallExpression;
+    zeroCacheQueries = 0;
+    zeroCacheRecordQueries = 0;
+    const zCandidates: NonNullable<
+      Parameters<typeof zc.getResolvedSignature>[1]
+    > = [];
+    const zResolved = zc.getResolvedSignature(zCall1, zCandidates)!;
+    expect(zCandidates).toHaveLength(2);
+    void zResolved.parameters.map((p) => p.name);
+    for (const candidate of zCandidates) {
+      void candidate.declaration;
+      void candidate.minArgumentCount;
+    }
+    expect(zeroCacheQueries).toBe(1);
+    expect(zeroCacheRecordQueries).toBe(0);
+  } finally {
+    zeroCacheClient.close();
+    owner.close();
+    await host.close();
+  }
+});

@@ -109,6 +109,7 @@ export interface TypeServiceClientOptions {
 export class TypeServiceClient {
   private closed = false;
   private readonly facts = new Map<string, TypePacketReader>();
+  private readonly pendingRecords = new Map<string, Uint8Array>();
   private readonly types = new WeakObjectCache<number, TypeView>();
   private readonly symbols = new WeakObjectCache<number, SymbolView>();
   private readonly signatures = new WeakObjectCache<number, SignatureView>();
@@ -223,7 +224,49 @@ export class TypeServiceClient {
       getNullType: () => requiredType(this.query({ op: 'nullType', args: {} })),
       getUndefinedType: () =>
         requiredType(this.query({ op: 'undefinedType', args: {} })),
+      getTrueType: () => requiredType(this.query({ op: 'trueType', args: {} })),
+      getFalseType: () =>
+        requiredType(this.query({ op: 'falseType', args: {} })),
       getVoidType: () => requiredType(this.query({ op: 'void', args: {} })),
+      getStringLiteralType: (value) =>
+        requiredType(
+          this.query({
+            op: 'stringLiteralType',
+            args: { value: nameToUnits(value) },
+          }),
+        ),
+      getNumberLiteralType: (value) =>
+        requiredType(
+          this.query({
+            op: 'numberLiteralType',
+            args: Number.isNaN(value)
+              ? { value: 0, nonFinite: 'NaN' }
+              : value === Infinity
+                ? { value: 0, nonFinite: 'Infinity' }
+                : value === -Infinity
+                  ? { value: 0, nonFinite: '-Infinity' }
+                  : { value: Object.is(value, -0) ? 0 : value },
+          }),
+        ),
+      getBigIntLiteralType: (value) => {
+        const base10Value = value.base10Value || '0';
+        return requiredType(
+          this.query({
+            op: 'bigIntLiteralType',
+            args: {
+              negative: value.negative && base10Value !== '0',
+              base10Value,
+            },
+          }),
+        );
+      },
+      getNullableType: (type, flags) =>
+        requiredType(
+          this.query({
+            op: 'nullableType',
+            args: { id: this.id(type, 'type'), flags: flags >>> 0 },
+          }),
+        ),
       getAmbientModules: () =>
         this.namedSymbolsFor(this.query({ op: 'ambientModules', args: {} })),
       getAugmentedPropertiesOfType: (t) =>
@@ -297,6 +340,33 @@ export class TypeServiceClient {
           ? this.query({ op: 'constantValue', args: { node } })
           : undefined;
       },
+      isOptionalParameter: (n) => {
+        const node = this.syntax.parseTreeLocation(n);
+        return node
+          ? this.query({ op: 'isOptionalParameter', args: { node } })
+          : false;
+      },
+      isImplementationOfOverload: (n) => {
+        const node = this.syntax.parseTreeLocation(n);
+        return node
+          ? this.query({ op: 'isImplementationOfOverload', args: { node } })
+          : undefined;
+      },
+      getSymbolsOfParameterPropertyDeclaration: (parameter, parameterName) => {
+        const node = this.syntax.parseTreeLocation(parameter);
+        return node
+          ? this.symbolsFor(
+              this.query({
+                op: 'parameterPropertySymbols',
+                args: { node, name: nameToUnits(parameterName) },
+              }),
+            )
+          : [];
+      },
+      runWithCancellationToken: (_token, cb) => {
+        ensure();
+        return cb(this.checker);
+      },
       getTypeAtLocation: (n) => this.type(nodeHandle('type', n)),
       getTypeFromTypeNode: (n) => this.type(nodeHandle('fromTypeNode', n)),
       getContextualType: (n) => this.type(nodeHandle('context', n)),
@@ -363,6 +433,21 @@ export class TypeServiceClient {
           op: 'typeString',
           args: {
             id: this.id(t, 'type'),
+            node: enclosing && this.syntax.parseTreeLocation(enclosing),
+            flags: flags === undefined ? undefined : flags >>> 0,
+          },
+        }),
+      typePredicateToString: (predicate, enclosing, flags) =>
+        this.query({
+          op: 'typePredicateString',
+          args: {
+            kind: predicate.kind >>> 0,
+            parameterName:
+              predicate.parameterName === undefined
+                ? undefined
+                : nameToUnits(predicate.parameterName),
+            parameterIndex: predicate.parameterIndex,
+            type: predicate.type ? this.id(predicate.type, 'type') : 0,
             node: enclosing && this.syntax.parseTreeLocation(enclosing),
             flags: flags === undefined ? undefined : flags >>> 0,
           },
@@ -506,13 +591,28 @@ export class TypeServiceClient {
         this.query({ op: 'isTuple', args: { id: this.id(t, 'type') } }),
       getSignatureFromDeclaration: (n) =>
         this.signature(nodeHandle('signature', n)),
-      getResolvedSignature: (n) => {
+      getResolvedSignature: (n, candidatesOutArray, argumentCount) => {
         const node = this.syntax.parseTreeLocation(n);
-        return node
-          ? this.signature(
-              this.query({ op: 'resolvedSignature', args: { node } }),
-            )
-          : undefined;
+        if (!node) return undefined;
+        const count =
+          argumentCount !== undefined && Number.isFinite(argumentCount)
+            ? Math.trunc(argumentCount)
+            : undefined;
+        const ids = this.query({
+          op: 'resolvedSignature',
+          args: {
+            node,
+            withCandidates: candidatesOutArray !== undefined,
+            argumentCount: count,
+          },
+        });
+        if (candidatesOutArray !== undefined) {
+          for (let i = 1; i < ids.length; i++) {
+            const candidate = this.signature(ids[i]);
+            if (candidate) candidatesOutArray.push(candidate);
+          }
+        }
+        return this.signature(ids[0] ?? 0);
       },
       getReturnTypeOfSignature: (s) =>
         this.type(
@@ -544,9 +644,9 @@ export class TypeServiceClient {
       checker: this.checker,
       ensure,
       query: (req) => this.query(req),
-      typeField: (id, field) => this.typeField(id, field),
-      symbolField: (id, field) => this.symbolField(id, field),
-      signatureField: (id, field) => this.signatureField(id, field),
+      typeFact: (id) => this.typeFact(id),
+      symbolFact: (id) => this.symbolFact(id),
+      signatureFact: (id) => this.signatureFact(id),
       type: (id) => this.type(id),
       symbol: (id, knownName) => this.symbol(id, knownName),
       signature: (id) => this.signature(id),
@@ -593,6 +693,12 @@ export class TypeServiceClient {
         return unsupported('Program.emit');
       },
       getSourceFileByPath: (path) => this.syntax.sourceByPath(path),
+      getConfigFileParsingDiagnostics: () =>
+        this.diagnostics({ op: 'configFileParsingDiagnostics', args: {} }),
+      getOptionsDiagnostics: () =>
+        this.diagnostics({ op: 'optionsDiagnostics', args: {} }),
+      getGlobalDiagnostics: () =>
+        this.diagnostics({ op: 'globalDiagnostics', args: {} }),
       getSyntacticDiagnostics: (source) =>
         this.diagnostics({
           op: 'syntacticDiagnostics',
@@ -626,7 +732,12 @@ export class TypeServiceClient {
 
   private diagnostics(
     request: ServiceRequest<
-      'syntacticDiagnostics' | 'semanticDiagnostics' | 'declarationDiagnostics'
+      | 'configFileParsingDiagnostics'
+      | 'optionsDiagnostics'
+      | 'globalDiagnostics'
+      | 'syntacticDiagnostics'
+      | 'semanticDiagnostics'
+      | 'declarationDiagnostics'
     >,
   ): readonly DiagnosticView[] {
     return this.query(request).map((d) =>
@@ -642,6 +753,7 @@ export class TypeServiceClient {
     this.closed = true;
     for (const reader of this.facts.values()) reader.close();
     this.facts.clear();
+    this.pendingRecords.clear();
     this.factBytes = 0;
     this.types.clear();
     this.symbols.clear();
@@ -684,6 +796,16 @@ export class TypeServiceClient {
       this.facts.delete(key);
       this.facts.set(key, reader);
     } else {
+      const pending = this.pendingRecords.get(key);
+      if (pending) {
+        this.pendingRecords.delete(key);
+        const transient = new TypePacketReader(pending);
+        try {
+          return read(transient);
+        } finally {
+          transient.close();
+        }
+      }
       reader = this.ingest(query, transport(query, key, true), key);
     }
     try {
@@ -716,6 +838,7 @@ export class TypeServiceClient {
     bytes: Readonly<Uint8Array>,
     cacheKey?: string,
   ): TypePacketReader {
+    this.pendingRecords.clear();
     const reply = typeReplyPackets(bytes);
     for (const record of reply.records) {
       const key = typeQueryKey({
@@ -724,7 +847,12 @@ export class TypeServiceClient {
         args: { id: record.id },
       });
       const reader = this.store(key, record.packet);
-      if (this.facts.get(key) !== reader) reader.close();
+      if (this.facts.get(key) !== reader) {
+        reader.close();
+        // Retain uncached supplemental records only until consumed or replaced
+        // by the next transport reply, so zero-budget clients avoid re-querying.
+        this.pendingRecords.set(key, Uint8Array.from(record.packet));
+      }
     }
     return cacheKey === undefined
       ? new TypePacketReader(reply.packet)
@@ -735,30 +863,21 @@ export class TypeServiceClient {
     return this.read(request, (packet) => packet.scalar<Q['op']>(request.op));
   }
 
-  private typeField<K extends keyof TypeFact>(
-    id: number,
-    field: K,
-  ): TypeFact[K] {
+  private typeFact(id: number): TypeFact {
     return this.read({ op: 'typeRecord', args: { id } }, (packet) =>
-      packet.typeField(field),
+      packet.typeFact(),
     );
   }
 
-  private symbolField<K extends keyof SymbolFact>(
-    id: number,
-    field: K,
-  ): SymbolFact[K] {
+  private symbolFact(id: number): SymbolFact {
     return this.read({ op: 'symbolRecord', args: { id } }, (packet) =>
-      packet.symbolField(field),
+      packet.symbolFact(),
     );
   }
 
-  private signatureField<K extends keyof SignatureFact>(
-    id: number,
-    field: K,
-  ): SignatureFact[K] {
+  private signatureFact(id: number): SignatureFact {
     return this.read({ op: 'signatureRecord', args: { id } }, (packet) =>
-      packet.signatureField(field),
+      packet.signatureFact(),
     );
   }
 
@@ -879,17 +998,23 @@ type NodeMaps = Pick<
   'esTreeNodeToTSNodeMap' | 'tsNodeToESTreeNodeMap'
 >;
 
-export function syntaxOnlyParserServices({
-  esTreeNodeToTSNodeMap,
-  tsNodeToESTreeNodeMap,
-}: Readonly<NodeMaps>) {
+export interface ParserServiceOptions {
+  readonly emitDecoratorMetadata?: boolean;
+  readonly experimentalDecorators?: boolean;
+  readonly isolatedDeclarations?: boolean;
+}
+
+export function syntaxOnlyParserServices(
+  { esTreeNodeToTSNodeMap, tsNodeToESTreeNodeMap }: Readonly<NodeMaps>,
+  options?: Readonly<ParserServiceOptions>,
+) {
   return {
     esTreeNodeToTSNodeMap,
     tsNodeToESTreeNodeMap,
     program: null,
-    emitDecoratorMetadata: false,
-    experimentalDecorators: false,
-    isolatedDeclarations: false,
+    emitDecoratorMetadata: options?.emitDecoratorMetadata === true,
+    experimentalDecorators: options?.experimentalDecorators === true,
+    isolatedDeclarations: options?.isolatedDeclarations === true,
   };
 }
 
@@ -913,22 +1038,42 @@ export class TypeServiceFile {
     frame: Readonly<DecodedFrame>,
     projection: TypeServiceProjection,
     sourceFileName = this.binding.sourceFileName,
+    parserOptions?: Readonly<ParserServiceOptions>,
   ) {
     if (this.closed) throw new Error('file type services are closed');
     this.syntax.attach(frame, projection, sourceFileName);
+    const options = this.owner.descriptor.compilerOptions;
+    const flags: ParserServiceOptions = {
+      emitDecoratorMetadata:
+        parserOptions?.emitDecoratorMetadata ??
+        options.emitDecoratorMetadata === true,
+      experimentalDecorators:
+        parserOptions?.experimentalDecorators ??
+        options.experimentalDecorators === true,
+      isolatedDeclarations:
+        parserOptions?.isolatedDeclarations ??
+        options.isolatedDeclarations === true,
+    };
     if (this.owner.descriptor.syntaxOnly) {
-      return syntaxOnlyParserServices(this.syntax);
+      return syntaxOnlyParserServices(this.syntax, flags);
     }
     const toTS = this.syntax.esTreeNodeToTSNodeMap.get;
-    const options = this.owner.descriptor.compilerOptions;
     return {
       program: this.owner.program,
       esTreeNodeToTSNodeMap: this.syntax.esTreeNodeToTSNodeMap,
       tsNodeToESTreeNodeMap: this.syntax.tsNodeToESTreeNodeMap,
       getContextualType: (node: Readonly<ESTreeNode>) =>
         this.owner.checker.getContextualType(toTS(node)),
-      getResolvedSignature: (node: Readonly<ESTreeNode>) =>
-        this.owner.checker.getResolvedSignature(toTS(node)),
+      getResolvedSignature: (
+        node: Readonly<ESTreeNode>,
+        candidatesOutArray?: SignatureView[],
+        argumentCount?: number,
+      ) =>
+        this.owner.checker.getResolvedSignature(
+          toTS(node),
+          candidatesOutArray,
+          argumentCount,
+        ),
       getTypeAtLocation: (node: Readonly<ESTreeNode>) =>
         this.owner.checker.getTypeAtLocation(toTS(node)),
       getSymbolAtLocation: (node: Readonly<ESTreeNode>) =>
@@ -939,9 +1084,9 @@ export class TypeServiceFile {
         symbol: Readonly<SymbolView>,
         node: Readonly<ESTreeNode>,
       ) => this.owner.checker.getTypeOfSymbolAtLocation(symbol, toTS(node)),
-      emitDecoratorMetadata: options.emitDecoratorMetadata === true,
-      experimentalDecorators: options.experimentalDecorators === true,
-      isolatedDeclarations: options.isolatedDeclarations === true,
+      emitDecoratorMetadata: flags.emitDecoratorMetadata === true,
+      experimentalDecorators: flags.experimentalDecorators === true,
+      isolatedDeclarations: flags.isolatedDeclarations === true,
     };
   }
 }

@@ -70,6 +70,9 @@ export interface LanguageOptions {
       globalReturn?: boolean;
       impliedStrict?: boolean;
     };
+    emitDecoratorMetadata?: boolean;
+    experimentalDecorators?: boolean;
+    isolatedDeclarations?: boolean;
   };
 }
 

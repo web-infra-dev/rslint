@@ -195,12 +195,15 @@ type PrintArgs = IDArgs & {
 export interface QueryArguments {
   // Program queries
   rootFileNames: EmptyArgs;
+  configFileParsingDiagnostics: { readonly node?: NodeRef };
+  optionsDiagnostics: { readonly node?: NodeRef };
+  globalDiagnostics: { readonly node?: NodeRef };
   syntacticDiagnostics: { readonly node?: NodeRef };
   semanticDiagnostics: { readonly node?: NodeRef };
   declarationDiagnostics: { readonly node?: NodeRef };
   // Syntax summaries
   nodeRecord: NodeArgs;
-  // Intrinsic types & ambient modules
+  // Intrinsic & literal types & ambient modules
   errorType: EmptyArgs;
   anyType: EmptyArgs;
   unknownType: EmptyArgs;
@@ -213,7 +216,19 @@ export interface QueryArguments {
   neverType: EmptyArgs;
   nullType: EmptyArgs;
   undefinedType: EmptyArgs;
+  trueType: EmptyArgs;
+  falseType: EmptyArgs;
   void: EmptyArgs;
+  stringLiteralType: { readonly value: readonly number[] };
+  numberLiteralType: {
+    readonly value: number;
+    readonly nonFinite?: 'NaN' | 'Infinity' | '-Infinity';
+  };
+  bigIntLiteralType: {
+    readonly negative: boolean;
+    readonly base10Value: string;
+  };
+  nullableType: IDArgs & { readonly flags: number };
   ambientModules: EmptyArgs;
   // Node -> semantic queries
   type: NodeArgs;
@@ -224,13 +239,19 @@ export interface QueryArguments {
   symbol: NodeArgs;
   declarationSymbol: NodeArgs;
   signature: NodeArgs;
-  resolvedSignature: NodeArgs;
+  resolvedSignature: NodeArgs & {
+    readonly withCandidates?: boolean;
+    readonly argumentCount?: number;
+  };
   shorthandValueSymbol: NodeArgs;
   exportSpecifierLocalTargetSymbol: NodeArgs;
   propertySymbolOfDestructuringAssignment: NodeArgs;
   jsxIntrinsicTagNamesAt: NodeArgs;
   constantValue: NodeArgs;
+  isOptionalParameter: NodeArgs;
+  isImplementationOfOverload: NodeArgs;
   validPropertyAccess: NodeArgs & { readonly name: readonly number[] };
+  parameterPropertySymbols: NodeArgs & { readonly name: readonly number[] };
   symbolsInScope: NodeArgs & { readonly meaning: number };
   resolveName: {
     readonly name: readonly number[];
@@ -268,6 +289,14 @@ export interface QueryArguments {
   signatures: IDArgs & { readonly kind: number };
   typeString: PrintArgs;
   typeNode: PrintArgs;
+  typePredicateString: {
+    readonly kind: number;
+    readonly parameterName?: readonly number[];
+    readonly parameterIndex?: number;
+    readonly type: number;
+    readonly node: NodeRef | undefined;
+    readonly flags: number | undefined;
+  };
   // Symbol queries
   symbolRecord: IDArgs;
   symbolMembers: IDArgs;
@@ -301,6 +330,9 @@ export interface QueryArguments {
 
 export interface QueryResults {
   rootFileNames: readonly string[];
+  configFileParsingDiagnostics: readonly DiagnosticFact[];
+  optionsDiagnostics: readonly DiagnosticFact[];
+  globalDiagnostics: readonly DiagnosticFact[];
   syntacticDiagnostics: readonly DiagnosticFact[];
   semanticDiagnostics: readonly DiagnosticFact[];
   declarationDiagnostics: readonly DiagnosticFact[];
@@ -317,7 +349,13 @@ export interface QueryResults {
   neverType: number;
   nullType: number;
   undefinedType: number;
+  trueType: number;
+  falseType: number;
   void: number;
+  stringLiteralType: number;
+  numberLiteralType: number;
+  bigIntLiteralType: number;
+  nullableType: number;
   ambientModules: readonly NamedSymbolFact[];
   type: number;
   fromTypeNode: number;
@@ -327,13 +365,16 @@ export interface QueryResults {
   symbol: number;
   declarationSymbol: number;
   signature: number;
-  resolvedSignature: number;
+  resolvedSignature: readonly number[];
   shorthandValueSymbol: number;
   exportSpecifierLocalTargetSymbol: number;
   propertySymbolOfDestructuringAssignment: number;
   jsxIntrinsicTagNamesAt: readonly NamedSymbolFact[];
   constantValue: string | number | undefined;
+  isOptionalParameter: boolean;
+  isImplementationOfOverload: boolean;
   validPropertyAccess: boolean;
+  parameterPropertySymbols: readonly number[];
   symbolsInScope: readonly NamedSymbolFact[];
   resolveName: number;
   typeRecord: TypeFact;
@@ -365,6 +406,7 @@ export interface QueryResults {
   signatures: readonly number[];
   typeString: string;
   typeNode: GeneratedSyntax | undefined;
+  typePredicateString: string;
   symbolRecord: SymbolFact;
   symbolMembers: readonly NamedSymbolFact[] | undefined;
   symbolExports: readonly NamedSymbolFact[] | undefined;
@@ -405,6 +447,9 @@ export type QueryTransport = (
 ) => Uint8Array;
 
 const NON_CACHEABLE_OPS = new Set<Operation>([
+  'configFileParsingDiagnostics',
+  'optionsDiagnostics',
+  'globalDiagnostics',
   'semanticDiagnostics',
   'declarationDiagnostics',
   'suggestionDiagnostics',
@@ -453,9 +498,22 @@ export function typeQueryKey(q: TypeServiceQuery): string {
     case 'neverType':
     case 'nullType':
     case 'undefinedType':
+    case 'trueType':
+    case 'falseType':
     case 'void':
     case 'ambientModules':
       return prefix;
+    case 'stringLiteralType':
+      return `${prefix}${q.args.value.length}:${q.args.value.join(',')}`;
+    case 'numberLiteralType':
+      return `${prefix}${q.args.nonFinite ?? (Object.is(q.args.value, -0) ? '0' : String(q.args.value))}`;
+    case 'bigIntLiteralType':
+      return `${prefix}${q.args.negative && q.args.base10Value !== '0' ? '-' : ''}${q.args.base10Value}`;
+    case 'nullableType':
+      return `${prefix}${q.args.id}:${q.args.flags}`;
+    case 'configFileParsingDiagnostics':
+    case 'optionsDiagnostics':
+    case 'globalDiagnostics':
     case 'syntacticDiagnostics':
     case 'semanticDiagnostics':
     case 'declarationDiagnostics':
@@ -467,17 +525,21 @@ export function typeQueryKey(q: TypeServiceQuery): string {
     case 'symbol':
     case 'declarationSymbol':
     case 'signature':
-    case 'resolvedSignature':
     case 'shorthandValueSymbol':
     case 'suggestionDiagnostics':
     case 'exportSpecifierLocalTargetSymbol':
     case 'propertySymbolOfDestructuringAssignment':
     case 'jsxIntrinsicTagNamesAt':
     case 'constantValue':
+    case 'isOptionalParameter':
+    case 'isImplementationOfOverload':
       return prefix + formatNodeKey(q.args.node);
+    case 'resolvedSignature':
+      return `${prefix}${formatNodeKey(q.args.node)}:${q.args.withCandidates ? 1 : 0}:${q.args.argumentCount ?? '-'}`;
     case 'contextualArgument':
       return `${prefix}${formatNodeKey(q.args.node)}:${q.args.index}`;
     case 'validPropertyAccess':
+    case 'parameterPropertySymbols':
       return `${prefix}${formatNodeKey(q.args.node)}:${q.args.name.length}:${q.args.name.join(',')}`;
     case 'property':
     case 'propertyType':
@@ -500,6 +562,8 @@ export function typeQueryKey(q: TypeServiceQuery): string {
     case 'typeString':
     case 'typeNode':
       return `${prefix}${q.args.id}:${formatNodeKey(q.args.node)}:${q.args.flags ?? '-'}`;
+    case 'typePredicateString':
+      return `${prefix}${q.args.kind}:${q.args.parameterName ? `${q.args.parameterName.length}:${q.args.parameterName.join(',')}` : '-'}:${q.args.parameterIndex ?? '-'}:${q.args.type}:${formatNodeKey(q.args.node)}:${q.args.flags ?? '-'}`;
     case 'signatureString':
     case 'symbolString':
       return `${prefix}${q.args.id}:${formatNodeKey(q.args.node)}:${q.args.flags ?? '-'}:${q.args.kind}`;
@@ -558,6 +622,9 @@ export type ScalarOperation = Exclude<
 
 export const SCALAR_KINDS: Readonly<Record<ScalarOperation, number>> = {
   rootFileNames: 17,
+  configFileParsingDiagnostics: 15,
+  optionsDiagnostics: 15,
+  globalDiagnostics: 15,
   syntacticDiagnostics: 15,
   semanticDiagnostics: 15,
   declarationDiagnostics: 15,
@@ -573,7 +640,13 @@ export const SCALAR_KINDS: Readonly<Record<ScalarOperation, number>> = {
   neverType: 1,
   nullType: 1,
   undefinedType: 1,
+  trueType: 1,
+  falseType: 1,
   void: 1,
+  stringLiteralType: 1,
+  numberLiteralType: 1,
+  bigIntLiteralType: 1,
+  nullableType: 1,
   ambientModules: 11,
   type: 1,
   fromTypeNode: 1,
@@ -583,13 +656,16 @@ export const SCALAR_KINDS: Readonly<Record<ScalarOperation, number>> = {
   symbol: 1,
   declarationSymbol: 1,
   signature: 1,
-  resolvedSignature: 1,
+  resolvedSignature: 4,
   shorthandValueSymbol: 1,
   exportSpecifierLocalTargetSymbol: 1,
   propertySymbolOfDestructuringAssignment: 1,
   jsxIntrinsicTagNamesAt: 11,
   constantValue: 16,
+  isOptionalParameter: 2,
+  isImplementationOfOverload: 2,
   validPropertyAccess: 2,
+  parameterPropertySymbols: 4,
   symbolsInScope: 11,
   resolveName: 1,
   typeDetails: 18,
@@ -620,6 +696,7 @@ export const SCALAR_KINDS: Readonly<Record<ScalarOperation, number>> = {
   signatures: 4,
   typeString: 3,
   typeNode: 14,
+  typePredicateString: 3,
   symbolMembers: 19,
   symbolExports: 19,
   symbolDocumentation: 12,

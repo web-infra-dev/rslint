@@ -223,3 +223,49 @@ func TestSanitizeTruncatedUTF8(t *testing.T) {
 		t.Fatalf("expected valid trimmed string %q, got %q", "例...", got)
 	}
 }
+
+func TestSyntaxOnlyDescriptorPreservesCompilerOptions(t *testing.T) {
+	const root = "/type-service-test"
+	fileName := tspath.ResolvePath(root, "input.ts")
+	configName := tspath.ResolvePath(root, "tsconfig.json")
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		configName: `{"compilerOptions":{"noLib":true,"experimentalDecorators":true,"emitDecoratorMetadata":true,"isolatedDeclarations":true}}`,
+		fileName:   "export class A {}",
+	})
+	raw, err := utils.CreateProgram(false, fs, root, configName, utils.CreateCompilerHost(root, fs))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := program.NewFromCompiler(raw)
+	file := p.GetSourceFile(fileName)
+	session, err := NewSyntaxOnly(t.Context(), p, []*ast.SourceFile{file})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+
+	for _, desc := range []struct {
+		name string
+		get  func() (Descriptor, error)
+	}{
+		{"Descriptor", session.Descriptor},
+		{"SyntaxDescriptor", func() (Descriptor, error) { return session.SyntaxDescriptor(file) }},
+	} {
+		d, err := desc.get()
+		if err != nil {
+			t.Fatalf("%s: %v", desc.name, err)
+		}
+		if !d.SyntaxOnly {
+			t.Fatalf("%s: expected SyntaxOnly=true", desc.name)
+		}
+		var opts map[string]any
+		if err := json.Unmarshal(d.CompilerOptions, &opts); err != nil {
+			t.Fatalf("%s: invalid CompilerOptions JSON: %v", desc.name, err)
+		}
+		for _, key := range []string{"experimentalDecorators", "emitDecoratorMetadata", "isolatedDeclarations"} {
+			if opts[key] != true {
+				t.Fatalf("%s: expected %s=true in syntax-only descriptor, got %v", desc.name, key, opts[key])
+			}
+		}
+	}
+}

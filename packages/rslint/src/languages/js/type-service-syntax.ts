@@ -1116,9 +1116,9 @@ export class GenerationSyntaxViews {
       if (key === 'languageVersion') {
         const targets = this.typescript.ScriptTarget;
         if (file.toLowerCase().endsWith('.json')) return targets.ES2015;
-        if (this.descriptor.syntaxOnly) return targets.Latest;
         const value = this.descriptor.compilerOptions.target;
         const target = typeof value === 'number' ? value : undefined;
+        if (this.descriptor.syntaxOnly) return target ?? targets.Latest;
         return target === undefined || target === Number(targets.ES3)
           ? targets.LatestStandard
           : target;

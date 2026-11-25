@@ -31,7 +31,10 @@ func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, no
 }
 
 var diagnosticKinds = map[Operation]program.DiagnosticKind{
-	"syntacticDiagnostics":   program.SyntacticDiagnostics,
-	"semanticDiagnostics":    program.SemanticDiagnostics,
-	"declarationDiagnostics": program.DeclarationDiagnostics,
+	"configFileParsingDiagnostics": program.ConfigFileParsingDiagnostics,
+	"optionsDiagnostics":           program.OptionsDiagnostics,
+	"globalDiagnostics":            program.GlobalDiagnostics,
+	"syntacticDiagnostics":         program.SyntacticDiagnostics,
+	"semanticDiagnostics":          program.SemanticDiagnostics,
+	"declarationDiagnostics":       program.DeclarationDiagnostics,
 }

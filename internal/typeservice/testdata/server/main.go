@@ -24,6 +24,7 @@ import (
 
 type request struct {
 	MetadataOnly bool              `json:"metadataOnly"`
+	SyntaxOnly   bool              `json:"syntaxOnly"`
 	Method       string            `json:"method"`
 	Config       string            `json:"config"`
 	File         string            `json:"file"`
@@ -88,7 +89,11 @@ func main() {
 						eligible = append(eligible, f)
 					}
 				}
-				session, err = typeservice.New(context.Background(), p, eligible)
+				if req.SyntaxOnly {
+					session, err = typeservice.NewSyntaxOnly(context.Background(), p, eligible)
+				} else {
+					session, err = typeservice.New(context.Background(), p, eligible)
+				}
 				if err == nil {
 					value, err = session.Descriptor()
 				}

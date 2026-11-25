@@ -212,10 +212,51 @@ export function lintFile(
   // of `languageOptions`. No legacy positions are accepted.
   // Lazy SourceCode resources may outlive lintFile. Keep their language
   // metadata, rather than capturing the request and its transport frame.
+  const rawParserOptions = req.languageOptions?.parserOptions;
+  let effectiveParserServices: Record<string, unknown> | undefined =
+    parserServices as Record<string, unknown> | undefined;
+  if (
+    effectiveParserServices &&
+    effectiveParserServices.program === null &&
+    rawParserOptions
+  ) {
+    const overrides: Record<string, unknown> = {};
+    for (const key of [
+      'emitDecoratorMetadata',
+      'experimentalDecorators',
+      'isolatedDeclarations',
+    ] as const) {
+      if (
+        typeof rawParserOptions[key] === 'boolean' &&
+        effectiveParserServices[key] !== rawParserOptions[key]
+      ) {
+        overrides[key] = rawParserOptions[key];
+      }
+    }
+    if (Object.keys(overrides).length > 0) {
+      effectiveParserServices = { ...effectiveParserServices, ...overrides };
+    }
+  }
+  const isolatedFromServices =
+    effectiveParserServices?.isolatedDeclarations === true;
   const languageOptions =
-    services && !req.languageOptions?.parserOptions
-      ? { ...req.languageOptions, parserOptions: {} }
-      : req.languageOptions;
+    services && !rawParserOptions
+      ? {
+          ...req.languageOptions,
+          parserOptions: isolatedFromServices
+            ? { isolatedDeclarations: true }
+            : {},
+        }
+      : isolatedFromServices &&
+          rawParserOptions?.isolatedDeclarations === undefined
+        ? {
+            ...req.languageOptions,
+            parserOptions: {
+              ...rawParserOptions,
+              isolatedDeclarations: true,
+            },
+          }
+        : req.languageOptions;
   const globals = languageOptions?.globals;
   const ecmaFeatures = languageOptions?.parserOptions?.ecmaFeatures;
   const createScopeManager = makeScopeManagerFactory(ast, {
@@ -274,7 +315,9 @@ export function lintFile(
       ends: parsed.tokenEnds,
     },
   });
-  if (parserServices) sharedSourceCode.parserServices = parserServices;
+  if (effectiveParserServices) {
+    sharedSourceCode.parserServices = effectiveParserServices;
+  }
 
   // ESLint v10's espree attaches `Program.tokens` (and `Program.comments`)
   // to the AST root directly. the frame decoder doesn't, so plugin rules that

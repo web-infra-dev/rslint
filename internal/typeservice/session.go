@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strings"
 	"sync"
@@ -196,18 +197,29 @@ func (s *Session) SyntaxDescriptor(file *ast.SourceFile) (Descriptor, error) {
 	if !s.syntaxOnly || !s.eligible[file] {
 		return Descriptor{}, errors.New("foreign syntax projection target")
 	}
-	d := s.syntaxDescriptor()
+	d, err := s.syntaxDescriptor()
+	if err != nil {
+		return Descriptor{}, err
+	}
 	d.Sources = []Source{syntaxSource(file)}
 	return d, nil
 }
 
-func (s *Session) syntaxDescriptor() Descriptor {
+func (s *Session) syntaxDescriptor() (Descriptor, error) {
+	options := json.RawMessage("{}")
+	if opts := s.program.Options(); opts != nil {
+		var err error
+		options, err = json.Marshal(compilerOptions(opts))
+		if err != nil {
+			return Descriptor{}, err
+		}
+	}
 	return Descriptor{
 		SyntaxOnly:       true,
 		Generation:       s.generation,
 		CurrentDirectory: s.program.CurrentDirectory(),
-		CompilerOptions:  json.RawMessage("{}"),
-	}
+		CompilerOptions:  options,
+	}, nil
 }
 
 func syntaxSource(f *ast.SourceFile) Source {
@@ -234,7 +246,10 @@ func (s *Session) Descriptor() (Descriptor, error) {
 		return Descriptor{}, ErrClosed
 	}
 	if s.syntaxOnly {
-		d := s.syntaxDescriptor()
+		d, err := s.syntaxDescriptor()
+		if err != nil {
+			return Descriptor{}, err
+		}
 		for _, file := range s.program.SourceFiles() {
 			if s.eligible[file] {
 				d.Sources = append(d.Sources, syntaxSource(file))
@@ -495,7 +510,9 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 	switch op {
 	case "type", "fromTypeNode", "context", "constraint", "apparent", "baseLiteral", "nonNullable",
 		"errorType", "anyType", "unknownType", "stringType", "numberType", "booleanType",
-		"bigIntType", "eSSymbolType", "nonPrimitiveType", "neverType", "nullType", "undefinedType", "void",
+		"bigIntType", "eSSymbolType", "nonPrimitiveType", "neverType", "nullType", "undefinedType",
+		"trueType", "falseType", "stringLiteralType", "numberLiteralType", "bigIntLiteralType",
+		"nullableType", "void",
 		"declaredType", "symbolType", "returnType", "numberIndexType", "typeArguments",
 		"stringIndexType", "awaited", "widened", "baseTypes", "defaultType", "typeOfSymbol",
 		"indexInfo", "indexInfos", "declaredIndexInfos", "typePredicate", "parameterType", "propertyType",
@@ -504,7 +521,7 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 	case "symbol", "declarationSymbol", "aliasedSymbol", "property", "properties", "resolveName",
 		"exportSymbol", "immediateAliasedSymbol", "shorthandValueSymbol",
 		"exportSpecifierLocalTargetSymbol", "propertySymbolOfDestructuringAssignment",
-		"mergedSymbol", "moduleMember":
+		"mergedSymbol", "moduleMember", "parameterPropertySymbols":
 		kind = "symbolRecord"
 	case "signature", "resolvedSignature", "signatures":
 		kind = "signatureRecord"
@@ -804,6 +821,10 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return s.namedSymbols(c.GetJsxIntrinsicTagNamesAt(native)), nil
 		case "constantValue":
 			return constantValue(c.GetConstantValue(native)), nil
+		case "isOptionalParameter":
+			return Boolean(checker.Checker_isOptionalParameter(c, native)), nil
+		case "isImplementationOfOverload":
+			return overloadImplementation(c, native), nil
 		case "type":
 			switch native.Kind {
 			case ast.KindJSDocPropertyTag, ast.KindJSDocTypedefTag, ast.KindJSDocCallbackTag:
@@ -833,11 +854,6 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				}
 			}
 			return Handle(s.signatureID(c.GetSignatureFromDeclaration(native))), nil
-		case "resolvedSignature":
-			if !ast.IsCallLikeExpression(native) {
-				return Handle(0), nil
-			}
-			return Handle(s.signatureID(c.GetResolvedSignature(native))), nil
 		case "shorthandValueSymbol":
 			return Handle(s.symbolID(c.GetShorthandAssignmentValueSymbol(native))), nil
 		case "suggestionDiagnostics":
@@ -846,9 +862,48 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			}
 			return diagnosticFacts(c.GetSuggestionDiagnostics(ctx, native.AsSourceFile())), ctx.Err()
 		}
+	case *ResolvedSignatureRequest:
+		if !ast.IsCallLikeExpression(native) {
+			return Handles{0}, nil
+		}
+		var sig *checker.Signature
+		var candidates []*checker.Signature
+		switch {
+		case r.ArgumentCount != nil:
+			sig, candidates = checker.Checker_getResolvedSignatureWorker(c, native, checker.CheckModeNormal, *r.ArgumentCount)
+			if !r.WithCandidates {
+				candidates = nil
+			}
+		case r.WithCandidates:
+			sig = checker.Checker_getResolvedSignature(c, native, &candidates, checker.CheckModeNormal)
+		default:
+			sig = c.GetResolvedSignature(native)
+		}
+		ids := make(Handles, 1, 1+len(candidates))
+		ids[0] = s.signatureID(sig)
+		for _, candidate := range candidates {
+			ids = append(ids, s.signatureID(candidate))
+		}
+		return ids, nil
 	case *NamedNodeRequest:
-		if r.Op == "validPropertyAccess" {
+		switch r.Op {
+		case "validPropertyAccess":
 			return Boolean(c.IsValidPropertyAccess(native, string(r.Name))), nil
+		case "parameterPropertySymbols":
+			if !ast.IsParameterPropertyDeclaration(native, native.Parent) ||
+				native.Parent == nil || native.Parent.Parent == nil ||
+				native.Parent.Locals() == nil || native.Parent.Parent.Symbol() == nil {
+				return nil, errors.New("parameter is not a parameter property declaration")
+			}
+			param, prop := c.GetSymbolsOfParameterPropertyDeclaration(native, string(r.Name))
+			ids := Handles{}
+			if param != nil {
+				ids = append(ids, s.symbolID(param))
+			}
+			if prop != nil {
+				ids = append(ids, s.symbolID(prop))
+			}
+			return ids, nil
 		}
 	case *ContextualArgumentRequest:
 		if !ast.IsCallLikeExpression(native) {
@@ -1037,6 +1092,10 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return Handle(s.typeID(c.GetNullType())), nil
 		case "undefinedType":
 			return Handle(s.typeID(c.GetUndefinedType())), nil
+		case "trueType":
+			return Handle(s.typeID(c.GetBooleanType().Types()[1])), nil
+		case "falseType":
+			return Handle(s.typeID(c.GetBooleanType().Types()[0])), nil
 		case "void":
 			return Handle(s.typeID(c.GetVoidType())), nil
 		case "ambientModules":
@@ -1076,6 +1135,49 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		return s.namedSymbols(symbolsInScope(c, native, ast.SymbolFlags(r.Meaning))), nil
 	case *ParameterTypeRequest:
 		return Handle(s.typeID(c.GetTypeParameterAtPosition(s.signatureByID(r.ID), r.Position))), nil
+	case *StringLiteralRequest:
+		return Handle(s.typeID(checker.Checker_getStringLiteralType(c, string(r.Value)))), nil
+	case *NumberLiteralRequest:
+		value := r.Value
+		switch r.NonFinite {
+		case "":
+		case "NaN":
+			value = math.NaN()
+		case "Infinity":
+			value = math.Inf(1)
+		case "-Infinity":
+			value = math.Inf(-1)
+		default:
+			return nil, errors.New("invalid non-finite number literal")
+		}
+		return Handle(s.typeID(checker.Checker_getNumberLiteralType(c, jsnum.Number(value)))), nil
+	case *BigIntLiteralRequest:
+		text := r.Base10Value
+		if text == "" {
+			text = "0"
+		}
+		negative := r.Negative && text != "0"
+		return Handle(s.typeID(checker.Checker_getBigIntLiteralType(c, jsnum.PseudoBigInt{Negative: negative, Base10Value: text}))), nil
+	case *NullableTypeRequest:
+		return Handle(s.typeID(checker.Checker_getNullableType(c, s.typeByID(r.ID), checker.TypeFlags(r.Flags)))), nil
+	case *TypePredicateStringRequest:
+		if r.Kind > uint32(checker.TypePredicateKindAssertsIdentifier) {
+			return nil, errors.New("invalid type predicate kind")
+		}
+		var name string
+		if r.ParameterName != nil {
+			name = string(*r.ParameterName)
+		}
+		var predType *checker.Type
+		if r.Type != 0 {
+			predType = s.typeByID(r.Type)
+		}
+		pred := checker.Checker_newTypePredicate(c, checker.TypePredicateKind(r.Kind), name, r.ParameterIndex, predType)
+		flags := checker.TypeFormatFlagsUseAliasDefinedOutsideCurrentScope
+		if r.Flags != nil {
+			flags = checker.TypeFormatFlags(*r.Flags)
+		}
+		return Text(checker.Checker_typePredicateToStringEx(c, pred, native, flags)), nil
 	case *PrintRequest:
 		return s.executePrint(c, r, native)
 	case *SignaturesRequest:
@@ -1341,6 +1443,22 @@ func encodeGeneratedNode(node *ast.Node, builder *checker.NodeBuilder, enclosing
 	}
 	prepareGeneratedSyntax(tree, ast.GetSourceFileOfNode(enclosing))
 	return result, nil
+}
+
+func overloadImplementation(c *checker.Checker, node *ast.Node) Boolean {
+	if !ast.IsFunctionLike(node) || !ast.NodeIsPresent(node.Body()) ||
+		ast.IsGetAccessorDeclaration(node) || ast.IsSetAccessorDeclaration(node) {
+		return false
+	}
+	signatures := checker.Checker_getSignaturesOfSymbol(c, checker.Checker_getSymbolOfDeclaration(c, node))
+	if len(signatures) > 1 {
+		return true
+	}
+	if len(signatures) == 1 {
+		decl := signatures[0].Declaration()
+		return Boolean(decl != nil && decl != node && decl.Flags&ast.NodeFlagsJSDoc == 0)
+	}
+	return false
 }
 
 func constantValue(value any) Literal {

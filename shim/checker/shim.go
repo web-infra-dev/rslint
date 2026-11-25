@@ -102,11 +102,17 @@ func Checker_isConstContext(recv *checker.Checker, node *ast.Node) bool
 //go:linkname Checker_getWriteTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWriteTypeOfSymbol
 func Checker_getWriteTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 
+//go:linkname Checker_getSymbolOfDeclaration github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getSymbolOfDeclaration
+func Checker_getSymbolOfDeclaration(recv *checker.Checker, node *ast.Node) *ast.Symbol
+
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType
 func Checker_getWidenedType(recv *checker.Checker, t *checker.Type) *checker.Type
+
+//go:linkname Checker_getNullableType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getNullableType
+func Checker_getNullableType(recv *checker.Checker, t *checker.Type, flags checker.TypeFlags) *checker.Type
 
 //go:linkname Checker_getPropertiesOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertiesOfType
 func Checker_getPropertiesOfType(recv *checker.Checker, t *checker.Type) []*ast.Symbol
@@ -125,6 +131,9 @@ func Checker_getIndexTypeOfType(recv *checker.Checker, t *checker.Type, keyType 
 
 //go:linkname Checker_getBaseTypes github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseTypes
 func Checker_getBaseTypes(recv *checker.Checker, t *checker.Type) []*checker.Type
+
+//go:linkname Checker_getSignaturesOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getSignaturesOfSymbol
+func Checker_getSignaturesOfSymbol(recv *checker.Checker, symbol *ast.Symbol) []*checker.Signature
 
 //go:linkname Checker_getReturnTypeOfSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getReturnTypeOfSignature
 func Checker_getReturnTypeOfSignature(recv *checker.Checker, sig *checker.Signature) *checker.Type
@@ -159,6 +168,15 @@ func Checker_isArrayOrTupleType(recv *checker.Checker, t *checker.Type) bool
 //go:linkname Checker_getDeclaredTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getDeclaredTypeOfSymbol
 func Checker_getDeclaredTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 
+//go:linkname Checker_getStringLiteralType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getStringLiteralType
+func Checker_getStringLiteralType(recv *checker.Checker, value string) *checker.Type
+
+//go:linkname Checker_getNumberLiteralType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getNumberLiteralType
+func Checker_getNumberLiteralType(recv *checker.Checker, value jsnum.Number) *checker.Type
+
+//go:linkname Checker_getBigIntLiteralType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBigIntLiteralType
+func Checker_getBigIntLiteralType(recv *checker.Checker, value jsnum.PseudoBigInt) *checker.Type
+
 //go:linkname Checker_getBaseTypeOfLiteralType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseTypeOfLiteralType
 func Checker_getBaseTypeOfLiteralType(recv *checker.Checker, t *checker.Type) *checker.Type
 
@@ -186,6 +204,9 @@ func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (s
 //go:linkname Checker_getPropertyNameForKnownSymbolName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertyNameForKnownSymbolName
 func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName string) string
 
+//go:linkname Checker_typePredicateToStringEx github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).typePredicateToStringEx
+func Checker_typePredicateToStringEx(recv *checker.Checker, typePredicate *checker.TypePredicate, enclosingDeclaration *ast.Node, flags checker.TypeFormatFlags) string
+
 //go:linkname Checker_isTypeIdenticalTo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeIdenticalTo
 func Checker_isTypeIdenticalTo(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 
@@ -198,8 +219,17 @@ func Checker_isTypeStrictSubtypeOf(recv *checker.Checker, source *checker.Type, 
 //go:linkname Checker_getMinArgumentCount github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getMinArgumentCount
 func Checker_getMinArgumentCount(recv *checker.Checker, signature *checker.Signature) int
 
+//go:linkname Checker_newTypePredicate github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).newTypePredicate
+func Checker_newTypePredicate(recv *checker.Checker, kind checker.TypePredicateKind, parameterName string, parameterIndex int32, t *checker.Type) *checker.TypePredicate
+
 //go:linkname Checker_getAugmentedPropertiesOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAugmentedPropertiesOfType
 func Checker_getAugmentedPropertiesOfType(recv *checker.Checker, t *checker.Type) []*ast.Symbol
+
+//go:linkname Checker_getResolvedSignatureWorker github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSignatureWorker
+func Checker_getResolvedSignatureWorker(recv *checker.Checker, node *ast.Node, checkMode checker.CheckMode, argumentCount int) (*checker.Signature, []*checker.Signature)
+
+//go:linkname Checker_isOptionalParameter github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isOptionalParameter
+func Checker_isOptionalParameter(recv *checker.Checker, node *ast.Node) bool
 
 type extra_Checker struct {
 	id                                     uint32

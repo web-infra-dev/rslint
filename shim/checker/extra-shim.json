@@ -41,7 +41,17 @@
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",
       "getTemplateTypeFromMappedType",
-      "getAugmentedPropertiesOfType"
+      "getAugmentedPropertiesOfType",
+      "getResolvedSignatureWorker",
+      "getStringLiteralType",
+      "getNumberLiteralType",
+      "getBigIntLiteralType",
+      "getNullableType",
+      "isOptionalParameter",
+      "getSymbolOfDeclaration",
+      "getSignaturesOfSymbol",
+      "newTypePredicate",
+      "typePredicateToStringEx"
     ]
   },
   "ExtraFields": {

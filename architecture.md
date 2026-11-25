@@ -2265,9 +2265,16 @@ String plugin declarations select bundled Go plugin namespaces. Live third-party
 
 Only direct callers of the ESLint rule runner (`lintFile`) can supply a factory
 for `sourceCode.parserServices`. Syntax-only sessions map between ESTree and
-TypeScript nodes and expose `program: null`. Typed sessions also expose a
-read-only `Program` and type checker. `Program.emit()` and `SourceFile.update()`
-are unsupported.
+TypeScript nodes, expose `program: null`, and preserve the file's decorator and
+`isolatedDeclarations` flags. Typed sessions also expose a read-only `Program`
+(including the diagnostic methods used by `ts.getPreEmitDiagnostics`, source
+file queries, and compiler options) and the rule-facing `TypeChecker` subset
+(types, symbols, signatures, overload candidate resolution, literals, JSDoc,
+formatting, and `typeToTypeNode`). `Program.emit()` and `SourceFile.update()`
+throw unsupported errors; compiler internal counters/cache probes, cross-project
+`getResolvedProjectReferences`, module-resolution-mode probes,
+`getSymbolOfExpando`, and emitter-only `NodeBuilder` declaration synthesis
+methods are intentionally omitted.
 
 `internal/typeservice` runs queries against the existing Go `Program`. In the
 worker, a `TypeServiceClient` requests compiler data on demand over a synchronous
