@@ -847,7 +847,7 @@ func TestStaticStringEvaluatorCallEscapes(t *testing.T) {
 		{"nested array capture with ordinary iterator", "const copy = [...[\"catch\"]]; const key = copy[0];", "key", true},
 		{"nested string capture with ordinary iterator", "const copy = [...\"catch\"]; const key = copy;", "key.join(\"\")", true},
 		{"array capture with unrelated string iterator mutation", "String.prototype[Symbol.iterator] = function*() { yield \"then\"; }; const copy = [...[\"catch\"]]; const key = copy[0];", "key", true},
-		{"binding transfer in argument", "let holder = {}; unknown(holder, (holder = methods, 0));", "methods.current", false},
+		{"binding replaced after argument read", "let holder = {}; unknown(holder, (holder = methods, 0));", "methods.current", true},
 		{"property transfer in argument", "const holder = {}; unknown(holder, (holder.item = methods, 0));", "methods.current", false},
 		{"assign transfer in argument", "const holder = {}; unknown(holder, (Object.assign(holder, {methods}), 0));", "methods.current", false},
 		{"define property transfer in argument", "const holder = {}; unknown(holder, (Object.defineProperty(holder, \"item\", {value: methods}), 0));", "methods.current", false},

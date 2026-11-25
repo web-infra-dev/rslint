@@ -1013,6 +1013,68 @@ func TestNoUnnecessaryConditionAccessorObservations(t *testing.T) {
 			{Code: "export {};\ntype Item={id:number};function f(flag:boolean=true){const xs=Object.assign([] as Item[],{0:{id:1}});const value=xs[0] ?? {id:0};Object.assign(xs,{length:0});return value;}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 113, EndLine: 2, EndColumn: 118}}},
 		})
 	})
+	t.Run("binding snapshots and ordered array sources", func(t *testing.T) {
+		for _, config := range []string{"tsconfig.json", "tsconfig.noUncheckedIndexedAccess.json"} {
+			t.Run(config, func(t *testing.T) {
+				rule_tester.RunRuleTester(fixtures.GetRootDir(), config, t, &NoUnnecessaryConditionRule, []rule_tester.ValidTestCase{
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:{item?:{id:number}}={};ref=copy;delete ref.item;return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:{item?:{id:number}}=copy;const saved=ref;ref={};delete saved.item;return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:Record<string,unknown>={};ref=copy;const key:string=\"item\";ref[key]=undefined;return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:{item?:{id:number}}={};function restore(){ref=copy;}ref={};restore();delete ref.item;return copy.item?.id;}\n"},
+
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;function choose(){ref=copy;}ref={};choose();Object.defineProperty(ref,'item',{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;function choose(){ref=copy;}ref={};choose();Object.assign(ref,{item:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;const choose=()=>{ref=copy;};ref={};choose();Reflect.set(ref,'item',undefined);return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;const choose=()=>{ref=copy;};ref={};[1].forEach(choose);Reflect.deleteProperty(ref,'item');return copy.item?.id;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const xs=Object.assign([] as Item[],{0:{id:1}});let ref:Item[]=xs;function choose(){ref=xs;}ref=[];choose();ref.length=0;return xs[0]?.id;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const xs=Object.assign([] as Item[],{0:{id:1}});let ref:Item[]=xs;function choose(){ref=xs;}ref=[];choose();Object.assign(ref,{length:0});return xs[0]?.id;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){class Extra{get length(){return 0;}}const out=Object.assign([] as Item[],{0:{id:1}},new Extra());return out[0] ?? {id:0};}\n"},
+					{Code: "export {};\ntype Item={id:number};function read(source:object){const xs=Object.assign([] as Item[],{0:{id:1}},source);return xs[0]?.id;}function f(){const source={tag:'x',length:0};return read(source);}\n"},
+					{Code: "export {};\ntype Item={id:number};function read(source:{}){const xs=Object.assign([] as Item[],{0:{id:1}},source);return xs[0]?.id;}function f(){const source={tag:'x',length:0};return read(source);}\n"},
+					{Code: "export {};\ntype Item={id:number};function read(source:{tag?:string}){const xs=Object.assign([] as Item[],{0:{id:1}},source);return xs[0]?.id;}function f(){const source={tag:'x',length:0};return read(source);}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;ref={};({ref}={ref:copy});Object.defineProperty(ref,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;ref={};[ref]=[copy];Object.defineProperty(ref,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;ref={};for(ref of [copy]){}Object.defineProperty(ref,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;const holder={ref};function choose(){ref=copy;}ref={};choose();holder.ref=ref;Object.defineProperty(holder.ref,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;class C { reset=ref=copy; }ref={};new C();Object.defineProperty(ref,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const xs=Object.assign([] as Item[],{0:{id:1}});xs.length=0;xs[0]={id:2};({get reset(){xs.length=0;return 0;}}).reset;return xs[0]?.id;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const xs=Object.assign([] as Item[],{0:{id:1}});xs.length=0;xs[0]={id:2};class C{value=xs[0]?.id;}xs.length=0;return new C().value;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const xs=Object.assign([] as Item[],{0:{id:1}});xs.length=0;xs[0]={id:2};class C{value=xs[0]?.id;static{xs.length=0;}}return new C().value;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{length:0,0:{id:1}});return out[0]?.id;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{0:{id:1}},{length:0},{length:20});return out[0]?.id;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{length:0},{0:{id:1}},{length:0});return out[0]?.id;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{length:0},{get 0():Item|undefined{return undefined}});return out[0]?.id;}\n"},
+					{Code: "export {};\ntype Item={id:number};function f(){const source:object={length:0};const out=Object.assign([] as Item[],{0:{id:1}},{...source});return out[0]?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});for(const ref of [copy]){Object.defineProperty(ref,\"item\",{value:undefined});}return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});for(const {ref} of [{ref:copy}]){Object.defineProperty(ref,\"item\",{value:undefined});}return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;const alias=ref;ref={};Object.defineProperty(alias,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;const alias=ref;ref={};function erase(a:object,b:object){Object.defineProperty(b,\"item\",{value:undefined});}erase(ref,alias);return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;let alias:object={};alias=ref;ref={};Object.defineProperty(alias,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;Object.defineProperty(ref,(ref={},\"item\"),{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object={};({ref=copy}={} as {ref?:object});Object.defineProperty(ref,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object={};[ref=copy]=[];Object.defineProperty(ref,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object={};({outer:{ref}}={outer:{ref:copy}});Object.defineProperty(ref,\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object={};for({ref=copy} of [{}] as {ref?:object}[]){Object.defineProperty(ref,\"item\",{value:undefined});return copy.item?.id;}return 0;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:{item?:object}=copy;const alias=ref;ref={};const saved=Object.assign({}, {item:{id:1}});alias.item=saved;function erase(x:{item?:object}){Object.defineProperty(x.item!,\"item\",{value:undefined});}erase(alias);return saved.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;const old=ref;ref={};const recent=ref;function erase(a:object,b:object){Object.defineProperty(b,\"item\",{value:undefined});}erase(recent,old);return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;function restore(){ref=copy;}ref={};Object.defineProperty((restore(),ref),\"item\",{value:undefined});return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:{item?:object}={};const holder:{item?:object}={};function store(){ref.item=copy;}ref=holder;store();function erase(box:{item?:object}){Object.defineProperty(box.item!,\"item\",{value:undefined});}erase(holder);return copy.item?.id;}\n"},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:{item?:object}={};const holder:{item?:object}={};class C{static {ref.item=copy;}[(ref=holder,\"method\")](){}}function erase(box:{item?:object}){Object.defineProperty(box.item!,\"item\",{value:undefined});}erase(holder);return copy.item?.id;}\n"},
+				}, []rule_tester.InvalidTestCase{
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{0:{id:1}},[]);return out[0] ?? {id:0};}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 95, EndLine: 2, EndColumn: 101}}},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{0:{id:1}},[] as Item[]);return out[0] ?? {id:0};}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 105, EndLine: 2, EndColumn: 111}}},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{0:{id:1}},()=>1);return out[0] ?? {id:0};}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 98, EndLine: 2, EndColumn: 104}}},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{0:{id:1}},'');return out[0] ?? {id:0};}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 95, EndLine: 2, EndColumn: 101}}},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{length:0},{0:{id:1}});return out[0] ?? {id:0};}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 103, EndLine: 2, EndColumn: 109}}},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{0:{id:1},length:1});return out[0] ?? {id:0};}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 101, EndLine: 2, EndColumn: 107}}},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{0:{id:1}},{length:20});return out[0] ?? {id:0};}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 104, EndLine: 2, EndColumn: 110}}},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{length:0},{1:{id:2}},{0:{id:1}});return out[0] ?? {id:0};}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 114, EndLine: 2, EndColumn: 120}}},
+					{Code: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;ref={};Object.defineProperty(ref,\"item\",{value:undefined});return copy.item?.id;}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverOptionalChain", Line: 2, Column: 153, EndLine: 2, EndColumn: 155, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveOptionalChain", Output: "export {};\nfunction f(){const copy=Object.assign({}, {item:{id:1}});let ref:object=copy;ref={};Object.defineProperty(ref,\"item\",{value:undefined});return copy.item.id;}\n"}}}}},
+					{Code: "export {};\ntype Item={id:number};function f(){const out=Object.assign([] as Item[],{0:{id:1},length:\"1\"});return out[0] ?? {id:0};}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 103, EndLine: 2, EndColumn: 109}}},
+				})
+			})
+		}
+	})
 	t.Run("iterable bounds", func(t *testing.T) {
 		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.noUncheckedIndexedAccess.json", t, &NoUnnecessaryConditionRule, []rule_tester.ValidTestCase{
 			{Code: "export {};\ntype Item={id:number};\nfunction f(){const [item]=new Set<Item>();return item?.id;}\n"},

@@ -8,15 +8,23 @@ type staticReferenceTransfer struct {
 	binding     bool
 }
 
+type staticArrayCopySource struct {
+	literal, length *ast.Node
+	hasLength       bool
+	unknown         bool
+}
+
 type staticEscapeFacts struct {
-	call         *ast.Node
-	collecting   bool
-	explicit     map[*ast.Symbol]bool
-	sites        map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
-	lengthWrites map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
-	captures     map[*ast.Symbol]staticEvalResult
-	capturing    map[*ast.Symbol]bool
-	ownCaptures  map[*ast.Symbol]*staticObjectValue
+	call              *ast.Node
+	collecting        bool
+	explicit          map[*ast.Symbol]bool
+	sites             map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
+	lengthWrites      map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
+	lengthWriteBlocks map[*ast.Symbol]*ast.Node
+	arrayCopySources  map[*ast.Node]staticArrayCopySource
+	captures          map[*ast.Symbol]staticEvalResult
+	capturing         map[*ast.Symbol]bool
+	ownCaptures       map[*ast.Symbol]*staticObjectValue
 	// Completed per-file facts for property-read queries; never cache a
 	// read-position-dependent result here.
 	constructorMutations map[*ast.Symbol]bool
@@ -117,6 +125,7 @@ func (e *StaticStringEvaluator) capturedOwnMember(node *ast.Node, key string) st
 // view. Expression caches and recursion stacks remain local to the view.
 func (e *StaticStringEvaluator) useReferenceFacts(source *StaticStringEvaluator) {
 	e.referenceFlags = source.referenceFlags
+	e.bindingTransfers = source.bindingTransfers
 	e.storedReferences = source.storedReferences
 	e.escapeFacts = source.escapeFacts
 	e.arrayPrototypeMutated = source.arrayPrototypeMutated
@@ -124,15 +133,15 @@ func (e *StaticStringEvaluator) useReferenceFacts(source *StaticStringEvaluator)
 	e.referenceFlagsComputed = true
 }
 
-func (e *StaticStringEvaluator) recordBindingTransfer(target, value, site *ast.Node) {
+func (e *StaticStringEvaluator) recordBindingTransfer(target, value, site *ast.Node, copied bool) {
 	symbol := e.referenceSymbol(SkipAssertionsAndParens(target))
 	if symbol == nil {
 		return
 	}
-	if e.storedReferences == nil {
-		e.storedReferences = make(map[*ast.Symbol][]staticReferenceTransfer)
+	if e.bindingTransfers == nil {
+		e.bindingTransfers = make(map[*ast.Symbol][]staticReferenceTransfer)
 	}
-	e.storedReferences[symbol] = append(e.storedReferences[symbol], staticReferenceTransfer{value: value, site: site, binding: true})
+	e.bindingTransfers[symbol] = append(e.bindingTransfers[symbol], staticReferenceTransfer{value: value, site: site, binding: true, copied: copied})
 }
 
 func statementContainer(node *ast.Node) *ast.Node {
@@ -145,18 +154,12 @@ func statementContainer(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// A straight-line reassignment replaces the old binding. Conditional writes
-// remain possible origins, and transfers after the call cannot affect it.
-func (e *StaticStringEvaluator) latestBindingTransfer(symbol *ast.Symbol) *ast.Node {
-	if e.escapeFacts == nil || e.escapeFacts.call == nil {
-		return nil
-	}
-	return e.latestBindingAt(symbol, e.escapeFacts.call)
-}
-
+// A straight-line reassignment replaces the old binding. Resolve it at the
+// identifier read so an alias retains the object captured before a reassignment.
+// Conditional writes remain possible origins.
 func (e *StaticStringEvaluator) latestBindingAt(symbol *ast.Symbol, point *ast.Node) *ast.Node {
 	var latest *ast.Node
-	for _, transfer := range e.storedReferences[symbol] {
+	for _, transfer := range e.bindingTransfers[symbol] {
 		node := transfer.site
 		if transfer.binding && node.End() <= point.Pos() && e.transferAvailableAt(transfer, point) && node.Kind == ast.KindBinaryExpression &&
 			node.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken && node.Parent.Kind == ast.KindExpressionStatement &&
@@ -167,8 +170,18 @@ func (e *StaticStringEvaluator) latestBindingAt(symbol *ast.Symbol, point *ast.N
 	return latest
 }
 
-func (e *StaticStringEvaluator) transferAvailable(transfer staticReferenceTransfer) bool {
-	return e.transferAvailableAt(transfer, e.escapeFacts.call)
+func (e *StaticStringEvaluator) bindingTransferReplaced(transfer staticReferenceTransfer, latest *ast.Node) bool {
+	if latest != nil && ast.IsBinaryExpression(latest) {
+		left := SkipAssertionsAndParens(latest.AsBinaryExpression().Left)
+		if ast.IsAssignmentPattern(left) && ast.IsNodeDescendantOf(transfer.site, left) {
+			// A pattern's default executes after its right-hand side and is
+			// part of this assignment, not an overwritten earlier binding.
+			return false
+		}
+	}
+	// A closure or deferred initializer can reestablish an earlier-written
+	// binding after a later straight-line assignment has executed.
+	return transfer.binding && latest != nil && e.propertyMutationFollowsRead(latest, latest, transfer.site)
 }
 
 func (e *StaticStringEvaluator) transferAvailableAt(transfer staticReferenceTransfer, point *ast.Node) bool {

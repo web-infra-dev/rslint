@@ -132,6 +132,9 @@ after static initialization instead. Static fields and blocks themselves run in
 source order. These orders also apply to aliases assigned in computed names.
 Instance initializers can run when a static initializer constructs the class.
 Loops and objects shared across function invocations remain conservative.
+Aliases retain the object they read before a later reassignment. Reassignments
+inside closures, destructuring defaults, and `for...of` bindings remain possible
+origins for mutations even when they appear earlier in the source.
 An unchanged array `push` method also preserves unrelated named properties.
 Assigning or defining an array's `length` can delete indexed elements, so those
 reads retain their guards after a possible truncation, including through aliases.
@@ -139,6 +142,13 @@ This also covers an enumerable `length` copied by `Object.assign`. Named
 properties and values captured before truncation retain their types. A directly
 preceding assignment to the same index restores ordinary narrowing, using the
 native control-flow graph.
+`Object.assign` sources are processed from left to right: a later source can
+restore an index deleted by an earlier source's `length`. Within one source,
+numeric keys are copied before `length`, regardless of their literal order.
+Opaque sources can contain an enumerable `length` absent from their declared
+type, so their indexed reads retain guards. For example, this also retains
+`xs[0] ?? fallback` after copying a class instance whose `length` getter is
+non-enumerable; the rule does not infer the instance's complete own shape.
 Length writes and aggregate aliases remain conservative: `xs.length++` may
 retain an indexed guard, as may `holder.other.length = 0` when `holder` also
 stores `xs`. Instance initializer mutations also remain conservative when the

@@ -34,6 +34,7 @@ type StaticStringEvaluator struct {
 	evaluation             *staticEvaluationState
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
+	bindingTransfers       map[*ast.Symbol][]staticReferenceTransfer
 	storedReferences       map[*ast.Symbol][]staticReferenceTransfer
 	markedReferences       map[*ast.Node]staticReferenceFlags
 	trackCallEscapes       bool
@@ -1984,16 +1985,14 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 		key, known := staticEvaluator.evalAccessExpressionKey(access)
 		if !known || isArrayIndexProperty(key) {
 			for call := range accountedCalls {
-				for _, source := range call.Arguments()[1:] {
-					// Object.assign copies an own enumerable length property too.
-					// The resulting intersection type does not describe deleted indices.
-					if staticEvaluator.typeChecker == nil || slices.ContainsFunc(UnionTypeParts(GetConstrainedTypeAtLocation(staticEvaluator.typeChecker, source)), func(part *checker.Type) bool {
-						return IsTypeAnyType(part) || IsTypeUnknownType(part) || checker.Checker_getPropertyOfType(staticEvaluator.typeChecker, part, "length") != nil
-					}) {
-						write := staticEvaluator.arrayIndexWriteAtRead(access)
-						if write == nil || !staticEvaluator.propertyMutationFollowsRead(write, origin, call) {
-							return true
-						}
+				truncates, unknown := staticEvaluator.arrayCopyMutation(call, key, known)
+				if unknown {
+					return true
+				}
+				if truncates {
+					write := staticEvaluator.arrayIndexWriteAtRead(access)
+					if write == nil || !staticEvaluator.propertyMutationFollowsRead(write, origin, call) {
+						return true
 					}
 				}
 			}
@@ -2013,6 +2012,9 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 			return false
 		}
 		write := staticEvaluator.arrayIndexWriteAtRead(access)
+		if write != nil && staticEvaluator.lengthWritesInReadBlock(symbol, origin, access, write) {
+			return false
+		}
 		for site := range sites {
 			if staticEvaluator.propertyMutationFollowsRead(site, origin, access) ||
 				write != nil && staticEvaluator.propertyMutationFollowsRead(write, origin, site) {
@@ -2022,6 +2024,122 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 		}
 	}
 	return false
+}
+
+func (staticEvaluator *StaticStringEvaluator) arrayCopyMutation(call *ast.Node, key string, keyKnown bool) (truncates, unknown bool) {
+	if !ast.IsCallExpression(call) || len(call.Arguments()) < 2 {
+		return false, true
+	}
+	index, _ := ecmascript.StringToNumber(key)
+	for _, source := range call.Arguments()[1:] {
+		info := staticEvaluator.arrayCopySource(source)
+		if info.unknown {
+			// An opaque source can also copy __proto__ or invoke a getter.
+			// A later indexed write alone cannot prove a data property exists.
+			return false, true
+		}
+		if truncates && keyKnown && info.literal != nil && staticEvaluator.typeChecker != nil {
+			tc := staticEvaluator.typeChecker
+			property := checker.Checker_getPropertyOfType(tc, tc.GetTypeAtLocation(info.literal), key)
+			if property != nil && property.Flags&(ast.SymbolFlagsOptional|ast.SymbolFlagsAccessor) == 0 &&
+				!IsNullableType(checker.Checker_getTypeOfSymbol(tc, property)) {
+				truncates = false
+			}
+		}
+		if info.hasLength {
+			value := staticEvaluator.evalValue(info.length)
+			number, numeric := staticValueToNumber(value.value)
+			// Numeric keys are copied before length within one source, even
+			// when the object literal spells length first. Sources themselves
+			// are copied left to right, so a later source can restore an index.
+			if !keyKnown || !value.ok || !numeric || number != float64(ecmascript.NumberToUint32(number)) || number <= index {
+				truncates = true
+			}
+		}
+	}
+	return truncates, false
+}
+
+func (staticEvaluator *StaticStringEvaluator) arrayCopySource(source *ast.Node) (info staticArrayCopySource) {
+	source = SkipAssertionsAndParens(source)
+	if source == nil {
+		return staticArrayCopySource{unknown: true}
+	}
+	facts := staticEvaluator.escapeFacts
+	if info, cached := facts.arrayCopySources[source]; cached {
+		return info
+	}
+	if facts.arrayCopySources == nil {
+		facts.arrayCopySources = make(map[*ast.Node]staticArrayCopySource)
+	}
+	// Cache immutable source syntax, with a conservative cycle sentinel.
+	facts.arrayCopySources[source] = staticArrayCopySource{unknown: true}
+	defer func() { facts.arrayCopySources[source] = info }()
+	if ast.IsIdentifier(source) {
+		initializer, symbol, known := staticEvaluator.resolveIdentifierInitializer(source)
+		if known && staticEvaluator.referenceFlagsFor(symbol)&(staticReferenceWrite|staticReferencePropertyMutation) == 0 {
+			return staticEvaluator.arrayCopySource(initializer)
+		}
+	}
+	if ast.IsArrayLiteralExpression(source) || ast.IsFunctionExpressionOrArrowFunction(source) {
+		// Their intrinsic length is non-enumerable.
+		return info
+	}
+	if ast.IsObjectLiteralExpression(source) {
+		info.literal = source
+		for _, property := range source.AsObjectLiteralExpression().Properties.Nodes {
+			if ast.IsSpreadAssignment(property) {
+				info.unknown = true
+				break
+			}
+			key, known := staticEvaluator.evalPropertyKey(property.Name())
+			if !known {
+				info.unknown = true
+				break
+			}
+			if key == "length" {
+				info.hasLength, info.length = true, nil
+				if ast.IsPropertyAssignment(property) {
+					info.length = property.Initializer()
+				} else if ast.IsShorthandPropertyAssignment(property) {
+					info.length = property.Name()
+				}
+			}
+		}
+		return info
+	}
+	if staticEvaluator.typeChecker != nil && !slices.ContainsFunc(UnionTypeParts(GetConstrainedTypeAtLocation(staticEvaluator.typeChecker, source)), func(part *checker.Type) bool {
+		return part.Flags()&checker.TypeFlagsPrimitive == 0
+	}) {
+		return info
+	}
+	return staticArrayCopySource{unknown: true}
+}
+
+func (staticEvaluator *StaticStringEvaluator) lengthWritesInReadBlock(symbol *ast.Symbol, origin, access, write *ast.Node) bool {
+	facts := staticEvaluator.escapeFacts
+	block, cached := facts.lengthWriteBlocks[symbol]
+	if !cached {
+		for site := range facts.lengthWrites[symbol] {
+			if site.Parent == nil || site.Parent.Kind != ast.KindExpressionStatement ||
+				site.Parent.Parent == nil || block != nil && block != site.Parent.Parent {
+				block = nil
+				break
+			}
+			block = site.Parent.Parent
+		}
+		if facts.lengthWriteBlocks == nil {
+			facts.lengthWriteBlocks = make(map[*ast.Symbol]*ast.Node)
+		}
+		facts.lengthWriteBlocks[symbol] = block
+	}
+	// All writes are ordinary statements in this invocation. The native
+	// immediately preceding indexed assignment supersedes the earlier ones;
+	// no direct length assignment can intervene without changing that flow.
+	// Exclude class initializers and computed names, whose order can differ.
+	root := executionRoot(access)
+	return block != nil && block == statementContainer(access) && block == statementContainer(write) &&
+		executionRoot(origin.Parent) == root && ast.GetThisContainer(access, true, false) == root && ast.GetThisContainer(write, true, false) == root
 }
 
 // Reuse the native flow graph's immediately preceding write. No branch or loop
@@ -2318,6 +2436,7 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 
 	staticEvaluator.referenceFlagsComputed = true
 	staticEvaluator.referenceFlags = nil
+	staticEvaluator.bindingTransfers = nil
 	staticEvaluator.storedReferences = nil
 	staticEvaluator.markedReferences = nil
 	if staticEvaluator.trackCallEscapes {
@@ -2326,8 +2445,10 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		defer func() { staticEvaluator.escapeFacts.collecting = false }()
 	}
 	var mutationCandidates []staticMutationCandidate
+	var shapeWrites []staticMutationCandidate
 	var lengthWrites []staticMutationCandidate
 	var calls []*ast.Node
+	var stores []struct{ target, value, site *ast.Node }
 
 	var visit func(node *ast.Node)
 	visit = func(node *ast.Node) {
@@ -2351,12 +2472,32 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		if staticEvaluator.trackCallEscapes && node.Kind == ast.KindBinaryExpression {
 			assignment := node.AsBinaryExpression()
 			if ast.IsIdentifier(SkipAssertionsAndParens(assignment.Left)) && ast.IsAssignmentOperator(assignment.OperatorToken.Kind) {
-				staticEvaluator.recordBindingTransfer(assignment.Left, assignment.Right, node)
+				staticEvaluator.recordBindingTransfer(assignment.Left, assignment.Right, node, false)
 			}
 		}
 		if node.Kind == ast.KindIdentifier && !IsNonReferenceIdentifier(node) {
 			if IsWriteReference(node) {
 				staticEvaluator.markReference(node, staticReferenceWrite)
+				if staticEvaluator.trackCallEscapes {
+					if ast.IsShorthandPropertyAssignment(node.Parent) {
+						if fallback := node.Parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer; fallback != nil {
+							staticEvaluator.recordBindingTransfer(node, fallback, node.Parent, false)
+						}
+					}
+					// Native assignment-target traversal includes nested patterns
+					// and defaults without treating their keys as references.
+					for target := ast.GetAssignmentTarget(node); target != nil; target = ast.GetAssignmentTarget(target) {
+						if ast.IsBinaryExpression(target) {
+							assignment := target.AsBinaryExpression()
+							left := SkipAssertionsAndParens(assignment.Left)
+							if ast.IsObjectLiteralExpression(left) || ast.IsArrayLiteralExpression(left) {
+								staticEvaluator.recordBindingTransfer(node, assignment.Right, target, true)
+							}
+						} else if ast.IsForOfStatement(target) {
+							staticEvaluator.recordBindingTransfer(node, target.Expression(), target, true)
+						}
+					}
+				}
 			}
 		}
 		if ast.IsAccessExpression(node) {
@@ -2370,6 +2511,7 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 					name, known := AccessExpressionStaticName(node)
 					if !known || name == "__proto__" || outer.Parent.Kind == ast.KindDeleteExpression {
 						flags |= staticReferencePropertyShapeMutation
+						shapeWrites = append(shapeWrites, staticMutationCandidate{call: outer.Parent, access: node})
 					}
 					if known && name == "length" {
 						lengthWrites = append(lengthWrites, staticMutationCandidate{call: outer.Parent, access: node})
@@ -2380,7 +2522,7 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 					assignment := outer.Parent.AsBinaryExpression()
 					switch assignment.OperatorToken.Kind {
 					case ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
-						staticEvaluator.recordStoredReferences(AccessExpressionObject(node), assignment.Right, outer.Parent, false)
+						stores = append(stores, struct{ target, value, site *ast.Node }{AccessExpressionObject(node), assignment.Right, outer.Parent})
 					}
 				}
 			}
@@ -2396,6 +2538,11 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		}
 	}
 	visit(&staticEvaluator.sourceFile.Node)
+	// Property stores can execute after bindings written later in the source,
+	// notably class computed names. Resolve them against the completed bindings.
+	for _, store := range stores {
+		staticEvaluator.recordStoredReferences(store.target, store.value, store.site, false)
+	}
 
 	for _, candidate := range mutationCandidates {
 		if methodName, ok := staticEvaluator.evalAccessExpressionKey(candidate.access); ok {
@@ -2436,6 +2583,13 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		staticEvaluator.escapeFacts.call = call
 		staticEvaluator.markedReferences = nil
 		staticEvaluator.markCallEscapes(call)
+	}
+	// Direct deletes and computed writes must follow later-collected bindings
+	// just like call mutations, including aliases assigned in computed names.
+	for _, write := range shapeWrites {
+		staticEvaluator.escapeFacts.call = write.call
+		staticEvaluator.markedReferences = nil
+		staticEvaluator.markReference(AccessExpressionObject(write.access), staticReferencePropertyMutation|staticReferencePropertyShapeMutation)
 	}
 	// Reuse the completed alias/store graph and per-mutation sites. Length
 	// writes affect indexed reads, without invalidating unrelated named fields
@@ -2504,16 +2658,21 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			return
 		}
 	}
-	if node != nil && !ast.IsIdentifier(node) {
-		if staticEvaluator.markedReferences[node]&flag == flag {
-			return
+	for node != nil {
+		if !ast.IsIdentifier(node) || followTransfers {
+			// Different reads of one mutable binding can capture different
+			// objects, even when they reach the same later mutation.
+			if staticEvaluator.markedReferences[node]&flag == flag {
+				return
+			}
+			if staticEvaluator.markedReferences == nil {
+				staticEvaluator.markedReferences = make(map[*ast.Node]staticReferenceFlags)
+			}
+			staticEvaluator.markedReferences[node] |= flag
 		}
-		if staticEvaluator.markedReferences == nil {
-			staticEvaluator.markedReferences = make(map[*ast.Node]staticReferenceFlags)
+		if !ast.IsIdentifier(node) {
+			break
 		}
-		staticEvaluator.markedReferences[node] |= flag
-	}
-	for node != nil && ast.IsIdentifier(node) {
 		if flag&staticReferenceNestedMutation != 0 && flag&staticReferenceCallReceiver == 0 {
 			// Destructuring a constructor can reach its prototype without a
 			// property-access node, e.g. const {prototype: proto} = Array.
@@ -2546,11 +2705,6 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 				if sites[symbol] == nil {
 					sites[symbol] = make(map[*ast.Node]staticReferenceFlags)
 				}
-				// Each mutation must reach the entire alias chain, even if a
-				// prior mutation already marked the same symbols as mutable.
-				if sites[symbol][facts.call]&flag == flag {
-					return
-				}
 				sites[symbol][facts.call] |= flag
 			}
 		} else if staticEvaluator.referenceFlags[symbol]&flag == flag {
@@ -2563,19 +2717,34 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			staticEvaluator.referenceFlags[symbol] |= flag
 			staticEvaluator.invalidateMutationValues()
 		}
-		latestBinding := staticEvaluator.latestBindingTransfer(symbol)
+		var latestBinding *ast.Node
 		if followTransfers {
-			for _, transfer := range staticEvaluator.storedReferences[symbol] {
-				if flag&staticReferenceCallEscape == 0 && !transfer.binding && flag&staticReferenceNestedMutation == 0 {
-					continue
-				}
-				if !staticEvaluator.transferAvailable(transfer) || transfer.binding && latestBinding != nil && transfer.site.End() < latestBinding.End() {
-					continue
-				}
-				if transfer.copied {
-					staticEvaluator.markCopiedReferences(transfer.value, flag&^staticReferenceCallReceiver)
-				} else {
-					staticEvaluator.markReference(transfer.value, flag&^staticReferenceCallReceiver)
+			latestBinding = staticEvaluator.latestBindingAt(symbol, node)
+			// Rebinding checks do not depend on property stores. Keep their
+			// indexes separate so repeated direct writes do not scan every
+			// value stored on the same object.
+			groups := [2][]staticReferenceTransfer{staticEvaluator.bindingTransfers[symbol]}
+			if flag&(staticReferenceCallEscape|staticReferenceNestedMutation) != 0 {
+				groups[1] = staticEvaluator.storedReferences[symbol]
+			}
+			for _, transfers := range groups {
+				for _, transfer := range transfers {
+					point := staticEvaluator.escapeFacts.call
+					if transfer.binding {
+						point = node
+					}
+					if !staticEvaluator.transferAvailableAt(transfer, point) || staticEvaluator.bindingTransferReplaced(transfer, latestBinding) {
+						continue
+					}
+					if transfer.copied {
+						transferredFlags := flag &^ staticReferenceCallReceiver
+						if transfer.binding {
+							transferredFlags |= staticReferenceNestedMutation
+						}
+						staticEvaluator.markCopiedReferences(transfer.value, transferredFlags)
+					} else {
+						staticEvaluator.markReference(transfer.value, flag&^staticReferenceCallReceiver)
+					}
 				}
 			}
 		}
@@ -2618,6 +2787,10 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 		// replacing the alias itself must not taint the original value. The
 		// already-marked check above also terminates circular alias chains.
 		node = SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
+		if node == nil && declaration.Parent != nil && declaration.Parent.Parent != nil && ast.IsForOfStatement(declaration.Parent.Parent) {
+			node = declaration.Parent.Parent.Expression()
+			flag |= staticReferenceNestedMutation
+		}
 	}
 	if node == nil || flag&staticReferencePropertyMutation == 0 {
 		return

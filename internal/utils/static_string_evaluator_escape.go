@@ -269,7 +269,7 @@ func (staticEvaluator *StaticStringEvaluator) markReturnedReferences(node *ast.N
 // Index references stored after an object's initializer, including writes made
 // through aliases. The index is built once with the other reference facts.
 func (staticEvaluator *StaticStringEvaluator) recordStoredReferences(target, value, site *ast.Node, copied bool) {
-	visited := make(map[*ast.Symbol]bool)
+	visited := make(map[*ast.Node]bool)
 	var visit func(*ast.Node, bool)
 	visit = func(node *ast.Node, nested bool) {
 		node = SkipAssertionsAndParens(node)
@@ -278,18 +278,19 @@ func (staticEvaluator *StaticStringEvaluator) recordStoredReferences(target, val
 		}
 		if ast.IsIdentifier(node) {
 			symbol := staticEvaluator.referenceSymbol(node)
-			if symbol == nil || visited[symbol] {
+			wasNested, seen := visited[node]
+			if symbol == nil || seen && (wasNested || !nested) {
 				return
 			}
-			visited[symbol] = true
+			visited[node] = nested
 			if staticEvaluator.storedReferences == nil {
 				staticEvaluator.storedReferences = make(map[*ast.Symbol][]staticReferenceTransfer)
 			}
 			staticEvaluator.storedReferences[symbol] = append(staticEvaluator.storedReferences[symbol], staticReferenceTransfer{value: value, site: site, copied: copied})
-			latest := staticEvaluator.latestBindingAt(symbol, site)
-			for _, transfer := range staticEvaluator.storedReferences[symbol] {
-				if transfer.binding && staticEvaluator.transferAvailableAt(transfer, site) && (latest == nil || transfer.site.End() >= latest.End()) {
-					visit(transfer.value, nested)
+			latest := staticEvaluator.latestBindingAt(symbol, node)
+			for _, transfer := range staticEvaluator.bindingTransfers[symbol] {
+				if transfer.binding && staticEvaluator.transferAvailableAt(transfer, node) && !staticEvaluator.bindingTransferReplaced(transfer, latest) {
+					visit(transfer.value, nested || transfer.copied)
 				}
 			}
 			if latest != nil {

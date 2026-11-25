@@ -153,6 +153,17 @@ func TestStaticPropertyReadShapeMutations(t *testing.T) {
 		{"restored other index", "copy.length = 0; copy[1] = 2;", "", "copy[0]", true},
 		{"computed alias before static block", "let alias: number[] = []; class C { static { Object.defineProperty(alias, 'value', {value: undefined}); } [(alias = copy, 'method')]() {} }", "", "copy.value", true},
 		{"computed store before static block", "const holder = {items: [] as number[]}; class C { static { Object.defineProperty(holder.items, 'value', {value: undefined}); } [(Object.assign(holder, {items: copy}), 'method')]() {} }", "", "copy.value", true},
+		{"closure restores binding", "let alias: object = copy; function restore() { alias = copy; } alias = {}; restore(); Object.defineProperty(alias, 'value', {value: undefined});", "", "copy.value", true},
+		{"captured mutable alias", "let alias: object = copy; const saved = alias; alias = {}; Object.defineProperty(saved, 'value', {value: undefined});", "", "copy.value", true},
+		{"multiple alias reads in one call", "let alias: object = copy; const saved = alias; alias = {}; unknown([alias, saved]);", "", "copy.value", true},
+		{"default assignment alias", "let alias: object = {}; ({alias = copy} = {} as {alias?: object}); Object.defineProperty(alias, 'value', {value: undefined});", "", "copy.value", true},
+		{"array default assignment alias", "let alias: object = {}; [alias = copy] = []; Object.defineProperty(alias, 'value', {value: undefined});", "", "copy.value", true},
+		{"iteration binding alias", "for (const alias of [copy]) { Object.defineProperty(alias, 'value', {value: undefined}); }", "", "copy.value", true},
+		{"delete through assigned alias", "let alias: {value?: number} = {}; alias = copy; delete alias.value;", "", "copy.value", true},
+		{"computed write through assigned alias", "let alias: Record<string, unknown> = {}; alias = copy; const key: string = 'value'; alias[key] = undefined;", "", "copy.value", true},
+		{"captured length alias", "let alias: number[] = copy; const saved = alias; alias = []; saved.length = 0;", "", "copy[0]", true},
+		{"restored between truncations", "copy.length = 0; copy[0] = 2;", "copy.length = 0;", "copy[0]", false},
+		{"deferred truncation after restoration", "copy.length = 0; copy[0] = 2; const holder = {get value() { copy.length = 0; return 0; }}; holder.value;", "", "copy[0]", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := fixtures.GetRootDir()
