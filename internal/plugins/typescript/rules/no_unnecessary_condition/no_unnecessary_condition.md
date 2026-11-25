@@ -90,6 +90,11 @@ The same protection applies to properties of an object returned by a getter.
 Values copied by object spread, object rest, or `Object.assign` retain ordinary
 field narrowing, as do undecorated private auto-accessors. A later optional
 spread may leave a getter already on the target in place; it remains an accessor.
+`Object.assign` also preserves target getters, including those on class instances
+and parameter objects; writing through a setter does not replace the getter.
+Initializer types never narrow a getter's public read type, which also covers
+values supplied by later spreads or descriptor changes. Calls resolve the
+applicable overload of each possible function through the checker.
 For a union of keys, the read type includes all selected properties. Setter types
 and write intersections must not determine whether the condition is necessary.
 For example, this `??=` remains necessary even after the setter receives `null`:
@@ -110,8 +115,10 @@ When `allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing` is enabled, option
 property and parameter markers still protect nullish fallbacks. For example, with
 `strictNullChecks` disabled, `options: { title?: string }` can be `{}`, so
 `options.title ?? 'Untitled'` remains necessary.
-After a directly reaching assignment of a statically known value, such as
-`options.title = 'set'`, the fallback is reported as unnecessary. Other optional
+After an assignment of a statically known value, such as
+`options.title = 'set'`, the fallback is reported as unnecessary. Unrelated
+variable declarations with no side effects in their initializers preserve this
+proof. Other optional
 property and parameter fallbacks are retained conservatively: without strict null checking,
 the compiler also erases nullish values from assignment sources. For example,
 assigning an optional parameter with `options.title = title` does not prove the

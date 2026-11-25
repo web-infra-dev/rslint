@@ -12,6 +12,7 @@
       "getIndexedAccessTypeOrUndefined",
       "getFlowTypeOfReference",
       "isMatchingReference",
+      "containsMatchingReference",
       "isConstantReference",
       "resolveCall",
       "getEffectiveCallArguments",

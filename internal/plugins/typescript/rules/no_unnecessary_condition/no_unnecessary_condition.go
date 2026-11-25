@@ -870,9 +870,10 @@ func (conditionTypes *conditionTypeChecker) getConditionType(node, accessor *ast
 			objectType := tc.GetNonNullableType(expressionType)
 			readType, propertyFlags = conditionTypes.getDeclaredMemberReadType(node, objectType)
 		} else if symbol := checker.Checker_getResolvedSymbolOrNil(tc, node); symbol != nil {
-			symbol, propertyFlags = conditionTypes.memberReadSymbol(node, symbol, nil)
+			readSymbol, flags := conditionTypes.memberReadSymbol(node, symbol, nil)
+			propertyFlags = flags
 			if needsReadType || propertyFlags&ast.SymbolFlagsAccessor != 0 || symbol.Flags&ast.SymbolFlagsAccessor != 0 || symbolHasAccessor(symbol) {
-				readType = checker.Checker_getTypeOfSymbol(tc, symbol)
+				readType = getMemberReadType(tc, symbol, readSymbol)
 			}
 		} else if needsReadType {
 			readType, propertyFlags = conditionTypes.getDeclaredMemberReadType(node, nil)
@@ -902,24 +903,11 @@ func (conditionTypes *conditionTypeChecker) getConditionType(node, accessor *ast
 		// The checker handles overload selection and generic instantiation.
 		readCalleeType := tc.GetNonNullableType(expressionType)
 		flowCalleeType = tc.GetNonNullableType(flowCalleeType)
-		if readCalleeType != flowCalleeType && !checker.Checker_isTypeAssignableTo(tc, readCalleeType, flowCalleeType) {
+		if readCalleeType != flowCalleeType {
 			calleeType := checker.Checker_getApparentType(tc, tc.GetNonNullableType(expressionType))
-			flowType = tc.GetUnknownType()
-			if signatures := checker.Checker_getSignaturesOfType(tc, calleeType, checker.SignatureKindCall); len(signatures) != 0 {
-				var factory ast.NodeFactory
-				call := node.AsCallExpression().Clone(&factory)
-				call.Parent = node.Parent
-				// Keep speculative signatures and errors off the parsed call.
-				var candidates []*checker.Signature
-				signature := checker.Checker_resolveCall(tc, call, signatures, &candidates, checker.CheckModeNormal, checker.SignatureFlagsNone, nil)
-				arguments := checker.Checker_getEffectiveCallArguments(tc, call)
-				if checker.Checker_hasCorrectArity(tc, call, arguments, signature, false) &&
-					checker.Checker_isSignatureApplicable(tc, call, arguments, signature, checker.Checker_assignableRelation(tc), checker.CheckModeNormal, false, nil) {
-					flowType = checker.Checker_getReturnTypeOfSignature(tc, signature)
-				}
-				if constraint := checker.Checker_getBaseConstraintOfType(tc, flowType); constraint != nil {
-					flowType = constraint
-				}
+			flowType = getReadCallType(tc, node, calleeType)
+			if constraint := checker.Checker_getBaseConstraintOfType(tc, flowType); constraint != nil {
+				flowType = constraint
 			}
 		}
 	}
@@ -937,6 +925,36 @@ func (conditionTypes *conditionTypeChecker) getConditionType(node, accessor *ast
 	return flowType
 }
 
+func getReadCallType(tc *checker.Checker, node *ast.Node, calleeType *checker.Type) *checker.Type {
+	// Let the checker reject unions without compatible call signatures,
+	// including generic functions with different type-parameter constraints.
+	if len(checker.Checker_getSignaturesOfType(tc, calleeType, checker.SignatureKindCall)) == 0 {
+		return tc.GetUnknownType()
+	}
+	var returnTypes []*checker.Type
+	for _, part := range utils.UnionTypeParts(calleeType) {
+		// Each possible function selects its own overload and generic arguments.
+		// Assignability does not prove that two overloaded calls return alike.
+		signatures := checker.Checker_getSignaturesOfType(tc, part, checker.SignatureKindCall)
+		if len(signatures) == 0 {
+			return tc.GetUnknownType()
+		}
+		var factory ast.NodeFactory
+		call := node.AsCallExpression().Clone(&factory)
+		call.Parent = node.Parent
+		// Keep speculative signatures and errors off the parsed call.
+		var candidates []*checker.Signature
+		signature := checker.Checker_resolveCall(tc, call, signatures, &candidates, checker.CheckModeNormal, checker.SignatureFlagsNone, nil)
+		arguments := checker.Checker_getEffectiveCallArguments(tc, call)
+		if !checker.Checker_hasCorrectArity(tc, call, arguments, signature, false) ||
+			!checker.Checker_isSignatureApplicable(tc, call, arguments, signature, checker.Checker_assignableRelation(tc), checker.CheckModeNormal, false, nil) {
+			return tc.GetUnknownType()
+		}
+		returnTypes = append(returnTypes, checker.Checker_getReturnTypeOfSignature(tc, signature))
+	}
+	return tc.GetUnionType(returnTypes)
+}
+
 func (conditionTypes *conditionTypeChecker) getDeclaredMemberReadType(node *ast.Node, objectType *checker.Type) (*checker.Type, ast.SymbolFlags) {
 	tc := conditionTypes.context.TypeChecker
 	if symbol := checker.Checker_getResolvedSymbolOrNil(tc, node); symbol != nil {
@@ -944,8 +962,8 @@ func (conditionTypes *conditionTypeChecker) getDeclaredMemberReadType(node *ast.
 			symbol = checker.Checker_getPropertyOfType(tc, objectType, symbol.Name)
 		}
 		if symbol != nil {
-			symbol, flags := conditionTypes.memberReadSymbol(node, symbol, objectType)
-			return checker.Checker_getTypeOfSymbol(tc, symbol), flags
+			readSymbol, flags := conditionTypes.memberReadSymbol(node, symbol, objectType)
+			return getMemberReadType(tc, symbol, readSymbol), flags
 		}
 	}
 	var keyType *checker.Type
@@ -962,8 +980,8 @@ func (conditionTypes *conditionTypeChecker) getDeclaredMemberReadType(node *ast.
 				symbol = checker.Checker_getPropertyOfType(tc, objectType, symbol.Name)
 			}
 			if symbol != nil {
-				symbol, flags := conditionTypes.memberReadSymbol(node, symbol, objectType)
-				return checker.Checker_getTypeOfSymbol(tc, symbol), flags
+				readSymbol, flags := conditionTypes.memberReadSymbol(node, symbol, objectType)
+				return getMemberReadType(tc, symbol, readSymbol), flags
 			}
 		}
 		name, ok := checker.Checker_getAccessedPropertyName(tc, node)
@@ -985,7 +1003,7 @@ func (conditionTypes *conditionTypeChecker) getDeclaredMemberReadType(node *ast.
 				readSymbol, flags := conditionTypes.memberReadSymbol(node, symbol, objectType)
 				propertyFlags |= flags
 				hasReadOverride = hasReadOverride || readSymbol != symbol
-				readTypes = append(readTypes, checker.Checker_getTypeOfSymbol(tc, readSymbol))
+				readTypes = append(readTypes, getMemberReadType(tc, symbol, readSymbol))
 				continue
 			}
 		}
@@ -999,6 +1017,16 @@ func (conditionTypes *conditionTypeChecker) getDeclaredMemberReadType(node *ast.
 	// With no access node, this query computes a read type without using the
 	// assignment target's write context or changing its cached resolution.
 	return checker.Checker_getIndexedAccessTypeOrUndefined(tc, objectType, keyType, checker.AccessFlagsExpressionPosition, nil, nil), propertyFlags
+}
+
+func getMemberReadType(tc *checker.Checker, symbol, readSymbol *ast.Symbol) *checker.Type {
+	declaredType := checker.Checker_getTypeOfSymbol(tc, symbol)
+	if readSymbol == symbol {
+		return declaredType
+	}
+	// Initializers identify getter ownership, but must not narrow the public
+	// read contract: later spreads or descriptor changes may use its full type.
+	return tc.GetUnionType([]*checker.Type{declaredType, checker.Checker_getTypeOfSymbol(tc, readSymbol)})
 }
 
 func (conditionTypes *conditionTypeChecker) memberReadSymbol(node *ast.Node, symbol *ast.Symbol, objectType *checker.Type) (*ast.Symbol, ast.SymbolFlags) {
@@ -1022,6 +1050,13 @@ func (conditionTypes *conditionTypeChecker) memberReadSymbol(node *ast.Node, sym
 		// property type even though the target still uses its own getter.
 		if ast.IsObjectLiteralExpression(origin) {
 			if property := checker.Checker_getPropertyOfType(tc, tc.GetTypeAtLocation(origin), symbol.Name); property != nil && originHasAccessorProperty(origin, property) {
+				return property, flags | ast.SymbolFlagsAccessor
+			}
+		} else if !ast.IsObjectBindingPattern(origin) {
+			// The target may be an instance, parameter, or call result. Its
+			// declared getter still applies after Object.assign invokes a setter.
+			targetType := tc.GetNonNullableType(utils.GetConstrainedTypeAtLocation(tc, origin))
+			if property := checker.Checker_getPropertyOfType(tc, targetType, symbol.Name); property != nil && typeHasAccessorProperty(tc, targetType, property) {
 				return property, flags | ast.SymbolFlagsAccessor
 			}
 		}
@@ -1136,6 +1171,7 @@ func (conditionTypes *conditionTypeChecker) resolveInitializer(node *ast.Node) *
 func (conditionTypes *conditionTypeChecker) receiverObjectOrigin(node *ast.Node) *ast.Node {
 	tc := conditionTypes.context.TypeChecker
 	var seen map[*ast.Node]bool
+	var assignedTarget *ast.Node
 	for {
 		node = conditionTypes.resolveInitializer(node)
 		if node == nil {
@@ -1152,29 +1188,29 @@ func (conditionTypes *conditionTypeChecker) receiverObjectOrigin(node *ast.Node)
 		if ast.IsObjectLiteralExpression(node) {
 			for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
 				if ast.IsPropertyAssignment(property) && ast.IsProtoSetter(property.Name()) {
-					return nil
+					return assignedTarget
 				}
 			}
 			return node
 		}
 		if !ast.IsCallExpression(node) || len(node.Arguments()) == 0 || seen[node] {
-			return nil
+			return assignedTarget
 		}
 		callee := conditionTypes.resolveInitializer(node.Expression())
 		if callee == nil || !ast.IsAccessExpression(callee) {
-			return nil
+			return assignedTarget
 		}
 		name, ok := checker.Checker_getAccessedPropertyName(tc, callee)
 		if !ok || name != "assign" {
-			return nil
+			return assignedTarget
 		}
 		object := conditionTypes.resolveInitializer(callee.Expression())
 		if object == nil {
-			return nil
+			return assignedTarget
 		}
 		symbol := tc.GetSymbolAtLocation(object)
 		if symbol == nil || symbol.Name != "Object" || !utils.IsSymbolFromDefaultLibrary(conditionTypes.context.Program(), symbol) {
-			return nil
+			return assignedTarget
 		}
 		// Object.assign writes values into its target; source accessors do
 		// not become accessors there. Existing target accessors still apply.
@@ -1182,7 +1218,8 @@ func (conditionTypes *conditionTypeChecker) receiverObjectOrigin(node *ast.Node)
 			seen = make(map[*ast.Node]bool)
 		}
 		seen[node] = true
-		node = node.Arguments()[0]
+		assignedTarget = node.Arguments()[0]
+		node = assignedTarget
 	}
 }
 
@@ -1265,8 +1302,17 @@ func getConditionReference(node *ast.Node) *ast.Node {
 func hasKnownNonNullishAssignment(tc *checker.Checker, node *ast.Node, evaluator *utils.StaticStringEvaluator) bool {
 	reference := getConditionReference(node)
 	flow := reference.FlowNodeData().FlowNode
-	if flow == nil || flow.Flags&ast.FlowFlagsAssignment == 0 || flow.Node == nil ||
+	for flow != nil && flow.Flags&ast.FlowFlagsAssignment != 0 && flow.Node != nil &&
 		!checker.Checker_isMatchingReference(tc, reference, flow.Node) {
+		// A separate variable declaration cannot invalidate this write unless
+		// it resets a receiver or its initializer can have side effects.
+		if !ast.IsVariableDeclaration(flow.Node) || checker.Checker_containsMatchingReference(tc, reference, flow.Node) ||
+			evaluator.HasSideEffect(flow.Node.Initializer(), true) {
+			return false
+		}
+		flow = flow.Antecedent
+	}
+	if flow == nil || flow.Flags&ast.FlowFlagsAssignment == 0 || flow.Node == nil {
 		return false
 	}
 	assignment := ast.GetAssignmentTarget(flow.Node)

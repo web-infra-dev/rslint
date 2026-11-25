@@ -171,6 +171,8 @@ func Checker_isMatchingReference(recv *checker.Checker, source *ast.Node, target
 func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (string, bool)
 //go:linkname Checker_isConstantReference github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isConstantReference
 func Checker_isConstantReference(recv *checker.Checker, node *ast.Node) bool
+//go:linkname Checker_containsMatchingReference github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).containsMatchingReference
+func Checker_containsMatchingReference(recv *checker.Checker, source *ast.Node, target *ast.Node) bool
 //go:linkname Checker_getPropertyNameForKnownSymbolName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertyNameForKnownSymbolName
 func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName string) string
 //go:linkname Checker_isTypeIdenticalTo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeIdenticalTo
