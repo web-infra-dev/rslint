@@ -238,6 +238,15 @@ func (staticEvaluator *StaticStringEvaluator) markReturnedReferences(node *ast.N
 	default:
 		return
 	}
+	if node.Kind == ast.KindConstructor {
+		// Parameter properties store their default values on the instance,
+		// just like explicit instance-field initializers.
+		for _, parameter := range node.Parameters() {
+			if ast.IsParameterPropertyDeclaration(parameter, node) {
+				staticEvaluator.markReference(parameter.Initializer(), flag)
+			}
+		}
+	}
 	body := node.Body()
 	if body == nil {
 		return
@@ -299,8 +308,8 @@ func (staticEvaluator *StaticStringEvaluator) recordStoredReferences(target, val
 			if len(symbol.Declarations) == 1 {
 				declaration := symbol.Declarations[0]
 				switch declaration.Kind {
-				case ast.KindVariableDeclaration:
-					visit(declaration.AsVariableDeclaration().Initializer, nested)
+				case ast.KindVariableDeclaration, ast.KindParameter:
+					visit(declaration.Initializer(), nested)
 				case ast.KindBindingElement:
 					for binding := declaration; binding.Kind == ast.KindBindingElement; binding = binding.Parent.Parent {
 						element := binding.AsBindingElement()
@@ -310,9 +319,7 @@ func (staticEvaluator *StaticStringEvaluator) recordStoredReferences(target, val
 						visit(element.Initializer, nested)
 						nested = true
 					}
-					if root := EnclosingVariableDeclarationOfBindingElement(declaration); root != nil {
-						visit(root.AsVariableDeclaration().Initializer, true)
-					}
+					visit(ast.GetRootDeclaration(declaration).Initializer(), true)
 				}
 			}
 			return

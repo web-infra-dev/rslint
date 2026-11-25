@@ -8,23 +8,25 @@ type staticReferenceTransfer struct {
 	binding     bool
 }
 
-type staticArrayCopySource struct {
+type staticCopySource struct {
 	literal, length *ast.Node
 	hasLength       bool
+	hasProperties   bool
 	unknown         bool
 }
 
 type staticEscapeFacts struct {
-	call              *ast.Node
-	collecting        bool
-	explicit          map[*ast.Symbol]bool
-	sites             map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
-	lengthWrites      map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
-	lengthWriteBlocks map[*ast.Symbol]*ast.Node
-	arrayCopySources  map[*ast.Node]staticArrayCopySource
-	captures          map[*ast.Symbol]staticEvalResult
-	capturing         map[*ast.Symbol]bool
-	ownCaptures       map[*ast.Symbol]*staticObjectValue
+	call                  *ast.Node
+	collecting            bool
+	explicit              map[*ast.Symbol]bool
+	sites                 map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
+	lengthWrites          map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
+	lengthWriteBlocks     map[*ast.Symbol]*ast.Node
+	untrackedLengthWrites map[*ast.Node]bool
+	copySources           map[*ast.Node]staticCopySource
+	captures              map[*ast.Symbol]staticEvalResult
+	capturing             map[*ast.Symbol]bool
+	ownCaptures           map[*ast.Symbol]*staticObjectValue
 	// Completed per-file facts for property-read queries; never cache a
 	// read-position-dependent result here.
 	constructorMutations map[*ast.Symbol]bool

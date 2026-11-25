@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/evaluator"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
@@ -1981,19 +1982,17 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 		}
 		return true
 	}
-	if origin != nil && ast.IsArrayLiteralExpression(origin) && access != nil {
+	if origin != nil && access != nil {
 		key, known := staticEvaluator.evalAccessExpressionKey(access)
-		if !known || isArrayIndexProperty(key) {
-			for call := range accountedCalls {
-				truncates, unknown := staticEvaluator.arrayCopyMutation(call, key, known)
-				if unknown {
+		for call := range accountedCalls {
+			invalidated, unknown := staticEvaluator.copyReadMutation(call, access, key, known, ast.IsArrayLiteralExpression(origin))
+			if unknown {
+				return true
+			}
+			if invalidated {
+				write := staticEvaluator.propertyWriteAtRead(access)
+				if write == nil || !staticEvaluator.propertyMutationFollowsRead(write, call, call) {
 					return true
-				}
-				if truncates {
-					write := staticEvaluator.arrayIndexWriteAtRead(access)
-					if write == nil || !staticEvaluator.propertyMutationFollowsRead(write, origin, call) {
-						return true
-					}
 				}
 			}
 		}
@@ -2011,7 +2010,7 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 		if known && !isArrayIndexProperty(key) {
 			return false
 		}
-		write := staticEvaluator.arrayIndexWriteAtRead(access)
+		write := staticEvaluator.propertyWriteAtRead(access)
 		if write != nil && staticEvaluator.lengthWritesInReadBlock(symbol, origin, access, write) {
 			return false
 		}
@@ -2026,72 +2025,136 @@ func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node, ori
 	return false
 }
 
-func (staticEvaluator *StaticStringEvaluator) arrayCopyMutation(call *ast.Node, key string, keyKnown bool) (truncates, unknown bool) {
+func (staticEvaluator *StaticStringEvaluator) copyReadMutation(call, access *ast.Node, key string, keyKnown, arrayTarget bool) (invalidated, unknown bool) {
 	if !ast.IsCallExpression(call) || len(call.Arguments()) < 2 {
 		return false, true
 	}
+	if !keyKnown && staticEvaluator.typeChecker != nil && ast.IsElementAccessExpression(access) {
+		keyType := GetConstrainedTypeAtLocation(staticEvaluator.typeChecker, access.AsElementAccessExpression().ArgumentExpression)
+		for _, part := range UnionTypeParts(keyType) {
+			if !checker.IsTypeUsableAsPropertyName(part) {
+				return false, true
+			}
+			invalidated, unknown := staticEvaluator.copyReadMutation(call, access, checker.GetPropertyNameFromType(part), true, arrayTarget)
+			if invalidated || unknown {
+				return invalidated, unknown
+			}
+		}
+		return false, false
+	}
+	arrayIndex := arrayTarget && (!keyKnown || isArrayIndexProperty(key))
+	var readType *checker.Type
+	addsNullish := func(value *checker.Type) bool {
+		tc := staticEvaluator.typeChecker
+		// Correct an intersection that erased a source's nullable value.
+		// When the property's native contract already includes that value,
+		// ordinary guards and writes can still narrow the copied data field.
+		if readType == nil {
+			readType = checker.Checker_getIndexedAccessTypeOrUndefined(tc, tc.GetTypeAtLocation(access.Expression()), checker.Checker_getStringLiteralType(tc, key), checker.AccessFlagsExpressionPosition, nil, nil)
+		}
+		return readType == nil || !checker.Checker_isTypeAssignableTo(tc, checker.Checker_getTypeWithFacts(tc, value, checker.TypeFactsEQUndefinedOrNull), readType)
+	}
 	index, _ := ecmascript.StringToNumber(key)
 	for _, source := range call.Arguments()[1:] {
-		info := staticEvaluator.arrayCopySource(source)
-		if info.unknown {
+		info := staticEvaluator.copySource(source)
+		if arrayIndex && info.unknown {
 			// An opaque source can also copy __proto__ or invoke a getter.
 			// A later indexed write alone cannot prove a data property exists.
 			return false, true
 		}
-		if truncates && keyKnown && info.literal != nil && staticEvaluator.typeChecker != nil {
+		if keyKnown && staticEvaluator.typeChecker != nil {
 			tc := staticEvaluator.typeChecker
-			property := checker.Checker_getPropertyOfType(tc, tc.GetTypeAtLocation(info.literal), key)
-			if property != nil && property.Flags&(ast.SymbolFlagsOptional|ast.SymbolFlagsAccessor) == 0 &&
-				!IsNullableType(checker.Checker_getTypeOfSymbol(tc, property)) {
-				truncates = false
+			sourceType := tc.GetTypeAtLocation(source)
+			if info.literal != nil {
+				sourceType = tc.GetTypeAtLocation(info.literal)
+			}
+			property := checker.Checker_getPropertyOfType(tc, sourceType, key)
+			if property != nil {
+				if valueType := checker.Checker_getTypeOfSymbol(tc, property); IsNullableType(valueType) {
+					// Each later source can overwrite a restored value again.
+					invalidated = invalidated || addsNullish(valueType)
+				} else if info.literal != nil && !info.unknown && property.Flags&(ast.SymbolFlagsOptional|ast.SymbolFlagsAccessor) == 0 {
+					invalidated = false
+				}
+			} else if info.hasProperties || info.unknown {
+				// Index signatures can overwrite a key without exposing a
+				// property symbol. Empty literal arrays have no own elements.
+				if indexInfo := checker.Checker_getApplicableIndexInfo(tc, sourceType, checker.Checker_getStringLiteralType(tc, key)); indexInfo != nil && IsNullableType(indexInfo.ValueType()) {
+					invalidated = invalidated || addsNullish(indexInfo.ValueType())
+				}
 			}
 		}
-		if info.hasLength {
+		if arrayIndex && info.hasLength {
 			value := staticEvaluator.evalValue(info.length)
 			number, numeric := staticValueToNumber(value.value)
 			// Numeric keys are copied before length within one source, even
 			// when the object literal spells length first. Sources themselves
 			// are copied left to right, so a later source can restore an index.
 			if !keyKnown || !value.ok || !numeric || number != float64(ecmascript.NumberToUint32(number)) || number <= index {
-				truncates = true
+				invalidated = true
 			}
 		}
 	}
-	return truncates, false
+	return invalidated, false
 }
 
-func (staticEvaluator *StaticStringEvaluator) arrayCopySource(source *ast.Node) (info staticArrayCopySource) {
+func (staticEvaluator *StaticStringEvaluator) copySource(source *ast.Node) (info staticCopySource) {
 	source = SkipAssertionsAndParens(source)
 	if source == nil {
-		return staticArrayCopySource{unknown: true}
+		return staticCopySource{unknown: true}
 	}
 	facts := staticEvaluator.escapeFacts
-	if info, cached := facts.arrayCopySources[source]; cached {
+	if info, cached := facts.copySources[source]; cached {
 		return info
 	}
-	if facts.arrayCopySources == nil {
-		facts.arrayCopySources = make(map[*ast.Node]staticArrayCopySource)
+	if facts.copySources == nil {
+		facts.copySources = make(map[*ast.Node]staticCopySource)
 	}
 	// Cache immutable source syntax, with a conservative cycle sentinel.
-	facts.arrayCopySources[source] = staticArrayCopySource{unknown: true}
-	defer func() { facts.arrayCopySources[source] = info }()
+	facts.copySources[source] = staticCopySource{unknown: true}
+	defer func() { facts.copySources[source] = info }()
 	if ast.IsIdentifier(source) {
 		initializer, symbol, known := staticEvaluator.resolveIdentifierInitializer(source)
 		if known && staticEvaluator.referenceFlagsFor(symbol)&(staticReferenceWrite|staticReferencePropertyMutation) == 0 {
-			return staticEvaluator.arrayCopySource(initializer)
+			return staticEvaluator.copySource(initializer)
 		}
 	}
 	if ast.IsArrayLiteralExpression(source) || ast.IsFunctionExpressionOrArrowFunction(source) {
 		// Their intrinsic length is non-enumerable.
+		if ast.IsArrayLiteralExpression(source) && len(source.AsArrayLiteralExpression().Elements.Nodes) != 0 {
+			info.literal = source
+			info.hasProperties = true
+		}
 		return info
 	}
 	if ast.IsObjectLiteralExpression(source) {
 		info.literal = source
 		for _, property := range source.AsObjectLiteralExpression().Properties.Nodes {
 			if ast.IsSpreadAssignment(property) {
-				info.unknown = true
-				break
+				spread := staticEvaluator.copySource(property.Expression())
+				if spread.literal != nil && ast.IsArrayLiteralExpression(spread.literal) && staticEvaluator.typeChecker != nil {
+					tc := staticEvaluator.typeChecker
+					sourceType := tc.GetTypeAtLocation(spread.literal)
+					// A plain array spread can overwrite an explicit property
+					// without appearing in that property's native symbol type.
+					// Tuples expose their individual indices to the checker.
+					if checker.Checker_isArrayType(tc, sourceType) {
+						if elementType := checker.Checker_getIndexTypeOfType(tc, sourceType, tc.GetNumberType()); elementType != nil && IsNullableType(elementType) {
+							spread.unknown = true
+						}
+					}
+				}
+				if spread.unknown {
+					info.unknown = true
+					break
+				}
+				if spread.hasLength {
+					info.hasLength, info.length = true, spread.length
+				}
+				info.hasProperties = info.hasProperties || spread.hasProperties
+				continue
 			}
+			info.hasProperties = true
 			key, known := staticEvaluator.evalPropertyKey(property.Name())
 			if !known {
 				info.unknown = true
@@ -2113,7 +2176,7 @@ func (staticEvaluator *StaticStringEvaluator) arrayCopySource(source *ast.Node) 
 	}) {
 		return info
 	}
-	return staticArrayCopySource{unknown: true}
+	return staticCopySource{unknown: true}
 }
 
 func (staticEvaluator *StaticStringEvaluator) lengthWritesInReadBlock(symbol *ast.Symbol, origin, access, write *ast.Node) bool {
@@ -2121,7 +2184,7 @@ func (staticEvaluator *StaticStringEvaluator) lengthWritesInReadBlock(symbol *as
 	block, cached := facts.lengthWriteBlocks[symbol]
 	if !cached {
 		for site := range facts.lengthWrites[symbol] {
-			if site.Parent == nil || site.Parent.Kind != ast.KindExpressionStatement ||
+			if facts.untrackedLengthWrites[site] || site.Parent == nil || site.Parent.Kind != ast.KindExpressionStatement ||
 				site.Parent.Parent == nil || block != nil && block != site.Parent.Parent {
 				block = nil
 				break
@@ -2133,7 +2196,7 @@ func (staticEvaluator *StaticStringEvaluator) lengthWritesInReadBlock(symbol *as
 		}
 		facts.lengthWriteBlocks[symbol] = block
 	}
-	// All writes are ordinary statements in this invocation. The native
+	// All writes are ordinary statements recorded by the native binder. The
 	// immediately preceding indexed assignment supersedes the earlier ones;
 	// no direct length assignment can intervene without changing that flow.
 	// Exclude class initializers and computed names, whose order can differ.
@@ -2143,8 +2206,8 @@ func (staticEvaluator *StaticStringEvaluator) lengthWritesInReadBlock(symbol *as
 }
 
 // Reuse the native flow graph's immediately preceding write. No branch or loop
-// traversal is needed to prove that this exact indexed reference was restored.
-func (staticEvaluator *StaticStringEvaluator) arrayIndexWriteAtRead(access *ast.Node) *ast.Node {
+// traversal is needed to prove that this exact property reference was restored.
+func (staticEvaluator *StaticStringEvaluator) propertyWriteAtRead(access *ast.Node) *ast.Node {
 	if staticEvaluator.typeChecker == nil || access.FlowNodeData() == nil || access.FlowNodeData().FlowNode == nil {
 		return nil
 	}
@@ -2515,6 +2578,16 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 					}
 					if known && name == "length" {
 						lengthWrites = append(lengthWrites, staticMutationCandidate{call: outer.Parent, access: node})
+						// Type assertions can hide an actual write from the native
+						// flow graph. Ask the binder about the complete target,
+						// including wrappers around the receiver or access itself.
+						if !binder.IsNarrowableReference(outer) {
+							facts := staticEvaluator.escapeFacts
+							if facts.untrackedLengthWrites == nil {
+								facts.untrackedLengthWrites = make(map[*ast.Node]bool)
+							}
+							facts.untrackedLengthWrites[outer.Parent] = true
+						}
 					}
 				}
 				staticEvaluator.markReference(AccessExpressionObject(node), flags)
@@ -2756,10 +2829,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 		}
 		declaration := symbol.Declarations[0]
 		if declaration.Kind == ast.KindBindingElement {
-			root := EnclosingVariableDeclarationOfBindingElement(declaration)
-			if root == nil {
-				return
-			}
+			root := ast.GetRootDeclaration(declaration)
 			for binding := declaration; binding.Kind == ast.KindBindingElement; binding = binding.Parent.Parent {
 				element := binding.AsBindingElement()
 				// Rest creates a fresh container. Only a nested mutation can
@@ -2768,7 +2838,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 					return
 				}
 				if element.DotDotDotToken != nil && flag&staticReferenceCallEscape != 0 &&
-					staticEvaluator.hasOnlyPrimitiveChildren(root.AsVariableDeclaration().Initializer) {
+					staticEvaluator.hasOnlyPrimitiveChildren(root.Initializer()) {
 					return
 				}
 				staticEvaluator.markReference(element.Initializer, flag)
@@ -2776,7 +2846,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			}
 			declaration = root
 		}
-		if declaration.Kind != ast.KindVariableDeclaration {
+		if declaration.Kind != ast.KindVariableDeclaration && declaration.Kind != ast.KindParameter {
 			if followTransfers {
 				staticEvaluator.markReturnedReferences(declaration, flag)
 			}
@@ -2786,7 +2856,7 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 		// the binding has other writes. Propagate only property mutations;
 		// replacing the alias itself must not taint the original value. The
 		// already-marked check above also terminates circular alias chains.
-		node = SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
+		node = SkipAssertionsAndParens(declaration.Initializer())
 		if node == nil && declaration.Parent != nil && declaration.Parent.Parent != nil && ast.IsForOfStatement(declaration.Parent.Parent) {
 			node = declaration.Parent.Parent.Expression()
 			flag |= staticReferenceNestedMutation

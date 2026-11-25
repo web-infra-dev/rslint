@@ -164,6 +164,15 @@ func TestStaticPropertyReadShapeMutations(t *testing.T) {
 		{"captured length alias", "let alias: number[] = copy; const saved = alias; alias = []; saved.length = 0;", "", "copy[0]", true},
 		{"restored between truncations", "copy.length = 0; copy[0] = 2;", "copy.length = 0;", "copy[0]", false},
 		{"deferred truncation after restoration", "copy.length = 0; copy[0] = 2; const holder = {get value() { copy.length = 0; return 0; }}; holder.value;", "", "copy[0]", true},
+		{"asserted truncation after restoration", "copy[0] = 2; (copy as number[]).length = 0;", "", "copy[0]", true},
+		{"asserted target truncation after restoration", "copy[0] = 2; (copy.length as number) = 0;", "", "copy[0]", true},
+		{"restored after asserted truncation", "(copy as number[]).length = 0; copy[0] = 2;", "", "copy[0]", false},
+		{"default parameter alias", "function erase(alias: object = copy) { Object.defineProperty(alias, 'value', {value: undefined}); } erase();", "", "copy.value", true},
+		{"default parameter binding", "function erase({alias = copy}: {alias?: object} = {}) { Object.defineProperty(alias, 'value', {value: undefined}); } erase();", "", "copy.value", true},
+		{"default parameter store", "const holder: {item?: object} = {}; function store(alias: object = copy) { holder.item = alias; } store(); unknown(holder);", "", "copy.value", true},
+		{"default parameter property", "class Holder { constructor(public item: object = copy) {} } unknown(new Holder());", "", "copy.value", true},
+		{"default parameter length", "function truncate(alias: number[] = copy) { alias.length = 0; } truncate();", "", "copy[0]", true},
+		{"default rest copies container", "function erase({...alias} = copy) { Object.defineProperty(alias, 'value', {value: undefined}); } erase();", "", "copy.value", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := fixtures.GetRootDir()

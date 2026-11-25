@@ -40,3 +40,5 @@ type ReferenceResolver = binder.ReferenceResolver
 type ReferenceResolverHooks = binder.ReferenceResolverHooks
 //go:linkname SetValueDeclaration github.com/microsoft/TypeScript/tsc/internal/binder.SetValueDeclaration
 func SetValueDeclaration(symbol *ast.Symbol, node *ast.Node)
+//go:linkname IsNarrowableReference github.com/microsoft/TypeScript/tsc/internal/binder.isNarrowableReference
+func IsNarrowableReference(node *ast.Node) bool

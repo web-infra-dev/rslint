@@ -135,20 +135,37 @@ Loops and objects shared across function invocations remain conservative.
 Aliases retain the object they read before a later reassignment. Reassignments
 inside closures, destructuring defaults, and `for...of` bindings remain possible
 origins for mutations even when they appear earlier in the source.
+Parameter defaults and constructor parameter properties also retain their possible
+source aliases. This remains conservative when a caller supplies another argument;
+the rule does not specialize the function body for individual calls.
 An unchanged array `push` method also preserves unrelated named properties.
 Assigning or defining an array's `length` can delete indexed elements, so those
 reads retain their guards after a possible truncation, including through aliases.
 This also covers an enumerable `length` copied by `Object.assign`. Named
 properties and values captured before truncation retain their types. A directly
 preceding assignment to the same index restores ordinary narrowing, using the
-native control-flow graph.
+native control-flow graph. The fast path also checks the native binder's assignment
+target rules: an asserted write such as `(xs as Item[]).length = 0` still invalidates
+an earlier indexed assignment even when it is absent from the native flow graph.
 `Object.assign` sources are processed from left to right: a later source can
 restore an index deleted by an earlier source's `length`. Within one source,
 numeric keys are copied before `length`, regardless of their literal order.
+A later nullable source can overwrite that restored value again. The same protection
+applies to named properties and unions of property keys: for example,
+`Object.assign({}, {item}, {item: maybeItem}).item?.id` keeps its guard when
+`maybeItem` can be `undefined`. Plain literal object spreads retain the same source
+analysis, including nested spreads and their final `length` values.
 Opaque sources can contain an enumerable `length` absent from their declared
 type, so their indexed reads retain guards. For example, this also retains
 `xs[0] ?? fallback` after copying a class instance whose `length` getter is
 non-enumerable; the rule does not infer the instance's complete own shape.
+Ordinary array types also do not prove that an individual source index exists.
+For example, `Object.assign([] as Item[], {length: 0}, [item])[0] ?? fallback`
+retains its fallback, while a tuple source can prove the index was restored.
+Nullable ordinary arrays spread into object sources remain conservative because
+their numeric index types can overwrite explicit keys without updating those
+keys' native property types. This includes a later restoration, as in
+`Object.assign([] as Item[], {...[maybeItem]}, {0: item})[0] ?? fallback`.
 Length writes and aggregate aliases remain conservative: `xs.length++` may
 retain an indexed guard, as may `holder.other.length = 0` when `holder` also
 stores `xs`. Instance initializer mutations also remain conservative when the
