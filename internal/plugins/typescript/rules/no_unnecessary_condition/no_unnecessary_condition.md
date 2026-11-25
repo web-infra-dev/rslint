@@ -57,7 +57,30 @@ records?.[(key)]?.id;
 ```
 
 The same protection applies when an index signature explicitly includes
-`undefined`, including numeric string keys such as `'0'`.
+`undefined` or `null`, or a property keyed by a unique symbol is optional. Index
+matching follows TypeScript's rules for numeric keys, numeric strings, symbols,
+and template literal keys.
+
+rslint also reports constant conditions in array predicate callbacks and
+truthiness assertions, unreachable logical fallbacks, and computed reads narrowed
+to `null` or `undefined`. typescript-eslint 8.74.0 can miss these cases:
+
+```typescript
+declare const flags: boolean[];
+declare const label: string | undefined;
+
+flags.filter(flag => flag || true);
+const display = label || 'Untitled' || 'Fallback';
+
+function read(value: { x?: number }) {
+  if (value.x === undefined) return value['x'] ?? 42;
+  return value.x;
+}
+```
+
+The computed-property exception applies only to `??=` writes through a union of
+keys, where TypeScript intersects the property types. It does not suppress
+diagnostics for ordinary reads.
 
 ## Original Documentation
 

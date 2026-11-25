@@ -7,7 +7,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
@@ -58,15 +57,6 @@ func isBoolOperator(kind ast.Kind) bool {
 	default:
 		return false
 	}
-}
-
-// valueString returns a property name from a literal type value.
-// Uses fmt.Stringer for named types (Number, PseudoBigInt).
-func valueString(v interface{}) string {
-	if s, ok := v.(fmt.Stringer); ok {
-		return s.String()
-	}
-	return fmt.Sprintf("%v", v)
 }
 
 type allowConstantLoopConditionsOption string
@@ -250,8 +240,8 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 
 		// --- Core check functions ---
 
-		var checkNode func(expression *ast.Node, isUnaryNotArgument bool, reportNode *ast.Node)
-		checkNode = func(expression *ast.Node, isUnaryNotArgument bool, reportNode *ast.Node) {
+		var checkNode func(expression *ast.Node, isUnaryNotArgument bool, reportNode *ast.Node, check truthinessCheck)
+		checkNode = func(expression *ast.Node, isUnaryNotArgument bool, reportNode *ast.Node, check truthinessCheck) {
 			expression = ast.SkipParentheses(expression)
 
 			if reportNode == nil {
@@ -260,7 +250,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 
 			// Handle unary negation
 			if ast.IsPrefixUnaryExpression(expression) && expression.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken {
-				checkNode(expression.AsPrefixUnaryExpression().Operand, !isUnaryNotArgument, reportNode)
+				checkNode(expression.AsPrefixUnaryExpression().Operand, !isUnaryNotArgument, reportNode, checkBoth)
 				return
 			}
 
@@ -269,14 +259,31 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			// For logical expressions (except ??), only check the right side
+			// The left operand has its own listener. In a value context, only
+			// absorbing right operands (`a || true`, `a && false`) make the
+			// whole expression constant. Preserve this restriction when nested.
 			if ast.IsBinaryExpression(expression) {
 				binExpr := expression.AsBinaryExpression()
 				op := binExpr.OperatorToken.Kind
 				if op == ast.KindAmpersandAmpersandToken || op == ast.KindBarBarToken {
-					if isOnlyUsedForTruthiness(expression) {
-						checkNode(binExpr.Right, false, nil)
+					if check == 0 && isOnlyUsedForTruthiness(expression, tc, opts.checkTypePredicates) {
+						check = checkBoth
 					}
+					if check != checkBoth {
+						absorbing := checkTruthy
+						if op == ast.KindAmpersandAmpersandToken {
+							absorbing = checkFalsy
+						}
+						if check == 0 {
+							check = absorbing
+						} else {
+							check &= absorbing
+						}
+						if check == 0 {
+							return
+						}
+					}
+					checkNode(binExpr.Right, false, nil, check)
 					return
 				}
 			}
@@ -290,7 +297,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				ctx.ReportNode(reportNode, buildNeverMessage())
 				return
 			}
-			if !utils.IsPossiblyTruthy(t) {
+			if !utils.IsPossiblyTruthy(t) && check != checkTruthy {
 				if !isUnaryNotArgument {
 					ctx.ReportNode(reportNode, buildAlwaysFalsyMessage())
 				} else {
@@ -298,7 +305,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				}
 				return
 			}
-			if !utils.IsPossiblyFalsy(t) {
+			if !utils.IsPossiblyFalsy(t) && check != checkFalsy {
 				if !isUnaryNotArgument {
 					ctx.ReportNode(reportNode, buildAlwaysTruthyMessage())
 				} else {
@@ -308,7 +315,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			}
 		}
 
-		checkNodeForNullish := func(node *ast.Node) {
+		checkNodeForNullish := func(node *ast.Node, isAssignment bool) {
 			// Match upstream: the rule operates on the ESTree node, which has no
 			// parenthesized-expression wrapper, so `(x) ?? y` reports on `x`.
 			// tsgo's AST keeps ParenthesizedExpression nodes, so skip them to
@@ -343,7 +350,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if isAlwaysNullish(t) && !hasPossiblyNonNullishComputedMemberProperty(tc, node) {
+			if isAlwaysNullish(t) && (!isAssignment || !hasPossiblyNonNullishComputedMemberProperty(tc, node)) {
 				ctx.ReportNode(node, buildAlwaysNullishMessage())
 				return
 			}
@@ -394,11 +401,11 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 		checkLogicalExpressionForUnnecessaryConditionals := func(node *ast.Node) {
 			binExpr := node.AsBinaryExpression()
 			if binExpr.OperatorToken.Kind == ast.KindQuestionQuestionToken {
-				checkNodeForNullish(binExpr.Left)
+				checkNodeForNullish(binExpr.Left, false)
 				return
 			}
 			// Only check the left side
-			checkNode(binExpr.Left, false, nil)
+			checkNode(binExpr.Left, false, nil, 0)
 		}
 
 		checkIfLoopIsNecessaryConditional := func(node *ast.Node) {
@@ -435,7 +442,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			checkNode(test, false, nil)
+			checkNode(test, false, nil, checkBoth)
 		}
 
 		// optionChainContainsOptionArrayIndex recursively walks the optional chain
@@ -592,7 +599,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				// Check for truthiness assertion functions
 				truthinessArg := typescriptutil.FindTruthinessAssertedArgument(tc, callExpr)
 				if truthinessArg != nil {
-					checkNode(truthinessArg, false, nil)
+					checkNode(truthinessArg, false, nil, checkBoth)
 				}
 
 				// Check for type guard assertion functions
@@ -615,13 +622,13 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 
 			// Check array method calls with predicates
 			if utils.IsArrayMethodCallWithPredicate(tc, callExpr) && len(callExpr.Arguments.Nodes) > 0 {
-				callback := callExpr.Arguments.Nodes[0]
+				callback := ast.SkipParentheses(callExpr.Arguments.Nodes[0])
 
 				if ast.IsArrowFunction(callback) || ast.IsFunctionExpression(callback) {
 					body := callback.Body()
 					if body != nil && !ast.IsBlock(body) {
 						// Arrow function with expression body: () => something
-						checkNode(body, false, nil)
+						checkNode(body, false, nil, checkBoth)
 						return
 					}
 					if body != nil && ast.IsBlock(body) {
@@ -629,7 +636,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 						if len(statements) == 1 && ast.IsReturnStatement(statements[0]) {
 							returnStmt := statements[0].AsReturnStatement()
 							if returnStmt.Expression != nil {
-								checkNode(returnStmt.Expression, false, nil)
+								checkNode(returnStmt.Expression, false, nil, checkBoth)
 								return
 							}
 						}
@@ -676,18 +683,18 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			assignExpr := node.AsBinaryExpression()
 			switch assignExpr.OperatorToken.Kind {
 			case ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken:
-				checkNode(assignExpr.Left, false, nil)
+				checkNode(assignExpr.Left, false, nil, checkBoth)
 			case ast.KindQuestionQuestionEqualsToken:
-				checkNodeForNullish(assignExpr.Left)
+				checkNodeForNullish(assignExpr.Left, true)
 			}
 		}
 
 		return rule.RuleListeners{
 			ast.KindIfStatement: func(node *ast.Node) {
-				checkNode(node.AsIfStatement().Expression, false, nil)
+				checkNode(node.AsIfStatement().Expression, false, nil, checkBoth)
 			},
 			ast.KindConditionalExpression: func(node *ast.Node) {
-				checkNode(node.AsConditionalExpression().Condition, false, nil)
+				checkNode(node.AsConditionalExpression().Condition, false, nil, checkBoth)
 			},
 			ast.KindWhileStatement: func(node *ast.Node) {
 				checkIfLoopIsNecessaryConditional(node)
@@ -769,6 +776,16 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 
 // Helper functions
 
+// Zero asks a logical expression to infer whether its value is consumed.
+// Other values restrict which constant right operands can be reported.
+type truthinessCheck uint8
+
+const (
+	checkTruthy truthinessCheck = 1 << iota
+	checkFalsy
+	checkBoth = checkTruthy | checkFalsy
+)
+
 func hasPossiblyNonNullishComputedMemberProperty(tc *checker.Checker, node *ast.Node) bool {
 	if !ast.IsElementAccessExpression(node) || ast.IsOptionalChain(node) {
 		return false
@@ -776,12 +793,17 @@ func hasPossiblyNonNullishComputedMemberProperty(tc *checker.Checker, node *ast.
 	element := node.AsElementAccessExpression()
 	objectType := utils.GetConstrainedTypeAtLocation(tc, element.Expression)
 	propertyType := utils.GetConstrainedTypeAtLocation(tc, element.ArgumentExpression)
+	// Writes through a union key use the intersection of the property types.
+	// A read or a single-key write still has meaningful flow narrowing.
+	if !propertyType.IsUnion() {
+		return false
+	}
 	possiblyNonNullish := false
 	for _, keyType := range utils.UnionTypeParts(propertyType) {
-		if !keyType.IsStringLiteral() && !keyType.IsNumberLiteral() {
+		if !checker.IsTypeUsableAsPropertyName(keyType) {
 			return false
 		}
-		selectedType := tc.GetTypeOfPropertyOfType(objectType, valueString(keyType.AsLiteralType().Value()))
+		selectedType := tc.GetTypeOfPropertyOfType(objectType, checker.GetPropertyNameFromType(keyType))
 		if selectedType == nil {
 			return false
 		}
@@ -792,8 +814,10 @@ func hasPossiblyNonNullishComputedMemberProperty(tc *checker.Checker, node *ast.
 	return possiblyNonNullish
 }
 
-func isOnlyUsedForTruthiness(node *ast.Node) bool {
+func isOnlyUsedForTruthiness(node *ast.Node, tc *checker.Checker, checkTypePredicates bool) bool {
+	node = ast.SkipParentheses(node)
 	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	var callback *ast.Node
 	switch parent.Kind {
 	case ast.KindIfStatement:
 		return ast.SkipParentheses(parent.AsIfStatement().Expression) == node
@@ -804,16 +828,35 @@ func isOnlyUsedForTruthiness(node *ast.Node) bool {
 	case ast.KindDoStatement:
 		return ast.SkipParentheses(parent.AsDoStatement().Expression) == node
 	case ast.KindForStatement:
-		return ast.SkipParentheses(parent.AsForStatement().Condition) == node
+		condition := parent.AsForStatement().Condition
+		return condition != nil && ast.SkipParentheses(condition) == node
 	case ast.KindPrefixUnaryExpression:
 		return parent.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
 	case ast.KindBinaryExpression:
 		binary := parent.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken:
-			return ast.SkipParentheses(binary.Left) == node || isOnlyUsedForTruthiness(parent)
+			return ast.SkipParentheses(binary.Left) == node || isOnlyUsedForTruthiness(parent, tc, checkTypePredicates)
 		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			return isOnlyUsedForTruthiness(parent)
+			return isOnlyUsedForTruthiness(parent, tc, checkTypePredicates)
+		}
+	case ast.KindCallExpression:
+		if checkTypePredicates {
+			argument := typescriptutil.FindTruthinessAssertedArgument(tc, parent.AsCallExpression())
+			return argument != nil && ast.SkipParentheses(argument) == node
+		}
+	case ast.KindArrowFunction:
+		callback = parent
+	case ast.KindReturnStatement:
+		callback = ast.GetContainingFunction(parent)
+	}
+	if callback != nil && (ast.IsArrowFunction(callback) || ast.IsFunctionExpression(callback)) {
+		call := ast.WalkUpParenthesizedExpressions(callback.Parent)
+		if ast.IsCallExpression(call) {
+			expression := call.AsCallExpression()
+			return len(expression.Arguments.Nodes) > 0 &&
+				ast.SkipParentheses(expression.Arguments.Nodes[0]) == callback &&
+				utils.IsArrayMethodCallWithPredicate(tc, expression)
 		}
 	}
 	return false
@@ -825,40 +868,19 @@ func isNullablePropertyType(tc *checker.Checker, objType *checker.Type, property
 			return isNullablePropertyType(tc, objType, part, includeUncheckedIndex)
 		})
 	}
-	if propertyType.IsNumberLiteral() || propertyType.IsStringLiteral() {
-		propName := valueString(propertyType.AsLiteralType().Value())
+	if checker.IsTypeUsableAsPropertyName(propertyType) {
+		propName := checker.GetPropertyNameFromType(propertyType)
 		propType := tc.GetTypeOfPropertyOfType(objType, propName)
 		if propType != nil {
 			return utils.IsNullableType(propType)
 		}
-		// A missing indexed property contributes its own undefined under
-		// noUncheckedIndexedAccess, including an identifier with a literal type.
-		if includeUncheckedIndex && len(tc.GetIndexInfosOfType(objType)) > 0 {
-			return true
-		}
-		// tsgo's GetTypeOfPropertyOfType doesn't resolve index signatures for
-		// non-array object types (e.g., { [key: number]: T }). For these types,
-		// Preserve nullability from the index signature's value type. String
-		// keys also match the string index by type name in upstream's fallback.
-		// Skip arrays — they are handled by the fallthrough getTypeName comparison.
-		if !checker.Checker_isArrayType(tc, objType) && !checker.IsTupleType(objType) {
-			var keyType *checker.Type
-			if propertyType.IsNumberLiteral() || jsnum.FromString(propName).String() == propName {
-				keyType = tc.GetNumberType()
-			} else {
-				keyType = tc.GetStringType()
-			}
-			indexType := checker.Checker_getIndexTypeOfType(tc, objType, keyType)
-			if indexType != nil {
-				return keyType == tc.GetStringType() || utils.IsNullableType(indexType)
-			}
-		}
 	}
-	typeName := utils.GetTypeName(tc, propertyType)
-	indexInfos := tc.GetIndexInfosOfType(objType)
-	return utils.Some(indexInfos, func(info *checker.IndexInfo) bool {
-		return utils.GetTypeName(tc, info.KeyType()) == typeName
-	})
+	// Let the checker handle numeric strings, template keys, symbols, and
+	// overlapping signatures instead of matching printed key type names.
+	info := checker.Checker_getApplicableIndexInfo(tc, objType, propertyType)
+	return info != nil && (includeUncheckedIndex || utils.IsNullableType(info.ValueType()) ||
+		// Preserve upstream's conservative treatment of matching index types.
+		utils.GetTypeName(tc, info.KeyType()) == utils.GetTypeName(tc, propertyType))
 }
 
 func collectReturnTypes(tc *checker.Checker, callbackType *checker.Type) []*checker.Type {

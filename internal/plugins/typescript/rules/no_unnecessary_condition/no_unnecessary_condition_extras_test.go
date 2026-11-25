@@ -162,22 +162,7 @@ tuple[(0)].id;
 (obj?.method)?.();
 `}}, nil)
 	})
-	t.Run("computed-chain", func(t *testing.T) {
-		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, nil, []rule_tester.InvalidTestCase{{Code: `declare const obj: {item:{id:string}, method:()=>string, get:()=>{id:string}} | undefined;
-declare const key: 'item';
-obj?.[(key)]?.id;
-`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "neverOptionalChain", Line: 3, Column: 13, EndLine: 3, EndColumn: 15,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{MessageId: "suggestRemoveOptionalChain", Output: `declare const obj: {item:{id:string}, method:()=>string, get:()=>{id:string}} | undefined;
-declare const key: 'item';
-obj?.[(key)].id;
-`},
-					},
-				},
-			}}})
-	})
+
 	t.Run("grouped-array-access", func(t *testing.T) {
 		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, []rule_tester.ValidTestCase{{Code: `declare const arr:{id:string}[] | undefined;
 (arr[0])?.id;
@@ -359,22 +344,7 @@ declare const key: 0;
 arr?.[(key)]?.id;
 `}}, nil)
 	})
-	t.Run("checked-computed-chain", func(t *testing.T) {
-		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.noUncheckedIndexedAccess.json", t, &NoUnnecessaryConditionRule, nil, []rule_tester.InvalidTestCase{{Code: `declare const obj: {item:{id:string}, method:()=>string, get:()=>{id:string}} | undefined;
-declare const key: 'item';
-obj?.[(key)]?.id;
-`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "neverOptionalChain", Line: 3, Column: 13, EndLine: 3, EndColumn: 15,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{MessageId: "suggestRemoveOptionalChain", Output: `declare const obj: {item:{id:string}, method:()=>string, get:()=>{id:string}} | undefined;
-declare const key: 'item';
-obj?.[(key)].id;
-`},
-					},
-				},
-			}}})
-	})
+
 }
 
 func TestNoUnnecessaryConditionLiteralComparisons(t *testing.T) {
@@ -442,4 +412,94 @@ func TestNoUnnecessaryConditionNumericStringIndex(t *testing.T) {
 			}},
 		}},
 	}})
+}
+
+func TestNoUnnecessaryConditionIndexSignatureSafety(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+	for _, config := range []string{"tsconfig.json", "tsconfig.noUncheckedIndexedAccess.json", "tsconfig.exactOptionalPropertyTypes.json"} {
+		for _, keyExpression := range []string{"key", "((key))"} {
+			for _, test := range []struct{ key, object string }{
+				{"0", "Record<string, Item | undefined>"},
+				{"number", "Record<string, Item | null>"},
+				{"`${number}`", "Record<number, Item | undefined>"},
+				{"unique symbol", "{ [key]?: Item }"},
+				{"unique symbol", "{ [key]: Item | undefined }"},
+				{"symbol", "Record<symbol, Item | undefined>"},
+				{"`data-${number}`", "{ [key: `data-${string}`]: Item | undefined }"},
+			} {
+				code := fmt.Sprintf("type Item = { id: number };\ndeclare const key: %s;\ndeclare const rows: (%s) | undefined;\nrows?.[%s]?.id;\n", test.key, test.object, keyExpression)
+				valid = append(valid, rule_tester.ValidTestCase{Code: code, TSConfig: config})
+			}
+			for _, test := range []struct{ key, object string }{
+				{"number", "Record<string, Item>"},
+				{"`${number}`", "Record<number, Item>"},
+				{"`data-${number}`", "{ [key: `data-${string}`]: Item }"},
+			} {
+				prefix := fmt.Sprintf("type Item = { id: number };\ndeclare const key: %s;\ndeclare const rows: (%s) | undefined;\n", test.key, test.object)
+				code := prefix + fmt.Sprintf("rows?.[%s]?.id;\n", keyExpression)
+				if config == "tsconfig.noUncheckedIndexedAccess.json" || test.key == "`data-${number}`" {
+					valid = append(valid, rule_tester.ValidTestCase{Code: code, TSConfig: config})
+				} else {
+					invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "suggestRemoveOptionalChain", Output: prefix + fmt.Sprintf("rows?.[%s].id;\n", keyExpression),
+					}}}}})
+				}
+			}
+			prefix := "type Item = { id: number };\ndeclare const key: unique symbol;\ndeclare const rows: { [key]: Item } | undefined;\n"
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: prefix + fmt.Sprintf("rows?.[%s]?.id;\n", keyExpression), TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+				MessageId: "suggestRemoveOptionalChain", Output: prefix + fmt.Sprintf("rows?.[%s].id;\n", keyExpression),
+			}}}}})
+			prefix = "type Item = { id: number };\ndeclare const key: `data-${number}`;\ndeclare const rows: { [p: `data-${string}`]: Item; [p: `${string}-${number}`]: Item | undefined } | undefined;\n"
+			code := prefix + fmt.Sprintf("rows?.[%s]?.id;\n", keyExpression)
+			if config == "tsconfig.noUncheckedIndexedAccess.json" {
+				valid = append(valid, rule_tester.ValidTestCase{Code: code, TSConfig: config})
+			} else {
+				invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverOptionalChain", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "suggestRemoveOptionalChain", Output: prefix + fmt.Sprintf("rows?.[%s].id;\n", keyExpression),
+				}}}}})
+			}
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, valid, invalid)
+}
+
+func TestNoUnnecessaryConditionTruthinessContexts(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "declare const flags: boolean[];\nflags.filter(flag => flag || true);\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
+		{Code: "declare const flags: boolean[];\nflags.filter(flag => flag && true);\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
+		{Code: "declare function assert(x: unknown): asserts x;\ndeclare const flag: boolean;\nassert(flag && true);\n", Options: map[string]any{"checkTypePredicates": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
+		{Code: "declare const name: string | undefined;\nconst label = name || 'Untitled' || 'Fallback';\nexport {};\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
+		{Code: "declare const flags: boolean[];\ndeclare const other: boolean;\nflags.filter(flag => (flag && true) || other);\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 3, Column: 31}}},
+		{Code: "declare const flags: boolean[];\ndeclare const other: boolean;\nflags.some(function(flag) { return (flag && true) || other; });\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
+		{Code: "declare const flags: boolean[];\nflags.every((flag => flag || true));\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
+		{Code: "declare function assert(x: unknown): asserts x;\ndeclare const a: boolean;\ndeclare const b: boolean;\nassert((a && true) || b);\n", Options: map[string]any{"checkTypePredicates": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
+		{Code: "declare const a: boolean;\ndeclare const b: boolean;\nconst result = a && 0 && b;\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysFalsy"}}},
+	})
+}
+
+func TestNoUnnecessaryConditionLogicalValues(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, []rule_tester.ValidTestCase{
+		{Code: "declare const a: boolean;\ndeclare const b: boolean;\nconst result = (a && 'a') || (b && 'b');\n"},
+		{Code: "declare const a: boolean;\ndeclare const b: boolean;\nconst result = (a || (b && true)) || b;\n"},
+		{Code: "declare const flags: boolean[];\ndeclare const other: boolean;\nflags.map(flag => (flag && true) || other);\n"},
+		{Code: "declare const object: { filter(callback: (flag: boolean) => unknown): void };\ndeclare const other: boolean;\nobject.filter(flag => (flag && true) || other);\n"},
+		{Code: "declare function assert(x: unknown): asserts x;\ndeclare const a: boolean;\ndeclare const b: boolean;\nassert((a && true) || b);\n"},
+		{Code: "declare const items: object[];\ndeclare const b: boolean;\nconst result = (items[0] && true) || b;\n"},
+		{Code: "declare const items: object[];\ndeclare const a: boolean;\ndeclare const b: boolean;\nconst result = (a || (items[0] && true)) || b;\n"},
+	}, nil)
+}
+
+func TestNoUnnecessaryConditionNarrowedComputedReads(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "function read(o: {x?: number}) {\n  if (o.x === undefined) return o['x'] ?? 42;\n  return o.x;\n}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysNullish", Line: 2, Column: 33}}},
+		{Code: "declare const key: unique symbol;\nfunction read(o: {[key]?: number}) {\n  if (o[key] === undefined) return o[key] ?? 42;\n}\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysNullish", Line: 3, Column: 36}}},
+	})
+}
+
+func TestNoUnnecessaryConditionOmittedForCondition(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, []rule_tester.ValidTestCase{
+		{Code: "declare function next(): boolean;\nfor (;; next() || next() || next()) { break; }\n"},
+		{Code: "declare function next(): boolean;\nfor (next() || next() || next();;) { break; }\n"},
+	}, nil)
 }

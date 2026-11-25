@@ -8,6 +8,7 @@
       "getSignaturesOfType",
       "getApparentType",
       "getIndexTypeOfType",
+      "getApplicableIndexInfo",
       "getPropertyOfType",
       "getPropertiesOfType",
       "getSignaturesOfType",
