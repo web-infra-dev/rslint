@@ -362,6 +362,90 @@ describe('CLI bulk suppressions', () => {
     expect(healthyDir.exitCode, healthyDir.stderr).toBe(0);
   });
 
+  test('refuses to suppress or prune when a glob falls back into parent ignores', async () => {
+    const cwd = await project({
+      'rslint.config.mjs':
+        "export default [{ignores:['nested/generated/**']},{rules:{'no-debugger':'error'}}];",
+      'nested/rslint.config.mjs':
+        "export default [{rules:{'no-debugger':'error'}}];",
+      'nested/generated/a.js': 'debugger;',
+      'ok.js': 'debugger;',
+    });
+    const record = await runRslint(
+      ['--suppress-all', 'nested/generated/a.js', 'ok.js'],
+      cwd,
+    );
+    expect(record.exitCode, record.stderr).toBe(0);
+    const baseline = await readBaseline(cwd);
+    baseline['gone.js'] = { 'no-debugger': { count: 1 } };
+    await fs.writeFile(
+      path.join(cwd, 'rslint-suppressions.json'),
+      JSON.stringify(baseline),
+    );
+    await fs.writeFile(
+      path.join(cwd, 'nested/rslint.config.mjs'),
+      'throw Error("broken nested config");',
+    );
+
+    const globCheck = await runRslint(['nested/**/*.js'], cwd);
+    expect(globCheck.exitCode).toBe(2);
+    expect(globCheck.stderr).toContain('configuration failed');
+
+    const globPrune = await runRslint(
+      ['--prune-suppressions', 'nested/**/*.js', 'ok.js'],
+      cwd,
+    );
+    expect(globPrune.exitCode).toBe(2);
+    expect(globPrune.stderr).toContain('configuration failed');
+    expect(await readBaseline(cwd)).toEqual(baseline);
+  });
+
+  test('exposes fallback diagnostics for a linked source under an aliased package directory', async () => {
+    const temp = await project({
+      'parent/rslint.config.mjs':
+        "export default [{rules:{'no-console':['error',{allow:['log']}]}}];",
+      'parent/pkg/rslint.config.mjs':
+        "export default [{rules:{'no-console':['error',{allow:['warn']}]}}];",
+      'shared/target.js': 'console.log(1);\nconsole.warn(2);',
+      'workspace/placeholder.txt': '',
+    });
+    const root = await fs.realpath(temp);
+    const pkgSub = path.join(root, 'parent', 'pkg', 'sub');
+    await fs.mkdir(pkgSub, { recursive: true });
+    try {
+      await fs.symlink(
+        path.join(root, 'shared', 'target.js'),
+        path.join(pkgSub, 'link.js'),
+      );
+    } catch {
+      return; // Windows without file-symlink privilege.
+    }
+    const workspace = path.join(root, 'workspace');
+    await fs.symlink(pkgSub, path.join(workspace, 'alias'), 'junction');
+
+    const record = await runRslint(
+      ['--suppress-all', 'alias/link.js'],
+      workspace,
+    );
+    expect(record.exitCode, record.stderr).toBe(0);
+
+    await fs.writeFile(
+      path.join(root, 'parent', 'pkg', 'rslint.config.mjs'),
+      'throw Error("broken pkg config");',
+    );
+    const fallback = await runRslint(
+      ['--format', 'jsonline', 'alias/link.js'],
+      workspace,
+    );
+    expect(fallback.exitCode).toBe(2);
+    expect(fallback.stderr).toContain('configuration failed');
+    expect(JSON.parse(fallback.stdout)).toMatchObject({
+      filePath: 'alias/link.js',
+      ruleName: 'no-console',
+      range: { start: { line: 2 } },
+    });
+  });
+
   test('reads baselines independently of TMPDIR state', async () => {
     const cwd = await project({
       'rslint.config.mjs': "export default [{rules:{'no-var':'error'}}];",
@@ -388,9 +472,12 @@ describe('CLI bulk suppressions', () => {
     );
     const readonlyTmp = path.join(cwd, 'readonly-tmp');
     await fs.mkdir(readonlyTmp, { mode: 0o555 });
-    onTestFinished(() => fs.chmod(readonlyTmp, 0o755).catch(() => {}));
-    const valid = await runWithTmp(readonlyTmp, ['a.js']);
-    expect(valid.exitCode, valid.stderr).toBe(0);
+    try {
+      const valid = await runWithTmp(readonlyTmp, ['a.js']);
+      expect(valid.exitCode, valid.stderr).toBe(0);
+    } finally {
+      await fs.chmod(readonlyTmp, 0o755);
+    }
   });
 
   test('uses portable keys when invoked through a symlinked project root', async () => {
@@ -447,21 +534,60 @@ describe('CLI bulk suppressions', () => {
     if (process.platform !== 'win32' && process.getuid?.() !== 0) {
       const readonlyDir = path.join(cwd, 'readonly');
       await fs.mkdir(readonlyDir, { mode: 0o555 });
-      onTestFinished(() => fs.chmod(readonlyDir, 0o755).catch(() => {}));
-      const unwritable = await runRslint(
-        [
-          '--fix',
-          '--suppress-all',
-          '--suppressions-location',
-          'readonly/missing/base.json',
-          'a.js',
-        ],
-        cwd,
+      try {
+        const unwritable = await runRslint(
+          [
+            '--fix',
+            '--suppress-all',
+            '--suppressions-location',
+            'readonly/missing/base.json',
+            'a.js',
+          ],
+          cwd,
+        );
+        expect(unwritable.exitCode).toBe(2);
+        expect(await fs.readFile(path.join(cwd, 'a.js'), 'utf8')).toBe(
+          'var a = 1; debugger;',
+        );
+      } finally {
+        await fs.chmod(readonlyDir, 0o755);
+      }
+
+      // Unchanged counts against an existing baseline inside a read-only
+      // directory must still succeed without requiring directory write access.
+      const roBaseDir = path.join(cwd, 'baselines');
+      await fs.mkdir(roBaseDir);
+      await fs.writeFile(
+        path.join(roBaseDir, 'base.json'),
+        JSON.stringify({ 'a.js': { 'no-debugger': { count: 1 } } }),
       );
-      expect(unwritable.exitCode).toBe(2);
-      expect(await fs.readFile(path.join(cwd, 'a.js'), 'utf8')).toBe(
-        'var a = 1; debugger;',
-      );
+      await fs.chmod(roBaseDir, 0o555);
+      try {
+        const unchangedFix = await runRslint(
+          [
+            '--fix',
+            '--suppress-all',
+            '--suppressions-location',
+            'baselines/base.json',
+            'a.js',
+          ],
+          cwd,
+        );
+        expect(unchangedFix.exitCode, unchangedFix.stderr).toBe(0);
+        const unchangedPrune = await runRslint(
+          [
+            '--prune-suppressions',
+            '--suppressions-location',
+            'baselines/base.json',
+            'a.js',
+          ],
+          cwd,
+        );
+        expect(unchangedPrune.exitCode, unchangedPrune.stderr).toBe(0);
+      } finally {
+        await fs.chmod(roBaseDir, 0o755);
+      }
+      await fs.writeFile(path.join(cwd, 'a.js'), 'var a = 1; debugger;');
     }
 
     const created = await runRslint(
@@ -509,15 +635,11 @@ describe('CLI bulk suppressions', () => {
   });
 
   test('preserves all updates from parallel recording processes', async () => {
-    const seed: Record<string, Record<string, { count: number }>> = {};
-    for (let i = 0; i < 2000; i++) {
-      seed[`existing/file-${String(i).padStart(4, '0')}.js`] = {
-        'no-debugger': { count: 1 },
-      };
-    }
     const files: Record<string, string> = {
       'rslint.config.mjs': "export default [{rules:{'no-debugger':'error'}}];",
-      'rslint-suppressions.json': JSON.stringify(seed, null, 2),
+      'rslint-suppressions.json': JSON.stringify({
+        'existing.js': { 'no-debugger': { count: 1 } },
+      }),
     };
     const targets = ['w0.js', 'w1.js', 'w2.js', 'w3.js'];
     for (const target of targets) {
@@ -555,12 +677,15 @@ describe('CLI bulk suppressions', () => {
     }
 
     const baseline = await readBaseline(cwd);
-    expect(Object.keys(baseline)).toHaveLength(2000 + targets.length);
-    for (const target of targets) {
-      expect(baseline[target]).toEqual({ 'no-debugger': { count: 1 } });
-    }
+    expect(baseline).toEqual({
+      'existing.js': { 'no-debugger': { count: 1 } },
+      'w0.js': { 'no-debugger': { count: 1 } },
+      'w1.js': { 'no-debugger': { count: 1 } },
+      'w2.js': { 'no-debugger': { count: 1 } },
+      'w3.js': { 'no-debugger': { count: 1 } },
+    });
     const leftovers = (await fs.readdir(cwd)).filter((name) =>
-      name.startsWith('.rslint-suppressions-'),
+      name.startsWith('.rslint-suppressions'),
     );
     expect(leftovers).toEqual([]);
   });

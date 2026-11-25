@@ -5,7 +5,6 @@ import (
 	"cmp"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -312,17 +311,16 @@ func normalizeDriveKeys(data entries) error {
 	return nil
 }
 
+// lockPathForBaseline returns a single lock file in the destination directory
+// so equivalent filename spellings on case- or normalization-insensitive
+// volumes (such as NFC/NFD on macOS) always serialize on the same lock.
 func lockPathForBaseline(targetPath string) string {
-	base := filepath.Base(targetPath)
-	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
-		base = strings.ToLower(base)
-	}
-	sum := sha256.Sum256([]byte(base))
-	return filepath.Join(filepath.Dir(targetPath), fmt.Sprintf(".rslint-suppressions-%x.lock", sum[:8]))
+	return filepath.Join(filepath.Dir(targetPath), ".rslint-suppressions.lock")
 }
 
-// update serializes updates to the baseline, re-reads the latest contents,
-// applies change, and writes the updated JSON atomically via a temporary file.
+// update checks whether the baseline needs modification, then serializes
+// writes with a destination-adjacent lock, re-reads the latest contents,
+// applies change, and replaces the baseline atomically via a temporary file.
 func (f *File) update(ctx context.Context, change func(entries) bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -335,6 +333,28 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 	} else if info, lstatErr := os.Lstat(f.path); lstatErr == nil && info.Mode()&fs.ModeSymlink != 0 {
 		return fmt.Errorf("cannot resolve suppressions destination %q", f.path)
 	}
+
+	// Avoid creating a lock file when an existing baseline already matches the
+	// desired counts, so no-op runs succeed even inside a read-only directory.
+	if info, err := os.Stat(path); err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("suppressions file %q must be a regular file", path)
+		}
+		snapshot, readErr := readEntries(path)
+		if readErr != nil {
+			return readErr
+		}
+		if !change(snapshot) {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			f.entries = snapshot
+			return nil
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+
 	if f.options.Mode == Record {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err

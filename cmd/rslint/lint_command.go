@@ -353,11 +353,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// target discovery. Per-file service/root options require selected targets
 	// before their effective values can contribute project candidates.
 	var targetPlan target.Plan
-	var targetDirectories []rslintconfig.DirectoryIdentity
 	var configResolver *configLint.Resolver
 	var projectPolicies map[target.File]rslintconfig.ProjectPolicy
 	if !typeCheckOnly || hasProjectOptions {
-		targetDirectories = configCatalog.TargetDirectories
+		targetDirectories := configCatalog.TargetDirectories
 		if len(args.GlobRoots) > 0 {
 			// Glob roots govern config discovery; only literal directory inputs
 			// authorize recursive lint-target walking.
@@ -626,16 +625,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
 	var suppressionError string
 	if baseline != nil {
-		allDiags, suppressionError = applyLintSuppressions(
-			ctx,
-			baseline,
-			pipelineResult.Observation,
-			allDiags,
-			targetPlan,
-			targetDirectories,
-			fs,
-			args,
-		)
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, args)
 	}
 	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0

@@ -317,6 +317,31 @@ func TestUpdateRequiresBaselineWriteAccess(t *testing.T) {
 	if content, err := os.ReadFile(baselinePath); err != nil || string(content) != original {
 		t.Fatalf("read-only baseline: %q, %v", content, err)
 	}
+
+	// A writable existing baseline inside a read-only directory must still
+	// succeed for unchanged record/prune runs without creating a lock file.
+	if runtime.GOOS != "windows" {
+		roDir := filepath.Join(cwd, "ro-dir")
+		assert.NilError(t, os.Mkdir(roDir, 0o755))
+		roBaseline := filepath.Join(roDir, "base.json")
+		assert.NilError(t, os.WriteFile(roBaseline, []byte(original), 0o644))
+		assert.NilError(t, os.Chmod(roDir, 0o555))
+		t.Cleanup(func() { _ = os.Chmod(roDir, 0o755) })
+		if err := probeDirectoryWritable(roDir); errors.Is(err, os.ErrPermission) {
+			for _, mode := range []Mode{Record, Prune} {
+				roFile, err := Open(cwd, Options{Mode: mode, Location: roBaseline})
+				assert.NilError(t, err)
+				if _, _, err := reportError(t.Context(), roFile, filepath.Join(cwd, "a.js"), "x"); err != nil {
+					t.Fatalf("mode %v unchanged count in read-only dir: got %v, want nil", mode, err)
+				}
+			}
+			recFile, err := Open(cwd, Options{Mode: Record, Location: roBaseline})
+			assert.NilError(t, err)
+			if _, _, err := reportError(t.Context(), recFile, filepath.Join(cwd, "a.js"), "y"); !errors.Is(err, os.ErrPermission) {
+				t.Fatalf("record changed count in read-only dir: expected permission error, got %v", err)
+			}
+		}
+	}
 }
 
 func TestUpdateThroughFileSymlink(t *testing.T) {
@@ -617,4 +642,68 @@ func TestConcurrentProcessUpdatesPreserveAllEntries(t *testing.T) {
 	nestedEntries, err := os.ReadDir(filepath.Join(cwd, ".cache", "concurrent"))
 	assert.NilError(t, err)
 	assert.Equal(t, len(nestedEntries), 1)
+}
+
+func TestConcurrentProcessUpdatesEquivalentUnicodeNames(t *testing.T) {
+	cwd := tempWorkingDirectory(t)
+	// cspell:disable-next-line
+	const nfc = "r\u00e9sum\u00e9.json"
+	// cspell:disable-next-line
+	const nfd = "re\u0301sume\u0301.json"
+
+	seed := make(entries, 2000)
+	for i := range 2000 {
+		seed[fmt.Sprintf("existing/file-%04d.js", i)] = map[string]entry{
+			"no-debugger": {Count: 1},
+		}
+	}
+	encoded, err := json.MarshalIndent(seed, "", "  ")
+	assert.NilError(t, err)
+	assert.NilError(t, os.WriteFile(filepath.Join(cwd, nfc), encoded, 0o644))
+
+	nfcInfo, err := os.Stat(filepath.Join(cwd, nfc))
+	assert.NilError(t, err)
+	nfdInfo, err := os.Stat(filepath.Join(cwd, nfd))
+	if err != nil || !os.SameFile(nfcInfo, nfdInfo) {
+		t.Skip("filesystem does not equate NFC and NFD filename spellings")
+	}
+
+	exe, err := os.Executable()
+	assert.NilError(t, err)
+	const workers = 4
+	spellings := []string{nfc, nfd, nfc, nfd}
+	var wg sync.WaitGroup
+	errs := make([]error, workers)
+	for i := range workers {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			cmd := exec.Command(exe, "-test.run=^TestConcurrentProcessUpdatesHelper$")
+			cmd.Env = append(os.Environ(),
+				"RSLINT_SUPPRESSIONS_CONCURRENT_WORKER=1",
+				"RSLINT_SUPPRESSIONS_CONCURRENT_CWD="+cwd,
+				"RSLINT_SUPPRESSIONS_CONCURRENT_LOCATION="+spellings[idx],
+				fmt.Sprintf("RSLINT_SUPPRESSIONS_CONCURRENT_FILE=unicode-%d.js", idx),
+			)
+			if out, runErr := cmd.CombinedOutput(); runErr != nil {
+				errs[idx] = fmt.Errorf("worker %d (%q) failed: %w\n%s", idx, spellings[idx], runErr, out)
+			}
+		}(i)
+	}
+	wg.Wait()
+	for _, runErr := range errs {
+		assert.NilError(t, runErr)
+	}
+
+	final, err := Open(cwd, Options{Location: nfc})
+	assert.NilError(t, err)
+	assert.Assert(t, final != nil)
+	assert.Equal(t, len(final.entries), 2000+workers)
+	for i := range workers {
+		key := fmt.Sprintf("unicode-%d.js", i)
+		assert.Equal(t, final.entries[key]["no-debugger"].Count, 1)
+	}
+	dirEntries, err := os.ReadDir(cwd)
+	assert.NilError(t, err)
+	assert.Equal(t, len(dirEntries), 1)
 }

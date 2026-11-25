@@ -3996,3 +3996,149 @@ func TestConfigDiscoveryMovedDirectoryRetainsPhysicalTreeAndLexicalOwner(t *test
 		})
 	}
 }
+
+func TestConfigDiscoveryTargetConfigFailure(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	if resolved := osvfs.FS().Realpath(root); resolved != "" {
+		root = tspath.NormalizePath(resolved)
+	}
+	writeFile := func(rel, content string) string {
+		full := filepath.Join(filepath.FromSlash(root), filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return tspath.NormalizePath(full)
+	}
+	rootConfig := writeFile("rslint.config.js", "")
+	nestedConfig := writeFile("nested/rslint.config.js", "")
+	healthyConfig := writeFile("nested/healthy/rslint.config.js", "")
+	generatedFile := writeFile("nested/generated/a.js", "debugger;")
+	healthyFile := writeFile("nested/healthy/ok.js", "debugger;")
+	pkgConfig := writeFile("pkg/rslint.config.js", "")
+	sharedFile := writeFile("shared/target.js", "console.log(1);")
+	pkgSubDir := filepath.Join(filepath.FromSlash(root), "pkg", "sub")
+	if err := os.MkdirAll(pkgSubDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	linkTarget := filepath.Join(pkgSubDir, "link.js")
+	aliasDir := filepath.Join(filepath.FromSlash(root), "alias")
+	hasSymlinks := os.Symlink(filepath.FromSlash(sharedFile), linkTarget) == nil &&
+		os.Symlink(pkgSubDir, aliasDir) == nil
+
+	fsys := osvfs.FS()
+	makeLoader := func() *fakeConfigModuleLoader {
+		return &fakeConfigModuleLoader{
+			configs: map[string]rslintconfig.RslintConfig{
+				rootConfig: {
+					{Ignores: []string{"nested/generated/**"}},
+					{Name: "root", Rules: rslintconfig.Rules{"no-debugger": "error"}},
+				},
+				healthyConfig: namedConfig("healthy"),
+			},
+			failures: map[string]ConfigModuleError{
+				nestedConfig: {Code: "ERR", Message: "broken nested"},
+				pkgConfig:    {Code: "ERR", Message: "broken pkg"},
+			},
+		}
+	}
+
+	t.Run("healthy child directory shadowed by own config", func(t *testing.T) {
+		dir := rslintconfig.ResolveDirectoryIdentities([]string{tspath.CombinePaths(root, "nested/healthy")}, fsys)
+		catalog, err := DiscoverAutomatic(context.Background(), fsys, makeLoader(), ConfigDiscoveryRequest{
+			CWD: root, Directories: dir, SingleThreaded: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if catalog.TargetConfigFailure {
+			t.Fatalf("healthy child directory unexpectedly marked TargetConfigFailure (failures=%+v)", catalog.Failures)
+		}
+	})
+
+	t.Run("unbounded directory walk under broken config", func(t *testing.T) {
+		dir := rslintconfig.ResolveDirectoryIdentities([]string{tspath.CombinePaths(root, "nested")}, fsys)
+		catalog, err := DiscoverAutomatic(context.Background(), fsys, makeLoader(), ConfigDiscoveryRequest{
+			CWD: root, Directories: dir, SingleThreaded: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !catalog.TargetConfigFailure {
+			t.Fatalf("unbounded directory walk under broken config missed TargetConfigFailure (failures=%+v)", catalog.Failures)
+		}
+	})
+
+	t.Run("glob match dropped by fallback parent ignore", func(t *testing.T) {
+		globRoot := rslintconfig.ResolveDirectoryIdentities([]string{tspath.CombinePaths(root, "nested")}, fsys)
+		catalog, err := DiscoverAutomatic(context.Background(), fsys, makeLoader(), ConfigDiscoveryRequest{
+			CWD:                       root,
+			Directories:               globRoot,
+			LimitDirectoryWalkToFiles: true,
+			Files: []DiscoveryFile{{
+				PathIdentity:    rslintconfig.FreezeFileIdentity(generatedFile, fsys),
+				Explicit:        false,
+				ScanDirectories: []string{globRoot[0].LexicalPath},
+			}},
+			SingleThreaded: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !catalog.TargetConfigFailure {
+			t.Fatalf("glob dropped by fallback ignore missed TargetConfigFailure (failures=%+v)", catalog.Failures)
+		}
+	})
+
+	t.Run("glob matching only healthy child package", func(t *testing.T) {
+		globRoot := rslintconfig.ResolveDirectoryIdentities([]string{tspath.CombinePaths(root, "nested")}, fsys)
+		catalog, err := DiscoverAutomatic(context.Background(), fsys, makeLoader(), ConfigDiscoveryRequest{
+			CWD:                       root,
+			Directories:               globRoot,
+			LimitDirectoryWalkToFiles: true,
+			Files: []DiscoveryFile{{
+				PathIdentity:    rslintconfig.FreezeFileIdentity(healthyFile, fsys),
+				Explicit:        false,
+				ScanDirectories: []string{globRoot[0].LexicalPath},
+			}},
+			SingleThreaded: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if catalog.TargetConfigFailure {
+			t.Fatalf("glob matching only healthy child unexpectedly set TargetConfigFailure (failures=%+v)", catalog.Failures)
+		}
+	})
+
+	if hasSymlinks {
+		t.Run("linked source inside aliased subdirectory uses physical parent ancestry", func(t *testing.T) {
+			outsideRoot := tspath.NormalizePath(t.TempDir())
+			if resolved := fsys.Realpath(outsideRoot); resolved != "" {
+				outsideRoot = tspath.NormalizePath(resolved)
+			}
+			outerAlias := filepath.Join(filepath.FromSlash(outsideRoot), "alias")
+			if err := os.Symlink(pkgSubDir, outerAlias); err != nil {
+				t.Fatal(err)
+			}
+			aliasedFile := tspath.NormalizePath(filepath.Join(outerAlias, "link.js"))
+			catalog, err := DiscoverAutomatic(context.Background(), fsys, makeLoader(), ConfigDiscoveryRequest{
+				CWD: outsideRoot,
+				Files: []DiscoveryFile{{
+					PathIdentity: rslintconfig.FreezeFileIdentity(aliasedFile, fsys),
+					Explicit:     true,
+				}},
+				SingleThreaded: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !catalog.TargetConfigFailure {
+				t.Fatalf("linked source falling back across physical parent config missed TargetConfigFailure (failures=%+v)", catalog.Failures)
+			}
+		})
+	}
+}

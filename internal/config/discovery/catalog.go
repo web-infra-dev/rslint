@@ -128,7 +128,12 @@ type ConfigCatalog struct {
 	EslintPlugins      []rslintconfig.EslintPluginEntry
 	Scopes             map[string]target.OwnerScope
 	Failures           []ConfigFailure
-	Stats              ConfigDiscoveryStats
+	// TargetConfigFailure reports whether a failed config module was skipped on
+	// the effective ownership route of any requested file, directory, or glob
+	// target, including targets subsequently dropped by the fallback config.
+	// Ancestor failures shadowed by a closer valid config do not set this flag.
+	TargetConfigFailure bool
+	Stats               ConfigDiscoveryStats
 	// Explicit reports that the catalog came from one explicitly selected
 	// invocation-wide flat config rather than hierarchical auto discovery.
 	Explicit bool

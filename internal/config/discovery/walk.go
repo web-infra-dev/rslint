@@ -17,6 +17,7 @@ type discoveryWalkNode struct {
 	ownerPath          string
 	ignoreMatcher      rslintconfig.GlobalIgnoreMatcher
 	configReachable    bool
+	configFailed       bool
 	gitEntryBlocked    bool
 	gitCursor          gitignore.Cursor
 	targets            *discoveryTargetTrie
@@ -32,6 +33,7 @@ type discoveryWalkResult struct {
 	files              []string
 	pending            *suspendedDiscoveryNode
 	candidateToAdopt   *configLoadState
+	configFailed       bool
 	directoriesVisited int
 	directoriesPruned  int
 	err                error
@@ -66,6 +68,9 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 			}
 			coordinator.walkStats.directoriesVisited += result.directoriesVisited
 			coordinator.walkStats.directoriesPruned += result.directoriesPruned
+			if result.configFailed {
+				coordinator.targetConfigFailure = true
+			}
 			for _, file := range result.files {
 				coordinator.reachableFiles[file] = true
 			}
@@ -100,6 +105,9 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 					item.node.ownerDir = state.candidate.directory
 					item.node.ownerPath = state.candidate.path
 					item.node.ignoreMatcher = state.ignoreMatcher
+					item.node.configFailed = false
+				} else if state != nil && state.failure != nil {
+					item.node.configFailed = true
 				}
 				next = append(next, item.node)
 			}
@@ -156,7 +164,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 		return discoveryWalkResult{err: err}
 	}
 	if node.ignoreMatcher.BlocksDirectory(node.directory, node.canonicalDirectory) {
-		return discoveryWalkResult{directoriesPruned: 1}
+		return discoveryWalkResult{directoriesPruned: 1, configFailed: node.configFailed}
 	}
 	result := discoveryWalkResult{}
 
@@ -176,8 +184,14 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 				node.ownerDir = state.candidate.directory
 				node.ownerPath = state.candidate.path
 				node.ignoreMatcher = state.ignoreMatcher
+				node.configFailed = false
+			} else {
+				node.configFailed = true
 			}
 		}
+	}
+	if node.configFailed && (node.targets == nil || node.recursive) {
+		result.configFailed = true
 	}
 	result.directoriesVisited = 1
 	node.gitCursor = coordinator.git.Observe(node.gitCursor, node.canonicalDirectory)
@@ -187,10 +201,16 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	// its hidden children for another repository.
 	if node.gitEntryBlocked && !node.ignoreMatcher.MayReopenGitDescendants(node.directory, node.canonicalDirectory) {
 		result.directoriesPruned = 1
+		if node.configFailed {
+			result.configFailed = true
+		}
 		return result
 	}
 	walkTargets := node.targets
 	if walkTargets != nil {
+		if node.configFailed && len(walkTargets.files) > 0 {
+			result.configFailed = true
+		}
 		for _, file := range walkTargets.files {
 			if !node.gitEntryBlocked || node.ignoreMatcher.ReopensGitignoredFile(*file) {
 				result.files = append(result.files, file.Path)
@@ -221,6 +241,9 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 			continue
 		}
 		if isSymlinkDirectoryChild(coordinator.fs, node.canonicalDirectory, parentRealPath, name, entries) {
+			if node.configFailed && childTargets != nil {
+				result.configFailed = true
+			}
 			continue
 		}
 		child := tspath.CombinePaths(node.directory, name)
@@ -230,6 +253,9 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 		}
 		if node.ignoreMatcher.BlocksDirectory(child, canonicalChild) {
 			result.directoriesPruned++
+			if node.configFailed {
+				result.configFailed = true
+			}
 			continue
 		}
 		nextCursor, entryBlocked := coordinator.git.Enter(node.gitCursor, canonicalChild)
@@ -237,6 +263,9 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 		childConfigReachable := !gitBlocked || node.ignoreMatcher.ReopensDirectoryNode(child, canonicalChild)
 		if gitBlocked && !node.ignoreMatcher.MayReopenGitDescendants(child, canonicalChild) {
 			result.directoriesPruned++
+			if node.configFailed {
+				result.configFailed = true
+			}
 			continue
 		}
 		children = append(children, discoveryWalkNode{
@@ -246,6 +275,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 			ownerPath:          node.ownerPath,
 			ignoreMatcher:      node.ignoreMatcher,
 			configReachable:    childConfigReachable,
+			configFailed:       node.configFailed,
 			gitEntryBlocked:    gitBlocked && !childConfigReachable,
 			gitCursor:          nextCursor,
 			targets:            childTargets,
