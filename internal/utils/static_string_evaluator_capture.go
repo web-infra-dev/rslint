@@ -12,15 +12,14 @@ type staticEscapeFacts struct {
 	call        *ast.Node
 	collecting  bool
 	explicit    map[*ast.Symbol]bool
-	sites       map[*ast.Symbol]map[*ast.Node]struct{}
-	visited     map[*ast.Symbol]staticReferenceFlags
+	sites       map[*ast.Symbol]map[*ast.Node]staticReferenceFlags
 	captures    map[*ast.Symbol]staticEvalResult
 	capturing   map[*ast.Symbol]bool
 	ownCaptures map[*ast.Symbol]*staticObjectValue
 }
 
 func newStaticEscapeFacts() *staticEscapeFacts {
-	return &staticEscapeFacts{explicit: make(map[*ast.Symbol]bool), sites: make(map[*ast.Symbol]map[*ast.Node]struct{}), visited: make(map[*ast.Symbol]staticReferenceFlags), captures: make(map[*ast.Symbol]staticEvalResult), capturing: make(map[*ast.Symbol]bool)}
+	return &staticEscapeFacts{explicit: make(map[*ast.Symbol]bool), sites: make(map[*ast.Symbol]map[*ast.Node]staticReferenceFlags), captures: make(map[*ast.Symbol]staticEvalResult), capturing: make(map[*ast.Symbol]bool)}
 }
 
 func executionRoot(node *ast.Node) *ast.Node {

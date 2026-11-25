@@ -142,6 +142,8 @@ const (
 	// objects reachable through the values it receives.
 	staticReferenceCallEscape
 	staticReferenceCallReceiver
+	// Deletions and prototype/computed writes can invalidate data properties.
+	staticReferencePropertyShapeMutation
 )
 
 // objectPassThroughMethods are the `Object` methods that return their argument
@@ -1934,6 +1936,30 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 	return flags&staticReferencePropertyMutation != 0
 }
 
+// HasPropertyShapeMutation conservatively detects changes that can invalidate
+// a data-property assumption, including unknown calls through aliases. Ordinary
+// writes to a known property name are allowed. The caller may exclude specific
+// calls whose writes it has already accounted for. Call-escape tracking is
+// required; without it, this query cannot establish that an object is unchanged.
+func (staticEvaluator *StaticStringEvaluator) HasPropertyShapeMutation(node *ast.Node, accountedCalls map[*ast.Node]bool) bool {
+	if !staticEvaluator.trackCallEscapes || staticEvaluator.sourceFile == nil {
+		return true
+	}
+	symbol := staticEvaluator.referenceSymbol(SkipAssertionsAndParens(node))
+	if symbol == nil {
+		return true
+	}
+	if staticEvaluator.referenceFlagsFor(symbol)&(staticReferenceWrite|staticReferencePropertyShapeMutation) != 0 {
+		return true
+	}
+	for site := range staticEvaluator.escapeFacts.sites[symbol] {
+		if !accountedCalls[site] {
+			return true
+		}
+	}
+	return false
+}
+
 func (staticEvaluator *StaticStringEvaluator) referenceFlagsFor(symbol *ast.Symbol) staticReferenceFlags {
 	staticEvaluator.ensureReferenceFlags()
 	return staticEvaluator.referenceFlags[symbol]
@@ -2023,7 +2049,14 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 				outer = outer.Parent
 			}
 			if outer.Parent != nil && (ast.IsAssignmentTarget(outer) || outer.Parent.Kind == ast.KindDeleteExpression) {
-				staticEvaluator.markReference(AccessExpressionObject(node), staticReferencePropertyMutation)
+				flags := staticReferencePropertyMutation
+				if staticEvaluator.trackCallEscapes {
+					name, known := AccessExpressionStaticName(node)
+					if !known || name == "__proto__" || outer.Parent.Kind == ast.KindDeleteExpression {
+						flags |= staticReferencePropertyShapeMutation
+					}
+				}
+				staticEvaluator.markReference(AccessExpressionObject(node), flags)
 				if staticEvaluator.trackCallEscapes && outer.Parent.Kind == ast.KindBinaryExpression {
 					assignment := outer.Parent.AsBinaryExpression()
 					switch assignment.OperatorToken.Kind {
@@ -2064,7 +2097,6 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 	}
 	for _, call := range calls {
 		staticEvaluator.escapeFacts.call = call
-		staticEvaluator.escapeFacts.visited = make(map[*ast.Symbol]staticReferenceFlags)
 		staticEvaluator.markedReferences = nil
 		staticEvaluator.markCallEscapes(call)
 	}
@@ -2153,19 +2185,19 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 		if facts := staticEvaluator.escapeFacts; facts != nil && flag&staticReferencePropertyMutation != 0 {
 			if facts.call == nil {
 				facts.explicit[symbol] = true
-			} else {
-				if facts.sites[symbol] == nil {
-					facts.sites[symbol] = make(map[*ast.Node]struct{})
-				}
-				facts.sites[symbol][facts.call] = struct{}{}
-			}
-			if facts.call != nil && flag&staticReferenceCallEscape != 0 {
-				if facts.visited[symbol]&flag == flag {
+				if staticEvaluator.referenceFlags[symbol]&flag == flag {
 					return
 				}
-				facts.visited[symbol] |= flag
-			} else if staticEvaluator.referenceFlags[symbol]&flag == flag {
-				return
+			} else {
+				if facts.sites[symbol] == nil {
+					facts.sites[symbol] = make(map[*ast.Node]staticReferenceFlags)
+				}
+				// Each call must reach the entire alias chain, even if a prior
+				// call already marked the same symbols as mutable.
+				if facts.sites[symbol][facts.call]&flag == flag {
+					return
+				}
+				facts.sites[symbol][facts.call] |= flag
 			}
 		} else if staticEvaluator.referenceFlags[symbol]&flag == flag {
 			return

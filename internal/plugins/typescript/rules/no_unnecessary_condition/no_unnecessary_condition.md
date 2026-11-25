@@ -104,11 +104,17 @@ into a stable local, such as `const item = copy.item`, does not prove that
 `item?.id` is redundant. Destructured reads retain the same uncertainty; subsequent
 guards on the captured value can still make a fallback unnecessary. Captured
 getter values also preserve the getter's read type rather than a preceding setter
-argument. Fresh arrays, functions, and objects with a `null` prototype retain
-ordinary data-copy narrowing unless the target has an explicit getter contract.
-Initializer types never narrow a getter's public read type, which also covers
-values supplied by later spreads or descriptor changes. Calls resolve the
-applicable overload of each possible function through the checker.
+argument, including explicitly typed locals and destructuring defaults. Ordinary
+fields on a captured object retain their own control-flow narrowing.
+Fresh arrays and functions retain ordinary data-copy narrowing when no descriptor
+changes or unaccounted calls are visible through their aliases. Deleting properties,
+changing the prototype, or copying a possible own `__proto__` key prevents that
+assumption. Objects with a `null` prototype also retain ordinary copy narrowing.
+Initializer types never narrow a getter's public read type, and an annotation on
+the copy cannot erase the target getter's actual read type. This also covers values
+supplied by later spreads or descriptor changes. Calls resolve the applicable
+overload of each possible function through the checker. A function with one fixed
+signature can ignore extra arguments accepted by another member of a callable union.
 For a union of keys, the read type includes all selected properties. Setter types
 and write intersections must not determine whether the condition is necessary.
 For example, this `??=` remains necessary even after the setter receives `null`:
