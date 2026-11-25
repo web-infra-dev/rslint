@@ -4,58 +4,111 @@ package suppressions
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sys/windows"
 )
 
+// inProcessUpdateMu serializes goroutines in the same process so two
+// goroutines never re-enter the same thread-owned Win32 mutex.
+var inProcessUpdateMu sync.Mutex
+
 func lockBaselineUpdate(ctx context.Context, targetPath string) (func(), error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	lockPath := lockPathForBaseline(targetPath)
-	// Go opens files on Windows without FILE_SHARE_DELETE, so no other process
-	// can remove lockPath while any handle remains open. Retry briefly in case
-	// a filter driver leaves a just-removed lock file delete-pending.
-	var f *os.File
-	err := retryWindowsTransient(ctx, func() error {
-		var openErr error
-		f, openErr = os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
-		return openErr
-	})
+	name, err := directoryMutexName(filepath.Dir(targetPath))
 	if err != nil {
 		return nil, err
 	}
-	var overlapped windows.Overlapped
-	if err := windows.LockFileEx(windows.Handle(f.Fd()), windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &overlapped); err != nil {
-		_ = f.Close()
+	namePtr, err := windows.UTF16PtrFromString(name)
+	if err != nil {
 		return nil, err
 	}
-	return func() {
-		var unlockOverlapped windows.Overlapped
-		_ = windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &unlockOverlapped)
-		_ = f.Close()
-		// Best-effort cleanup: succeeds for the last holder and harmlessly
-		// returns ERROR_SHARING_VIOLATION when another writer holds a handle.
-		_ = os.Remove(lockPath)
-	}, nil
+
+	inProcessUpdateMu.Lock()
+	runtime.LockOSThread()
+	handle, err := windows.CreateMutex(nil, false, namePtr)
+	if err != nil {
+		runtime.UnlockOSThread()
+		inProcessUpdateMu.Unlock()
+		return nil, err
+	}
+	for {
+		status, waitErr := windows.WaitForSingleObject(handle, 50)
+		switch status {
+		case windows.WAIT_OBJECT_0, windows.WAIT_ABANDONED:
+			return func() {
+				_ = windows.ReleaseMutex(handle)
+				_ = windows.CloseHandle(handle)
+				runtime.UnlockOSThread()
+				inProcessUpdateMu.Unlock()
+			}, nil
+		case uint32(windows.WAIT_TIMEOUT):
+			if err := ctx.Err(); err != nil {
+				_ = windows.CloseHandle(handle)
+				runtime.UnlockOSThread()
+				inProcessUpdateMu.Unlock()
+				return nil, err
+			}
+		default:
+			_ = windows.CloseHandle(handle)
+			runtime.UnlockOSThread()
+			inProcessUpdateMu.Unlock()
+			if waitErr != nil {
+				return nil, waitErr
+			}
+			return nil, fmt.Errorf("wait for suppressions lock failed: status %#x", status)
+		}
+	}
+}
+
+// directoryMutexName derives a kernel mutex name from the destination
+// directory's volume and file index so no lock file is created on disk and
+// case/short-name/junction aliases of the same directory share one mutex.
+func directoryMutexName(dir string) (string, error) {
+	if ptr, err := windows.UTF16PtrFromString(dir); err == nil {
+		h, openErr := windows.CreateFile(
+			ptr,
+			0,
+			windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+			nil,
+			windows.OPEN_EXISTING,
+			windows.FILE_FLAG_BACKUP_SEMANTICS,
+			0,
+		)
+		if openErr == nil {
+			var info windows.ByHandleFileInformation
+			infoErr := windows.GetFileInformationByHandle(h, &info)
+			_ = windows.CloseHandle(h)
+			if infoErr == nil && (info.VolumeSerialNumber != 0 || info.FileIndexHigh != 0 || info.FileIndexLow != 0) {
+				return fmt.Sprintf("Local\\rslint-suppressions-%08x-%08x%08x", info.VolumeSerialNumber, info.FileIndexHigh, info.FileIndexLow), nil
+			}
+		}
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		abs = dir
+	}
+	sum := sha256.Sum256([]byte(strings.ToLower(abs)))
+	return fmt.Sprintf("Local\\rslint-suppressions-%x", sum[:16]), nil
 }
 
 func replaceBaselineFile(ctx context.Context, tempName, path string) error {
 	// A concurrent read-only check opens path without FILE_SHARE_DELETE on
 	// Windows, which can briefly block MoveFileExW. Retry transiently once
 	// write permission on path has already been verified.
-	return retryWindowsTransient(ctx, func() error {
-		return os.Rename(tempName, path)
-	})
-}
-
-func retryWindowsTransient(ctx context.Context, op func() error) error {
 	var err error
 	for attempt := range 25 {
-		err = op()
+		err = os.Rename(tempName, path)
 		if err == nil {
 			return nil
 		}

@@ -400,7 +400,39 @@ describe('CLI bulk suppressions', () => {
     expect(await readBaseline(cwd)).toEqual(baseline);
   });
 
-  test('exposes fallback diagnostics for a linked source under an aliased package directory', async () => {
+  test('keeps suppressions active when combining a healthy glob with an explicit file in an ignored healthy package', async () => {
+    const cwd = await project({
+      'rslint.config.mjs':
+        "export default [{ignores:['nested/hidden/**']},{rules:{'no-debugger':'error'}}];",
+      'nested/rslint.config.mjs': 'throw Error("broken nested config");',
+      'nested/hidden/rslint.config.mjs':
+        "export default [{rules:{'no-debugger':'error'}}];",
+      'nested/clean/rslint.config.mjs':
+        "export default [{rules:{'no-debugger':'error'}}];",
+      'nested/hidden/a.js': 'debugger;',
+      'nested/clean/ok.ts': 'debugger;',
+    });
+    const record = await runRslint(
+      ['--suppress-all', 'nested/hidden/a.js', 'nested/clean/ok.ts'],
+      cwd,
+    );
+    expect(record.exitCode, record.stderr).toBe(0);
+
+    for (const args of [
+      ['nested/**/*.ts'],
+      ['nested/hidden/a.js'],
+      ['nested/hidden/a.js', 'nested/clean/ok.ts'],
+      ['nested/**/*.ts', 'nested/hidden/a.js'],
+      ['nested/hidden/a.js', 'nested/**/*.ts'],
+    ]) {
+      const result = await runRslint(args, cwd);
+      expect(result.exitCode, `${args.join(' ')}: ${result.stderr}`).toBe(0);
+    }
+  });
+
+  test('exposes fallback diagnostics for a linked source under an aliased package directory', async ({
+    skip,
+  }) => {
     const temp = await project({
       'parent/rslint.config.mjs':
         "export default [{rules:{'no-console':['error',{allow:['log']}]}}];",
@@ -417,8 +449,14 @@ describe('CLI bulk suppressions', () => {
         path.join(root, 'shared', 'target.js'),
         path.join(pkgSub, 'link.js'),
       );
-    } catch {
-      return; // Windows without file-symlink privilege.
+    } catch (error) {
+      if (
+        process.platform === 'win32' &&
+        (error as NodeJS.ErrnoException)?.code === 'EPERM'
+      ) {
+        skip();
+      }
+      throw error;
     }
     const workspace = path.join(root, 'workspace');
     await fs.symlink(pkgSub, path.join(workspace, 'alias'), 'junction');
@@ -688,6 +726,40 @@ describe('CLI bulk suppressions', () => {
       name.startsWith('.rslint-suppressions'),
     );
     expect(leftovers).toEqual([]);
+  });
+
+  test('preserves caller-owned baselines named .rslint-suppressions.lock', async () => {
+    const cwd = await project({
+      'rslint.config.mjs': "export default [{rules:{'no-debugger':'error'}}];",
+      'a.js': 'debugger;',
+      'b.js': 'debugger;',
+      'c.js': 'debugger;',
+    });
+    const lockNamed = '.rslint-suppressions.lock';
+    const first = await runRslint(
+      ['--suppress-all', '--suppressions-location', lockNamed, 'a.js'],
+      cwd,
+    );
+    expect(first.exitCode, first.stderr).toBe(0);
+
+    const second = await runRslint(
+      ['--suppress-all', '--suppressions-location', lockNamed, 'b.js'],
+      cwd,
+    );
+    expect(second.exitCode, second.stderr).toBe(0);
+
+    const defaultWrite = await runRslint(['--suppress-all', 'c.js'], cwd);
+    expect(defaultWrite.exitCode, defaultWrite.stderr).toBe(0);
+
+    expect(
+      JSON.parse(await fs.readFile(path.join(cwd, lockNamed), 'utf8')),
+    ).toEqual({
+      'a.js': { 'no-debugger': { count: 1 } },
+      'b.js': { 'no-debugger': { count: 1 } },
+    });
+    expect(await readBaseline(cwd)).toEqual({
+      'c.js': { 'no-debugger': { count: 1 } },
+    });
   });
 
   test('preserves a type-aware count when the file is outside its TypeScript project', async () => {

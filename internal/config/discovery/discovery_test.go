@@ -4114,6 +4114,36 @@ func TestConfigDiscoveryTargetConfigFailure(t *testing.T) {
 		}
 	})
 
+	t.Run("glob combined with explicit file in ignored healthy child package", func(t *testing.T) {
+		hiddenConfig := writeFile("nested/generated/rslint.config.js", "")
+		loader := makeLoader()
+		loader.configs[hiddenConfig] = namedConfig("hidden")
+		globRoot := rslintconfig.ResolveDirectoryIdentities([]string{tspath.CombinePaths(root, "nested")}, fsys)
+		catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+			CWD:                       root,
+			Directories:               globRoot,
+			LimitDirectoryWalkToFiles: true,
+			Files: []DiscoveryFile{
+				{
+					PathIdentity:    rslintconfig.FreezeFileIdentity(healthyFile, fsys),
+					Explicit:        false,
+					ScanDirectories: []string{globRoot[0].LexicalPath},
+				},
+				{
+					PathIdentity: rslintconfig.FreezeFileIdentity(generatedFile, fsys),
+					Explicit:     true,
+				},
+			},
+			SingleThreaded: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if catalog.TargetConfigFailure {
+			t.Fatalf("glob + explicit healthy child file unexpectedly set TargetConfigFailure (failures=%+v)", catalog.Failures)
+		}
+	})
+
 	if hasSymlinks {
 		t.Run("linked source inside aliased subdirectory uses physical parent ancestry", func(t *testing.T) {
 			outsideRoot := tspath.NormalizePath(t.TempDir())

@@ -707,3 +707,42 @@ func TestConcurrentProcessUpdatesEquivalentUnicodeNames(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, len(dirEntries), 1)
 }
+
+func TestLockDoesNotTouchCallerNamedLockFile(t *testing.T) {
+	cwd := tempWorkingDirectory(t)
+	const lockNamed = ".rslint-suppressions.lock"
+
+	// Fresh custom baseline literally named .rslint-suppressions.lock.
+	fresh, err := Open(cwd, Options{Mode: Record, Location: lockNamed})
+	assert.NilError(t, err)
+	_, _, err = reportError(t.Context(), fresh, filepath.Join(cwd, "a.js"), "no-debugger")
+	assert.NilError(t, err)
+
+	// Updating an existing baseline of that name preserves old and new entries.
+	existing, err := Open(cwd, Options{Mode: Record, Location: lockNamed})
+	assert.NilError(t, err)
+	_, _, err = reportError(t.Context(), existing, filepath.Join(cwd, "b.js"), "no-debugger")
+	assert.NilError(t, err)
+
+	// Recording to the default baseline in the same directory preserves the
+	// separate .rslint-suppressions.lock file untouched.
+	def, err := Open(cwd, Options{Mode: Record})
+	assert.NilError(t, err)
+	_, _, err = reportError(t.Context(), def, filepath.Join(cwd, "c.js"), "no-debugger")
+	assert.NilError(t, err)
+
+	reopenedCustom, err := Open(cwd, Options{Location: lockNamed})
+	assert.NilError(t, err)
+	assert.Assert(t, reopenedCustom != nil)
+	assert.DeepEqual(t, reopenedCustom.entries, entries{
+		"a.js": {"no-debugger": {Count: 1}},
+		"b.js": {"no-debugger": {Count: 1}},
+	})
+
+	reopenedDefault, err := Open(cwd, Options{})
+	assert.NilError(t, err)
+	assert.Assert(t, reopenedDefault != nil)
+	assert.DeepEqual(t, reopenedDefault.entries, entries{
+		"c.js": {"no-debugger": {Count: 1}},
+	})
+}
