@@ -46,8 +46,8 @@ const (
 type ObservationResult struct {
 	Index  int
 	Native NativeObservation
-	// ProgramRootIdentities preserves requested generation metadata in load
-	// order. Consumers may deduplicate the physical identities for presentation.
+	// ProgramRootIdentities preserves requested generation metadata,
+	// deduplicated in load order.
 	ProgramRootIdentities []string
 
 	pluginKind    pluginObservationKind

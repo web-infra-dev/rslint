@@ -3,6 +3,7 @@ package linter
 import (
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -210,4 +211,101 @@ func TestPipelineCollectsLintedFilesOnlyWhenDemanded(t *testing.T) {
 	if len(files) != 1 || files[0].Path != fileName || files[0].SourceFile == nil {
 		t.Fatalf("requested ASTs = %+v", files)
 	}
+}
+
+func TestPipelineEmptyNativeGenerationSkipsExecutionAndRetainsZeroTargetTypeCheck(t *testing.T) {
+	t.Run("zero-program unit skips prepareLintExecution and avoids 4096-entry diagnostic buffers", func(t *testing.T) {
+		work, err := prepareNativeObservation(
+			Generation{Native: NativeGeneration{}},
+			nil,
+			rule.EditDemandNone,
+			nil,
+			false,
+			ProgramPhases,
+		)
+		if err != nil {
+			t.Fatalf("prepareNativeObservation: %v", err)
+		}
+		defer work.close()
+		if work.execution != nil {
+			t.Fatal("zero-Program native observation unexpectedly allocated lint execution and diagnostic channel")
+		}
+
+		// 64 parallel empty loads would allocate ~32 MiB of 4096-entry diagnostic channels
+		// if prepareLintExecution ran; skipping it stays well under 4 MiB even under -race.
+		const emptyUnits = 64
+		acquireEmpty := func(context.Context) (Generation, ReleaseFunc, error) {
+			return Generation{}, nil, nil
+		}
+		var benchErr error
+		bench := testing.Benchmark(func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				loads := make([]GenerationLoad, emptyUnits)
+				for i := range loads {
+					loads[i] = GenerationLoad{Acquire: acquireEmpty}
+				}
+				res, err := RunPipeline(context.Background(), NewLintRequest(
+					pipelinePlanProvider{GenerationPlan{Loads: loads}},
+					ObservationPolicy{},
+					nil,
+				))
+				if err != nil {
+					benchErr = err
+					b.Fatal(err)
+				}
+				if res.Observation.Native.Lint == nil || res.Observation.Native.Lint.LintedFileCount != 0 {
+					benchErr = fmt.Errorf("unexpected empty observation: %+v", res.Observation.Native)
+					b.Fatal(benchErr)
+				}
+			}
+		})
+		if benchErr != nil {
+			t.Fatalf("benchmark RunPipeline failed: %v", benchErr)
+		}
+		if bench.N <= 0 {
+			t.Fatalf("benchmark ran %d iterations, want > 0", bench.N)
+		}
+		const maxBytes = 4 << 20
+		if got := bench.AllocedBytesPerOp(); got >= maxBytes {
+			t.Fatalf("64 parallel empty loads allocated %d bytes/op, want < %d (diagnostic channels were not skipped)", got, maxBytes)
+		}
+	})
+
+	t.Run("configured Program with zero lint targets retains execution and runs type check", func(t *testing.T) {
+		cp, _ := createTestProgramWithFilesAndCompilerOptions(t, map[string]string{
+			"broken.ts": `export const value: number = "wrong";`,
+		}, `{"types":[]}`)
+		gen := Generation{
+			Native: NativeGeneration{
+				Programs:         []*program.Program{program.NewFromCompiler(cp)},
+				TargetsByProgram: [][]string{nil},
+				TypeCheck:        true,
+				Cwd:              cp.GetCurrentDirectory(),
+				RulesForFile:     func(*ast.SourceFile) []rule.ConfiguredRule { return nil },
+			},
+			Target: TargetProjection{Path: func(path string) string { return path }},
+		}
+		work, err := prepareNativeObservation(gen, nil, rule.EditDemandNone, nil, false, ProgramPhases)
+		if err != nil {
+			t.Fatalf("prepareNativeObservation: %v", err)
+		}
+		if work.execution == nil {
+			work.close()
+			t.Fatal("zero-target configured Program unexpectedly skipped lint execution")
+		}
+		work.close()
+
+		res, err := RunPipeline(context.Background(), NewLintRequest(
+			pipelineTestProvider(gen, nil),
+			ObservationPolicy{},
+			nil,
+		))
+		if err != nil {
+			t.Fatalf("RunPipeline: %v", err)
+		}
+		if len(res.Observation.Native.Diagnostics) != 1 || res.Observation.Native.Diagnostics[0].RuleName != "TypeScript(TS2322)" {
+			t.Fatalf("zero-target TypeCheck diagnostics = %+v, want one TypeScript(TS2322)", res.Observation.Native.Diagnostics)
+		}
+	})
 }

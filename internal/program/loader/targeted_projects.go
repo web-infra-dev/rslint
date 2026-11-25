@@ -337,6 +337,7 @@ func (execution *targetedProjectExecution) projectSet(
 		}
 		set.compilerPrograms = append(set.compilerPrograms, slot.program)
 		set.configOrders = append(set.configOrders, execution.plan.specs[index].configOrders)
+		set.planIndexes = append(set.planIndexes, index)
 		projectSetIndexByPlanIndex[index] = len(set.compilerPrograms) - 1
 	}
 	set.programs = lintprogram.NewOwnedFromCompilers(set.compilerPrograms)

@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"weak"
@@ -19,6 +21,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
@@ -5179,5 +5182,1456 @@ func TestProgramLoadsAllDeclaredWithoutLintTargets(t *testing.T) {
 	diagnostics := collectProgramTypeDiagnostics(t, programs)
 	if !containsTSDiagnostic(diagnostics, "TS2430") || !containsTSDiagnostic(diagnostics, "TS2322") {
 		t.Fatalf("declared Programs lost type-check coverage: %+v", diagnostics)
+	}
+}
+
+type programBindingProjection struct {
+	configPath string
+	targets    []string
+	sources    []string
+	typed      bool
+}
+
+func projectBindingSequence(binding LoadResult) []programBindingProjection {
+	result := make([]programBindingProjection, 0, len(binding.Programs))
+	for index, program := range binding.Programs {
+		sources := make([]string, 0)
+		for _, source := range program.SourceFiles() {
+			sources = append(sources, source.FileName())
+		}
+		targets := append([]string(nil), binding.TargetsByProgram[index]...)
+		result = append(result, programBindingProjection{
+			configPath: program.Options().ConfigFilePath,
+			targets:    targets,
+			sources:    sources,
+			typed:      program.CanProvideProgramDiagnostics(),
+		})
+	}
+	return result
+}
+
+func executeProgramLoadsForTest(t *testing.T, loads []ProgramLoad, parallel bool) (
+	[]LoadResult,
+	[]programBindingProjection,
+	[]string,
+	[]*lintprogram.Program,
+) {
+	t.Helper()
+	results := make([]LoadResult, len(loads))
+	errs := make([]error, len(loads))
+	if parallel {
+		var wg sync.WaitGroup
+		wg.Add(len(loads))
+		for index, load := range loads {
+			go func() {
+				defer wg.Done()
+				results[index], errs[index] = load.Load()
+			}()
+		}
+		wg.Wait()
+	} else {
+		for index, load := range loads {
+			results[index], errs[index] = load.Load()
+		}
+	}
+	var gotPrograms []programBindingProjection
+	var gotProgramList []*lintprogram.Program
+	var gotRootIdentities []string
+	for index, err := range errs {
+		if err != nil {
+			t.Fatalf("load %d failed: %v", index, err)
+		}
+		binding := results[index]
+		gotPrograms = append(gotPrograms, projectBindingSequence(binding)...)
+		gotProgramList = append(gotProgramList, binding.Programs...)
+		gotRootIdentities = append(gotRootIdentities, binding.ProgramRootIdentities...)
+	}
+	return results, gotPrograms, gotRootIdentities, gotProgramList
+}
+
+func assertProgramLoadsMatchMaterialized(
+	t *testing.T,
+	fsys vfs.FS,
+	request ProjectBuildRequest,
+	cwd string,
+	compilerRoots bool,
+	loads []ProgramLoad,
+) {
+	t.Helper()
+	materialized := NewSession(fsys)
+	set, err := materialized.BuildProjects(request)
+	if err != nil {
+		t.Fatalf("materialized BuildProjects: %v", err)
+	}
+	loadBinding := materialized.LoadCLI
+	if compilerRoots {
+		loadBinding = materialized.LoadAPI
+	}
+	want, err := loadBinding(set, request.Targets, cwd, request.SingleThreaded)
+	if err != nil {
+		t.Fatalf("materialized load: %v", err)
+	}
+	wantPrograms := projectBindingSequence(want)
+	results, gotPrograms, gotRootIdentities, gotProgramList := executeProgramLoadsForTest(t, loads, !request.SingleThreaded)
+	if !reflect.DeepEqual(gotPrograms, wantPrograms) {
+		t.Fatalf("streamed Programs differ from materialized:\ngot:  %+v\nwant: %+v", gotPrograms, wantPrograms)
+	}
+	gotMapping := make(map[string]target.File)
+	for unitIndex, binding := range results {
+		expectedKeys := make(map[string]struct{})
+		for _, targets := range binding.TargetsByProgram {
+			for _, sourcePath := range targets {
+				sourceKey := exactPathID(sourcePath)
+				file, ok := binding.LintTargetBySourcePath[sourceKey]
+				if !ok {
+					t.Fatalf("load %d missing LintTargetBySourcePath entry for bound source %q", unitIndex, sourcePath)
+				}
+				expectedKeys[sourceKey] = struct{}{}
+				if file.CanonicalPath != "" {
+					canonicalKey := exactPathID(file.CanonicalPath)
+					if canonicalFile, ok := binding.LintTargetBySourcePath[canonicalKey]; !ok || canonicalFile != file {
+						t.Fatalf("load %d LintTargetBySourcePath canonical key %q = (%+v, %t), want %+v",
+							unitIndex, canonicalKey, canonicalFile, ok, file)
+					}
+					expectedKeys[canonicalKey] = struct{}{}
+				}
+			}
+		}
+		if len(expectedKeys) == 0 {
+			if binding.LintTargetBySourcePath != nil {
+				t.Fatalf("load %d with no bound targets had non-nil LintTargetBySourcePath: %+v", unitIndex, binding.LintTargetBySourcePath)
+			}
+			continue
+		}
+		if len(binding.LintTargetBySourcePath) != len(expectedKeys) {
+			t.Fatalf("load %d LintTargetBySourcePath had unexpected keys: got %+v, expected %v",
+				unitIndex, binding.LintTargetBySourcePath, expectedKeys)
+		}
+		for key, value := range binding.LintTargetBySourcePath {
+			if existing, exists := gotMapping[key]; exists && existing != value {
+				t.Fatalf("load %d LintTargetBySourcePath key %q conflicts across units (%+v vs %+v); verify per-unit mappings directly",
+					unitIndex, key, existing, value)
+			}
+			gotMapping[key] = value
+		}
+	}
+	if len(gotMapping) == 0 {
+		gotMapping = nil
+	}
+	if !reflect.DeepEqual(gotMapping, want.LintTargetBySourcePath) {
+		t.Fatalf("streamed LintTargetBySourcePath differs:\ngot:  %+v\nwant: %+v", gotMapping, want.LintTargetBySourcePath)
+	}
+	if request.IncludeProgramRootIdentities && !slices.Equal(gotRootIdentities, want.ProgramRootIdentities) {
+		t.Fatalf("streamed ProgramRootIdentities differ:\ngot:  %v\nwant: %v", gotRootIdentities, want.ProgramRootIdentities)
+	}
+	type diagProjection struct {
+		filePath string
+		ruleName string
+		message  string
+		pos      int
+		end      int
+		severity rule.DiagnosticSeverity
+	}
+	projectDiags := func(diags []rule.RuleDiagnostic) []diagProjection {
+		projected := make([]diagProjection, len(diags))
+		for i, d := range diags {
+			projected[i] = diagProjection{
+				filePath: d.FilePath,
+				ruleName: d.RuleName,
+				message:  d.Message.Description,
+				pos:      d.Range.Pos(),
+				end:      d.Range.End(),
+				severity: d.Severity,
+			}
+		}
+		return projected
+	}
+	wantDiags := projectDiags(collectProgramTypeDiagnostics(t, want.Programs))
+	gotDiags := projectDiags(collectProgramTypeDiagnostics(t, gotProgramList))
+	if !reflect.DeepEqual(gotDiags, wantDiags) {
+		t.Fatalf("streamed type diagnostics differ:\ngot:  %+v\nwant: %+v", gotDiags, wantDiags)
+	}
+}
+
+func TestProgramLoadsPartialStreamingMixedWorkspace(t *testing.T) {
+	t.Run("js root without allowJs and independent projects", func(t *testing.T) {
+		for _, tc := range []struct {
+			name           string
+			scope          ProjectScope
+			compilerRoots  bool
+			singleThreaded bool
+		}{
+			{"ActiveOwners/native/parallel", ActiveOwners, false, false},
+			{"AllDeclared/native/parallel", AllDeclared, false, false},
+			{"ActiveOwners/compilerRoots/serial", ActiveOwners, true, true},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				dir := tspath.NormalizePath(t.TempDir())
+				writeProgramTestFiles(t, dir, map[string]string{
+					"coupled/tsconfig.json": `{"files":["target.js"],"compilerOptions":{"noLib":true}}`,
+					"coupled/target.js":     `export const jsValue = 1;`,
+					"ind-a/tsconfig.json":   `{"files":["a.ts"],"compilerOptions":{"types":[]}}`,
+					"ind-a/a.ts":            `export const a: number = "wrong";`,
+					"ind-b/tsconfig.json":   `{"files":["b.ts"],"compilerOptions":{"noLib":true}}`,
+					"ind-b/b.ts":            `interface Parent { v: string; } interface Child extends Parent { v: number; }`,
+					"outside.ts":            `export const outside = 3;`,
+				})
+				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				coupledFile := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "coupled/target.js"))
+				indAFile := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "ind-a/a.ts"))
+				indBFile := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "ind-b/b.ts"))
+				outsideFile := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "outside.ts"))
+				coupledDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"coupled/tsconfig.json"}, BaseDirectory: dir}
+				indADecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ind-a/tsconfig.json"}, BaseDirectory: dir}
+				indBDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ind-b/tsconfig.json"}, BaseDirectory: dir}
+				config := rslintconfig.RslintConfig{
+					{Files: []string{"coupled/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: coupledDecl.Patterns}}},
+					{Files: []string{"ind-a/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: indADecl.Patterns}}},
+					{Files: []string{"ind-b/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: indBDecl.Patterns}}},
+				}
+				request := ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{dir: config},
+					Targets: target.Plan{Files: []target.File{coupledFile, indAFile, outsideFile, indBFile}},
+					Policies: map[target.File]rslintconfig.ProjectPolicy{
+						coupledFile: {ExplicitProject: coupledDecl},
+						indAFile:    {ExplicitProject: indADecl},
+						indBFile:    {ExplicitProject: indBDecl},
+						outsideFile: {ProjectDisabled: true},
+					},
+					Scope:                        tc.scope,
+					SingleThreaded:               tc.singleThreaded,
+					IncludeProgramRootIdentities: true,
+				}
+				loads, err := NewSession(fsys).PlanLoads(request, dir, tc.compilerRoots)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(loads) != 4 {
+					t.Fatalf("expected 4 loads (coupled + 2 independent + trailing unbound), got %d", len(loads))
+				}
+				assertProgramLoadsMatchMaterialized(t, fsys, request, dir, tc.compilerRoots, loads)
+
+				// Independent load must construct and bind on its own without requiring the coupled load.
+				isolatedLoads, err := NewSession(fsys).PlanLoads(request, dir, tc.compilerRoots)
+				if err != nil || len(isolatedLoads) != 4 {
+					t.Fatalf("isolated PlanLoads: loads=%d err=%v", len(isolatedLoads), err)
+				}
+				single, err := isolatedLoads[1].Load()
+				if err != nil {
+					t.Fatalf("independent load failed: %v", err)
+				}
+				if len(single.Programs) != 1 || single.Programs[0].Options().ConfigFilePath != tspath.ResolvePath(dir, "ind-a/tsconfig.json") ||
+					!slices.Equal(single.TargetsByProgram[0], []string{indAFile.Path}) {
+					t.Fatalf("independent load did not stream standalone project: %+v", projectBindingSequence(single))
+				}
+			})
+		}
+	})
+
+	t.Run("interleaved coupled fallback across candidate list with independent middle project", func(t *testing.T) {
+		for _, scope := range []ProjectScope{ActiveOwners, AllDeclared} {
+			t.Run(strconv.Itoa(int(scope)), func(t *testing.T) {
+				dir := tspath.NormalizePath(t.TempDir())
+				writeProgramTestFiles(t, dir, map[string]string{
+					"first.json":  `{"files":["first-ok.ts","target.js"],"compilerOptions":{"noLib":true}}`,
+					"middle.json": `{"files":["middle.ts"],"compilerOptions":{"noLib":true}}`,
+					"import.json": `{"files":["main.ts"],"compilerOptions":{"noLib":true,"allowJs":true}}`,
+					"tail.json":   `{"files":["tail.ts"],"compilerOptions":{"noLib":true}}`,
+					"first-ok.ts": `export const firstOk = 0;`,
+					"target.js":   `export const value = 1;`,
+					"main.ts":     `import "./target.js"; export const main: number = "bad";`,
+					"middle.ts":   `export const middle: number = "bad-middle";`,
+					"tail.ts":     `export const tail = 2;`,
+				})
+				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				firstOK := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "first-ok.ts"))
+				targetJS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "target.js"))
+				mainTS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "main.ts"))
+				middleTS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "middle.ts"))
+				tailTS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "tail.ts"))
+				firstOnlyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"first.json"}, BaseDirectory: dir}
+				coupledDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"first.json", "import.json"}, BaseDirectory: dir}
+				middleDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"middle.json"}, BaseDirectory: dir}
+				tailDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"tail.json"}, BaseDirectory: dir}
+				// Ordering [firstOK, middleTS, targetJS, mainTS, tailTS] gives plan.specs = [first.json, middle.json, import.json, tail.json]
+				// in ActiveOwners (interleaving coupled 0, 2 with independent 1, 3), matching AllDeclared's declaration order.
+				// mainTS is directly owned by import.json, which is pulled into the coupled group by targetJS's fallback list
+				// and receives both main.ts and fallback target.js in sorted TargetsByProgram order.
+				var configs map[string]rslintconfig.RslintConfig
+				if scope == AllDeclared {
+					configs = map[string]rslintconfig.RslintConfig{dir: {{
+						LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+							Project: rslintconfig.ProjectPaths{"first.json", "middle.json", "import.json", "tail.json"},
+						}},
+					}}}
+				}
+				request := ProjectBuildRequest{
+					Configs: configs,
+					Targets: target.Plan{Files: []target.File{firstOK, middleTS, targetJS, mainTS, tailTS}},
+					Policies: map[target.File]rslintconfig.ProjectPolicy{
+						firstOK:  {ExplicitProject: firstOnlyDecl},
+						targetJS: {ExplicitProject: coupledDecl},
+						mainTS:   {ExplicitProject: coupledDecl},
+						middleTS: {ExplicitProject: middleDecl},
+						tailTS:   {ExplicitProject: tailDecl},
+					},
+					Scope:                        scope,
+					IncludeProgramRootIdentities: true,
+				}
+				loads, err := NewSession(fsys).PlanLoads(request, dir, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(loads) != 5 {
+					t.Fatalf("expected 5 loads (4 projects + trailing unbound), got %d", len(loads))
+				}
+				assertProgramLoadsMatchMaterialized(t, fsys, request, dir, false, loads)
+			})
+		}
+	})
+
+	t.Run("sparse coupled planIndexes skips unused fallback candidate with empty LoadResult", func(t *testing.T) {
+		root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+		writeProgramTestFiles(t, root, map[string]string{
+			"alias/tsconfig.json":           `{"files":["real.ts"],"compilerOptions":{"noLib":true}}`,
+			"alias/real.ts":                 `export const realValue = 1;`,
+			"unused-fallback/tsconfig.json": `{"files":["unused.ts"],"compilerOptions":{"noLib":true}}`,
+			"unused-fallback/unused.ts":     `export const unused = 0;`,
+			"coupled-js/tsconfig.json":      `{"files":["target.js"],"compilerOptions":{"noLib":true}}`,
+			"coupled-js/target.js":          `export const jsVal = 2;`,
+			"ind/tsconfig.json":             `{"files":["ind.ts"],"compilerOptions":{"noLib":true}}`,
+			"ind/ind.ts":                    `export const indValue = 3;`,
+		})
+		linkPath := tspath.ResolvePath(root, "alias/link.ts")
+		if err := os.Symlink(tspath.ResolvePath(root, "alias/real.ts"), linkPath); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		linkFile := testLintTarget(fsys, root, linkPath)
+		jsFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "coupled-js/target.js"))
+		indFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "ind/ind.ts"))
+		// alias/link.ts fails hasIndependentRoots and pulls unused-fallback into coupled,
+		// but alias/tsconfig.json admits link.ts so unused-fallback is never built.
+		// coupled-js is built after it, exercising sparse set.planIndexes[1] == 2 != 1.
+		aliasDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"alias/tsconfig.json", "unused-fallback/tsconfig.json"}, BaseDirectory: root}
+		jsDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"coupled-js/tsconfig.json"}, BaseDirectory: root}
+		indDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ind/tsconfig.json"}, BaseDirectory: root}
+		request := ProjectBuildRequest{
+			Targets: target.Plan{Files: []target.File{linkFile, jsFile, indFile}},
+			Policies: map[target.File]rslintconfig.ProjectPolicy{
+				linkFile: {ExplicitProject: aliasDecl},
+				jsFile:   {ExplicitProject: jsDecl},
+				indFile:  {ExplicitProject: indDecl},
+			},
+			Scope:                        ActiveOwners,
+			IncludeProgramRootIdentities: true,
+		}
+		loads, err := NewSession(fsys).PlanLoads(request, root, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(loads) != 5 {
+			t.Fatalf("expected 5 loads (alias + unused fallback + coupled-js + ind + trailing unbound), got %d", len(loads))
+		}
+		// Verify unused fallback slot returns empty LoadResult{} and subsequent coupled spec lands at its own slot.
+		probeLoads, err := NewSession(fsys).PlanLoads(request, root, false)
+		if err != nil || len(probeLoads) != 5 {
+			t.Fatalf("probe PlanLoads: loads=%d err=%v", len(probeLoads), err)
+		}
+		unusedBinding, err := probeLoads[1].Load()
+		if err != nil || len(unusedBinding.Programs) != 0 || len(unusedBinding.TargetsByProgram) != 0 || unusedBinding.LintTargetBySourcePath != nil {
+			t.Fatalf("unused fallback candidate should return empty LoadResult, got %+v err=%v", unusedBinding, err)
+		}
+		jsBinding, err := probeLoads[2].Load()
+		if err != nil || len(jsBinding.Programs) != 1 || jsBinding.Programs[0].Options().ConfigFilePath != tspath.ResolvePath(root, "coupled-js/tsconfig.json") {
+			t.Fatalf("coupled spec after unused candidate landed at wrong slot: %+v err=%v", projectBindingSequence(jsBinding), err)
+		}
+		assertProgramLoadsMatchMaterialized(t, fsys, request, root, false, loads)
+	})
+
+	t.Run("mixed ProjectService and explicit coupled projects", func(t *testing.T) {
+		t.Run("independent service project streams alongside explicit coupled project", func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			writeProgramTestFiles(t, root, map[string]string{
+				"explicit/tsconfig.json": `{"files":["target.js"],"compilerOptions":{"noLib":true}}`,
+				"explicit/target.js":     `export const jsVal = 1;`,
+				"service/tsconfig.json":  `{"files":["svc.ts"],"compilerOptions":{"noLib":true}}`,
+				"service/svc.ts":         `export const svcVal: number = "wrong";`,
+			})
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			jsFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "explicit/target.js"))
+			svcFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "service/svc.ts"))
+			explicitDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"explicit/tsconfig.json"}, BaseDirectory: root}
+			request := ProjectBuildRequest{
+				Targets: target.Plan{Files: []target.File{jsFile, svcFile}},
+				Policies: map[target.File]rslintconfig.ProjectPolicy{
+					jsFile:  {ExplicitProject: explicitDecl},
+					svcFile: {ServiceRootDirectory: root},
+				},
+				Scope:                        ActiveOwners,
+				IncludeProgramRootIdentities: true,
+			}
+			loads, err := NewSession(fsys).PlanLoads(request, root, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(loads) != 3 {
+				t.Fatalf("expected 3 loads (explicit coupled + independent service + trailing unbound), got %d", len(loads))
+			}
+			assertProgramLoadsMatchMaterialized(t, fsys, request, root, false, loads)
+		})
+
+		t.Run("non-independent service project falls back to nil plan", func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			writeProgramTestFiles(t, root, map[string]string{
+				"service/tsconfig.json":  `{"files":["real.ts"],"compilerOptions":{"noLib":true}}`,
+				"service/real.ts":        `export const realVal = 1;`,
+				"explicit/tsconfig.json": `{"files":["ind.ts"],"compilerOptions":{"noLib":true}}`,
+				"explicit/ind.ts":        `export const indVal = 2;`,
+			})
+			linkPath := tspath.ResolvePath(root, "service/link.ts")
+			if err := os.Symlink(tspath.ResolvePath(root, "service/real.ts"), linkPath); err != nil {
+				t.Skipf("symlink unavailable: %v", err)
+			}
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			linkFile := testLintTarget(fsys, root, linkPath)
+			indFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "explicit/ind.ts"))
+			explicitDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"explicit/tsconfig.json"}, BaseDirectory: root}
+			loads, err := NewSession(fsys).PlanLoads(ProjectBuildRequest{
+				Targets: target.Plan{Files: []target.File{linkFile, indFile}},
+				Policies: map[target.File]rslintconfig.ProjectPolicy{
+					linkFile: {ServiceRootDirectory: root},
+					indFile:  {ExplicitProject: explicitDecl},
+				},
+				Scope: ActiveOwners,
+			}, root, false)
+			if err != nil || len(loads) != 0 {
+				t.Fatalf("non-independent service project must fall back to nil plan, got loads=%d err=%v", len(loads), err)
+			}
+		})
+
+		t.Run("service project with disableSourceOfProjectReferenceRedirect and overlapping reference falls back to nil plan", func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			writeProgramTestFiles(t, root, map[string]string{
+				"healthy/tsconfig.json": `{"files":["healthy.ts"],"compilerOptions":{"noLib":true}}`,
+				"healthy/healthy.ts":    `export const healthy = 1;`,
+				"legacy/tsconfig.json":  `{"files":["legacy.js"],"compilerOptions":{"noLib":true,"allowJs":false}}`,
+				"legacy/legacy.js":      `export const legacy = 2;`,
+				"service/tsconfig.json": `{"compilerOptions":{"noLib":true,"disableSourceOfProjectReferenceRedirect":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}`,
+				"service/leaf.json":     `{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["target.ts"]}`,
+				"service/target.ts":     `export const target = 3;`,
+			})
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			healthyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "healthy/healthy.ts"))
+			legacyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "legacy/legacy.js"))
+			servicePath := tspath.ResolvePath(root, "service/target.ts")
+			serviceFile := testLintTarget(fsys, root, servicePath)
+			serviceConfig := tspath.ResolvePath(root, "service/tsconfig.json")
+			healthyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"healthy/tsconfig.json"}, BaseDirectory: root}
+			legacyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"legacy/tsconfig.json"}, BaseDirectory: root}
+			config := rslintconfig.RslintConfig{
+				{Files: []string{"healthy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: healthyDecl.Patterns}}},
+				{Files: []string{"legacy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: legacyDecl.Patterns}}},
+				{Files: []string{"service/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}},
+			}
+			wantErrMsg := fmt.Sprintf("project root %q from %q was absent from its TypeScript Program", servicePath, serviceConfig)
+			for _, tc := range []struct {
+				name  string
+				scope ProjectScope
+			}{
+				{"ActiveOwners", ActiveOwners},
+				{"AllDeclared", AllDeclared},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					request := ProjectBuildRequest{
+						Configs: map[string]rslintconfig.RslintConfig{root: config},
+						Targets: target.Plan{Files: []target.File{healthyFile, legacyFile, serviceFile}},
+						Policies: map[target.File]rslintconfig.ProjectPolicy{
+							healthyFile: {ExplicitProject: healthyDecl},
+							legacyFile:  {ExplicitProject: legacyDecl},
+							serviceFile: {ServiceRootDirectory: root},
+						},
+						Scope:          tc.scope,
+						SingleThreaded: true,
+					}
+					_, buildErr := NewSession(fsys).BuildProjects(request)
+					if buildErr == nil || buildErr.Error() != wantErrMsg {
+						t.Fatalf("materialized BuildProjects error = %v, want %q", buildErr, wantErrMsg)
+					}
+					loads, err := NewSession(fsys).PlanLoads(request, root, false)
+					if err != nil || loads != nil {
+						t.Fatalf("service project with disabled source redirect and overlapping reference must return (nil, nil), got loads=%d err=%v", len(loads), err)
+					}
+				})
+			}
+		})
+
+		t.Run("service project with disableSourceOfProjectReferenceRedirect and disjoint reference still streams", func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			writeProgramTestFiles(t, root, map[string]string{
+				"healthy/tsconfig.json": `{"files":["healthy.ts"],"compilerOptions":{"noLib":true}}`,
+				"healthy/healthy.ts":    `export const healthy = 1;`,
+				"legacy/tsconfig.json":  `{"files":["legacy.js"],"compilerOptions":{"noLib":true,"allowJs":false}}`,
+				"legacy/legacy.js":      `export const legacy = 2;`,
+				"service/tsconfig.json": `{"compilerOptions":{"noLib":true,"disableSourceOfProjectReferenceRedirect":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}`,
+				"service/leaf.json":     `{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["other.ts"]}`,
+				"service/target.ts":     `export const target = 3;`,
+				"service/other.ts":      `export const other = 4;`,
+			})
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			healthyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "healthy/healthy.ts"))
+			legacyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "legacy/legacy.js"))
+			serviceFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "service/target.ts"))
+			healthyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"healthy/tsconfig.json"}, BaseDirectory: root}
+			legacyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"legacy/tsconfig.json"}, BaseDirectory: root}
+			config := rslintconfig.RslintConfig{
+				{Files: []string{"healthy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: healthyDecl.Patterns}}},
+				{Files: []string{"legacy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: legacyDecl.Patterns}}},
+				{Files: []string{"service/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}},
+			}
+			for _, tc := range []struct {
+				name  string
+				scope ProjectScope
+			}{
+				{"ActiveOwners", ActiveOwners},
+				{"AllDeclared", AllDeclared},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					request := ProjectBuildRequest{
+						Configs: map[string]rslintconfig.RslintConfig{root: config},
+						Targets: target.Plan{Files: []target.File{healthyFile, legacyFile, serviceFile}},
+						Policies: map[target.File]rslintconfig.ProjectPolicy{
+							healthyFile: {ExplicitProject: healthyDecl},
+							legacyFile:  {ExplicitProject: legacyDecl},
+							serviceFile: {ServiceRootDirectory: root},
+						},
+						Scope:                        tc.scope,
+						IncludeProgramRootIdentities: true,
+					}
+					loads, err := NewSession(fsys).PlanLoads(request, root, false)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(loads) != 4 {
+						t.Fatalf("expected 4 loads (healthy + legacy coupled + service + trailing unbound), got %d", len(loads))
+					}
+					assertProgramLoadsMatchMaterialized(t, fsys, request, root, false, loads)
+				})
+			}
+		})
+
+		t.Run("service project with default source redirect and overlapping .d.ts output falls back to nil plan", func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			writeProgramTestFiles(t, root, map[string]string{
+				"healthy/tsconfig.json":  `{"files":["healthy.ts"],"compilerOptions":{"noLib":true}}`,
+				"healthy/healthy.ts":     `export const healthy = 1;`,
+				"legacy/tsconfig.json":   `{"files":["legacy.js"],"compilerOptions":{"noLib":true,"allowJs":false}}`,
+				"legacy/legacy.js":       `export const legacy = 2;`,
+				"service/tsconfig.json":  `{"compilerOptions":{"noLib":true},"files":["dist/leaf.d.ts"],"references":[{"path":"./leaf.json"}]}`,
+				"service/leaf.json":      `{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["leaf.ts"]}`,
+				"service/leaf.ts":        `export const leaf = 3;`,
+				"service/dist/leaf.d.ts": `export declare const leaf: number;`,
+			})
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			healthyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "healthy/healthy.ts"))
+			legacyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "legacy/legacy.js"))
+			servicePath := tspath.ResolvePath(root, "service/dist/leaf.d.ts")
+			serviceFile := testLintTarget(fsys, root, servicePath)
+			serviceConfig := tspath.ResolvePath(root, "service/tsconfig.json")
+			healthyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"healthy/tsconfig.json"}, BaseDirectory: root}
+			legacyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"legacy/tsconfig.json"}, BaseDirectory: root}
+			config := rslintconfig.RslintConfig{
+				{Files: []string{"healthy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: healthyDecl.Patterns}}},
+				{Files: []string{"legacy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: legacyDecl.Patterns}}},
+				{Files: []string{"service/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}},
+			}
+			wantErrMsg := fmt.Sprintf("project root %q from %q was absent from its TypeScript Program", servicePath, serviceConfig)
+			for _, tc := range []struct {
+				name  string
+				scope ProjectScope
+			}{
+				{"ActiveOwners", ActiveOwners},
+				{"AllDeclared", AllDeclared},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					request := ProjectBuildRequest{
+						Configs: map[string]rslintconfig.RslintConfig{root: config},
+						Targets: target.Plan{Files: []target.File{healthyFile, legacyFile, serviceFile}},
+						Policies: map[target.File]rslintconfig.ProjectPolicy{
+							healthyFile: {ExplicitProject: healthyDecl},
+							legacyFile:  {ExplicitProject: legacyDecl},
+							serviceFile: {ServiceRootDirectory: root},
+						},
+						Scope:          tc.scope,
+						SingleThreaded: true,
+					}
+					_, buildErr := NewSession(fsys).BuildProjects(request)
+					if buildErr == nil || buildErr.Error() != wantErrMsg {
+						t.Fatalf("materialized BuildProjects error = %v, want %q", buildErr, wantErrMsg)
+					}
+					loads, err := NewSession(fsys).PlanLoads(request, root, false)
+					if err != nil || loads != nil {
+						t.Fatalf("service project with overlapping referenced .d.ts output must return (nil, nil), got loads=%d err=%v", len(loads), err)
+					}
+				})
+			}
+		})
+
+		t.Run("service project with default source redirect and disjoint .d.ts still streams", func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			writeProgramTestFiles(t, root, map[string]string{
+				"healthy/tsconfig.json":  `{"files":["healthy.ts"],"compilerOptions":{"noLib":true}}`,
+				"healthy/healthy.ts":     `export const healthy = 1;`,
+				"legacy/tsconfig.json":   `{"files":["legacy.js"],"compilerOptions":{"noLib":true,"allowJs":false}}`,
+				"legacy/legacy.js":       `export const legacy = 2;`,
+				"service/tsconfig.json":  `{"compilerOptions":{"noLib":true},"files":["unrelated.d.ts"],"references":[{"path":"./leaf.json"}]}`,
+				"service/leaf.json":      `{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["leaf.ts"]}`,
+				"service/leaf.ts":        `export const leaf = 3;`,
+				"service/unrelated.d.ts": `export declare const unrelated: number;`,
+			})
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			healthyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "healthy/healthy.ts"))
+			legacyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "legacy/legacy.js"))
+			serviceFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "service/unrelated.d.ts"))
+			healthyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"healthy/tsconfig.json"}, BaseDirectory: root}
+			legacyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"legacy/tsconfig.json"}, BaseDirectory: root}
+			config := rslintconfig.RslintConfig{
+				{Files: []string{"healthy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: healthyDecl.Patterns}}},
+				{Files: []string{"legacy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: legacyDecl.Patterns}}},
+				{Files: []string{"service/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}},
+			}
+			request := ProjectBuildRequest{
+				Configs: map[string]rslintconfig.RslintConfig{root: config},
+				Targets: target.Plan{Files: []target.File{healthyFile, legacyFile, serviceFile}},
+				Policies: map[target.File]rslintconfig.ProjectPolicy{
+					healthyFile: {ExplicitProject: healthyDecl},
+					legacyFile:  {ExplicitProject: legacyDecl},
+					serviceFile: {ServiceRootDirectory: root},
+				},
+				Scope:                        ActiveOwners,
+				IncludeProgramRootIdentities: true,
+			}
+			loads, err := NewSession(fsys).PlanLoads(request, root, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(loads) != 4 {
+				t.Fatalf("expected 4 loads (healthy + legacy coupled + service + trailing unbound), got %d", len(loads))
+			}
+			assertProgramLoadsMatchMaterialized(t, fsys, request, root, false, loads)
+		})
+
+		t.Run("service project with preserveSymlinks node_modules symlink to referenced .d.ts falls back to nil plan", func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			writeProgramTestFiles(t, root, map[string]string{
+				"healthy/tsconfig.json":                  `{"files":["healthy.ts"],"compilerOptions":{"noLib":true}}`,
+				"healthy/healthy.ts":                     `export const healthy = 1;`,
+				"legacy/tsconfig.json":                   `{"files":["legacy.js"],"compilerOptions":{"noLib":true,"allowJs":false}}`,
+				"legacy/legacy.js":                       `export const legacy = 2;`,
+				"service/node_modules/pkg/tsconfig.json": `{"compilerOptions":{"noLib":true,"preserveSymlinks":true},"files":["index.d.ts"],"references":[{"path":"../../leaf.json"}]}`,
+				"service/leaf.json":                      `{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["leaf.ts"]}`,
+				"service/leaf.ts":                        `export const leaf = 3;`,
+				"service/dist/leaf.d.ts":                 `export declare const leaf: number;`,
+			})
+			linkPath := tspath.ResolvePath(root, "service/node_modules/pkg/index.d.ts")
+			if err := os.Symlink(tspath.ResolvePath(root, "service/dist/leaf.d.ts"), linkPath); err != nil {
+				t.Skipf("symlink unavailable: %v", err)
+			}
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			healthyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "healthy/healthy.ts"))
+			legacyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "legacy/legacy.js"))
+			serviceFile := testLintTarget(fsys, root, linkPath)
+			serviceConfig := tspath.ResolvePath(root, "service/node_modules/pkg/tsconfig.json")
+			healthyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"healthy/tsconfig.json"}, BaseDirectory: root}
+			legacyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"legacy/tsconfig.json"}, BaseDirectory: root}
+			request := ProjectBuildRequest{
+				Targets: target.Plan{Files: []target.File{healthyFile, legacyFile, serviceFile}},
+				Policies: map[target.File]rslintconfig.ProjectPolicy{
+					healthyFile: {ExplicitProject: healthyDecl},
+					legacyFile:  {ExplicitProject: legacyDecl},
+					serviceFile: {ServiceRootDirectory: root},
+				},
+				Scope:          ActiveOwners,
+				SingleThreaded: true,
+			}
+			wantErrMsg := fmt.Sprintf("project root %q from %q was absent from its TypeScript Program", linkPath, serviceConfig)
+			_, buildErr := NewSession(fsys).BuildProjects(request)
+			if buildErr == nil || buildErr.Error() != wantErrMsg {
+				t.Fatalf("materialized BuildProjects error = %v, want %q", buildErr, wantErrMsg)
+			}
+			loads, err := NewSession(fsys).PlanLoads(request, root, false)
+			if err != nil || loads != nil {
+				t.Fatalf("preserveSymlinks /node_modules/ symlink to referenced .d.ts must return (nil, nil), got loads=%d err=%v", len(loads), err)
+			}
+		})
+
+		t.Run("service project with disableSourceOfProjectReferenceRedirect sharing .d.ts still streams", func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			files := map[string]string{
+				"service/tsconfig.json": `{"compilerOptions":{"noLib":true,"disableSourceOfProjectReferenceRedirect":true},"files":["app.ts","env.d.ts"],"references":[{"path":"./lib.json"}]}`,
+				"service/lib.json":      `{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["lib.ts","env.d.ts"]}`,
+				"service/app.ts":        `export const app: number = 1;`,
+				"service/lib.ts":        `export const lib: number = 2;`,
+				"service/env.d.ts":      `declare const ENV: string;`,
+			}
+			for i := range 8 {
+				files[fmt.Sprintf("ind%d/tsconfig.json", i)] = `{"compilerOptions":{"noLib":true},"files":["index.ts"]}`
+				files[fmt.Sprintf("ind%d/index.ts", i)] = fmt.Sprintf("export const v%d = %d;\n", i, i)
+			}
+			writeProgramTestFiles(t, root, files)
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+
+			targets := make([]target.File, 0, 10)
+			policies := make(map[target.File]rslintconfig.ProjectPolicy, 10)
+			config := make(rslintconfig.RslintConfig, 0, 9)
+			for i := range 8 {
+				file := testLintTarget(fsys, root, tspath.ResolvePath(root, fmt.Sprintf("ind%d/index.ts", i)))
+				decl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{fmt.Sprintf("ind%d/tsconfig.json", i)}, BaseDirectory: root}
+				targets = append(targets, file)
+				policies[file] = rslintconfig.ProjectPolicy{ExplicitProject: decl}
+				config = append(config, rslintconfig.ConfigEntry{
+					Files:           []string{fmt.Sprintf("ind%d/**", i)},
+					LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: decl.Patterns}},
+				})
+			}
+			appFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "service/app.ts"))
+			envFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "service/env.d.ts"))
+			targets = append(targets, appFile, envFile)
+			policies[appFile] = rslintconfig.ProjectPolicy{ServiceRootDirectory: root}
+			policies[envFile] = rslintconfig.ProjectPolicy{ServiceRootDirectory: root}
+			config = append(config, rslintconfig.ConfigEntry{
+				Files:           []string{"service/**"},
+				LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}},
+			})
+
+			for _, scope := range []ProjectScope{ActiveOwners, AllDeclared} {
+				request := ProjectBuildRequest{
+					Configs:                      map[string]rslintconfig.RslintConfig{root: config},
+					Targets:                      target.Plan{Files: targets},
+					Policies:                     policies,
+					Scope:                        scope,
+					SingleThreaded:               true,
+					IncludeProgramRootIdentities: true,
+				}
+				loads, err := NewSession(fsys).PlanLoads(request, root, false)
+				if err != nil {
+					t.Fatalf("scope=%v PlanLoads: %v", scope, err)
+				}
+				if len(loads) != 9 {
+					t.Fatalf("scope=%v expected 9 streaming loads (8 independent + 1 service sharing .d.ts), got %d", scope, len(loads))
+				}
+				assertProgramLoadsMatchMaterialized(t, fsys, request, root, false, loads)
+			}
+		})
+
+		t.Run("disjoint apps referencing composite library skip declaration map build and projectService filters candidates", func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			files := map[string]string{
+				"lib/tsconfig.json":     `{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist","rootDir":"src"},"include":["src/**/*"]}`,
+				"small/tsconfig.json":   `{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist","rootDir":"src"},"files":["src/one.ts"]}`,
+				"small/src/one.ts":      `export const one: number = 1;`,
+				"service/tsconfig.json": `{"compilerOptions":{"noLib":true},"include":["src/**/*","types-*.d.ts"],"references":[{"path":"../lib"},{"path":"../small"}]}`,
+				"service/types-0.d.ts":  `export declare const flag0: boolean;`,
+				"service/types-1.d.ts":  `export declare const flag1: boolean;`,
+				"service/types-2.d.ts":  `export declare const flag2: boolean;`,
+			}
+			for i := range 32 {
+				files[fmt.Sprintf("lib/src/m%d.ts", i)] = fmt.Sprintf("export const m%d: number = %d;\n", i, i)
+				files[fmt.Sprintf("service/src/s%d.ts", i)] = fmt.Sprintf("export const s%d: number = %d;\n", i, i)
+			}
+			for i := range 4 {
+				files[fmt.Sprintf("app%d/tsconfig.json", i)] = `{"compilerOptions":{"noLib":true},"files":["index.ts"],"references":[{"path":"../lib"}]}`
+				files[fmt.Sprintf("app%d/index.ts", i)] = fmt.Sprintf("export const app%d: number = %d;\n", i, i)
+			}
+			writeProgramTestFiles(t, root, files)
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+
+			// Directly verify that disjoint apps never trigger ParseInputOutputNames
+			// on the referenced composite library and share a single cached parse.
+			session := NewSession(fsys)
+			var refCache planReferenceCache
+			app0Path := tspath.ResolvePath(root, "app0/tsconfig.json")
+			app0Parsed, err := session.context.parseConfig(tspath.ResolvePath(root, "app0"), app0Path)
+			if err != nil {
+				t.Fatalf("parseConfig(app0): %v", err)
+			}
+			app0File := testLintTarget(fsys, root, tspath.ResolvePath(root, "app0/index.ts"))
+			if !session.hasIndependentRoots(app0Parsed, []target.File{app0File}, false, &refCache) {
+				t.Fatal("disjoint app0 referencing composite lib unexpectedly reported non-independent")
+			}
+			libCfgPath := tspath.ResolvePath(root, "lib/tsconfig.json")
+			var cachedLib *tsoptions.ParsedCommandLine
+			for _, entry := range refCache.lru {
+				if entry.name == libCfgPath {
+					cachedLib = entry.child
+					break
+				}
+			}
+			if cachedLib == nil {
+				t.Fatalf("expected %s to be cached in plan refCache", libCfgPath)
+			}
+			if cachedLib.OutputDtsToProjectReference() != nil || cachedLib.SourceToProjectReference() != nil {
+				t.Fatal("disjoint app eagerly built declaration output maps on referenced composite library")
+			}
+
+			var targets []target.File
+			policies := make(map[target.File]rslintconfig.ProjectPolicy)
+			var config rslintconfig.RslintConfig
+			for i := range 4 {
+				f := testLintTarget(fsys, root, tspath.ResolvePath(root, fmt.Sprintf("app%d/index.ts", i)))
+				decl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{fmt.Sprintf("app%d/tsconfig.json", i)}, BaseDirectory: root}
+				targets = append(targets, f)
+				policies[f] = rslintconfig.ProjectPolicy{ExplicitProject: decl}
+				config = append(config, rslintconfig.ConfigEntry{
+					Files:           []string{fmt.Sprintf("app%d/**", i)},
+					LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: decl.Patterns}},
+				})
+			}
+			for i := range 32 {
+				f := testLintTarget(fsys, root, tspath.ResolvePath(root, fmt.Sprintf("service/src/s%d.ts", i)))
+				targets = append(targets, f)
+				policies[f] = rslintconfig.ProjectPolicy{ServiceRootDirectory: root}
+			}
+			for i := range 3 {
+				dtsFile := testLintTarget(fsys, root, tspath.ResolvePath(root, fmt.Sprintf("service/types-%d.d.ts", i)))
+				targets = append(targets, dtsFile)
+				policies[dtsFile] = rslintconfig.ProjectPolicy{ServiceRootDirectory: root}
+			}
+			config = append(config, rslintconfig.ConfigEntry{
+				Files:           []string{"service/**"},
+				LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}},
+			})
+
+			request := ProjectBuildRequest{
+				Configs:                      map[string]rslintconfig.RslintConfig{root: config},
+				Targets:                      target.Plan{Files: targets},
+				Policies:                     policies,
+				Scope:                        ActiveOwners,
+				SingleThreaded:               true,
+				IncludeProgramRootIdentities: true,
+			}
+			loads, err := NewSession(fsys).PlanLoads(request, root, false)
+			if err != nil {
+				t.Fatalf("PlanLoads: %v", err)
+			}
+			if len(loads) != 5 {
+				t.Fatalf("expected 5 streaming loads (4 apps + 1 projectService), got %d", len(loads))
+			}
+			assertProgramLoadsMatchMaterialized(t, fsys, request, root, false, loads)
+		})
+	})
+
+	t.Run("unreadable unmatched root falls back to nil plan", func(t *testing.T) {
+		root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+		writeProgramTestFiles(t, root, map[string]string{
+			"healthy/tsconfig.json": `{"files":["healthy.ts"],"compilerOptions":{"noLib":true}}`,
+			"healthy/healthy.ts":    `export const healthy = 1;`,
+			"legacy/tsconfig.json":  `{"files":["legacy.js"],"compilerOptions":{"noLib":true,"allowJs":false}}`,
+			"legacy/legacy.js":      `export const legacy = 2;`,
+			"outside.ts":            `export const outside = 3;`,
+		})
+		outsidePath := tspath.ResolvePath(root, "outside.ts")
+		fsys := &unreadableProjectConfigFS{
+			FS:         bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+			configPath: outsidePath,
+		}
+		healthyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "healthy/healthy.ts"))
+		legacyFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "legacy/legacy.js"))
+		outsideFile := testLintTarget(fsys, root, outsidePath)
+		healthyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"healthy/tsconfig.json"}, BaseDirectory: root}
+		legacyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"legacy/tsconfig.json"}, BaseDirectory: root}
+		config := rslintconfig.RslintConfig{
+			{Files: []string{"healthy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: healthyDecl.Patterns}}},
+			{Files: []string{"legacy/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: legacyDecl.Patterns}}},
+		}
+		wantErrMsg := fmt.Sprintf("program: could not read root %q", outsidePath)
+		for _, tc := range []struct {
+			name  string
+			scope ProjectScope
+		}{
+			{"ActiveOwners", ActiveOwners},
+			{"AllDeclared", AllDeclared},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				for _, singleThreaded := range []bool{true, false} {
+					request := ProjectBuildRequest{
+						Configs: map[string]rslintconfig.RslintConfig{root: config},
+						Targets: target.Plan{Files: []target.File{healthyFile, legacyFile, outsideFile}},
+						Policies: map[target.File]rslintconfig.ProjectPolicy{
+							healthyFile: {ExplicitProject: healthyDecl},
+							legacyFile:  {ExplicitProject: legacyDecl},
+							outsideFile: {ProjectDisabled: true},
+						},
+						Scope:          tc.scope,
+						SingleThreaded: singleThreaded,
+					}
+					loads, err := NewSession(fsys).PlanLoads(request, root, false)
+					if err != nil || loads != nil {
+						t.Fatalf("singleThreaded=%v: unreadable unmatched root must return (nil, nil), got loads=%d err=%v", singleThreaded, len(loads), err)
+					}
+					materialized := NewSession(fsys)
+					set, err := materialized.BuildProjects(request)
+					if err != nil {
+						t.Fatalf("singleThreaded=%v: BuildProjects: %v", singleThreaded, err)
+					}
+					if _, err := materialized.LoadCLI(set, request.Targets, root, singleThreaded); err == nil || err.Error() != wantErrMsg {
+						t.Fatalf("singleThreaded=%v: LoadCLI error = %v, want %q", singleThreaded, err, wantErrMsg)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("overlapping project reference coupled pair with independent project", func(t *testing.T) {
+		dir := tspath.NormalizePath(t.TempDir())
+		writeProgramTestFiles(t, dir, map[string]string{
+			"ref-a.json": `{"files":["shared.ts"],"references":[{"path":"./ref-b.json"}],"compilerOptions":{"noLib":true}}`,
+			"ref-b.json": `{"files":["shared.ts","b.ts"],"compilerOptions":{"noLib":true}}`,
+			"ind.json":   `{"files":["ind.ts"],"compilerOptions":{"noLib":true}}`,
+			"shared.ts":  `export const shared = 1;`,
+			"b.ts":       `export const b = 2;`,
+			"ind.ts":     `export const ind = 3;`,
+		})
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		sharedFile := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "shared.ts"))
+		bFile := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "b.ts"))
+		indFile := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "ind.ts"))
+		refDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ref-a.json", "ref-b.json"}, BaseDirectory: dir}
+		indDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ind.json"}, BaseDirectory: dir}
+		request := ProjectBuildRequest{
+			Targets: target.Plan{Files: []target.File{sharedFile, bFile, indFile}},
+			Policies: map[target.File]rslintconfig.ProjectPolicy{
+				sharedFile: {ExplicitProject: refDecl},
+				bFile:      {ExplicitProject: refDecl},
+				indFile:    {ExplicitProject: indDecl},
+			},
+			Scope:                        ActiveOwners,
+			IncludeProgramRootIdentities: true,
+		}
+		loads, err := NewSession(fsys).PlanLoads(request, dir, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(loads) != 4 {
+			t.Fatalf("expected 4 loads (2 coupled + 1 independent + trailing unbound), got %d", len(loads))
+		}
+		assertProgramLoadsMatchMaterialized(t, fsys, request, dir, false, loads)
+	})
+
+	t.Run("symlink alias coupled project with independent project", func(t *testing.T) {
+		for _, scope := range []ProjectScope{ActiveOwners, AllDeclared, Targeted} {
+			t.Run(strconv.Itoa(int(scope)), func(t *testing.T) {
+				root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+				writeProgramTestFiles(t, root, map[string]string{
+					"alias/tsconfig.json": `{"files":["real.ts"],"compilerOptions":{"noLib":true}}`,
+					"alias/real.ts":       `export const realValue = 1;`,
+					"ind/tsconfig.json":   `{"files":["ind.ts"],"compilerOptions":{"noLib":true}}`,
+					"ind/ind.ts":          `export const indValue = 2;`,
+					"outside.ts":          `export const outsideValue = 3;`,
+				})
+				linkPath := tspath.ResolvePath(root, "alias/link.ts")
+				if err := os.Symlink(tspath.ResolvePath(root, "alias/real.ts"), linkPath); err != nil {
+					t.Skipf("symlink unavailable: %v", err)
+				}
+				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				linkFile := testLintTarget(fsys, root, linkPath)
+				indFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "ind/ind.ts"))
+				outsideFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "outside.ts"))
+				aliasDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"alias/tsconfig.json"}, BaseDirectory: root}
+				indDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ind/tsconfig.json"}, BaseDirectory: root}
+				config := rslintconfig.RslintConfig{
+					{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+						Project: rslintconfig.ProjectPaths{"alias/tsconfig.json", "ind/tsconfig.json"},
+					}}},
+				}
+				request := ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{root: config},
+					Targets: target.Plan{Files: []target.File{linkFile, indFile, outsideFile}},
+					Policies: map[target.File]rslintconfig.ProjectPolicy{
+						linkFile:    {ExplicitProject: aliasDecl},
+						indFile:     {ExplicitProject: indDecl},
+						outsideFile: {ProjectDisabled: true},
+					},
+					Scope:                        scope,
+					IncludeProgramRootIdentities: true,
+				}
+				loads, err := NewSession(fsys).PlanLoads(request, root, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scope == Targeted {
+					if len(loads) != 0 {
+						t.Fatalf("Targeted scope with non-independent alias project must fall back to nil plan, got %d loads", len(loads))
+					}
+					return
+				}
+				if len(loads) != 3 {
+					t.Fatalf("expected 3 loads (coupled alias + independent + unbound), got %d", len(loads))
+				}
+				assertProgramLoadsMatchMaterialized(t, fsys, request, root, false, loads)
+			})
+		}
+	})
+
+	t.Run("coupled bound target and unbound symlink alias keep isolated mappings", func(t *testing.T) {
+		root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+		writeProgramTestFiles(t, root, map[string]string{
+			"alias/tsconfig.json": `{"files":["real.ts","rejected.js"],"compilerOptions":{"noLib":true}}`,
+			"alias/real.ts":       `export const realValue = 1;`,
+			"alias/rejected.js":   `export const jsVal = 2;`,
+			"ind/tsconfig.json":   `{"files":["ind.ts"],"compilerOptions":{"noLib":true}}`,
+			"ind/ind.ts":          `export const indValue = 3;`,
+		})
+		realPath := tspath.ResolvePath(root, "alias/real.ts")
+		linkPath := tspath.ResolvePath(root, "alias/link.ts")
+		if err := os.Symlink(realPath, linkPath); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		realFile := testLintTarget(fsys, root, realPath)
+		rejectedPath := tspath.ResolvePath(root, "alias/rejected.js")
+		rejectedFile := testLintTarget(fsys, root, rejectedPath)
+		linkFile := testLintTarget(fsys, root, linkPath)
+		indPath := tspath.ResolvePath(root, "ind/ind.ts")
+		indFile := testLintTarget(fsys, root, indPath)
+		aliasDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"alias/tsconfig.json"}, BaseDirectory: root}
+		indDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ind/tsconfig.json"}, BaseDirectory: root}
+		request := ProjectBuildRequest{
+			Targets: target.Plan{Files: []target.File{realFile, rejectedFile, linkFile, indFile}},
+			Policies: map[target.File]rslintconfig.ProjectPolicy{
+				realFile:     {ExplicitProject: aliasDecl},
+				rejectedFile: {ExplicitProject: aliasDecl},
+				linkFile:     {ProjectDisabled: true},
+				indFile:      {ExplicitProject: indDecl},
+			},
+			Scope:                        ActiveOwners,
+			IncludeProgramRootIdentities: true,
+		}
+		loads, err := NewSession(fsys).PlanLoads(request, root, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(loads) != 3 {
+			t.Fatalf("expected 3 loads (coupled alias + independent + trailing unbound), got %d", len(loads))
+		}
+		results, gotPrograms, gotRootIdentities, _ := executeProgramLoadsForTest(t, loads, true)
+
+		materialized := NewSession(fsys)
+		set, err := materialized.BuildProjects(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := materialized.LoadCLI(set, request.Targets, root, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(gotPrograms, projectBindingSequence(want)) {
+			t.Fatalf("streamed Programs differ from materialized:\ngot:  %+v\nwant: %+v", gotPrograms, projectBindingSequence(want))
+		}
+		if !slices.Equal(gotRootIdentities, want.ProgramRootIdentities) {
+			t.Fatalf("streamed ProgramRootIdentities differ: got %v, want %v", gotRootIdentities, want.ProgramRootIdentities)
+		}
+		wantCoupledMap := map[string]target.File{exactPathID(realPath): realFile}
+		if !reflect.DeepEqual(results[0].LintTargetBySourcePath, wantCoupledMap) {
+			t.Fatalf("coupled unit mapping clobbered: got %+v, want %+v", results[0].LintTargetBySourcePath, wantCoupledMap)
+		}
+		wantIndMap := map[string]target.File{exactPathID(indPath): indFile}
+		if !reflect.DeepEqual(results[1].LintTargetBySourcePath, wantIndMap) {
+			t.Fatalf("independent unit mapping mismatch: got %+v, want %+v", results[1].LintTargetBySourcePath, wantIndMap)
+		}
+		wantUnboundMap := map[string]target.File{
+			exactPathID(linkPath):     linkFile,
+			exactPathID(realPath):     linkFile,
+			exactPathID(rejectedPath): rejectedFile,
+		}
+		if !reflect.DeepEqual(results[2].LintTargetBySourcePath, wantUnboundMap) {
+			t.Fatalf("unbound unit mapping mismatch: got %+v, want %+v", results[2].LintTargetBySourcePath, wantUnboundMap)
+		}
+	})
+
+	t.Run("two coupled projects owning distinct symlink aliases keep isolated mappings", func(t *testing.T) {
+		root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+		writeProgramTestFiles(t, root, map[string]string{
+			"shared/real.ts":      `export const sharedValue = 1;`,
+			"proj1/tsconfig.json": `{"files":["../shared/real.ts"],"compilerOptions":{"noLib":true}}`,
+			"proj2/tsconfig.json": `{"files":["../shared/real.ts"],"compilerOptions":{"noLib":true}}`,
+			"ind/tsconfig.json":   `{"files":["ind.ts"],"compilerOptions":{"noLib":true}}`,
+			"ind/ind.ts":          `export const indValue = 2;`,
+		})
+		realPath := tspath.ResolvePath(root, "shared/real.ts")
+		link1Path := tspath.ResolvePath(root, "shared/link1.ts")
+		link2Path := tspath.ResolvePath(root, "shared/link2.ts")
+		if err := os.Symlink(realPath, link1Path); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+		if err := os.Symlink(realPath, link2Path); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		link1File := testLintTarget(fsys, root, link1Path)
+		link2File := testLintTarget(fsys, root, link2Path)
+		indPath := tspath.ResolvePath(root, "ind/ind.ts")
+		indFile := testLintTarget(fsys, root, indPath)
+		proj1Decl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"proj1/tsconfig.json"}, BaseDirectory: root}
+		proj2Decl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"proj2/tsconfig.json"}, BaseDirectory: root}
+		indDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ind/tsconfig.json"}, BaseDirectory: root}
+		request := ProjectBuildRequest{
+			Targets: target.Plan{Files: []target.File{link1File, link2File, indFile}},
+			Policies: map[target.File]rslintconfig.ProjectPolicy{
+				link1File: {ExplicitProject: proj1Decl},
+				link2File: {ExplicitProject: proj2Decl},
+				indFile:   {ExplicitProject: indDecl},
+			},
+			Scope:                        ActiveOwners,
+			IncludeProgramRootIdentities: true,
+		}
+		loads, err := NewSession(fsys).PlanLoads(request, root, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(loads) != 4 {
+			t.Fatalf("expected 4 loads (proj1 + proj2 + ind + empty trailing unbound), got %d", len(loads))
+		}
+		results, gotPrograms, gotRootIdentities, _ := executeProgramLoadsForTest(t, loads, true)
+
+		materialized := NewSession(fsys)
+		set, err := materialized.BuildProjects(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := materialized.LoadCLI(set, request.Targets, root, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(gotPrograms, projectBindingSequence(want)) {
+			t.Fatalf("streamed Programs differ from materialized:\ngot:  %+v\nwant: %+v", gotPrograms, projectBindingSequence(want))
+		}
+		if !slices.Equal(gotRootIdentities, want.ProgramRootIdentities) {
+			t.Fatalf("streamed ProgramRootIdentities differ: got %v, want %v", gotRootIdentities, want.ProgramRootIdentities)
+		}
+		wantProj1Map := map[string]target.File{exactPathID(realPath): link1File}
+		if !reflect.DeepEqual(results[0].LintTargetBySourcePath, wantProj1Map) {
+			t.Fatalf("proj1 mapping clobbered: got %+v, want %+v", results[0].LintTargetBySourcePath, wantProj1Map)
+		}
+		wantProj2Map := map[string]target.File{exactPathID(realPath): link2File}
+		if !reflect.DeepEqual(results[1].LintTargetBySourcePath, wantProj2Map) {
+			t.Fatalf("proj2 mapping clobbered: got %+v, want %+v", results[1].LintTargetBySourcePath, wantProj2Map)
+		}
+		wantIndMap := map[string]target.File{exactPathID(indPath): indFile}
+		if !reflect.DeepEqual(results[2].LintTargetBySourcePath, wantIndMap) {
+			t.Fatalf("independent mapping mismatch: got %+v, want %+v", results[2].LintTargetBySourcePath, wantIndMap)
+		}
+		if len(results[3].Programs) != 0 || results[3].LintTargetBySourcePath != nil {
+			t.Fatalf("expected empty trailing unbound slot, got %+v", results[3])
+		}
+	})
+}
+
+func TestProgramLoadsCandidatePrecedenceBetweenCoupledAndIndependent(t *testing.T) {
+	t.Run("independent target listing coupled project earlier stays bound to independent owner", func(t *testing.T) {
+		dir := tspath.NormalizePath(t.TempDir())
+		writeProgramTestFiles(t, dir, map[string]string{
+			"first.json":  `{"files":["target.js","helper.ts"],"compilerOptions":{"noLib":true}}`,
+			"second.json": `{"files":["ind.ts"],"compilerOptions":{"noLib":true}}`,
+			"target.js":   `export const target = 1;`,
+			"helper.ts":   `import "./ind"; export const helper = 2;`,
+			"ind.ts":      `export const ind = 3;`,
+		})
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		targetJS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "target.js"))
+		indTS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "ind.ts"))
+		firstOnlyDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"first.json"}, BaseDirectory: dir}
+		bothDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"first.json", "second.json"}, BaseDirectory: dir}
+		request := ProjectBuildRequest{
+			Targets: target.Plan{Files: []target.File{targetJS, indTS}},
+			Policies: map[target.File]rslintconfig.ProjectPolicy{
+				targetJS: {ExplicitProject: firstOnlyDecl},
+				indTS:    {ExplicitProject: bothDecl},
+			},
+			Scope:                        ActiveOwners,
+			IncludeProgramRootIdentities: true,
+		}
+		loads, err := NewSession(fsys).PlanLoads(request, dir, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(loads) != 3 {
+			t.Fatalf("expected 3 loads (first coupled, second independent, trailing unbound), got %d", len(loads))
+		}
+		assertProgramLoadsMatchMaterialized(t, fsys, request, dir, false, loads)
+	})
+
+	t.Run("zero independent projects cleanly falls back to nil plan", func(t *testing.T) {
+		dir := tspath.NormalizePath(t.TempDir())
+		writeProgramTestFiles(t, dir, map[string]string{
+			"first.json":  `{"files":["target.js"],"compilerOptions":{"noLib":true}}`,
+			"second.json": `{"files":["second.ts"],"compilerOptions":{"noLib":true}}`,
+			"third.json":  `{"files":["third.ts"],"compilerOptions":{"noLib":true}}`,
+			"target.js":   `export const target = 1;`,
+			"second.ts":   `export const second = 2;`,
+			"third.ts":    `export const third = 3;`,
+		})
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		targetJS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "target.js"))
+		secondTS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "second.ts"))
+		thirdTS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "third.ts"))
+		allDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"first.json", "second.json", "third.json"}, BaseDirectory: dir}
+		loads, err := NewSession(fsys).PlanLoads(ProjectBuildRequest{
+			Targets: target.Plan{Files: []target.File{targetJS, secondTS, thirdTS}},
+			Policies: map[target.File]rslintconfig.ProjectPolicy{
+				targetJS: {ExplicitProject: allDecl},
+				secondTS: {ExplicitProject: allDecl},
+				thirdTS:  {ExplicitProject: allDecl},
+			},
+			Scope: ActiveOwners,
+		}, dir, false)
+		if err != nil || len(loads) != 0 {
+			t.Fatalf("expected fallback to nil plan when all projects are coupled, got loads=%d err=%v", len(loads), err)
+		}
+	})
+}
+
+func TestProgramLoadsPartialStreamingTargetedAbsentRootError(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	writeProgramTestFiles(t, dir, map[string]string{
+		"bad.json":  `{"files":["target.js"],"compilerOptions":{"noLib":true}}`,
+		"good.json": `{"files":["good.ts"],"compilerOptions":{"noLib":true}}`,
+		"target.js": `export const bad = 1;`,
+		"good.ts":   `export const good = 2;`,
+	})
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	badJS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "target.js"))
+	goodTS := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "good.ts"))
+	badDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"bad.json"}, BaseDirectory: dir}
+	goodDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"good.json"}, BaseDirectory: dir}
+	request := ProjectBuildRequest{
+		Targets: target.Plan{Files: []target.File{badJS, goodTS}},
+		Policies: map[target.File]rslintconfig.ProjectPolicy{
+			badJS:  {ExplicitProject: badDecl},
+			goodTS: {ExplicitProject: goodDecl},
+		},
+		Scope:          Targeted,
+		SingleThreaded: true,
+	}
+	_, wantErr := NewSession(fsys).BuildProjects(request)
+	if wantErr == nil || !strings.Contains(wantErr.Error(), "was absent from its TypeScript Program") {
+		t.Fatalf("expected materialized Targeted build to fail on absent root, got %v", wantErr)
+	}
+	loads, err := NewSession(fsys).PlanLoads(request, dir, false)
+	if err != nil || len(loads) != 0 {
+		t.Fatalf("Targeted scope with non-independent rejected root must fall back to nil plan for whole-binding validation, got loads=%d err=%v", len(loads), err)
+	}
+}
+
+type countingRealpathFS struct {
+	vfs.FS
+	mu    sync.Mutex
+	calls map[string]int
+}
+
+func (f *countingRealpathFS) Realpath(path string) string {
+	normalized := tspath.NormalizePath(path)
+	f.mu.Lock()
+	f.calls[normalized]++
+	f.mu.Unlock()
+	return f.FS.Realpath(path)
+}
+
+func TestProgramLoadsCoupledSharedRootIdentityFrozenOnce(t *testing.T) {
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+	const coupledCount = 8
+	files := map[string]string{
+		"shared.d.ts":       `export declare const shared: number;`,
+		"ind/tsconfig.json": `{"files":["ind.ts"],"compilerOptions":{"noLib":true}}`,
+		"ind/ind.ts":        `export const ind = 1;`,
+	}
+	for i := range coupledCount {
+		dir := "c" + strconv.Itoa(i)
+		files[dir+"/tsconfig.json"] = `{"files":["../shared.d.ts","rejected.js","ok.ts"],"compilerOptions":{"noLib":true}}`
+		files[dir+"/rejected.js"] = `export const j = 1;`
+		files[dir+"/ok.ts"] = `export const ok = 1;`
+	}
+	writeProgramTestFiles(t, root, files)
+
+	sharedPath := tspath.ResolvePath(root, "shared.d.ts")
+	measureSharedRealpathCalls := func(includeRootIDs bool) ([]LoadResult, []string, int) {
+		spy := &countingRealpathFS{
+			FS:    bundled.WrapFS(osvfs.FS()),
+			calls: make(map[string]int),
+		}
+		var targets []target.File
+		policies := make(map[target.File]rslintconfig.ProjectPolicy)
+		for i := range coupledCount {
+			dir := "c" + strconv.Itoa(i)
+			decl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{dir + "/tsconfig.json"}, BaseDirectory: root}
+			rej := testLintTarget(spy, root, tspath.ResolvePath(root, dir+"/rejected.js"))
+			okFile := testLintTarget(spy, root, tspath.ResolvePath(root, dir+"/ok.ts"))
+			targets = append(targets, rej, okFile)
+			policies[rej] = rslintconfig.ProjectPolicy{ExplicitProject: decl}
+			policies[okFile] = rslintconfig.ProjectPolicy{ExplicitProject: decl}
+		}
+		indDecl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ind/tsconfig.json"}, BaseDirectory: root}
+		indFile := testLintTarget(spy, root, tspath.ResolvePath(root, "ind/ind.ts"))
+		targets = append(targets, indFile)
+		policies[indFile] = rslintconfig.ProjectPolicy{ExplicitProject: indDecl}
+
+		request := ProjectBuildRequest{
+			Targets:                      target.Plan{Files: targets},
+			Policies:                     policies,
+			Scope:                        ActiveOwners,
+			IncludeProgramRootIdentities: includeRootIDs,
+			SingleThreaded:               true,
+		}
+		loads, err := NewSession(spy).PlanLoads(request, root, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(loads) != coupledCount+2 {
+			t.Fatalf("expected %d loads (%d coupled + 1 independent + 1 unbound), got %d", coupledCount+2, coupledCount, len(loads))
+		}
+		spy.mu.Lock()
+		spy.calls[sharedPath] = 0
+		spy.mu.Unlock()
+
+		results, _, gotRoots, _ := executeProgramLoadsForTest(t, loads, false)
+		spy.mu.Lock()
+		sharedRealpathCalls := spy.calls[sharedPath]
+		spy.mu.Unlock()
+		return results, gotRoots, sharedRealpathCalls
+	}
+
+	_, _, withoutIDs := measureSharedRealpathCalls(false)
+	results, gotRoots, withIDs := measureSharedRealpathCalls(true)
+	if delta := withIDs - withoutIDs; delta != 1 {
+		t.Fatalf("ProgramRootIdentityProjector called Realpath on shared.d.ts %d extra times across %d coupled Programs (with=%d without=%d), want 1",
+			delta, coupledCount, withIDs, withoutIDs)
+	}
+	sharedID := exactPathID(sharedPath)
+	if !slices.Contains(results[0].ProgramRootIdentities, sharedID) {
+		t.Fatalf("first coupled unit missing shared.d.ts identity: %v", results[0].ProgramRootIdentities)
+	}
+	for i := 1; i < coupledCount; i++ {
+		if slices.Contains(results[i].ProgramRootIdentities, sharedID) {
+			t.Fatalf("coupled unit %d duplicated shared.d.ts identity: %v", i, results[i].ProgramRootIdentities)
+		}
+	}
+	// Verify exact declaration order matches materialized BuildProjects.
+	fsys := bundled.WrapFS(osvfs.FS())
+	var matTargets []target.File
+	matPolicies := make(map[target.File]rslintconfig.ProjectPolicy)
+	for i := range coupledCount {
+		dir := "c" + strconv.Itoa(i)
+		decl := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{dir + "/tsconfig.json"}, BaseDirectory: root}
+		rej := testLintTarget(fsys, root, tspath.ResolvePath(root, dir+"/rejected.js"))
+		okFile := testLintTarget(fsys, root, tspath.ResolvePath(root, dir+"/ok.ts"))
+		matTargets = append(matTargets, rej, okFile)
+		matPolicies[rej] = rslintconfig.ProjectPolicy{ExplicitProject: decl}
+		matPolicies[okFile] = rslintconfig.ProjectPolicy{ExplicitProject: decl}
+	}
+	indFile := testLintTarget(fsys, root, tspath.ResolvePath(root, "ind/ind.ts"))
+	matTargets = append(matTargets, indFile)
+	matPolicies[indFile] = rslintconfig.ProjectPolicy{ExplicitProject: &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"ind/tsconfig.json"}, BaseDirectory: root}}
+	matSet, err := NewSession(fsys).BuildProjects(ProjectBuildRequest{
+		Targets:                      target.Plan{Files: matTargets},
+		Policies:                     matPolicies,
+		Scope:                        ActiveOwners,
+		IncludeProgramRootIdentities: true,
+		SingleThreaded:               true,
+	})
+	if err != nil {
+		t.Fatalf("materialized BuildProjects: %v", err)
+	}
+	if !slices.Equal(gotRoots, matSet.ProgramRootIdentities()) {
+		t.Fatalf("streamed ProgramRootIdentities mismatch:\ngot:  %v\nwant: %v", gotRoots, matSet.ProgramRootIdentities())
+	}
+}
+
+func TestPlanReferenceCacheBoundedLRU(t *testing.T) {
+	var cache planReferenceCache
+	var parseCalls atomic.Int32
+	configs := make(map[string]*tsoptions.ParsedCommandLine, 32)
+	for i := range 32 {
+		name := fmt.Sprintf("/repo/lib-%d/tsconfig.json", i)
+		configs[name] = &tsoptions.ParsedCommandLine{}
+	}
+	parse := func(name string) (*tsoptions.ParsedCommandLine, error) {
+		parseCalls.Add(1)
+		return configs[name], nil
+	}
+
+	// Load 32 distinct one-use libraries: LRU retention must stay bounded to maxPlanReferenceCacheEntries.
+	for i := range 32 {
+		name := fmt.Sprintf("/repo/lib-%d/tsconfig.json", i)
+		got, err := cache.load(name, parse)
+		if err != nil || got != configs[name] {
+			t.Fatalf("load(%s) = (%p, %v), want %p", name, got, err, configs[name])
+		}
+	}
+	if len(cache.lru) != maxPlanReferenceCacheEntries {
+		t.Fatalf("cache.lru len = %d, want %d", len(cache.lru), maxPlanReferenceCacheEntries)
+	}
+
+	// Verify LRU promotion on hit: touching the oldest resident entry (lib-24)
+	// moves it to MRU so inserting one new key evicts lib-25 instead of lib-24.
+	beforeHits := parseCalls.Load()
+	oldestResident := fmt.Sprintf("/repo/lib-%d/tsconfig.json", 32-maxPlanReferenceCacheEntries)
+	secondOldest := fmt.Sprintf("/repo/lib-%d/tsconfig.json", 32-maxPlanReferenceCacheEntries+1)
+	if got, err := cache.load(oldestResident, parse); err != nil || got != configs[oldestResident] {
+		t.Fatalf("hit load(%s) = (%p, %v), want %p", oldestResident, got, err, configs[oldestResident])
+	}
+	if parseCalls.Load() != beforeHits {
+		t.Fatalf("hit on %s unexpectedly re-parsed", oldestResident)
+	}
+	evictor := "/repo/lib-0/tsconfig.json"
+	if got, err := cache.load(evictor, parse); err != nil || got != configs[evictor] {
+		t.Fatalf("evictor load(%s) = (%p, %v), want %p", evictor, got, err, configs[evictor])
+	}
+	// oldestResident must still hit (0 new parses), while secondOldest was evicted (1 parse).
+	afterEvict := parseCalls.Load()
+	if got, err := cache.load(oldestResident, parse); err != nil || got != configs[oldestResident] {
+		t.Fatalf("promoted load(%s) = (%p, %v), want %p", oldestResident, got, err, configs[oldestResident])
+	}
+	if parseCalls.Load() != afterEvict {
+		t.Fatalf("promoted entry %s was unexpectedly evicted", oldestResident)
+	}
+	if got, err := cache.load(secondOldest, parse); err != nil || got != configs[secondOldest] {
+		t.Fatalf("evicted load(%s) = (%p, %v), want %p", secondOldest, got, err, configs[secondOldest])
+	}
+	if parseCalls.Load() != afterEvict+1 {
+		t.Fatalf("evicted entry %s did not trigger re-parse: delta=%d", secondOldest, parseCalls.Load()-afterEvict)
+	}
+
+	// Verify (nil, err) caching avoids re-parsing persistent errors within a PlanLoads call.
+	sentinelErr := errors.New("broken config")
+	var errCalls atomic.Int32
+	for range 2 {
+		got, err := cache.load("/repo/broken/tsconfig.json", func(string) (*tsoptions.ParsedCommandLine, error) {
+			errCalls.Add(1)
+			return nil, sentinelErr
+		})
+		if got != nil || !errors.Is(err, sentinelErr) {
+			t.Fatalf("error cache load = (%v, %v), want (nil, %v)", got, err, sentinelErr)
+		}
+	}
+	if errCalls.Load() != 1 {
+		t.Fatalf("error cache parsed %d times, want 1", errCalls.Load())
+	}
+
+	// Concurrent loads remain race-free and keep the LRU bounded.
+	var wg sync.WaitGroup
+	for i := range 16 {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			name := fmt.Sprintf("/repo/lib-%d/tsconfig.json", idx%4)
+			got, err := cache.load(name, parse)
+			if err != nil || got != configs[name] {
+				t.Errorf("concurrent load(%s) = (%p, %v), want %p", name, got, err, configs[name])
+			}
+		}(i)
+	}
+	wg.Wait()
+	if len(cache.lru) != maxPlanReferenceCacheEntries {
+		t.Fatalf("final cache.lru len = %d, want %d", len(cache.lru), maxPlanReferenceCacheEntries)
 	}
 }

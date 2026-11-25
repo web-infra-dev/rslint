@@ -100,6 +100,64 @@ func (p *ProgramRootIdentityProjector) Freeze(programs []*lintprogram.Program) [
 	return identities
 }
 
+// FreezePerProgram resolves physical root identities across all programs in one
+// deduplicated pass (avoiding repeated physical lookups for shared roots such
+// as declaration files) and attributes each unique canonical identity to the
+// first program in declaration order that declares it.
+func (p *ProgramRootIdentityProjector) FreezePerProgram(programs []*lintprogram.Program) [][]string {
+	if len(programs) == 0 {
+		return nil
+	}
+	rootPaths := make([]string, 0)
+	rootProgram := make([]int, 0)
+	seenRootPaths := make(map[string]struct{})
+	for progIndex, program := range programs {
+		if !program.CanProvideProgramDiagnostics() {
+			continue
+		}
+		for _, rootPath := range program.RootFileNames() {
+			rootPath = tspath.NormalizePath(rootPath)
+			rootPathID := exactPathID(rootPath)
+			if _, seen := seenRootPaths[rootPathID]; seen {
+				continue
+			}
+			seenRootPaths[rootPathID] = struct{}{}
+			rootPaths = append(rootPaths, rootPath)
+			rootProgram = append(rootProgram, progIndex)
+		}
+	}
+
+	resolver := p.resolver
+	canonicalIDs := make([]string, len(rootPaths))
+	unknownPaths := make([]string, 0, len(rootPaths))
+	unknownIndexes := make([]int, 0, len(rootPaths))
+	for index, rootPath := range rootPaths {
+		rootPathID := exactPathID(rootPath)
+		if canonicalID, known := resolver.knownCanonicalID(rootPathID); known {
+			canonicalIDs[index] = canonicalID
+			continue
+		}
+		unknownPaths = append(unknownPaths, rootPath)
+		unknownIndexes = append(unknownIndexes, index)
+	}
+	resolvedUnknown := p.freezeUnknown(unknownPaths)
+	for index, canonicalID := range resolvedUnknown {
+		canonicalIDs[unknownIndexes[index]] = canonicalID
+	}
+
+	perProgram := make([][]string, len(programs))
+	seenIdentities := make(map[string]struct{}, len(canonicalIDs))
+	for index, canonicalID := range canonicalIDs {
+		if _, seen := seenIdentities[canonicalID]; seen {
+			continue
+		}
+		seenIdentities[canonicalID] = struct{}{}
+		progIndex := rootProgram[index]
+		perProgram[progIndex] = append(perProgram[progIndex], canonicalID)
+	}
+	return perProgram
+}
+
 func (p *ProgramRootIdentityProjector) freezeUnknown(paths []string) []string {
 	if len(paths) == 0 {
 		return nil

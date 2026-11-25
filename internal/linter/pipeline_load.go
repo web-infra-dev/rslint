@@ -109,6 +109,9 @@ func executeObservation(
 	if plan.SingleThreaded || len(loads) <= 1 {
 		for i := range loads {
 			run(i, nil)
+			if errs[i] != nil {
+				break
+			}
 		}
 	} else {
 		runWithProgramAdmission(estimates, runtime.GOMAXPROCS(0), run)
@@ -140,8 +143,18 @@ func mergeObservationUnits(parts []observationUnitExecution, index int) (observa
 	} else {
 		combined.native.lint = &LintResult{ExecutedRules: make(map[string]struct{})}
 		var plugins []EslintPluginDispatchOutcome
+		var seenRootIDs map[string]struct{}
 		for _, part := range parts {
-			combined.programRootIdentities = append(combined.programRootIdentities, part.programRootIdentities...)
+			for _, id := range part.programRootIdentities {
+				if seenRootIDs == nil {
+					seenRootIDs = make(map[string]struct{}, len(part.programRootIdentities))
+				}
+				if _, seen := seenRootIDs[id]; seen {
+					continue
+				}
+				seenRootIDs[id] = struct{}{}
+				combined.programRootIdentities = append(combined.programRootIdentities, id)
+			}
 			native := part.native
 			combined.native.syntacticDiagnostics = append(combined.native.syntacticDiagnostics, native.syntacticDiagnostics...)
 			combined.native.diagnostics = append(combined.native.diagnostics, native.diagnostics...)

@@ -303,25 +303,32 @@ func directRootOwners(
 
 func bindTargetToProgram(
 	binding *LoadResult,
+	mappingsByProgram []map[string]target.File,
 	set ProjectSet,
 	programFiles *programFileIndex,
 	programIndexes []int,
 	programIndex int,
-	target target.File,
+	file target.File,
 ) bool {
 	if programIndex < 0 || programIndex >= len(set.compilerPrograms) {
 		return false
 	}
-	sourceFile := exactProgramSourceFile(set.compilerPrograms[programIndex], target.Path)
+	sourceFile := exactProgramSourceFile(set.compilerPrograms[programIndex], file.Path)
 	if sourceFile == nil {
-		sourceFile = programFiles.sourceFile(programIndexes, programIndex, target.CanonicalPath)
+		sourceFile = programFiles.sourceFile(programIndexes, programIndex, file.CanonicalPath)
 	}
 	if sourceFile == nil {
 		return false
 	}
 	sourcePath := sourceFile.FileName()
 	binding.TargetsByProgram[programIndex] = append(binding.TargetsByProgram[programIndex], sourcePath)
-	storeSourceTargetMapping(binding.LintTargetBySourcePath, sourcePath, target.CanonicalPath, target)
+	storeSourceTargetMapping(binding.LintTargetBySourcePath, sourcePath, file.CanonicalPath, file)
+	if mappingsByProgram != nil {
+		if mappingsByProgram[programIndex] == nil {
+			mappingsByProgram[programIndex] = make(map[string]target.File)
+		}
+		storeSourceTargetMapping(mappingsByProgram[programIndex], sourcePath, file.CanonicalPath, file)
+	}
 	return true
 }
 
@@ -330,13 +337,28 @@ func (s *Session) bindTargetsToProjects(
 	plan target.Plan,
 	singleThreaded bool,
 ) (LoadResult, []target.File) {
+	binding, unbound, _ := s.bindTargetsToProjectsWithPerProgramMappings(set, plan, singleThreaded, false)
+	return binding, unbound
+}
+
+func (s *Session) bindTargetsToProjectsWithPerProgramMappings(
+	set ProjectSet,
+	plan target.Plan,
+	singleThreaded bool,
+	perProgram bool,
+) (LoadResult, []target.File, []map[string]target.File) {
 	fsys := s.FS()
 	binding := LoadResult{
-		compilerPrograms:       append([]*compiler.Program(nil), set.compilerPrograms...),
-		Programs:               append([]*lintprogram.Program(nil), set.programs...),
-		TargetsByProgram:       make([][]string, len(set.compilerPrograms)),
-		LintTargetBySourcePath: make(map[string]target.File),
-		ProgramRootIdentities:  set.programRootIdentities,
+		compilerPrograms:      append([]*compiler.Program(nil), set.compilerPrograms...),
+		Programs:              append([]*lintprogram.Program(nil), set.programs...),
+		TargetsByProgram:      make([][]string, len(set.compilerPrograms)),
+		ProgramRootIdentities: set.programRootIdentities,
+	}
+	var mappingsByProgram []map[string]target.File
+	if perProgram {
+		mappingsByProgram = make([]map[string]target.File, len(set.compilerPrograms))
+	} else {
+		binding.LintTargetBySourcePath = make(map[string]target.File)
 	}
 
 	var unbound []target.File
@@ -356,6 +378,7 @@ func (s *Session) bindTargetsToProjects(
 		})
 		if bindTargetToProgram(
 			&binding,
+			mappingsByProgram,
 			set,
 			programFiles,
 			programIndexes,
@@ -371,6 +394,7 @@ func (s *Session) bindTargetsToProjects(
 		for _, programIndex := range programIndexes {
 			if bindTargetToProgram(
 				&binding,
+				mappingsByProgram,
 				set,
 				programFiles,
 				programIndexes,
@@ -386,5 +410,5 @@ func (s *Session) bindTargetsToProjects(
 			storeSourceTargetMapping(binding.LintTargetBySourcePath, target.Path, target.CanonicalPath, target)
 		}
 	}
-	return binding, unbound
+	return binding, unbound, mappingsByProgram
 }
