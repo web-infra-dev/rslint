@@ -78,9 +78,26 @@ function read(value: { x?: number }) {
 }
 ```
 
-The computed-property exception applies only to `??=` writes through a union of
-keys, where TypeScript intersects the property types. It does not suppress
-diagnostics for ordinary reads.
+Async and generator callbacks return objects, regardless of the value in their
+`return` statement. For example, `flags.filter(async () => false)` keeps every
+element. rslint reports the callback as always truthy instead of reporting its
+body as always falsy.
+
+Logical assignments check the value being read, including control-flow narrowing.
+For accessors, this is the getter's type; for a union of keys, it is the union of
+the selected read types. Setter types and write intersections must not determine
+whether the condition is necessary. For example, this `??=` remains necessary:
+
+```typescript
+interface Box {
+  get value(): number | undefined;
+  set value(reset: null);
+}
+
+function reset(box: Box) {
+  box['value'] ??= null;
+}
+```
 
 ## Original Documentation
 

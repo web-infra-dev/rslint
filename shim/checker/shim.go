@@ -127,10 +127,14 @@ func Checker_isArrayType(recv *checker.Checker, t *checker.Type) bool
 func Checker_isArrayOrTupleType(recv *checker.Checker, t *checker.Type) bool
 //go:linkname Checker_getDeclaredTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getDeclaredTypeOfSymbol
 func Checker_getDeclaredTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
+//go:linkname Checker_getStringLiteralType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getStringLiteralType
+func Checker_getStringLiteralType(recv *checker.Checker, value string) *checker.Type
 //go:linkname Checker_getBaseTypeOfLiteralType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseTypeOfLiteralType
 func Checker_getBaseTypeOfLiteralType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getWidenedLiteralLikeTypeForContextualType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedLiteralLikeTypeForContextualType
 func Checker_getWidenedLiteralLikeTypeForContextualType(recv *checker.Checker, t *checker.Type, contextualType *checker.Type) *checker.Type
+//go:linkname Checker_getIndexedAccessTypeOrUndefined github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getIndexedAccessTypeOrUndefined
+func Checker_getIndexedAccessTypeOrUndefined(recv *checker.Checker, objectType *checker.Type, indexType *checker.Type, accessFlags checker.AccessFlags, accessNode *ast.Node, alias *checker.TypeAlias) *checker.Type
 //go:linkname Checker_getBaseConstraintOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseConstraintOfType
 func Checker_getBaseConstraintOfType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getContextualType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getContextualType
@@ -141,6 +145,8 @@ func Checker_getContextualTypeForArgumentAtIndex(recv *checker.Checker, callTarg
 func Checker_getApparentTypeOfContextualType(recv *checker.Checker, node *ast.Node, contextFlags checker.ContextFlags) *checker.Type
 //go:linkname Checker_getAwaitedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAwaitedType
 func Checker_getAwaitedType(recv *checker.Checker, t *checker.Type) *checker.Type
+//go:linkname Checker_getFlowTypeOfReference github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getFlowTypeOfReference
+func Checker_getFlowTypeOfReference(recv *checker.Checker, reference *ast.Node, declaredType *checker.Type) *checker.Type
 //go:linkname Checker_getAccessedPropertyName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAccessedPropertyName
 func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (string, bool)
 //go:linkname Checker_getPropertyNameForKnownSymbolName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertyNameForKnownSymbolName

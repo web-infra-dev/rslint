@@ -168,6 +168,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
+		checkTypePredicates := opts.checkTypePredicates
 		tc := ctx.TypeChecker
 
 		compilerOptions := ctx.Program().Options()
@@ -210,32 +211,20 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			})
 		}
 
-		isNullableMemberExpression := func(node *ast.Node) bool {
-			if !ast.IsAccessExpression(node) {
+		isPossiblyMissingIndexedRead := func(node *ast.Node) bool {
+			if !ast.IsElementAccessExpression(node) {
 				return false
 			}
-			objectType := ctx.TypeChecker.GetTypeAtLocation(node.Expression())
-			if ast.IsElementAccessExpression(node) {
-				propertyType := ctx.TypeChecker.GetTypeAtLocation(node.AsElementAccessExpression().ArgumentExpression)
-				return isNullablePropertyType(tc, objectType, propertyType, false)
-			}
-			// PropertyAccessExpression — use Checker_getAccessedPropertyName for
-			// correct handling of private fields (#prop) and computed properties
-			propName, ok := checker.Checker_getAccessedPropertyName(tc, node)
-			if !ok {
+			// A nullable declared read type and a non-nullish flow type mean
+			// the access was narrowed. Do not widen it back to its declaration.
+			declaredType := getDeclaredMemberReadType(tc, node)
+			if declaredType == nil || isPossiblyNullish(declaredType) {
 				return false
 			}
-			propSymbol := checker.Checker_getPropertyOfType(tc, objectType, propName)
-			if propSymbol == nil {
-				// Fallback for private fields (#prop) — getPropertyOfType uses
-				// the display name but private fields have internal escaped names.
-				// GetSymbolAtLocation resolves private fields correctly.
-				propSymbol = tc.GetSymbolAtLocation(node)
-			}
-			if propSymbol != nil && utils.IsSymbolFlagSet(propSymbol, ast.SymbolFlagsOptional) {
-				return true
-			}
-			return false
+			element := node.AsElementAccessExpression()
+			objectType := utils.GetConstrainedTypeAtLocation(tc, element.Expression)
+			propertyType := utils.GetConstrainedTypeAtLocation(tc, element.ArgumentExpression)
+			return isNullablePropertyType(tc, objectType, propertyType, false)
 		}
 
 		// --- Core check functions ---
@@ -266,7 +255,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				binExpr := expression.AsBinaryExpression()
 				op := binExpr.OperatorToken.Kind
 				if op == ast.KindAmpersandAmpersandToken || op == ast.KindBarBarToken {
-					if check == 0 && isOnlyUsedForTruthiness(expression, tc, opts.checkTypePredicates) {
+					if check == 0 && isOnlyUsedForTruthiness(expression, tc, checkTypePredicates) {
 						check = checkBoth
 					}
 					if check != checkBoth {
@@ -288,7 +277,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			t := utils.GetConstrainedTypeAtLocation(tc, expression)
+			t := getConstrainedConditionType(tc, expression)
 			if isConditionalAlwaysNecessary(t) {
 				return
 			}
@@ -315,13 +304,13 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			}
 		}
 
-		checkNodeForNullish := func(node *ast.Node, isAssignment bool) {
+		checkNodeForNullish := func(node *ast.Node) {
 			// Match upstream: the rule operates on the ESTree node, which has no
 			// parenthesized-expression wrapper, so `(x) ?? y` reports on `x`.
 			// tsgo's AST keeps ParenthesizedExpression nodes, so skip them to
 			// align the reported range with typescript-eslint (mirrors checkNode).
 			node = ast.SkipParentheses(node)
-			t := utils.GetConstrainedTypeAtLocation(tc, node)
+			t := getConstrainedConditionType(tc, node)
 
 			// Conditional is always necessary if it involves any, unknown, or type parameter
 			if utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsTypeParameter|checker.TypeFlagsTypeVariable|checker.TypeFlagsConditional) {
@@ -339,7 +328,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				if !isNoUncheckedIndexedAccess && isArrayIndexExpression(node) {
 					return
 				}
-				if ast.IsAccessExpression(node) && isNullableMemberExpression(node) {
+				if !isNoUncheckedIndexedAccess && isPossiblyMissingIndexedRead(node) {
 					return
 				}
 				if !isNoUncheckedIndexedAccess &&
@@ -350,7 +339,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if isAlwaysNullish(t) && (!isAssignment || !hasPossiblyNonNullishComputedMemberProperty(tc, node)) {
+			if isAlwaysNullish(t) {
 				ctx.ReportNode(node, buildAlwaysNullishMessage())
 				return
 			}
@@ -401,7 +390,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 		checkLogicalExpressionForUnnecessaryConditionals := func(node *ast.Node) {
 			binExpr := node.AsBinaryExpression()
 			if binExpr.OperatorToken.Kind == ast.KindQuestionQuestionToken {
-				checkNodeForNullish(binExpr.Left, false)
+				checkNodeForNullish(binExpr.Left)
 				return
 			}
 			// Only check the left side
@@ -595,7 +584,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 		checkCallExpression := func(node *ast.Node) {
 			callExpr := node.AsCallExpression()
 
-			if opts.checkTypePredicates {
+			if checkTypePredicates {
 				// Check for truthiness assertion functions
 				truthinessArg := typescriptutil.FindTruthinessAssertedArgument(tc, callExpr)
 				if truthinessArg != nil {
@@ -624,7 +613,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			if utils.IsArrayMethodCallWithPredicate(tc, callExpr) && len(callExpr.Arguments.Nodes) > 0 {
 				callback := ast.SkipParentheses(callExpr.Arguments.Nodes[0])
 
-				if ast.IsArrowFunction(callback) || ast.IsFunctionExpression(callback) {
+				if (ast.IsArrowFunction(callback) || ast.IsFunctionExpression(callback)) && ast.GetFunctionFlags(callback) == ast.FunctionFlagsNormal {
 					body := callback.Body()
 					if body != nil && !ast.IsBlock(body) {
 						// Arrow function with expression body: () => something
@@ -685,7 +674,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			case ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken:
 				checkNode(assignExpr.Left, false, nil, checkBoth)
 			case ast.KindQuestionQuestionEqualsToken:
-				checkNodeForNullish(assignExpr.Left, true)
+				checkNodeForNullish(assignExpr.Left)
 			}
 		}
 
@@ -786,32 +775,46 @@ const (
 	checkBoth = checkTruthy | checkFalsy
 )
 
-func hasPossiblyNonNullishComputedMemberProperty(tc *checker.Checker, node *ast.Node) bool {
-	if !ast.IsElementAccessExpression(node) || ast.IsOptionalChain(node) {
-		return false
-	}
-	element := node.AsElementAccessExpression()
-	objectType := utils.GetConstrainedTypeAtLocation(tc, element.Expression)
-	propertyType := utils.GetConstrainedTypeAtLocation(tc, element.ArgumentExpression)
-	// Writes through a union key use the intersection of the property types.
-	// A read or a single-key write still has meaningful flow narrowing.
-	if !propertyType.IsUnion() {
-		return false
-	}
-	possiblyNonNullish := false
-	for _, keyType := range utils.UnionTypeParts(propertyType) {
-		if !checker.IsTypeUsableAsPropertyName(keyType) {
-			return false
+// Logical assignments test the value being read, even when the checker gives
+// their left-hand side a setter type or an intersection of writable properties.
+func getConstrainedConditionType(tc *checker.Checker, node *ast.Node) *checker.Type {
+	if ast.IsAccessExpression(node) || ast.IsNonNullExpression(node) {
+		target := ast.GetAssignmentTarget(node)
+		if target != nil && ast.IsBinaryExpression(target) && ast.IsLogicalOrCoalescingAssignmentOperator(target.AsBinaryExpression().OperatorToken.Kind) {
+			if ast.IsNonNullExpression(node) {
+				return tc.GetNonNullableType(getConstrainedConditionType(tc, ast.SkipParentheses(node.Expression())))
+			}
+			if readType := getDeclaredMemberReadType(tc, node); readType != nil {
+				flowType := checker.Checker_getFlowTypeOfReference(tc, node, readType)
+				if constraint := checker.Checker_getBaseConstraintOfType(tc, flowType); constraint != nil {
+					return constraint
+				}
+				return flowType
+			}
 		}
-		selectedType := tc.GetTypeOfPropertyOfType(objectType, checker.GetPropertyNameFromType(keyType))
-		if selectedType == nil {
-			return false
-		}
-		possiblyNonNullish = possiblyNonNullish || !utils.Every(utils.UnionTypeParts(selectedType), func(part *checker.Type) bool {
-			return utils.IsTypeFlagSet(part, possiblyNullishFlag)
-		})
 	}
-	return possiblyNonNullish
+	return utils.GetConstrainedTypeAtLocation(tc, node)
+}
+
+func getDeclaredMemberReadType(tc *checker.Checker, node *ast.Node) *checker.Type {
+	var keyType *checker.Type
+	if ast.IsElementAccessExpression(node) {
+		keyType = utils.GetConstrainedTypeAtLocation(tc, node.AsElementAccessExpression().ArgumentExpression)
+	} else {
+		// Symbol lookup also resolves private fields and inherited accessors.
+		if symbol := tc.GetSymbolAtLocation(node); symbol != nil {
+			return checker.Checker_getTypeOfSymbol(tc, symbol)
+		}
+		name, ok := checker.Checker_getAccessedPropertyName(tc, node)
+		if !ok {
+			return nil
+		}
+		keyType = checker.Checker_getStringLiteralType(tc, name)
+	}
+	objectType := utils.GetConstrainedTypeAtLocation(tc, node.Expression())
+	// With no access node, this query computes a read type without using the
+	// assignment target's write context or changing its cached resolution.
+	return checker.Checker_getIndexedAccessTypeOrUndefined(tc, objectType, keyType, checker.AccessFlagsExpressionPosition, nil, nil)
 }
 
 func isOnlyUsedForTruthiness(node *ast.Node, tc *checker.Checker, checkTypePredicates bool) bool {
@@ -850,7 +853,7 @@ func isOnlyUsedForTruthiness(node *ast.Node, tc *checker.Checker, checkTypePredi
 	case ast.KindReturnStatement:
 		callback = ast.GetContainingFunction(parent)
 	}
-	if callback != nil && (ast.IsArrowFunction(callback) || ast.IsFunctionExpression(callback)) {
+	if callback != nil && (ast.IsArrowFunction(callback) || ast.IsFunctionExpression(callback)) && ast.GetFunctionFlags(callback) == ast.FunctionFlagsNormal {
 		call := ast.WalkUpParenthesizedExpressions(callback.Parent)
 		if ast.IsCallExpression(call) {
 			expression := call.AsCallExpression()

@@ -503,3 +503,80 @@ func TestNoUnnecessaryConditionOmittedForCondition(t *testing.T) {
 		{Code: "declare function next(): boolean;\nfor (next() || next() || next();;) { break; }\n"},
 	}, nil)
 }
+
+func TestNoUnnecessaryConditionWrappedCallbacks(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, callback := range []string{
+		"async () => false",
+		"async flag => flag",
+		"async flag => (flag && true) || other",
+		"async function(flag) { return (flag && true) || other; }",
+		"function* () { return false; }",
+		"async function* () { return false; }",
+	} {
+		for _, wrapped := range []string{callback, "((" + callback + "))"} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code:   "declare const flags: boolean[];\ndeclare const other: boolean;\nflags.filter(" + wrapped + ");\n",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthyFunc"}},
+			})
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, nil, invalid)
+}
+
+func TestNoUnnecessaryConditionNarrowedIndexedReads(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, config := range []string{"tsconfig.json", "tsconfig.noUncheckedIndexedAccess.json", "tsconfig.exactOptionalPropertyTypes.json"} {
+		for _, test := range []struct{ declaration, object, key string }{
+			{"", "Record<string, number | undefined>", "0"},
+			{"declare const key: 0;\n", "Record<string, number | undefined>", "key"},
+			{"declare const key: unique symbol;\n", "Record<symbol, number | undefined>", "key"},
+			{"", "{ value?: number }", "'value'"},
+		} {
+			for _, body := range []string{
+				fmt.Sprintf("table[%s] = 1; return table[%s] ?? 42;", test.key, test.key),
+				fmt.Sprintf("if (table[%s] !== undefined) return table[%s] ?? 42;", test.key, test.key),
+				fmt.Sprintf("table[%s] = 1; table[%s] ??= 42;", test.key, test.key),
+			} {
+				invalid = append(invalid, rule_tester.InvalidTestCase{
+					Code:     test.declaration + fmt.Sprintf("function read(table: %s) { %s }\n", test.object, body),
+					TSConfig: config,
+					Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}},
+				})
+			}
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, nil, invalid)
+}
+
+func TestNoUnnecessaryConditionAccessorAssignments(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+	for _, config := range []string{"tsconfig.json", "tsconfig.noUncheckedIndexedAccess.json", "tsconfig.exactOptionalPropertyTypes.json"} {
+		for _, access := range []string{"box.value", "(box['value'])", "box[(key)]"} {
+			for _, test := range []struct{ read, write, assignment, message string }{
+				{"number | undefined", "null", "??= null", ""},
+				{"boolean", "undefined", "&&= undefined", ""},
+				{"number", "undefined", "??= undefined", "neverNullish"},
+				{"undefined", "number", "??= 1", "alwaysNullish"},
+				{"0", "1", "||= 1", "alwaysFalsy"},
+				{"true", "false", "&&= false", "alwaysTruthy"},
+			} {
+				code := fmt.Sprintf("interface Base { get value(): %s; set value(reset: %s); }\ninterface Box extends Base {}\nfunction reset(box: Box) { const key = 'value'; %s %s; }\n", test.read, test.write, access, test.assignment)
+				if test.message == "" {
+					valid = append(valid, rule_tester.ValidTestCase{Code: code, TSConfig: config})
+				} else {
+					invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: test.message}}})
+				}
+			}
+		}
+		valid = append(valid, rule_tester.ValidTestCase{Code: "class Box { get #value(): number | undefined { return undefined; } set #value(reset: null) {} reset() { this.#value ??= null; } }\n", TSConfig: config})
+		invalid = append(invalid,
+			rule_tester.InvalidTestCase{Code: "class Box { get #value(): number { return 7; } set #value(reset: undefined) {} reset() { this.#value ??= undefined; } }\n", TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish"}}},
+			rule_tester.InvalidTestCase{Code: "function read(o: {x?: number}) {\n  if (o.x === undefined) return o['x'] ??= 42;\n}\n", TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysNullish", Line: 2, Column: 33}}},
+			rule_tester.InvalidTestCase{Code: "interface Box { get value(): 0; set value(reset: 1); }\nfunction reset(box: Box) { (box['value'])! ||= 1; }\n", TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysFalsy"}}},
+			rule_tester.InvalidTestCase{Code: "interface Box { get value(): true; set value(reset: false); }\nfunction reset(box: Box) { box['value']! &&= false; }\n", TSConfig: config, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy"}}},
+		)
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, valid, invalid)
+}
