@@ -344,9 +344,10 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 		}
 		snapshot, readErr := readEntries(path)
 		if readErr != nil {
-			return readErr
-		}
-		if !change(snapshot) {
+			if !errors.Is(readErr, fs.ErrNotExist) {
+				return readErr
+			}
+		} else if !change(snapshot) {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -391,6 +392,9 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 			f.entries = data
 			return nil
 		case errors.Is(err, fs.ErrNotExist):
+			if link, lstatErr := os.Lstat(path); lstatErr == nil && link.Mode()&fs.ModeSymlink != 0 {
+				return fmt.Errorf("cannot resolve suppressions destination %q", path)
+			}
 			if err := f.missing(path); err != nil {
 				return err
 			}

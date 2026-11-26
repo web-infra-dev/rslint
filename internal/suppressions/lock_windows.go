@@ -15,13 +15,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Lock a single byte far beyond EOF so mandatory Windows byte-range locks
-// serialize writers across all login sessions without blocking readers.
-const (
-	baselineLockOffsetLow  = 0xffffffff
-	baselineLockOffsetHigh = 0x7fffffff
-)
-
 type lockedBaseline struct {
 	file   *os.File
 	mode   fs.FileMode
@@ -71,10 +64,10 @@ func lockExistingBaseline(ctx context.Context, path string) (*lockedBaseline, er
 			return nil, err
 		}
 		ov := windows.Overlapped{
-			Offset:     baselineLockOffsetLow,
-			OffsetHigh: baselineLockOffsetHigh,
+			Offset:     uint32(baselineLockOffset),
+			OffsetHigh: uint32(uint64(baselineLockOffset) >> 32),
 		}
-		if err := windows.LockFileEx(windows.Handle(f.Fd()), windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &ov); err != nil {
+		if err := windows.LockFileEx(windows.Handle(f.Fd()), windows.LOCKFILE_EXCLUSIVE_LOCK, 0, baselineLockLength, 0, &ov); err != nil {
 			_ = f.Close()
 			_ = root.Close()
 			return nil, err
@@ -106,10 +99,10 @@ func lockExistingBaseline(ctx context.Context, path string) (*lockedBaseline, er
 
 func unlockWindowsHandle(f *os.File) {
 	ov := windows.Overlapped{
-		Offset:     baselineLockOffsetLow,
-		OffsetHigh: baselineLockOffsetHigh,
+		Offset:     uint32(baselineLockOffset),
+		OffsetHigh: uint32(uint64(baselineLockOffset) >> 32),
 	}
-	_ = windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &ov)
+	_ = windows.UnlockFileEx(windows.Handle(f.Fd()), 0, baselineLockLength, 0, &ov)
 	_ = f.Close()
 }
 
