@@ -46,18 +46,15 @@ import {
 
 /**
  * The forwarded subset of ESLint flat-config `languageOptions` exposed
- * to plugin rules as `context.languageOptions`. Plugin rules read it
- * to branch on `languageOptions.parserOptions.ecmaFeatures.jsx`,
- * `languageOptions.sourceType`, or `languageOptions.globals`.
+ * to plugin rules as `context.languageOptions`.
  *
- * Field set matches what the wire payload from Go carries in each file's
- * `languageOptions` (computed by Go via `GetConfigForFile`); out-of-band
- * fields the runner doesn't reproduce (custom `parser`,
- * `parserOptions.project`, `parserOptions.tsconfigRootDir`) are
- * intentionally absent. This is the contract the linter package and the
- * plugin runtime share — any change here must update both
- * `ecma-language-plugin.ts:LintFileRequest` and Go's
- * `EslintPluginLintFile.LanguageOptions`.
+ * The core fields (`ecmaVersion`, `sourceType`, `globals`,
+ * `parserOptions.ecmaFeatures`) match Go's `EslintPluginLintFile.LanguageOptions`
+ * wire contract — any change to those fields must stay in sync with
+ * `ecma-language-plugin.ts:LintFileRequest` and Go's wire type. The optional
+ * TypeScript syntax-only flags (`emitDecoratorMetadata`,
+ * `experimentalDecorators`, `isolatedDeclarations`) are forwarded to
+ * `lintFile`'s `services` factory by direct callers and future bridge wiring.
  */
 export interface LanguageOptions {
   /**
@@ -84,6 +81,9 @@ export interface LanguageOptions {
       globalReturn?: boolean;
       impliedStrict?: boolean;
     };
+    emitDecoratorMetadata?: boolean;
+    experimentalDecorators?: boolean;
+    isolatedDeclarations?: boolean;
   };
 }
 

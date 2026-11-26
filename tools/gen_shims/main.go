@@ -5,24 +5,36 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/types"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
-	"golang.org/x/tools/go/packages"
 	"log"
 	"maps"
 	"os"
 	"path"
 	"slices"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"golang.org/x/tools/go/packages"
 )
 
 const tsgoInternalPrefix = "github.com/microsoft/TypeScript/tsc/internal/"
 
 type ExtraShim struct {
-	ExtraFunctions  []string              `json:"ExtraFunctions"`
-	ExtraMethods    map[string]([]string) `json:"ExtraMethods"`
-	ExtraFields     map[string]([]string) `json:"ExtraFields"`
-	IgnoreFunctions []string              `json:"IgnoreFunctions"`
+	ExtraFunctions  []string            `json:"ExtraFunctions"`
+	ExtraMethods    map[string][]string `json:"ExtraMethods"`
+	ExtraFields     map[string][]string `json:"ExtraFields"`
+	IgnoreFunctions []string            `json:"IgnoreFunctions"`
+}
+
+func emitFieldAccessor(out *strings.Builder, receiver *types.Named, selector string, qualifier types.Qualifier) {
+	member, _, _ := types.LookupFieldOrMethod(receiver, true, receiver.Obj().Pkg(), selector)
+	field, ok := member.(*types.Var)
+	if !ok || !field.IsField() {
+		log.Fatalf("expected %s to contain field %s", receiver.Obj().Name(), selector)
+	}
+	name := receiver.Obj().Name()
+	fmt.Fprintf(out, "func %s_%s(v *%s) %s {\n  return ((*extra_%s)(unsafe.Pointer(v))).%s\n}\n",
+		name, selector, types.TypeString(receiver, qualifier), types.TypeString(field.Type(), qualifier), name, selector)
 }
 
 // check whether signature can be exported
@@ -73,6 +85,8 @@ func main() {
 		"ls",
 		"locale",
 		"module",
+		"nodebuilder",
+		"printer",
 		"project",
 		"project/logging",
 		"api",
@@ -106,21 +120,10 @@ func main() {
 		extraShimFilePath := path.Join(shimDirPath, "extra-shim.json")
 		if data, err := os.ReadFile(extraShimFilePath); err == nil {
 			if err := json.Unmarshal(data, &extraShim); err != nil {
-				fmt.Printf("error parsing %v: %v", extraShimFilePath, err)
-				return
+				log.Fatalf("error parsing %s: %v", extraShimFilePath, err)
 			}
-		}
-		if extraShim.ExtraMethods == nil {
-			extraShim.ExtraMethods = map[string][]string{}
-		}
-		if extraShim.ExtraFunctions == nil {
-			extraShim.ExtraFunctions = []string{}
-		}
-		if extraShim.ExtraFields == nil {
-			extraShim.ExtraFields = map[string]([]string){}
-		}
-		if extraShim.IgnoreFunctions == nil {
-			extraShim.IgnoreFunctions = []string{}
+		} else if !os.IsNotExist(err) {
+			log.Fatalf("error reading %s: %v", extraShimFilePath, err)
 		}
 
 		// true if directly used, false otherwise
@@ -344,8 +347,6 @@ func main() {
 					importPackage("unsafe", true)
 
 					matchedExtraFields[name] = true
-					mirrorStructName := "extra_" + name
-
 					var emitExtraStruct func(name string, s *types.Struct)
 					emitExtraStruct = func(name string, s *types.Struct) {
 						shimBuilder.WriteString("type extra_")
@@ -384,7 +385,7 @@ func main() {
 											string
 											*types.Struct
 										}{n, structType})
-										shimBuilder.WriteString("extra_")
+										shimBuilder.WriteString("*extra_")
 										shimBuilder.WriteString(n)
 										continue
 									}
@@ -411,34 +412,8 @@ func main() {
 
 					emitExtraStruct(name, structType)
 
-					mappedFieldTypes := make(map[string]*types.Var, structType.NumFields())
-					for field := range structType.Fields() {
-						mappedFieldTypes[field.Name()] = field
-					}
-
 					for _, field := range extraShim.ExtraFields[name] {
-						shimBuilder.WriteString("func ")
-						shimBuilder.WriteString(name)
-						shimBuilder.WriteByte('_')
-						shimBuilder.WriteString(field)
-						shimBuilder.WriteString("(v *")
-						shimBuilder.WriteString(pkg.Name)
-						shimBuilder.WriteByte('.')
-						shimBuilder.WriteString(name)
-						shimBuilder.WriteString(") ")
-
-						fieldVar, ok := mappedFieldTypes[field]
-						if !ok {
-							log.Fatalf("expected struct %q to contain field %q", name, field)
-						}
-						shimBuilder.WriteString(types.TypeString(fieldVar.Type(), qualifierOnlyPackageName))
-						shimBuilder.WriteString(" {\n")
-						shimBuilder.WriteString("  return ((*")
-						shimBuilder.WriteString(mirrorStructName)
-						shimBuilder.WriteString(")(unsafe.Pointer(v))).")
-						shimBuilder.WriteString(field)
-						shimBuilder.WriteString("\n")
-						shimBuilder.WriteString("}\n")
+						emitFieldAccessor(&shimBuilder, named, field, qualifierOnlyPackageName)
 					}
 				}
 			case *types.Const:
@@ -459,6 +434,11 @@ func main() {
 		}
 
 		exit := false
+		for name, found := range matchedExtraFields {
+			if !found {
+				log.Fatalf("couldn't find struct %s.%s for field access", pkg.Name, name)
+			}
+		}
 		for fnName, found := range matchedExtraFunctions {
 			if found {
 				continue
@@ -498,12 +478,9 @@ func main() {
 		shimHeaderBuilder.WriteString("\n")
 
 		shimGoPath := path.Join(shimDirPath, "shim.go")
-		file, err := os.Create(shimGoPath)
-		if err != nil {
-			log.Fatalf("error opening shim file for writing: %v", err)
+		if err := os.WriteFile(shimGoPath, []byte(shimHeaderBuilder.String()+shimBuilder.String()), 0o644); err != nil {
+			log.Fatalf("error writing %s: %v", shimGoPath, err)
 		}
-		file.WriteString(shimHeaderBuilder.String())
-		file.WriteString(shimBuilder.String())
 
 		shimHeaderBuilder.Reset()
 		shimBuilder.Reset()

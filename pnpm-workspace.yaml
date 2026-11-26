@@ -33,6 +33,7 @@ catalog:
   '@eslint-community/eslint-plugin-eslint-comments': ^4.8.1
   '@eslint/plugin-kit': ^0.7.3
   '@stylistic/eslint-plugin': ^5.10.0
+  '@typescript-eslint/eslint-plugin': ^8.65.0
   '@typescript-eslint/parser': ^8.65.0
   '@typescript-eslint/scope-manager': ^8.65.0
   '@typescript-eslint/visitor-keys': ^8.65.0

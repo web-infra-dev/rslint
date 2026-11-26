@@ -14,7 +14,8 @@
  * eslint-scope on `.ts` files would silently miscount `Variable.references`
  * for the TS-only constructs.
  *
- * Selection is by file extension; languageOptions can override globals
+ * TypeScript parser services select the TS analyzer even in JS files.
+ * Otherwise selection is by file extension. languageOptions can override globals
  * (forwarded per-file in the wire request's `languageOptions`, which Go
  * computes via `GetConfigForFile`).
  */
@@ -38,6 +39,13 @@ import {
 import type { GlobalAccess } from './types.js';
 
 type NormalizedGlobalAccess = 'readonly' | 'writable' | 'off';
+
+export interface ScopeCompilerOptions {
+  readonly jsxFactory?: string;
+  readonly jsxFragmentFactory?: string;
+  readonly lib?: readonly string[];
+  readonly target?: number;
+}
 
 /** Subset of options accepted by both analyzers. */
 export interface ScopeFactoryOptions {
@@ -71,22 +79,23 @@ export interface ScopeFactoryOptions {
    * `nodejsScope` to eslint-scope.
    */
   globalReturn?: boolean;
-  /**
-   * `languageOptions.parserOptions.ecmaFeatures.jsxPragma`. The TS
-   * scope-manager treats `<X />` as a reference to this identifier so
-   * `no-unused-vars` on the JSX-pragma import doesn't false-positive.
-   * Defaults to `'React'` to match the historical behaviour, but
-   * Preact / Vue JSX configurations override it.
-   */
   jsxPragma?: string;
-  /**
-   * `languageOptions.parserOptions.ecmaFeatures.jsxFragmentName`. The
-   * TS scope-manager treats `<>...</>` as a reference to this
-   * identifier (defaults to `'Fragment'`). Preact users set this to
-   * `'Fragment'` already; some bundlers / TS configs use a custom
-   * fragment factory.
-   */
   jsxFragmentName?: string;
+  /**
+   * Force the TypeScript scope analyzer even for `.js`/`.jsx` files (e.g.
+   * when TypeScript parserServices are attached).
+   */
+  useTsScope?: boolean;
+  /**
+   * Snapshot of compiler options read eagerly from `parserServices.program`
+   * so lazy `getScope()` calls never depend on a live type-service client.
+   */
+  compilerOptions?: ScopeCompilerOptions;
+  parserServices?: {
+    program?: {
+      getCompilerOptions(): ScopeCompilerOptions;
+    } | null;
+  };
 }
 
 const TS_EXT = new Set(['.ts', '.tsx', '.mts', '.cts']);
@@ -125,9 +134,11 @@ export function makeScopeManagerFactory(
 }
 
 function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
-  const useTs = shouldUseTsScopeManager(opts.filePath);
   const ecmaVersion = normalizeEcmaVersion(opts.ecmaVersion);
-  if (useTs) {
+  const program = opts.parserServices?.program;
+  const hasTsParserServices = opts.useTsScope === true || program !== undefined;
+  if (shouldUseTsScopeManager(opts.filePath) || hasTsParserServices) {
+    const compiler = opts.compilerOptions ?? program?.getCompilerOptions();
     const tsScope = tsScopeManagerPkg as unknown as {
       analyze: (ast: object, options?: object) => unknown;
     };
@@ -151,15 +162,15 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
       // strict, producing false-positives for `no-shadow-restricted-
       // names` and similar in legacy bundles.
       impliedStrict: opts.impliedStrict ?? false,
-      // Defaults preserved for back-compat; Preact / Vue JSX users
-      // override via languageOptions.parserOptions.ecmaFeatures.
-      jsxPragma: opts.jsxPragma ?? 'React',
-      jsxFragmentName: opts.jsxFragmentName ?? 'Fragment',
-      // Keep scope-manager's established esnext *type* catalog, but never let
-      // it independently decide runtime globals. seedEcmaGlobals reconciles
-      // every value binding with the same ecmaVersion table used by native
-      // rules while retaining type-only bindings.
-      lib: ['esnext'],
+      // A factory such as preact.h references the binding named preact.
+      jsxPragma: opts.jsxPragma ?? compiler?.jsxFactory?.split('.')[0].trim(),
+      // TypeScript files on the ordinary CLI historically use Fragment.
+      jsxFragmentName:
+        opts.jsxFragmentName ??
+        (!hasTsParserServices
+          ? 'Fragment'
+          : compiler?.jsxFragmentFactory?.split('.')[0].trim()),
+      lib: compiler && scopeLibs(compiler.lib, compiler.target),
     });
     return scopeManager;
   }
@@ -188,6 +199,35 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
     // nor the TS analyzer takes globals at construct time, so both paths seed
     // them post-analysis via seedGlobals below.
   });
+}
+
+// Matches TypeScript's ScriptTarget numeric enum (ES2015=2 .. ES2025=12, ESNext=99).
+// Kept local so scope-factory never reaches into @rslint/api internals.
+export const TARGET_DEFAULT_LIB: Readonly<Record<number, string>> = {
+  2: 'es6',
+  3: 'es2016.full',
+  4: 'es2017.full',
+  5: 'es2018.full',
+  6: 'es2019.full',
+  7: 'es2020.full',
+  8: 'es2021.full',
+  9: 'es2022.full',
+  10: 'es2023.full',
+  11: 'es2024.full',
+  12: 'es2025.full',
+  99: 'esnext.full',
+};
+
+function scopeLibs(
+  files: readonly string[] | undefined,
+  target = 12,
+): string[] {
+  if (files)
+    return files.flatMap(
+      (file) =>
+        /lib\.(.+)\.d\.[cm]?ts$/.exec(file.toLowerCase())?.slice(1) ?? [],
+    );
+  return [TARGET_DEFAULT_LIB[target] ?? 'lib'];
 }
 
 // Minimal shape of an eslint-scope Variable that the
@@ -321,6 +361,13 @@ function demoteTypeScriptValueGlobal(
   gs: GlobalScopeLike,
   variable: SyntheticGlobal,
 ): void {
+  // A pure library type keeps its builtin identity when runtime globals change.
+  if (
+    variable.isTypeVariable &&
+    !variable.isValueVariable &&
+    variable.defs.length === 0
+  )
+    return;
   if (promotedTypeOnlyGlobals.has(variable)) {
     Reflect.deleteProperty(variable, 'isValueVariable');
     promotedTypeOnlyGlobals.delete(variable);
@@ -445,20 +492,15 @@ export function seedEcmaGlobals(
   if (!gs) return;
 
   const normalizedVersion = normalizeEcmaVersion(ecmaVersion);
-  const selectedNames = new Set<string>();
+  // The project library owns host globals such as URL. ecmaVersion governs
+  // only ECMAScript globals, and explicit languageOptions.globals apply last.
   for (const [name, introducedIn] of ECMASCRIPT_GLOBALS) {
     if (introducedIn <= normalizedVersion) {
-      selectedNames.add(name);
+      ensureGlobal(gs, name, 'readonly');
+      continue;
     }
-  }
-
-  // The TypeScript analyzer needs lib data for type bindings, but its value
-  // catalog must not bypass languageOptions.ecmaVersion (or introduce esnext
-  // proposals that native rules do not know). Demote only the value side;
-  // type-only references remain resolved against the lib variable.
-  for (const variable of gs.variables) {
-    if (!isTypeScriptImplicitLibVariable(variable)) continue;
-    if (selectedNames.has(variable.name)) continue;
+    const variable = gs.set?.get(name);
+    if (!variable || !isTypeScriptImplicitLibVariable(variable)) continue;
     if (hasRuntimeDefinition(variable)) {
       variable.isValueVariable = true;
       clearGlobalMode(variable);
@@ -466,7 +508,6 @@ export function seedEcmaGlobals(
       demoteTypeScriptValueGlobal(gs, variable);
     }
   }
-  for (const name of selectedNames) ensureGlobal(gs, name, 'readonly');
   resolveThroughReferences(gs);
 }
 

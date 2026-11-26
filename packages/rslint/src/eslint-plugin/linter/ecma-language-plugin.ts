@@ -34,12 +34,14 @@ import {
 import { buildUtf16ToByteMap } from '../../languages/js/positions.js';
 import {
   makeScopeManagerFactory,
+  type ScopeFactoryOptions,
   seedEcmaGlobals,
   seedGlobals,
 } from '../../languages/js/scope-factory.js';
 import { mergeListeners, visit } from './listener-merge.js';
 import {
   createRuleContext,
+  type LanguageOptions,
   type ListenerFn,
   type RuleContext,
 } from './context.js';
@@ -51,7 +53,6 @@ import {
   type FixTextPart,
   type SuggestionsMode,
 } from './diagnostic-builder.js';
-import type { GlobalsConfig } from '../../languages/js/types.js';
 import type { LoadedPlugins } from '../plugin/plugin-loader.js';
 import type { Fix } from './fixer.js';
 import { applyDisableDirectives } from './apply-disable-directives.js';
@@ -99,33 +100,7 @@ export interface LintFileRequest {
   filePath: string;
   /** Workers materialize ordinary objects from owned bytes after the last native read. */
   frame: Uint8Array | SharedBytes;
-  /**
-   * Forwarded subset of user `languageOptions`. Only the fields the
-   * runner actually consumes are typed here; the rest of the user's
-   * `languageOptions` (parser custom hooks, plugin-specific extensions)
-   * is intentionally dropped at the IPC boundary because the worker
-   * doesn't reproduce ESLint's full language plugin pipeline.
-   *
-   * Per ESLint v10's flat-config spec
-   * (https://eslint.org/docs/v10.x/use/configure/language-options),
-   * `ecmaVersion` / `sourceType` / `globals` are TOP-LEVEL properties
-   * of `languageOptions`. `parserOptions` is reserved for parser-
-   * specific extras (`ecmaFeatures`, `allowReserved`). The v8-era
-   * positions (`parserOptions.ecmaVersion` / `parserOptions.sourceType`)
-   * are NOT accepted — rslint targets v10 cleanly.
-   */
-  languageOptions?: {
-    ecmaVersion?: number | 'latest';
-    sourceType?: 'module' | 'script' | 'commonjs';
-    globals?: GlobalsConfig;
-    parserOptions?: {
-      ecmaFeatures?: {
-        jsx?: boolean;
-        globalReturn?: boolean;
-        impliedStrict?: boolean;
-      };
-    };
-  };
+  languageOptions?: LanguageOptions;
   /** Merged flat-config `settings` for plugin consumption (e.g. `react.version`). */
   settings?: Record<string, unknown>;
   /** Map of fully-qualified rule name → config. Already enabled-filtered. */
@@ -196,13 +171,30 @@ function readFrame(req: LintFileRequest): ReturnType<typeof decodeFrame> {
   );
 }
 
+type ParserServices = object &
+  NonNullable<ScopeFactoryOptions['parserServices']>;
+
+type ParserOptions = NonNullable<
+  LintFileRequest['languageOptions']
+>['parserOptions'];
+
 /**
  * Lint a single file. Stateless — `loadedPlugins` is owned by the
  * Worker; this function does not mutate it.
+ *
+ * When a `services` factory is provided, it receives the file's
+ * `languageOptions.parserOptions` so it can apply per-file syntax-only
+ * options at construction time (`TypeServiceFile.parserServicesFactory`
+ * forwards them automatically); `lintFile` passes the returned object
+ * directly to rules without wrapping or mutating it.
  */
 export function lintFile(
   req: LintFileRequest,
   loadedPlugins: LoadedPlugins,
+  services?: (
+    frame: ReturnType<typeof decodeFrame>,
+    parserOptions?: ParserOptions,
+  ) => ParserServices,
 ): LintFileResult {
   const result: LintFileResult = {
     filePath: req.filePath,
@@ -212,12 +204,15 @@ export function lintFile(
     cancelled: false,
   };
 
-  let parsed: ReturnType<typeof decodeFrame>;
+  let parsed: ReturnType<typeof decodeFrame> | undefined;
+  let parserServices: ParserServices | undefined;
   try {
     parsed = readFrame(req);
+    parserServices = services?.(parsed, req.languageOptions?.parserOptions);
   } catch (err) {
     if (err instanceof FrameCancelled) result.cancelled = true;
-    else result.parseError = `frame: ${(err as Error)?.message ?? String(err)}`;
+    else
+      result.parseError = `${parsed ? 'parser services' : 'frame'}: ${(err as Error)?.message ?? String(err)}`;
     return result;
   }
   const sourceText = parsed.text,
@@ -228,11 +223,28 @@ export function lintFile(
   // ── 3. scope-manager factory (lazy) ──────────────────────────────
   // ESLint v10: sourceType / ecmaVersion / globals are top-level fields
   // of `languageOptions`. No legacy positions are accepted.
-  // Lazy SourceCode resources may outlive lintFile. Keep their language
-  // metadata, rather than capturing the request and its transport frame.
-  const languageOptions = req.languageOptions;
+  // Lazy SourceCode resources may outlive lintFile and a closed type-service
+  // client. Snapshot compiler options eagerly so deferred getScope() calls
+  // never touch the live Program.
+  // ESLint v10 guarantees `languageOptions.parserOptions` is an object when a
+  // parser runs (e.g. `@typescript-eslint/no-deprecated` destructures it
+  // directly). Default missing `parserOptions` to `{}` when parser services
+  // are attached without writing derived parser flags back into it.
+  const languageOptions =
+    services && !req.languageOptions?.parserOptions
+      ? { ...req.languageOptions, parserOptions: {} }
+      : req.languageOptions;
   const globals = languageOptions?.globals;
   const ecmaFeatures = languageOptions?.parserOptions?.ecmaFeatures;
+  const compilerOptions = parserServices?.program?.getCompilerOptions();
+  const scopeCompilerOptions = compilerOptions
+    ? {
+        jsxFactory: compilerOptions.jsxFactory,
+        jsxFragmentFactory: compilerOptions.jsxFragmentFactory,
+        lib: compilerOptions.lib ? [...compilerOptions.lib] : undefined,
+        target: compilerOptions.target,
+      }
+    : undefined;
   const createScopeManager = makeScopeManagerFactory(ast, {
     filePath: req.filePath,
     sourceType: languageOptions?.sourceType ?? 'module',
@@ -245,6 +257,8 @@ export function lintFile(
     // are filled in by `scope-factory` to match ESLint v10.
     impliedStrict: ecmaFeatures?.impliedStrict,
     globalReturn: ecmaFeatures?.globalReturn,
+    useTsScope: parserServices?.program !== undefined,
+    compilerOptions: scopeCompilerOptions,
   });
   const scopeManagerFactory = () => {
     const sm = createScopeManager();
@@ -288,6 +302,9 @@ export function lintFile(
       ends: parsed.tokenEnds,
     },
   });
+  if (parserServices) {
+    sharedSourceCode.parserServices = parserServices;
+  }
 
   // ESLint v10's espree attaches `Program.tokens` (and `Program.comments`)
   // to the AST root directly. the frame decoder doesn't, so plugin rules that

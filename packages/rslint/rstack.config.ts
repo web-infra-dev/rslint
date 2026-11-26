@@ -14,12 +14,10 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  * Two groups of `lib` blocks:
  *
  * 1. Library surface → `dist/` (`tsconfig.lib.json`, which excludes the plugin
- *    runtime and JavaScript language modules from file discovery). A dts build
- *    is a TS project, so it must
- *    not share its `tsBuildInfoFile` with the tsgo `typecheck` over the same
- *    `src` — the two tools' incremental formats clash. Hence a tsconfig per
- *    consumer: `tsconfig.lib.json` (here), `tsconfig.worker.json` (below), and
- *    `tsconfig.build.json` (typecheck). `output.autoExternal` externalizes the
+ *    runtime and JavaScript language modules from file discovery). Its
+ *    declarations use a separate build info file from the tsgo check in
+ *    `tsconfig.build.json` because the cache formats differ.
+ *    `output.autoExternal` externalizes the
  *    optional `jiti` peer. The `globals` catalog is a devDep; a Rspack plugin
  *    emits one package-internal JSON asset per environment so the root can
  *    load only selected maps.
@@ -27,9 +25,10 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  *    the surface modules share a graph, so shared chunks between entries are
  *    fine here.
  *
- * 2. Plugin host and worker → `dist/eslint-plugin/` (`tsconfig.worker.json`,
- *    which includes `src/eslint-plugin/**` and `src/languages/js/**`). Each
- *    entry is its own `lib` block
+ * 2. Plugin host and worker → `dist/eslint-plugin/`. The public plugin entries
+ *    bundle declarations from `tsconfig.plugin-api.json`. Core checks the
+ *    worker through `tsconfig.build.json`. Each runtime entry has
+ *    its own `lib` block (the public index shares its block with a type-only entry)
  *    so Rspack inlines each output's full module graph with NO shared chunks —
  *    crucial for the worker (`new Worker(...)` spawns a fresh V8 isolate that
  *    pays a filesystem-open + parse cost per extra chunk; modules can't be
@@ -80,7 +79,16 @@ define.lib(() => {
       distPath: { root: './dist/eslint-plugin' },
     },
     source: {
-      tsconfigPath: './tsconfig.worker.json',
+      tsconfigPath: './tsconfig.plugin-api.json',
+    },
+    tools: {
+      rspack(config: Rspack.Configuration) {
+        config.resolve ??= {};
+        config.resolve.conditionNames = [
+          '@typescript/source',
+          ...(config.resolve.conditionNames ?? ['...']),
+        ];
+      },
     },
   };
 
@@ -91,27 +99,21 @@ define.lib(() => {
         ...workerBase,
         source: {
           ...workerBase.source,
-          entry: { index: './src/eslint-plugin/index.ts' },
+          entry: {
+            index: './src/eslint-plugin/index.ts',
+            types: './src/eslint-plugin/types.ts',
+          },
         },
-        // Bundle dts only on the main entry — the others re-export from `index`
-        // or are tiny standalone modules; per-entry dts would duplicate types.
         dts: { bundle: true },
       },
       {
         ...workerBase,
         source: {
           ...workerBase.source,
+          tsconfigPath: './tsconfig.worker.json',
           entry: { 'lint-worker': './src/eslint-plugin/lint-worker.ts' },
         },
         dts: false,
-      },
-      {
-        ...workerBase,
-        source: {
-          ...workerBase.source,
-          entry: { types: './src/eslint-plugin/types.ts' },
-        },
-        dts: { bundle: true },
       },
       {
         ...workerBase,

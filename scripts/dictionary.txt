@@ -410,6 +410,7 @@ nilnil
 Nkoo
 nocase
 noconfig
+nodebuilder
 nodesep
 nodeutil
 noembed
@@ -446,6 +447,7 @@ objectbindingpattern
 objectliteralexpression
 Occitan
 omitempty
+omitzero
 onblur
 onchange
 onclick
@@ -664,6 +666,7 @@ tttodo
 txtar
 txtarfs
 typeparam
+typeservice
 typescriptutil
 Über
 über

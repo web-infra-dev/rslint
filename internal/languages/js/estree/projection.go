@@ -64,6 +64,8 @@ type estreeProjector struct {
 	triviaStarts     map[int]int
 	frameBytes       uint64
 	scan             scanner.Scanner
+	origin           *ast.Node
+	mapping          *originProjection
 }
 
 // Options are syntax metadata already resolved by the linter.
@@ -71,6 +73,9 @@ type Options struct {
 	SourceType string
 	HasBOM     bool
 }
+
+// Keep the first reverse mapping reserved after its frame ID is reclaimed.
+const detachedChainReverse = ^uint32(0)
 
 // Builder reuses scratch for sequential projections. Build returns
 // independently owned bytes and clears every source-backed reference on return.
@@ -137,6 +142,10 @@ func (b *Builder) Build(ctx context.Context, file *ast.SourceFile, options Optio
 // storage must remain immutable until every consumer has finished; it never
 // aliases the Builder's scratch. allocate is called synchronously at most once.
 func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte) (data []byte, err error) {
+	return b.build(ctx, file, options, allocate, nil)
+}
+
+func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte, mapping *originProjection) (data []byte, err error) {
 	if options.SourceType != "module" && options.SourceType != "script" && options.SourceType != "commonjs" {
 		return nil, fmt.Errorf("invalid ESTree sourceType %q", options.SourceType)
 	}
@@ -157,6 +166,7 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	p.file = file
 	p.text = file.Text()
 	p.sourceType = options.SourceType
+	p.mapping = mapping
 	if options.SourceType == "commonjs" {
 		p.sourceType = "script"
 	}
@@ -168,8 +178,14 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	p.offsets.reset(ctx, p.text)
 	// The native node count is a sizing hint, not a limit on projected syntax.
 	// Reserve once per file instead of copying growing columns at every append.
-	p.nodes = slices.Grow(p.nodes[:0], min(file.NodeCount, maxInitialFrameBytes/14))
+	nodeCapacity := min(file.NodeCount, maxInitialFrameBytes/14)
+	p.nodes = slices.Grow(p.nodes[:0], nodeCapacity)
 	p.values = slices.Grow(p.values[:0], min(file.NodeCount*4, maxInitialFrameBytes/4))
+	if mapping != nil {
+		// Both the frame and the compiler reserve index zero for absent nodes.
+		mapping.Origins = make([]uint32, 1, nodeCapacity+1)
+		mapping.Reverse = make(map[uint32]uint32, nodeCapacity)
+	}
 	p.lists = p.lists[:0]
 	p.emptyList = 0
 	p.strings = p.strings[:0]
@@ -180,6 +196,15 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	}
 	p.tokenCovers = p.tokenCovers[:0]
 	root := p.convert(file.AsNode(), false)
+	if mapping != nil {
+		for _, alias := range mapping.ChainAliases {
+			delete(mapping.Reverse, alias.Index)
+		}
+		p.check()
+		if mapping.originsOnly {
+			return nil, nil
+		}
+	}
 	initialTokenBytes := maxInitialFrameBytes - int(min(p.frameBytes, maxInitialFrameBytes))
 	b.tokens = slices.Grow(b.tokens[:0], min(max(16, file.NodeCount*2), initialTokenBytes/9))
 	b.tokens, b.comments = scanTokensAndCommentsInto(ctx, &p.scan, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxWireFrameSize-int(p.frameBytes))
@@ -193,6 +218,8 @@ func (p *estreeProjector) check() {
 }
 
 func (p *estreeProjector) clearSource() {
+	p.origin = nil
+	p.mapping = nil
 	p.file = nil
 	p.text = ""
 	p.sourceType = ""
@@ -355,6 +382,10 @@ func (p *estreeProjector) convertListWithNulls(nodes []*ast.Node, pattern bool) 
 }
 
 func (p *estreeProjector) add(typeName string, start, end uint32, values ...uint32) uint32 {
+	return p.addWithOrigin(typeName, p.origin, start, end, values...)
+}
+
+func (p *estreeProjector) addWithOrigin(typeName string, origin *ast.Node, start, end uint32, values ...uint32) uint32 {
 	typeID := typeIDs[typeName]
 	for index, field := range schemas[typeID].fields {
 		switch field {
@@ -382,6 +413,13 @@ func (p *estreeProjector) add(typeName string, start, end uint32, values ...uint
 		end:        end,
 		valueStart: uint32(len(p.values)),
 	})
+	if m := p.mapping; m != nil {
+		var index uint32
+		if origin != nil {
+			index = m.table.GetIndex(origin)
+		}
+		m.Origins = append(m.Origins, index)
+	}
 	p.values = append(p.values, values...)
 	return id
 }
@@ -424,7 +462,7 @@ func (p *estreeProjector) rangeOf(node *ast.Node) (uint32, uint32) {
 
 func (p *estreeProjector) addNode(typeName string, node *ast.Node, values ...uint32) uint32 {
 	start, end := p.rangeOf(node)
-	return p.add(typeName, start, end, values...)
+	return p.addWithOrigin(typeName, node, start, end, values...)
 }
 
 func (p *estreeProjector) hasModifier(node *ast.Node, flag ast.ModifierFlags) bool {
@@ -463,7 +501,7 @@ func (p *estreeProjector) typeAnnotation(node *ast.Node) uint32 {
 	_, end := p.rangeOf(node)
 	if node.Parent != nil && node.Parent.Kind == ast.KindTypePredicate {
 		inner := p.nodes[typeID-1]
-		return nodeValue(p.add("TSTypeAnnotation", inner.start, inner.end, nodeValue(typeID)))
+		return nodeValue(p.addWithOrigin("TSTypeAnnotation", nil, inner.start, inner.end, nodeValue(typeID)))
 	}
 	// The parser's full start follows the authored ':' or '=>' token and
 	// includes intervening trivia, so comments cannot confuse a backward scan.
@@ -472,7 +510,7 @@ func (p *estreeProjector) typeAnnotation(node *ast.Node) uint32 {
 		width = 2
 	}
 	start := p.offsets.At(max(0, node.Pos()-width))
-	return nodeValue(p.add("TSTypeAnnotation", start, end, nodeValue(typeID)))
+	return nodeValue(p.addWithOrigin("TSTypeAnnotation", nil, start, end, nodeValue(typeID)))
 }
 
 func (p *estreeProjector) typeParameters(list *ast.NodeList, declaration bool) uint32 {
@@ -480,8 +518,10 @@ func (p *estreeProjector) typeParameters(list *ast.NodeList, declaration bool) u
 		return undefinedValue()
 	}
 	typeName := "TSTypeParameterInstantiation"
+	origin := p.origin
 	if declaration {
 		typeName = "TSTypeParameterDeclaration"
+		origin = nil
 	}
 	start := p.offsets.At(max(0, list.Pos()-1))
 	endPos := list.End()
@@ -494,7 +534,7 @@ func (p *estreeProjector) typeParameters(list *ast.NodeList, declaration bool) u
 	}
 	endPos = scan.TokenEnd()
 	end := p.offsets.At(endPos)
-	return nodeValue(p.add(typeName, start, end, p.convertList(list.Nodes, false)))
+	return nodeValue(p.addWithOrigin(typeName, origin, start, end, p.convertList(list.Nodes, false)))
 }
 
 func (p *estreeProjector) identifierWithAnnotation(name, typeNode *ast.Node) uint32 {

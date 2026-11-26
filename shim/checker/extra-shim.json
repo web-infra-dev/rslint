@@ -40,14 +40,32 @@
       "getTypeParameterFromMappedType",
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",
-      "getTemplateTypeFromMappedType"
+      "getTemplateTypeFromMappedType",
+      "getAugmentedPropertiesOfType",
+      "getStringLiteralType",
+      "getNumberLiteralType",
+      "getBigIntLiteralType",
+      "getNullableType",
+      "isOptionalParameter",
+      "getSymbolOfDeclaration",
+      "getSignaturesOfSymbol",
+      "newTypePredicate",
+      "typePredicateToStringEx"
     ]
   },
   "ExtraFields": {
     "Type": ["alias", "flags", "symbol", "objectFlags"],
     "ConditionalType": ["root"],
-    "ConditionalRoot": ["node"],
-    "TupleType": ["combinedFlags"],
+    "ConditionalRoot": [
+      "node",
+      "checkType",
+      "extendsType",
+      "isDistributive",
+      "inferTypeParameters",
+      "outerTypeParameters",
+      "alias"
+    ],
+    "TupleType": ["combinedFlags", "minLength"],
     "LiteralType": ["freshType", "regularType"],
     "Signature": ["parameters", "declaration"],
     "Checker": [
@@ -56,6 +74,16 @@
       "globalRegExpType",
       "couldContainTypeVariables"
     ],
-    "InterfaceType": ["thisType"]
+    "InterfaceType": [
+      "thisType",
+      "declaredMembersResolved",
+      "declaredIndexInfos"
+    ],
+    "MappedType": [
+      "typeParameter",
+      "constraintType",
+      "templateType",
+      "modifiersType"
+    ]
   }
 }
