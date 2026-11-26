@@ -23,6 +23,7 @@
       "getApparentTypeOfContextualType",
       "getAwaitedType",
       "getTypeOfSymbol",
+      "getWriteTypeOfSymbol",
       "getReturnTypeOfSignature",
       "getMinArgumentCount",
       "getContextualTypeForArgumentAtIndex",

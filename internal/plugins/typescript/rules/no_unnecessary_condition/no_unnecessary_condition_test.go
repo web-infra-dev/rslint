@@ -41,6 +41,26 @@ func TestNoUnnecessaryCondition(t *testing.T) {
 		{Code: "function test<T extends string>(t: T) {\n  return t ? 'yes' : 'no';\n}\n"},
 		{Code: "function test<T>(t: T) {\n  return t ? 'yes' : 'no';\n}\n"},
 		{Code: "function test<T>(t: T | []) {\n  return t ? 'yes' : 'no';\n}\n"},
+		// Unresolved conditional types (typescript-eslint v8.74.0)
+		{Code: "const truthy = <T,>(value: Awaited<T>) => (value ? 1 : 2);\n"},
+		{Code: "const nullish = <T,>(value: Awaited<T>) => value ?? 1;\n"},
+		{Code: "const fromPromise = async <T,>(promise: Promise<T>) => {\n  const value = await promise;\n  return value ? 1 : 2;\n};\n"},
+		{Code: "type Id<T> = T extends unknown ? T : never;\nfunction test<T>(t: Id<T>) {\n  return t ? 'yes' : 'no';\n}\n"},
+		{Code: "const truthyUnion = <T,>(value: Awaited<T> | string) => (value ? 1 : 2);\n"},
+		{Code: "const truthy = <T extends string>(value: Awaited<T>) => (value ? 1 : 2);\n"},
+		{Code: "const nullish = <T extends Promise<string | null>>(value: Awaited<T>) =>\n  value ?? 1;\n"},
+		{Code: "const isUndefined = <T,>(value: Awaited<T>) => value === undefined;\n"},
+		{Code: "const isNull = <T,>(value: Awaited<T>) => value === null;\n"},
+		{Code: "function test<T, K extends keyof T>(value: Awaited<T[K]>) {\n  return value ?? 1;\n}\n"},
+		// Logical operands that are result values, not conditions (typescript-eslint v8.74.0)
+		{Code: "function test(foo?: boolean, bar?: boolean) {\n  return (foo && 'foo') || (bar && 'bar');\n}\n"},
+		{Code: "declare const b1: boolean;\ndeclare const b2: boolean;\nconst x = (b1 && 'b1') || b2;\n"},
+		// Computed keys selecting a possibly non-nullish property (typescript-eslint v8.74.0)
+		{Code: "type Fields = {\n  hello?: number;\n  world?: boolean;\n};\n\nlet fields: Fields = {};\n\nfor (const key of ['hello', 'world'] as const) {\n  fields[key] ??= undefined;\n}\n"},
+		{Code: "type Fields = {\n  hello?: boolean | number;\n  world?: boolean;\n};\n\nlet fields: Fields = {};\n\nfor (const key of ['hello', 'world'] as const) {\n  fields[key] ??= undefined;\n}\n"},
+		{Code: "type Fields = {\n  hello?: number;\n  world?: 1 | 2 | 3;\n};\n\nlet fields: Fields = {};\n\nfor (const key of ['hello', 'world'] as const) {\n  fields[key] ??= undefined;\n}\n"},
+		{Code: "type Fields = {\n  hello?: 1 | 2 | 4;\n  world?: 1 | 3 | 5;\n};\n\nlet fields: Fields = {};\n\nfor (const key of ['hello', 'world'] as const) {\n  fields[key] ??= undefined;\n}\n"},
+		{Code: "interface Foo {\n  bizz?: number;\n  buzz?: boolean;\n}\n\nlet fields: Foo = {};\n\nfor (const key of ['bizz', 'buzz'] as const) {\n  fields[key] ??= undefined;\n}\n"},
 
 		// === Branded / intersection types ===
 		{Code: "declare const b1: string & { __brand: string };\nif (b1) {}\n"},
@@ -794,6 +814,53 @@ func TestNoUnnecessaryCondition(t *testing.T) {
 		{
 			Code:   "declare const arr: object[];\nif (arr.filter) {}\n",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 2, Column: 5}},
+		},
+		// Conditional types that still resolve to a known constraint (typescript-eslint v8.74.0)
+		{
+			Code:   "function test<T extends string>(a: Awaited<T>) {\n  return a ?? 'default';\n}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 10, EndLine: 2, EndColumn: 11}},
+		},
+		{
+			Code:   "function test<T extends Promise<object>>(a: Awaited<T>) {\n  return a ? 'yes' : 'no';\n}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 2, Column: 10, EndLine: 2, EndColumn: 11}},
+		},
+		{
+			Code:   "function test<T>(a: T extends string ? 'a' : 'b') {\n  return a ? 'yes' : 'no';\n}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 2, Column: 10, EndLine: 2, EndColumn: 11}},
+		},
+		{
+			Code:   "function test<T>(a: T extends string ? 'a' : 'b') {\n  return a ?? 'default';\n}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 10, EndLine: 2, EndColumn: 11}},
+		},
+		// Logical operands in a truthiness context are conditions (typescript-eslint v8.74.0)
+		{
+			Code:   "declare const b1: boolean;\ndeclare const b2: boolean;\nif ((b1 && 'b1') || b2) {\n}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 3, Column: 12, EndLine: 3, EndColumn: 16}},
+		},
+		{
+			Code:   "declare const b1: boolean;\ndeclare const b2: boolean;\ndo {} while ((b1 && 'b1') || b2);\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 3, Column: 21, EndLine: 3, EndColumn: 25}},
+		},
+		{
+			Code:   "declare const b1: boolean;\ndeclare const b2: boolean;\nfor (; (b1 && 'b1') || b2;) {}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 3, Column: 15, EndLine: 3, EndColumn: 19}},
+		},
+		{
+			Code:   "declare const b1: boolean;\ndeclare const b2: boolean;\nif (!((b1 && 'b1') || b2)) {\n}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 3, Column: 14, EndLine: 3, EndColumn: 18}},
+		},
+		{
+			Code:   "declare const b1: boolean;\ndeclare const b2: boolean;\nconst t1 = b1 && 'b1' && b2;\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 3, Column: 18, EndLine: 3, EndColumn: 22}},
+		},
+		// Computed keys selecting only nullish properties (typescript-eslint v8.74.0)
+		{
+			Code:   "type Fields = {\n  hello?: undefined;\n  world?: null;\n};\n\nlet fields: Fields = {};\n\nfor (const key of ['hello', 'world'] as const) {\n  fields[key] ??= undefined;\n}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysNullish", Line: 9, Column: 3, EndLine: 9, EndColumn: 14}},
+		},
+		{
+			Code:   "interface Foo {\n  bizz?: undefined;\n  buzz?: null;\n}\n\nlet fields: Foo = {};\n\nfor (const key of ['buzz', 'bizz'] as const) {\n  fields[key] ??= undefined;\n}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysNullish", Line: 9, Column: 3, EndLine: 9, EndColumn: 14}},
 		},
 	})
 }

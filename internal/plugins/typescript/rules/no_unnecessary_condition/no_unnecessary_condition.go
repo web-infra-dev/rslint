@@ -361,7 +361,9 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 			elem := node.AsElementAccessExpression()
-			isDynamicIndex := !ast.IsLiteralExpression(elem.ArgumentExpression)
+			// ESTree has no parenthesized-expression node, so `tuple[(0)]` has a
+			// literal property upstream; skip tsgo's parentheses to match.
+			isDynamicIndex := !ast.IsLiteralExpression(ast.SkipParentheses(elem.ArgumentExpression))
 			objectType := utils.GetConstrainedTypeAtLocation(tc, elem.Expression)
 			for _, part := range utils.UnionTypeParts(objectType) {
 				if checker.Checker_isArrayType(tc, part) || (isDynamicIndex && checker.IsTupleType(part)) {
@@ -371,13 +373,59 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			return false
 		}
 
-		// Conditional is always necessary if it involves any, unknown, or a naked type variable
+		// Conditional is always necessary if it involves any, unknown, a naked
+		// type variable, or an unresolved conditional type such as `Awaited<T>`.
 		isConditionalAlwaysNecessary := func(t *checker.Type) bool {
 			return utils.Some(utils.UnionTypeParts(t), func(part *checker.Type) bool {
 				return utils.IsTypeAnyType(part) ||
 					utils.IsTypeUnknownType(part) ||
-					utils.IsTypeFlagSet(part, checker.TypeFlagsTypeVariable)
+					utils.IsTypeFlagSet(part, checker.TypeFlagsTypeVariable|checker.TypeFlagsConditional)
 			})
+		}
+
+		// accessorReadType returns the getter type of an accessor property whose
+		// getter can return values its setter does not accept. TypeScript narrows
+		// such a property to the assigned (setter) type after `obj.prop = value`,
+		// but the next read runs the getter, which can still return any value of
+		// its declared type. Optional chains are excluded so the `undefined`
+		// introduced by the chain is preserved.
+		accessorReadType := func(node *ast.Node) *checker.Type {
+			node = ast.SkipParentheses(node)
+			if !ast.IsAccessExpression(node) || node.Flags&ast.NodeFlagsOptionalChain != 0 {
+				return nil
+			}
+			var symbol *ast.Symbol
+			if ast.IsPropertyAccessExpression(node) {
+				symbol = tc.GetSymbolAtLocation(node.Name())
+			} else {
+				argument := ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
+				if !ast.IsStringLiteralLike(argument) && !ast.IsNumericLiteral(argument) {
+					return nil
+				}
+				symbol = tc.GetSymbolAtLocation(argument)
+			}
+			if symbol == nil || symbol.Flags&ast.SymbolFlagsGetAccessor == 0 || symbol.Flags&ast.SymbolFlagsSetAccessor == 0 {
+				return nil
+			}
+			readType := checker.Checker_getTypeOfSymbol(tc, symbol)
+			writeType := checker.Checker_getWriteTypeOfSymbol(tc, symbol)
+			if readType == nil || writeType == nil || checker.Checker_isTypeAssignableTo(tc, readType, writeType) {
+				return nil
+			}
+			return readType
+		}
+
+		// getConditionType returns the constrained type used to judge a
+		// condition, replacing assignment-narrowed accessor reads with the
+		// getter's declared type (see accessorReadType).
+		getConditionType := func(node *ast.Node) *checker.Type {
+			if readType := accessorReadType(node); readType != nil {
+				if constraint := checker.Checker_getBaseConstraintOfType(tc, readType); constraint != nil {
+					return constraint
+				}
+				return readType
+			}
+			return utils.GetConstrainedTypeAtLocation(tc, node)
 		}
 
 		isNullableMemberExpression := func(node *ast.Node) bool {
@@ -429,17 +477,22 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			// For logical expressions (except ??), only check the right side
+			// For logical expressions (except ??), only check the right side, and
+			// only when the expression is used for truthiness; otherwise the right
+			// side is a possible result value rather than a condition. The left
+			// side has already been checked by the logical-expression listener.
 			if ast.IsBinaryExpression(expression) {
 				binExpr := expression.AsBinaryExpression()
 				op := binExpr.OperatorToken.Kind
 				if op == ast.KindAmpersandAmpersandToken || op == ast.KindBarBarToken {
-					checkNode(binExpr.Right, false, nil)
+					if isOnlyUsedForTruthiness(expression) {
+						checkNode(binExpr.Right, false, nil)
+					}
 					return
 				}
 			}
 
-			t := utils.GetConstrainedTypeAtLocation(tc, expression)
+			t := getConditionType(expression)
 			if isConditionalAlwaysNecessary(t) {
 				return
 			}
@@ -472,10 +525,11 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			// tsgo's AST keeps ParenthesizedExpression nodes, so skip them to
 			// align the reported range with typescript-eslint (mirrors checkNode).
 			node = ast.SkipParentheses(node)
-			t := utils.GetConstrainedTypeAtLocation(tc, node)
+			t := getConditionType(node)
 
-			// Conditional is always necessary if it involves any, unknown, or type parameter
-			if utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsTypeParameter|checker.TypeFlagsTypeVariable) {
+			// Conditional is always necessary if it involves any, unknown, a type
+			// parameter, or an unresolved conditional type
+			if utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsTypeParameter|checker.TypeFlagsTypeVariable|checker.TypeFlagsConditional) {
 				return
 			}
 
@@ -501,15 +555,15 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if isAlwaysNullish(t) {
+			if isAlwaysNullish(t) && !hasPossiblyNonNullishComputedMemberProperty(tc, node) {
 				ctx.ReportNode(node, buildAlwaysNullishMessage())
 				return
 			}
 		}
 
 		checkIfBoolExpressionIsNecessaryConditional := func(node *ast.Node, left *ast.Node, right *ast.Node, operator string) {
-			leftType := utils.GetConstrainedTypeAtLocation(tc, left)
-			rightType := utils.GetConstrainedTypeAtLocation(tc, right)
+			leftType := getConditionType(left)
+			rightType := getConditionType(right)
 
 			leftStatic := toStaticValue(leftType)
 			rightStatic := toStaticValue(rightType)
@@ -532,7 +586,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			// Workaround for TypeScript issue #37160
 			if isStrictNullChecks {
 				isComparable := func(t *checker.Type, flag checker.TypeFlags) bool {
-					flag |= checker.TypeFlagsAny | checker.TypeFlagsUnknown | checker.TypeFlagsTypeParameter | checker.TypeFlagsTypeVariable
+					flag |= checker.TypeFlagsAny | checker.TypeFlagsUnknown | checker.TypeFlagsTypeParameter | checker.TypeFlagsTypeVariable | checker.TypeFlagsConditional
 					if operator == "==" || operator == "!=" {
 						flag |= checker.TypeFlagsNull | checker.TypeFlagsUndefined | checker.TypeFlagsVoid
 					}
@@ -638,7 +692,9 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			// identifier (`a[k]`). For literal keys (`a[0]`, `a['x']`) the element
 			// type, e.g. `T | undefined` under noUncheckedIndexedAccess, is the
 			// access's own nullability and must not be blamed on the object.
-			if isComputed && !ast.IsIdentifier(node.AsElementAccessExpression().ArgumentExpression) {
+			// ESTree has no parenthesized-expression node, so `a[(k)]` also has an
+			// identifier key upstream.
+			if isComputed && !ast.IsIdentifier(ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)) {
 				return false
 			}
 			propName := ""
@@ -687,7 +743,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 		}
 
 		isOptionableExpression := func(node *ast.Node) bool {
-			t := utils.GetConstrainedTypeAtLocation(tc, node)
+			t := getConditionType(node)
 			isOwnNullable := true
 			if ast.IsAccessExpression(node) {
 				isOwnNullable = !isMemberExpressionNullableOriginFromObject(node)
@@ -768,7 +824,13 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			if utils.IsArrayMethodCallWithPredicate(tc, callExpr) && len(callExpr.Arguments.Nodes) > 0 {
 				callback := callExpr.Arguments.Nodes[0]
 
-				if ast.IsArrowFunction(callback) || ast.IsFunctionExpression(callback) {
+				// An async or generator callback returns a Promise or generator
+				// object, which is what the array method consumes. Its returned
+				// expression is not the predicate result, so judge such callbacks
+				// by their signature return types below instead.
+				isInlineSyncCallback := (ast.IsArrowFunction(callback) || ast.IsFunctionExpression(callback)) &&
+					ast.GetFunctionFlags(callback)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) == 0
+				if isInlineSyncCallback {
 					body := callback.Body()
 					if body != nil && !ast.IsBlock(body) {
 						// Arrow function with expression body: () => something
@@ -919,6 +981,75 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 })
 
 // Helper functions
+
+// isOnlyUsedForTruthiness reports whether the value of a logical expression is
+// consumed only as a condition, so its right operand is a condition too. In
+// `(a && 'a') || b` the left operand of `||` is also a possible result value,
+// so `'a'` is not a condition there.
+func isOnlyUsedForTruthiness(node *ast.Node) bool {
+	child := node
+	parent := node.Parent
+	for parent != nil && ast.IsParenthesizedExpression(parent) {
+		child = parent
+		parent = parent.Parent
+	}
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindConditionalExpression:
+		return parent.AsConditionalExpression().Condition == child
+	case ast.KindIfStatement:
+		return parent.AsIfStatement().Expression == child
+	case ast.KindWhileStatement:
+		return parent.AsWhileStatement().Expression == child
+	case ast.KindDoStatement:
+		return parent.AsDoStatement().Expression == child
+	case ast.KindForStatement:
+		return parent.AsForStatement().Condition == child
+	case ast.KindBinaryExpression:
+		binExpr := parent.AsBinaryExpression()
+		switch binExpr.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken:
+			return binExpr.Left == child || isOnlyUsedForTruthiness(parent)
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+			return isOnlyUsedForTruthiness(parent)
+		}
+		return false
+	case ast.KindPrefixUnaryExpression:
+		return parent.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
+	}
+	return false
+}
+
+// hasPossiblyNonNullishComputedMemberProperty reports whether a computed
+// member access whose key is a union of literals selects at least one
+// property that may hold a non-nullish value, e.g. `fields[key]` where key is
+// `'a' | 'b'` and `fields` is `{ a?: undefined; b?: number }`.
+func hasPossiblyNonNullishComputedMemberProperty(tc *checker.Checker, node *ast.Node) bool {
+	if !ast.IsElementAccessExpression(node) {
+		return false
+	}
+	elem := node.AsElementAccessExpression()
+	objectType := utils.GetConstrainedTypeAtLocation(tc, elem.Expression)
+	keyType := utils.GetConstrainedTypeAtLocation(tc, elem.ArgumentExpression)
+	propertyTypes := make([]*checker.Type, 0, 2)
+	for _, part := range utils.UnionTypeParts(keyType) {
+		if !part.IsStringLiteral() && !part.IsNumberLiteral() {
+			return false
+		}
+		propertyType := tc.GetTypeOfPropertyOfType(objectType, valueString(part.AsLiteralType().Value()))
+		if propertyType == nil {
+			return false
+		}
+		propertyTypes = append(propertyTypes, propertyType)
+	}
+	return utils.Some(propertyTypes, func(t *checker.Type) bool {
+		return utils.Some(utils.UnionTypeParts(t), func(part *checker.Type) bool {
+			return !isNullishType(part) && !utils.IsTypeFlagSet(part, checker.TypeFlagsVoid)
+		})
+	})
+}
 
 func isNullablePropertyType(tc *checker.Checker, objType *checker.Type, propertyType *checker.Type) bool {
 	if propertyType.IsUnion() {

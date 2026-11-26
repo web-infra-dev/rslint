@@ -31,6 +31,10 @@ func TestEdgeCases_CheckNode(t *testing.T) {
 		{Code: "declare const arr: object[];\nif (arr[0]) {}\n"},
 		// Deeply nested parens + unary
 		{Code: "declare const b: boolean;\nif (((!((b))))) {}\n"},
+		// A parenthesized logical operand of || is a result value, not a condition
+		{Code: "declare const b1: boolean;\ndeclare const b2: boolean;\nconst x = ((b1 && 'b1')) || b2;\n"},
+		// A parenthesized dynamic tuple index is still unsound
+		{Code: "declare const tuple: [object, object];\ndeclare const i: number;\nif (tuple[(i)]) {}\n"},
 	}, []rule_tester.InvalidTestCase{
 		// Triple negation on always-truthy
 		{
@@ -46,6 +50,16 @@ func TestEdgeCases_CheckNode(t *testing.T) {
 		{
 			Code:   "declare const b: boolean;\nif (b || null) {}\n",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysFalsy", Line: 2, Column: 10}},
+		},
+		// Parentheses between a truthiness context and a logical operand
+		{
+			Code:   "declare const b1: boolean;\ndeclare const b2: boolean;\nif (((b1 && 'b1')) || b2) {}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 3, Column: 13}},
+		},
+		// A parenthesized literal tuple index has a sound type
+		{
+			Code:   "declare const tuple: [object];\nif (tuple[(0)]) {}\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthy", Line: 2, Column: 5}},
 		},
 		// Nested ternary with truthy
 		{
@@ -76,6 +90,7 @@ func TestEdgeCases_CheckNodeForNullish(t *testing.T) {
 		{Code: "declare const obj: { a?: string };\nconst x = obj.a ?? 'default';\n"},
 		// Array index ?? — unsound without noUncheckedIndexedAccess
 		{Code: "declare const arr: string[];\nconst x = arr[0] ?? '';\n"},
+		{Code: "declare const tuple: readonly [string, string];\ndeclare const index: number;\nconst x = tuple[(index)] ?? '';\n"},
 		// A dynamic tuple index is unsound, while a literal tuple index is exact
 		{Code: "declare const tuple: readonly [string, string];\ndeclare const index: number;\nconst x = tuple[index] ?? '';\n"},
 		// Chain with optional array index — should skip
@@ -211,6 +226,7 @@ func TestEdgeCases_OptionalChain(t *testing.T) {
 		{Code: "type Fn = (() => string | null) | (() => number);\ndeclare const fn: Fn;\nfn()?.toString();\n"},
 		// Array index optional chain — unsound without noUncheckedIndexedAccess
 		{Code: "declare const arr: { a: string }[];\narr[0]?.a;\n"},
+		{Code: "declare const arr: { a: string }[];\narr[(0)]?.a;\n"},
 		// Deep chain: nullable at root only
 		{Code: "declare const x: { a: { b: { c: string } } } | null;\nx?.a.b.c;\n"},
 		// Chain with method call having nullable return
@@ -226,6 +242,36 @@ func TestEdgeCases_OptionalChain(t *testing.T) {
 				MessageId: "neverOptionalChain", Line: 2, Column: 4,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestRemoveOptionalChain", Output: "declare const x: { a: { b: string } };\nx.a.b;\n"},
+				},
+			}},
+		},
+		// A parenthesized literal tuple index has a sound type
+		{
+			Code: "declare const tuple: [{ id: string }];\ntuple[(0)]?.id;\n",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "neverOptionalChain", Line: 2, Column: 11,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "suggestRemoveOptionalChain", Output: "declare const tuple: [{ id: string }];\ntuple[(0)].id;\n"},
+				},
+			}},
+		},
+		// A parenthesized identifier key attributes nullability to the object
+		{
+			Code: "declare const obj: { item: { id: string } } | undefined;\ndeclare const key: 'item';\nobj?.[(key)]?.id;\n",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "neverOptionalChain", Line: 3, Column: 13,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "suggestRemoveOptionalChain", Output: "declare const obj: { item: { id: string } } | undefined;\ndeclare const key: 'item';\nobj?.[(key)].id;\n"},
+				},
+			}},
+		},
+		{
+			Code:     "declare const obj: { item: { id: string } } | undefined;\ndeclare const key: 'item';\nobj?.[(key)]?.id;\n",
+			TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "neverOptionalChain", Line: 3, Column: 13,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "suggestRemoveOptionalChain", Output: "declare const obj: { item: { id: string } } | undefined;\ndeclare const key: 'item';\nobj?.[(key)].id;\n"},
 				},
 			}},
 		},
@@ -403,6 +449,8 @@ func TestEdgeCases_CallExpression(t *testing.T) {
 		{Code: "declare function isString(x: unknown): x is string;\ndeclare const s: string;\nisString(s);\n"},
 		// Spread args — skip because parameter index is unreliable
 		{Code: "declare function assert(x: unknown): asserts x;\nassert(...[]);\n", Options: map[string]interface{}{"checkTypePredicates": true}},
+		// A sync callback returning its boolean argument is a real predicate
+		{Code: "declare const flags: boolean[];\nflags.filter(flag => flag);\n"},
 	}, []rule_tester.InvalidTestCase{
 		// Arrow expression body always truthy
 		{
@@ -423,6 +471,24 @@ func TestEdgeCases_CallExpression(t *testing.T) {
 		{
 			Code:   "function getFalsy() { return; }\n[1, 2, 3].findIndex(getFalsy);\n",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysFalsyFunc", Line: 2, Column: 21}},
+		},
+		// Async and generator callbacks return a Promise or generator object, which
+		// the array method consumes instead of the eventually produced boolean
+		{
+			Code:   "declare const flags: boolean[];\nflags.filter(async () => false);\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthyFunc", Line: 2, Column: 14}},
+		},
+		{
+			Code:   "declare const flags: boolean[];\nflags.filter(async flag => flag);\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthyFunc", Line: 2, Column: 14}},
+		},
+		{
+			Code:   "declare const flags: boolean[];\nflags.some(async function (flag) {\n  return flag;\n});\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthyFunc", Line: 2, Column: 12}},
+		},
+		{
+			Code:   "declare const flags: boolean[];\nflags.find(function* (flag) {\n  yield flag;\n});\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "alwaysTruthyFunc", Line: 2, Column: 12}},
 		},
 		// checkTypePredicates: asserts x on always truthy
 		{
@@ -577,6 +643,41 @@ func TestEdgeCases_DeepNesting(t *testing.T) {
 				{MessageId: "neverNullish", Line: 3, Column: 12},
 				{MessageId: "neverNullish", Line: 3, Column: 12},
 			},
+		},
+	})
+}
+
+// TestEdgeCases_AccessorReadType covers accessor properties whose getter can
+// return values its setter does not accept. TypeScript narrows such a property
+// to the assigned value after a write, but the next read runs the getter.
+func TestEdgeCases_AccessorReadType(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule, []rule_tester.ValidTestCase{
+		{Code: "declare const source: { value?: number };\nconst copy = {\n  ...source,\n  get value(): number | undefined {\n    return undefined;\n  },\n  set value(v: number) {},\n};\ncopy.value = 1;\ncopy.value ?? 42;\n"},
+		{Code: "class Box {\n  get value(): number | undefined {\n    return undefined;\n  }\n  set value(v: number) {}\n}\ndeclare const box: Box;\nbox.value = 1;\nbox.value ?? 0;\nbox.value?.toFixed();\nconst isMissing = box.value === undefined;\n(box.value) ?? 0;\n"},
+		{Code: "class Box {\n  get value(): number | undefined {\n    return undefined;\n  }\n  set value(v: number) {}\n}\ndeclare const box: Box;\nbox['value'] = 1;\nbox['value'] ?? 0;\n"},
+		{Code: "interface Store {\n  get item(): { id: number } | undefined;\n  set item(value: { id: number });\n}\ndeclare const store: Store;\nstore.item = { id: 1 };\nstore.item?.id;\n"},
+		{Code: "class Box<T> {\n  get value(): T | undefined {\n    return undefined;\n  }\n  set value(v: T) {}\n}\ndeclare const box: Box<number>;\nbox.value = 1;\nbox.value ?? 0;\n"},
+		// Condition narrowing is not kept for such a property either
+		{Code: "class Box {\n  get value(): number | undefined {\n    return undefined;\n  }\n  set value(v: number) {}\n}\ndeclare const box: Box;\nif (box.value !== undefined) {\n  box.value ?? 0;\n}\n"},
+	}, []rule_tester.InvalidTestCase{
+		// A value copied into a variable keeps TypeScript's narrowed type
+		{
+			Code:   "class Box {\n  get value(): number | undefined {\n    return undefined;\n  }\n  set value(v: number) {}\n}\ndeclare const box: Box;\nbox.value = 1;\nconst saved = box.value;\nsaved ?? 0;\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 10, Column: 1}},
+		},
+		// The getter type is still non-nullish when it differs from the setter type
+		{
+			Code:   "class Box {\n  get value(): string {\n    return '';\n  }\n  set value(v: number) {}\n}\ndeclare const box: Box;\nbox.value = 1;\nbox.value ?? '';\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 9, Column: 1}},
+		},
+		// Every getter value is accepted by the setter, so assignment narrowing is kept
+		{
+			Code:   "class Box {\n  get value(): number | undefined {\n    return 1;\n  }\n  set value(v: number | undefined) {}\n}\ndeclare const box: Box;\nbox.value = 1;\nbox.value ?? 0;\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 9, Column: 1}},
+		},
+		{
+			Code:   "class Box {\n  get value(): number {\n    return 1;\n  }\n  set value(v: number | string) {}\n}\ndeclare const box: Box;\nbox.value = 1;\nbox.value ?? 0;\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 9, Column: 1}},
 		},
 	})
 }
