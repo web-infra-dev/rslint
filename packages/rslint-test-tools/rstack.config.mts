@@ -1001,6 +1001,23 @@ const ecosystemTests = {
   ],
 };
 
+const goBackedBase = {
+  tools: {
+    rspack(config: { resolve?: { conditionNames?: string[] } }) {
+      config.resolve ??= {};
+      config.resolve.conditionNames = [
+        '@typescript/source',
+        ...(config.resolve.conditionNames ?? ['...']),
+      ];
+    },
+  },
+  testEnvironment: 'node' as const,
+  globals: true,
+  testTimeout: ecosystemTests.testTimeout,
+  hookTimeout: ecosystemTests.hookTimeout,
+  setupFiles: ['./tests/eslint-plugin/setup-worker-entry.ts'],
+};
+
 // Cross-language tests own their Go producer; other tests need no Go setup.
 define.test({
   // All projects share one runner pool; limits must be set at the root.
@@ -1011,30 +1028,23 @@ define.test({
       name: 'ecosystem',
     },
     {
+      ...goBackedBase,
       name: 'go-frame',
-      tools: {
-        rspack(config) {
-          config.resolve ??= {};
-          config.resolve.conditionNames = [
-            '@typescript/source',
-            ...(config.resolve.conditionNames ?? ['...']),
-          ];
-        },
-      },
-      testEnvironment: 'node',
-      globals: true,
-      testTimeout: ecosystemTests.testTimeout,
-      hookTimeout: ecosystemTests.hookTimeout,
       include: [
         './tests/languages/js/**/*.test.ts',
         './tests/eslint-plugin/**/*.test.ts',
       ],
-      exclude: ['./tests/eslint-plugin/pool-isolation/harness.test.ts'],
-      setupFiles: ['./tests/eslint-plugin/setup-worker-entry.ts'],
-      globalSetup: [
-        './tests/languages/js/setup-projector.ts',
-        './tests/eslint-plugin/type-services/setup-server.ts',
+      exclude: [
+        './tests/eslint-plugin/pool-isolation/harness.test.ts',
+        './tests/eslint-plugin/type-services/**/*.test.ts',
       ],
+      globalSetup: ['./tests/languages/js/setup-projector.ts'],
+    },
+    {
+      ...goBackedBase,
+      name: 'type-services',
+      include: ['./tests/eslint-plugin/type-services/**/*.test.ts'],
+      globalSetup: ['./tests/eslint-plugin/type-services/setup-server.ts'],
     },
   ],
 });

@@ -1114,28 +1114,41 @@ export class TypeServiceClient {
 
   /**
    * Open a file handle for the duration of `run` and close it automatically
-   * when `run` returns (or when a returned promise settles) so callers cannot
-   * leak per-file ESTree mappings.
+   * when `run` returns (or when a returned promise/thenable settles) so
+   * callers cannot leak per-file ESTree mappings.
+   *
+   * Any `PromiseLike` return branch (including union members or `Promise`
+   * subclasses) is normalized to a plain `Promise<Awaited<...>>` so custom
+   * subclass methods are not promised after wrapping.
    */
   withFile<T>(
     binding: FileBinding,
-    run: (file: TypeServiceFile) => PromiseLike<T>,
-  ): Promise<T>;
-  withFile<T>(binding: FileBinding, run: (file: TypeServiceFile) => T): T;
-  withFile<T>(
+    run: (file: TypeServiceFile) => T,
+  ): WithFileResult<T>;
+  withFile(
     binding: FileBinding,
-    run: (file: TypeServiceFile) => T | PromiseLike<T>,
-  ): T | Promise<T> {
+    run: (file: TypeServiceFile) => unknown,
+  ): unknown {
     const file = this.file(binding);
     let pending = false;
     try {
       const result = run(file);
-      if (isPromiseLike(result)) {
-        const settled = Promise.resolve(result).finally(() => {
-          file.close();
-        });
-        pending = true;
-        return settled;
+      if (
+        (typeof result === 'object' || typeof result === 'function') &&
+        result !== null
+      ) {
+        // Read `then` at most once so custom thenables with one-shot or
+        // side-effecting getters match native `await` / `Promise.resolve`.
+        const then: unknown = Reflect.get(result, 'then');
+        if (typeof then === 'function') {
+          const settled = new Promise<unknown>((resolve, reject) => {
+            Reflect.apply(then, result, [resolve, reject]);
+          }).finally(() => {
+            file.close();
+          });
+          pending = true;
+          return settled;
+        }
       }
       return result;
     } finally {
@@ -1153,13 +1166,8 @@ export class TypeServiceClient {
   }
 }
 
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return (
-    (typeof value === 'object' || typeof value === 'function') &&
-    value !== null &&
-    typeof Reflect.get(value, 'then') === 'function'
-  );
-}
+export type WithFileResult<T> =
+  T extends PromiseLike<infer U> ? Promise<Awaited<U>> : T;
 
 type NodeMaps = Pick<
   FileSyntaxViews,

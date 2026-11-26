@@ -1312,6 +1312,64 @@ test('withFile supports sync/async callbacks and GC preserves live node maps', a
       'file type services are closed',
     );
 
+    // Custom thenables with one-shot `then` getters must only have `then` read
+    // once, matching native `await` / `Promise.resolve`.
+    let thenReads = 0;
+    let thenableServices: typeof syncServices | undefined;
+    const thenableValue = await client.withFile(
+      projection.binding,
+      (handle) => {
+        thenableServices = handle.parserServices(decoded, projection);
+        return {
+          get then() {
+            thenReads++;
+            if (thenReads > 1) {
+              throw new Error('then was read twice');
+            }
+            return (resolveThenable: (value: number) => void) => {
+              expect(
+                (thenableServices!.esTreeNodeToTSNodeMap.get(stmt) as any)
+                  ?.kind,
+              ).toBe(ts.SyntaxKind.VariableStatement);
+              resolveThenable(42);
+            };
+          },
+        };
+      },
+    );
+    expect(thenableValue).toBe(42);
+    expect(thenReads).toBe(1);
+    expect(() => thenableServices!.esTreeNodeToTSNodeMap.get(stmt)).toThrow(
+      'file type services are closed',
+    );
+
+    // Union return types containing a Promise subclass normalize the pending
+    // branch to a plain Promise at the type level (no stale subclass methods).
+    class CancellableJob<V> extends Promise<V> {
+      cancel() {
+        return 'cancelled';
+      }
+    }
+    const runMixed = (asyncBranch: boolean) =>
+      client.withFile(projection.binding, (handle) => {
+        const s = handle.parserServices(decoded, projection);
+        if (asyncBranch) {
+          return new CancellableJob<number>((resolveJob) => {
+            resolveJob((s.esTreeNodeToTSNodeMap.get(stmt) as any)?.kind);
+          });
+        }
+        return (s.esTreeNodeToTSNodeMap.get(stmt) as any)?.kind as number;
+      });
+    const mixedSync = runMixed(false);
+    if (typeof mixedSync !== 'number') {
+      // @ts-expect-error normalized union branch is a plain Promise, not CancellableJob
+      mixedSync.cancel();
+    }
+    expect(mixedSync).toBe(ts.SyntaxKind.VariableStatement);
+    const mixedAsync = runMixed(true);
+    expect(mixedAsync).toBeInstanceOf(Promise);
+    expect(await mixedAsync).toBe(ts.SyntaxKind.VariableStatement);
+
     // Explicit Symbol.dispose closes handles and maps immediately.
     const disposed = client.file(projection.binding);
     const disposedServices = disposed.parserServices(decoded, projection);
