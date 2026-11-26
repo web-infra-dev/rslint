@@ -1917,29 +1917,47 @@ func BenchmarkNoRestrictedSyntaxLargeSpecifierLists(b *testing.B) {
 	}
 	list := names.String()
 
+	var manyImports strings.Builder
+	for i := range 100 {
+		manyImports.WriteString("import { a")
+		manyImports.WriteString(strconv.Itoa(i))
+		manyImports.WriteString(" } from 'lib';\n")
+	}
+
 	cases := []struct {
 		name     string
 		code     string
 		selector string
 		kind     ast.Kind
+		want     int
 	}{
 		{
 			name:     "ExportNamed1000",
 			code:     "export { " + list + " } from 'lib';\n",
 			selector: "ExportSpecifier:first-child",
 			kind:     ast.KindExportSpecifier,
+			want:     1000,
 		},
 		{
 			name:     "ImportNamed1000",
 			code:     "import { " + list + " } from 'lib';\n",
 			selector: "ImportSpecifier:first-child",
 			kind:     ast.KindImportSpecifier,
+			want:     1000,
 		},
 		{
 			name:     "ImportDefaultAndNamed1000",
 			code:     "import Def, { " + list + " } from 'lib';\n",
 			selector: "ImportSpecifier:first-child",
 			kind:     ast.KindImportSpecifier,
+			want:     1000,
+		},
+		{
+			name:     "ImportNamed100Declarations",
+			code:     manyImports.String(),
+			selector: "ImportDeclaration[specifiers.length=0]",
+			kind:     ast.KindImportDeclaration,
+			want:     100,
 		},
 	}
 
@@ -1953,25 +1971,25 @@ func BenchmarkNoRestrictedSyntaxLargeSpecifierLists(b *testing.B) {
 			if err != nil {
 				b.Fatalf("parseSelector(%q): %v", tc.selector, err)
 			}
-			var specifiers []*ast.Node
+			var targets []*ast.Node
 			var collect func(*ast.Node) bool
 			collect = func(n *ast.Node) bool {
 				if n.Kind == tc.kind {
-					specifiers = append(specifiers, n)
+					targets = append(targets, n)
 				}
 				n.ForEachChild(collect)
 				return false
 			}
 			collect(sf.AsNode())
-			if len(specifiers) != 1000 {
-				b.Fatalf("expected 1000 specifiers, got %d", len(specifiers))
+			if len(targets) != tc.want {
+				b.Fatalf("expected %d targets, got %d", tc.want, len(targets))
 			}
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
 				mc := &matchContext{sf: sf}
-				for _, node := range specifiers {
+				for _, node := range targets {
 					matches(compiled, node, mc)
 				}
 			}

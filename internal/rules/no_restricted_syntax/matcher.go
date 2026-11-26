@@ -25,18 +25,7 @@ type matchContext struct {
 var emptyNodeSlice = []*ast.Node{}
 
 func (mc *matchContext) importSpecifiersFor(node *ast.Node) []*ast.Node {
-	if mc == nil {
-		return collectImportSpecifiers(node)
-	}
-	if cached, ok := mc.importSpecifiers[node]; ok {
-		return cached
-	}
-	specifiers := collectImportSpecifiers(node)
-	if mc.importSpecifiers == nil {
-		mc.importSpecifiers = make(map[*ast.Node][]*ast.Node)
-	}
-	mc.importSpecifiers[node] = specifiers
-	return specifiers
+	return collectImportSpecifiersCached(node, mc)
 }
 
 // kindSet is the result of computing the set of tsgo kinds a selector might
@@ -3570,6 +3559,10 @@ func readSpecifiersAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 }
 
 func collectImportSpecifiers(node *ast.Node) []*ast.Node {
+	return collectImportSpecifiersCached(node, nil)
+}
+
+func collectImportSpecifiersCached(node *ast.Node, mc *matchContext) []*ast.Node {
 	clause := node.AsImportDeclaration().ImportClause
 	if clause == nil {
 		return emptyNodeSlice
@@ -3606,9 +3599,23 @@ func collectImportSpecifiers(node *ast.Node) []*ast.Node {
 		if len(named) == 0 {
 			return []*ast.Node{clause}
 		}
+		// Only cache synthesized default + named slices: all other shapes
+		// either reuse an AST-owned slice or hold at most two elements.
+		if mc != nil {
+			if cached, ok := mc.importSpecifiers[node]; ok {
+				return cached
+			}
+		}
 		out := make([]*ast.Node, 1, 1+len(named))
 		out[0] = clause
-		return append(out, named...)
+		out = append(out, named...)
+		if mc != nil {
+			if mc.importSpecifiers == nil {
+				mc.importSpecifiers = make(map[*ast.Node][]*ast.Node)
+			}
+			mc.importSpecifiers[node] = out
+		}
+		return out
 	}
 	if hasDefault {
 		return []*ast.Node{clause}
