@@ -133,6 +133,55 @@ function test<T>(t: T | []) {
 }
     `,
     `
+const truthy = <T,>(value: Awaited<T>) => (value ? 1 : 2);
+    `,
+    `
+const nullish = <T,>(value: Awaited<T>) => value ?? 1;
+    `,
+    `
+const fromPromise = async <T,>(promise: Promise<T>) => {
+  const value = await promise;
+  return value ? 1 : 2;
+};
+    `,
+    `
+type Id<T> = T extends unknown ? T : never;
+function test<T>(t: Id<T>) {
+  return t ? 'yes' : 'no';
+}
+    `,
+    `
+const truthyUnion = <T,>(value: Awaited<T> | string) => (value ? 1 : 2);
+    `,
+    `
+const truthy = <T extends string>(value: Awaited<T>) => (value ? 1 : 2);
+    `,
+    `
+const nullish = <T extends Promise<string | null>>(value: Awaited<T>) =>
+  value ?? 1;
+    `,
+    `
+const isUndefined = <T,>(value: Awaited<T>) => value === undefined;
+    `,
+    `
+const isNull = <T,>(value: Awaited<T>) => value === null;
+    `,
+    `
+function test<T, K extends keyof T>(value: Awaited<T[K]>) {
+  return value ?? 1;
+}
+    `,
+    `
+function test(foo?: boolean, bar?: boolean) {
+  return (foo && 'foo') || (bar && 'bar');
+}
+    `,
+    `
+declare const b1: boolean;
+declare const b2: boolean;
+const x = (b1 && 'b1') || b2;
+    `,
+    `
 function test<T>(arg: T, key: keyof T) {
   if (arg[key]?.toString()) {
   }
@@ -1005,6 +1054,66 @@ declare const foo: Foo;
 declare const key: Keys;
 foo[key] ??= 1;
     `,
+    `
+type Fields = {
+  hello?: number;
+  world?: boolean;
+};
+
+let fields: Fields = {};
+
+for (const key of ['hello', 'world'] as const) {
+  fields[key] ??= undefined;
+}
+    `,
+    `
+type Fields = {
+  hello?: boolean | number;
+  world?: boolean;
+};
+
+let fields: Fields = {};
+
+for (const key of ['hello', 'world'] as const) {
+  fields[key] ??= undefined;
+}
+    `,
+    `
+type Fields = {
+  hello?: number;
+  world?: 1 | 2 | 3;
+};
+
+let fields: Fields = {};
+
+for (const key of ['hello', 'world'] as const) {
+  fields[key] ??= undefined;
+}
+    `,
+    `
+type Fields = {
+  hello?: 1 | 2 | 4;
+  world?: 1 | 3 | 5;
+};
+
+let fields: Fields = {};
+
+for (const key of ['hello', 'world'] as const) {
+  fields[key] ??= undefined;
+}
+    `,
+    `
+interface Foo {
+  bizz?: number;
+  buzz?: boolean;
+}
+
+let fields: Foo = {};
+
+for (const key of ['bizz', 'buzz'] as const) {
+  fields[key] ??= undefined;
+}
+    `,
     {
       code: `
 declare const foo: { bar?: number };
@@ -1512,6 +1621,93 @@ if (negBigInt) {
           column: 5,
           endLine: 3,
           endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `
+declare const b1: boolean;
+declare const b2: boolean;
+if ((b1 && 'b1') || b2) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 12,
+          endLine: 4,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+declare const b1: boolean;
+declare const b2: boolean;
+do {} while ((b1 && 'b1') || b2);
+      `,
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 21,
+          endLine: 4,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: `
+declare const b1: boolean;
+declare const b2: boolean;
+for (; (b1 && 'b1') || b2;) {}
+      `,
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 15,
+          endLine: 4,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: `
+declare const b1: boolean;
+declare const b2: boolean;
+if (!((b1 && 'b1') || b2)) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: `
+declare const b1: boolean;
+declare const b2: boolean;
+const t1 = b1 && 'b1' && b2;
+      `,
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 22,
         },
       ],
     },
@@ -2341,6 +2537,76 @@ function test(a: string | false) {
     {
       code: `
 function test<T extends string>(a: T) {
+  return a ?? 'default';
+}
+      `,
+      errors: [
+        {
+          messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+function test<T extends string>(a: Awaited<T>) {
+  return a ?? 'default';
+}
+      `,
+      errors: [
+        {
+          messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+function test<T extends Promise<object>>(a: Awaited<T>) {
+  return a ? 'yes' : 'no';
+}
+      `,
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+function test<T>(a: T extends string ? 'a' : 'b') {
+  return a ? 'yes' : 'no';
+}
+      `,
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+function test<T>(a: T extends string ? 'a' : 'b') {
   return a ?? 'default';
 }
       `,
@@ -4082,6 +4348,56 @@ function getElem(dict: Record<string, { foo: string }>, key: string) {
           column: 7,
           endLine: 3,
           endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+type Fields = {
+  hello?: undefined;
+  world?: null;
+};
+
+let fields: Fields = {};
+
+for (const key of ['hello', 'world'] as const) {
+  fields[key] ??= undefined;
+}
+      `,
+      errors: [
+        {
+          messageId: 'alwaysNullish',
+          message:
+            'Unnecessary conditional, left-hand side of `??` operator is always `null` or `undefined`.',
+          line: 10,
+          column: 3,
+          endLine: 10,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `
+interface Foo {
+  bizz?: undefined;
+  buzz?: null;
+}
+
+let fields: Foo = {};
+
+for (const key of ['buzz', 'bizz'] as const) {
+  fields[key] ??= undefined;
+}
+      `,
+      errors: [
+        {
+          messageId: 'alwaysNullish',
+          message:
+            'Unnecessary conditional, left-hand side of `??` operator is always `null` or `undefined`.',
+          line: 10,
+          column: 3,
+          endLine: 10,
+          endColumn: 14,
         },
       ],
     },

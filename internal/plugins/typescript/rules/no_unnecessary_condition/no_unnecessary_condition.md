@@ -40,7 +40,12 @@ function foo(arg: string) {
 }
 ```
 
+## Differences from upstream
+
+- An `async` or generator callback passed to an array predicate method such as `filter` is judged by the Promise or generator object it returns, because that object is the value the method consumes. `flags.filter(async () => false)` reports `alwaysTruthyFunc` instead of upstream's `alwaysFalsy` on `false`, and `flags.filter(async flag => flag)` reports `alwaysTruthyFunc` where upstream reports nothing.
+- When an accessor's getter can return values its setter does not accept, a read of that property uses the getter's declared type instead of the type TypeScript narrows to after an assignment. After `box.value = 1`, `box.value ?? 0` is not reported when `get value(): number | undefined` is paired with `set value(v: number)`, whereas upstream reports `neverNullish`. Other narrowing of such a property is not kept either, so `if (box.value !== undefined) box.value ?? 0;` is not reported. A value already copied into a variable, such as `const saved = box.value`, keeps TypeScript's narrowed type.
+
 ## Original Documentation
 
 - [typescript-eslint: no-unnecessary-condition](https://typescript-eslint.io/rules/no-unnecessary-condition)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.69.0/packages/eslint-plugin/src/rules/no-unnecessary-condition.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.74.0/packages/eslint-plugin/src/rules/no-unnecessary-condition.ts)

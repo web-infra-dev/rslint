@@ -87,6 +87,8 @@ func Checker_getTypeOfExpression(recv *checker.Checker, node *ast.Node) *checker
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
 //go:linkname Checker_isConstContext github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isConstContext
 func Checker_isConstContext(recv *checker.Checker, node *ast.Node) bool
+//go:linkname Checker_getWriteTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWriteTypeOfSymbol
+func Checker_getWriteTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType
