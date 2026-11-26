@@ -175,6 +175,7 @@ func isRstestExpectCall(
 			entries.first,
 			entries.secondName,
 			entries.count > 1,
+			entries.secondDynamic,
 			entries.firstInvoked,
 			analysis,
 		).ok
@@ -184,13 +185,14 @@ func isRstestExpectCall(
 }
 
 type rstestExpectEntries struct {
-	first        *ast.Node
-	secondName   string
-	count        uint8
-	firstInvoked bool
+	first         *ast.Node
+	secondName    string
+	count         uint8
+	secondDynamic bool
+	firstInvoked  bool
 }
 
-func (entries *rstestExpectEntries) append(name string, node *ast.Node) {
+func (entries *rstestExpectEntries) append(name string, node *ast.Node, dynamic bool) {
 	if name == "" {
 		return
 	}
@@ -199,6 +201,7 @@ func (entries *rstestExpectEntries) append(name string, node *ast.Node) {
 		entries.first = node
 	case 1:
 		entries.secondName = name
+		entries.secondDynamic = dynamic
 	}
 	if entries.count < 2 {
 		entries.count++
@@ -236,12 +239,12 @@ func firstRstestExpectEntries(node *ast.Node) rstestExpectEntries {
 		switch name.Kind {
 		case ast.KindIdentifier:
 			if text := name.AsIdentifier().Text; text != "" {
-				entries.append(text, name)
+				entries.append(text, name, false)
 				return entries
 			}
 		case ast.KindPrivateIdentifier:
 			if text := name.AsPrivateIdentifier().Text; text != "" {
-				entries.append(text, name)
+				entries.append(text, name, false)
 				return entries
 			}
 		}
@@ -259,17 +262,17 @@ func firstRstestExpectEntries(node *ast.Node) rstestExpectEntries {
 		switch name.Kind {
 		case ast.KindIdentifier:
 			if text := name.AsIdentifier().Text; text != "" {
-				entries.append(text, name)
+				entries.append(text, name, true)
 				return entries
 			}
 		case ast.KindStringLiteral:
 			if text := name.AsStringLiteral().Text; text != "" {
-				entries.append(text, name)
+				entries.append(text, name, false)
 				return entries
 			}
 		case ast.KindNoSubstitutionTemplateLiteral:
 			if text := name.AsNoSubstitutionTemplateLiteral().Text; text != "" {
-				entries.append(text, name)
+				entries.append(text, name, false)
 				return entries
 			}
 		}
@@ -518,9 +521,21 @@ func importMetaRstestRootEntryOptions(
 	if node == nil {
 		return testFramework.MemberEntry{}, false
 	}
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return testFramework.MemberEntry{}, false
+	for {
+		node = ast.SkipParentheses(node)
+		if node == nil {
+			return testFramework.MemberEntry{}, false
+		}
+		// `@rstest/core` types `import.meta.rstest` as optional for in-source
+		// testing, so `import.meta.rstest!.expect(...)` is idiomatic TypeScript
+		// and `!` is erased at runtime. Unwrap non-null assertions on the
+		// `import.meta.rstest` receiver itself while preserving wrapper
+		// boundaries later in the chain (e.g. `expect(x)!.toBe(1)`).
+		if node.Kind == ast.KindNonNullExpression {
+			node = node.AsNonNullExpression().Expression
+			continue
+		}
+		break
 	}
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
@@ -565,13 +580,16 @@ func rstestExpectMemberMatch(
 		return rstestExpectMatch{}
 	}
 	secondName := ""
+	secondDynamic := false
 	if len(entries) > 1 {
 		secondName = entries[1].Name
+		secondDynamic = isComputedDynamicMemberName(entries[1].Node)
 	}
 	return rstestExpectRootMatch(
 		entries[0].Node,
 		secondName,
 		len(entries) > 1,
+		secondDynamic,
 		isReceiverEntryInvoked(entries, throughTransparentExpressions),
 		analysis,
 	)
@@ -581,6 +599,7 @@ func rstestExpectRootMatch(
 	root *ast.Node,
 	secondName string,
 	hasSecond bool,
+	secondDynamic bool,
 	firstInvoked bool,
 	analysis *RstestCallAnalysis,
 ) rstestExpectMatch {
@@ -611,7 +630,7 @@ func rstestExpectRootMatch(
 	case rstestExpectRootReceiver:
 		return rstestExpectMatch{
 			index:           1,
-			ok:              !firstInvoked && hasSecond && secondName == "expect",
+			ok:              !firstInvoked && hasSecond && !secondDynamic && secondName == "expect",
 			fromTestContext: rootInfo.FromTestContext,
 		}
 	default:

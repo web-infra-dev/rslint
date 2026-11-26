@@ -83,6 +83,8 @@ func TestValidExpectRule(t *testing.T) {
 			// Provenance: non-Rstest expect and local shadow are ignored.
 			{Code: `import { expect } from "vitest"; expect(1);`},
 			{Code: `const expect = () => {}; expect(1);`},
+			{Code: `import r = require('@rstest/core'); const expect = 'test'; r[expect]('works', () => {});`},
+			{Code: `import * as r from '@rstest/core'; const expect = 'test'; r[expect]('works', () => {});`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// --- arg count ---

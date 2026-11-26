@@ -78,7 +78,7 @@ func (analysis *RstestCallAnalysis) resolveAssertCall(node *ast.Node) bool {
 	case rstestExpectRootDirect:
 		return true
 	case rstestExpectRootReceiver:
-		return !entries.firstInvoked && entries.count > 1 && entries.secondName == rstestAssertAPIName
+		return !entries.firstInvoked && entries.count > 1 && !entries.secondDynamic && entries.secondName == rstestAssertAPIName
 	default:
 		return false
 	}

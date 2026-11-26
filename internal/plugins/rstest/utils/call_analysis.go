@@ -339,6 +339,7 @@ func (analysis *RstestCallAnalysis) expectConfigMember(node *ast.Node) string {
 		entries[0].Node,
 		secondName,
 		len(entries) > 1,
+		false,
 		isReceiverEntryInvoked(entries, false),
 		analysis,
 	)

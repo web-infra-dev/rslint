@@ -171,10 +171,14 @@ expect(run()).rejects.toThrow();
 		`async () => { await run(); }`,
 		`import.meta.rstest.expect(run()).rejects.toThrow();`,
 	)
-	// A non-null assertion on the optional import.meta.rstest namespace is not
-	// recognized as an Rstest binding by the shared expect parser, so the
-	// assertion behind it is left alone.
-	addValid(`import.meta.rstest!.expect(async () => { await run(); }).rejects.toThrow();`)
+	// A non-null assertion on the optional import.meta.rstest namespace is
+	// erased at runtime, so the assertion behind it is recognized and keeps
+	// the non-null assertion in the suggestion.
+	add(
+		`import.meta.rstest!.expect(async () => { await run(); }).rejects.toThrow();`,
+		`async () => { await run(); }`,
+		`import.meta.rstest!.expect(run()).rejects.toThrow();`,
+	)
 	// A modifier written as a string key reads the same property.
 	add(
 		`expect(async () => { await run(); })["rejects"].toThrow();`,
