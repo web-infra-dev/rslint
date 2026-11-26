@@ -45,11 +45,17 @@ func (p *Program) resolveModuleNameAt(sourceFile *ast.SourceFile, specifier stri
 	if !p.IsValid() || !p.OwnsSourceFile(sourceFile) || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
 		return "", nil, false
 	}
+	return p.resolveOwnedModuleNameAt(sourceFile, specifier, moduleSpecifier)
+}
 
+// resolveOwnedModuleNameAt resolves specifier for a sourceFile and
+// string-literal-like node already validated against p, avoiding repeated
+// ownership lookups when resolving all references of a file.
+func (p *Program) resolveOwnedModuleNameAt(sourceFile *ast.SourceFile, specifier string, moduleSpecifier *ast.StringLiteralLike) (string, *ast.SourceFile, bool) {
 	mode := resolutionMode(p, sourceFile, moduleSpecifier)
 
 	resolvedPath := ""
-	if cached := p.GetResolvedModule(sourceFile, specifier, mode); cached != nil {
+	if cached := p.source.resolvedModule(sourceFile, specifier, mode); cached != nil {
 		resolvedPath = cached.ResolvedFileName
 	} else {
 		// A missing cache entry means TypeScript never collected this specifier,
@@ -96,7 +102,7 @@ func (p *Program) GetResolvedModulePath(sourceFile ast.HasFileName, source modul
 // parentheses and JavaScript's JSDoc wrappers around the callee and argument
 // so a package's `require` condition stays selected for every spelling.
 func resolutionMode(sourceProgram *Program, sourceFile *ast.SourceFile, moduleSpecifier *ast.StringLiteralLike) core.ResolutionMode {
-	mode := sourceProgram.GetModeForUsageLocation(sourceFile, moduleSpecifier)
+	mode := sourceProgram.source.modeForUsageLocation(sourceFile, moduleSpecifier)
 	if mode != core.ResolutionModeESM {
 		return mode
 	}
@@ -136,7 +142,7 @@ func isRequireCall(node *ast.Node, kinds ast.OuterExpressionKinds) bool {
 // TypeScript did collect was resolved under. It goes through the Program's own
 // resolver, so a specifier several rules ask about is walked once.
 func resolveWithModuleResolver(sourceProgram *Program, sourceFile *ast.SourceFile, specifier string, mode core.ResolutionMode) string {
-	resolved := sourceProgram.ResolveModuleName(specifier, sourceFile.FileName(), mode)
+	resolved := sourceProgram.source.resolveModuleName(specifier, sourceFile.FileName(), mode)
 	if resolved == nil || !resolved.IsResolved() {
 		return ""
 	}

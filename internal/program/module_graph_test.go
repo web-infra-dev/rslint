@@ -49,3 +49,14 @@ func TestModuleGraphFiltersUnresolvedExpressionShapes(t *testing.T) {
 		}
 	}
 }
+
+func TestModuleGraphNonLiteralOnlyReturnsNil(t *testing.T) {
+	files := specifierCacheFiles(false)
+	files[specifierCacheImporter] = "import(dynamic); require(dynamic); define([dynamic]);"
+	raw, _ := specifierCacheProgram(t, files)
+	file := specifierCacheFile(t, raw)
+	graph := lintprogram.NewFromCompiler(raw).ModuleGraph()
+	if references := graph.References(file, lintprogram.AllModuleReferences); references != nil {
+		t.Fatalf("expected nil for file with no string-literal specifiers, got %#v", references)
+	}
+}

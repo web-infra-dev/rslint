@@ -5,6 +5,7 @@ import (
 	"sync"
 	"weak"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 )
 
@@ -16,6 +17,17 @@ import (
 type derivedCache struct {
 	mu     sync.Mutex
 	values map[any]*derivedValue
+
+	sourceFilesByNameOnce sync.Once
+	sourceFilesByName     map[string]*ast.SourceFile
+
+	// resolvedModuleFiles caches GetSourceFileForResolvedModule lookups that
+	// miss the exact FileName index (such as package-deduplicated paths,
+	// project-reference redirects, case-folded spellings, or unloaded targets)
+	// so repeated imports of the same path avoid repeated tspath.ToPath work.
+	// Keys are resolved path strings and values are *ast.SourceFile (possibly
+	// typed nil), so nothing retains a strong reference to Program.
+	resolvedModuleFiles sync.Map
 }
 
 type derivedValue struct {

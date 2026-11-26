@@ -1,6 +1,9 @@
 package no_cycle
 
 import (
+	"sync"
+	"sync/atomic"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
@@ -56,6 +59,28 @@ type moduleGraph struct {
 	// its group means. A group can therefore hold files no expand route
 	// reaches, but never miss one that a route does.
 	group []int32
+
+	// explored[i] becomes true only after node i and every node reachable from
+	// it over edge have had their nodes[v] and group[v] finalized. Once
+	// explored[i].Load() observes true, callers inspect i's reachable subgraph
+	// without acquiring mu.
+	explored []atomic.Bool
+
+	referenceKinds     program.ModuleReferenceKinds
+	allowUnsafeDynamic bool
+
+	mu     sync.Mutex
+	tarjan tarjanState
+}
+
+type tarjanState struct {
+	visitIndex []int32
+	lowLink    []int32
+	onStack    []bool
+	component  []int32
+	pending    []groupFrame
+	visited    int32
+	groups     int32
 }
 
 type directTargetsKey struct {
@@ -90,7 +115,8 @@ func directCyclesFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, sett
 		var cycles []directCycle
 		type backEdge struct{ dynamic, found bool }
 		checked := make(map[*ast.SourceFile]backEdge)
-		for _, ref := range refs {
+		for i := range refs {
+			ref := &refs[i]
 			if ref.TypeOnly || ref.Target == nil || ref.Target == self || !import_utils.HasAuthoredModuleView(ref.Source()) {
 				continue
 			}
@@ -105,7 +131,7 @@ func directCyclesFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, sett
 				checked[ref.Target] = back
 			}
 			if back.found {
-				cycles = append(cycles, directCycle{reference: ref, dynamicBack: back.dynamic})
+				cycles = append(cycles, directCycle{reference: *ref, dynamicBack: back.dynamic})
 			}
 		}
 		return cycles
@@ -121,7 +147,9 @@ func directCyclesFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, sett
 func directTargetsFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, file *ast.SourceFile, kinds program.ModuleReferenceKinds) map[*ast.SourceFile]bool {
 	return rule.CachedByProgram(ctx, directTargetsKey{file: file, kinds: kinds}, func() map[*ast.SourceFile]bool {
 		var targets map[*ast.SourceFile]bool
-		for _, ref := range sourceGraph.References(file, kinds) {
+		refs := sourceGraph.References(file, kinds)
+		for i := range refs {
+			ref := &refs[i]
 			if ref.TypeOnly || ref.Target == nil || !import_utils.HasAuthoredModuleView(ref.Source()) {
 				continue
 			}
@@ -135,9 +163,10 @@ func directTargetsFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, fil
 }
 
 // moduleGraphFor returns the Program generation's dependency graph for these
-// options, building it on the first file that asks for it.
-func moduleGraphFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, opts ruleOptions) *moduleGraph {
-	settings := import_utils.SettingsFor(ctx)
+// options, initializing its file index on the first file that asks for it.
+// Individual nodes and their strongly connected components are populated
+// on demand by ensureExplored.
+func moduleGraphFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, settings *import_utils.ModuleSettings, opts ruleOptions) *moduleGraph {
 	key := graphKey{
 		settings:           settings.Key(),
 		referenceKinds:     opts.referenceKinds,
@@ -145,50 +174,93 @@ func moduleGraphFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, opts 
 		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
 	}
 	return rule.CachedByProgram(ctx, key, func() *moduleGraph {
-		return buildModuleGraph(ctx, sourceGraph, settings, opts)
+		return newModuleGraph(sourceGraph, settings, opts)
 	})
 }
 
-func buildModuleGraph(ctx rule.RuleContext, sourceGraph program.ModuleGraph, settings *import_utils.ModuleSettings, opts ruleOptions) *moduleGraph {
+func newModuleGraph(sourceGraph program.ModuleGraph, settings *import_utils.ModuleSettings, opts ruleOptions) *moduleGraph {
 	files := sourceGraph.Files()
+	count := len(files)
 	graph := &moduleGraph{
-		nodes: make([]moduleNode, len(files)),
-		index: make(map[*ast.SourceFile]int32, len(files)),
+		nodes:              make([]moduleNode, count),
+		index:              make(map[*ast.SourceFile]int32, count),
+		group:              make([]int32, count),
+		explored:           make([]atomic.Bool, count),
+		referenceKinds:     opts.referenceKinds,
+		allowUnsafeDynamic: opts.allowUnsafeDynamicCyclicDependency,
+		tarjan: tarjanState{
+			visitIndex: make([]int32, count),
+			lowLink:    make([]int32, count),
+			onStack:    make([]bool, count),
+			pending:    make([]groupFrame, 0, 32),
+			groups:     1,
+		},
 	}
-	// Classify files once and collect only included references. The second
-	// pass converts their targets after the complete index is available,
-	// avoiding another index lookup for every source file.
 	for i, file := range files {
 		if fileIsExcluded(settings, opts, file) {
 			continue
 		}
 		graph.index[file] = int32(i)
-		graph.nodes[i].refs = sourceGraph.References(file, opts.referenceKinds)
 	}
+	return graph
+}
 
-	for i := range graph.nodes {
-		node := &graph.nodes[i]
-		refs := node.refs
-		if len(refs) == 0 {
+// ensureExplored populates the outgoing edges and finalizes the strongly
+// connected components for self and every file reachable from it over edge.
+// Because Tarjan closes every SCC completely before returning from its root,
+// exploring only reachable roots yields the exact same component partition for
+// all visited nodes while avoiding collecting or resolving unreachable files
+// (such as default libraries or unreferenced type declarations).
+func (graph *moduleGraph) ensureExplored(sourceGraph program.ModuleGraph, self int32) {
+	if graph.explored[self].Load() {
+		return
+	}
+	graph.mu.Lock()
+	defer graph.mu.Unlock()
+	if graph.explored[self].Load() {
+		return
+	}
+	files := sourceGraph.Files()
+	graph.tarjanVisit(self, func(nodeIdx int32) {
+		graph.populateNode(sourceGraph, nodeIdx, files[nodeIdx])
+	})
+	if graph.tarjan.visited == int32(len(graph.index)) {
+		graph.tarjan = tarjanState{}
+	}
+}
+
+func (graph *moduleGraph) populateNode(sourceGraph program.ModuleGraph, nodeIdx int32, file *ast.SourceFile) {
+	refs := sourceGraph.References(file, graph.referenceKinds)
+	if len(refs) == 0 {
+		return
+	}
+	var edge []int32
+	for r := range refs {
+		if refs[r].TypeOnly || refs[r].Target == nil || !import_utils.HasAuthoredModuleView(refs[r].Source()) {
 			continue
 		}
-		node.edge = make([]int32, len(refs))
-		for r := range refs {
-			node.edge[r] = -1
-			if refs[r].TypeOnly || refs[r].Target == nil || !import_utils.HasAuthoredModuleView(refs[r].Source()) {
-				continue
-			}
-			if target, ok := graph.index[refs[r].Target]; ok {
-				node.edge[r] = target
+		target, ok := graph.index[refs[r].Target]
+		if !ok {
+			continue
+		}
+		if edge == nil {
+			edge = make([]int32, len(refs))
+			for j := range edge {
+				edge[j] = -1
 			}
 		}
-		node.expand = node.edge
-		if opts.allowUnsafeDynamicCyclicDependency {
-			node.expand = withheldDynamicEdges(node)
-		}
+		edge[r] = target
 	}
-	graph.computeGroups()
-	return graph
+	if edge == nil {
+		return
+	}
+	node := &graph.nodes[nodeIdx]
+	node.refs = refs
+	node.edge = edge
+	node.expand = edge
+	if graph.allowUnsafeDynamic {
+		node.expand = withheldDynamicEdges(node)
+	}
 }
 
 // fileIsExcluded reports whether every edge into file is dropped: its path is
@@ -232,77 +304,81 @@ func withheldDynamicEdges(node *moduleNode) []int32 {
 	return expand
 }
 
-// computeGroups assigns every file its strongly connected component over
-// edge, running Tarjan from an explicit stack so that a deep import chain
-// cannot exhaust the goroutine stack.
-func (graph *moduleGraph) computeGroups() {
-	count := len(graph.nodes)
-	graph.group = make([]int32, count)
+// tarjanVisit assigns every file reachable from root its strongly connected
+// component over edge, running Tarjan from an explicit stack so that a deep
+// import chain cannot exhaust the goroutine stack. Component IDs start at 1 so
+// group[v] == 0 unambiguously marks an unexplored node.
+func (graph *moduleGraph) tarjanVisit(root int32, prepareNode func(node int32)) {
+	if graph.tarjan.visitIndex == nil {
+		return
+	}
+	t := &graph.tarjan
+	if t.visitIndex[root] != 0 {
+		return
+	}
+	t.pending = append(t.pending, groupFrame{node: root})
 
-	visitIndex := make([]int32, count)
-	lowLink := make([]int32, count)
-	onStack := make([]bool, count)
-	component := make([]int32, 0, count)
-	pending := make([]groupFrame, 0, 32)
-
-	var visited, groups int32
-	for root := range count {
-		if visitIndex[root] != 0 {
-			continue
+	for len(t.pending) > 0 {
+		frame := &t.pending[len(t.pending)-1]
+		node := frame.node
+		if frame.edge == 0 {
+			if prepareNode != nil {
+				prepareNode(node)
+			}
+			t.visited++
+			t.visitIndex[node] = t.visited
+			t.lowLink[node] = t.visited
+			t.component = append(t.component, node)
+			t.onStack[node] = true
 		}
-		pending = append(pending, groupFrame{node: int32(root)})
 
-		for len(pending) > 0 {
-			frame := &pending[len(pending)-1]
-			node := frame.node
-			if frame.edge == 0 {
-				visited++
-				visitIndex[node] = visited
-				lowLink[node] = visited
-				component = append(component, node)
-				onStack[node] = true
-			}
-
-			descended := false
-			edges := graph.nodes[node].edge
-			for int(frame.edge) < len(edges) {
-				target := edges[frame.edge]
-				frame.edge++
-				if target < 0 {
-					continue
-				}
-				if visitIndex[target] == 0 {
-					pending = append(pending, groupFrame{node: target})
-					descended = true
-					break
-				}
-				if onStack[target] && visitIndex[target] < lowLink[node] {
-					lowLink[node] = visitIndex[target]
-				}
-			}
-			if descended {
+		descended := false
+		edges := graph.nodes[node].edge
+		for int(frame.edge) < len(edges) {
+			target := edges[frame.edge]
+			frame.edge++
+			if target < 0 {
 				continue
 			}
-
-			if lowLink[node] == visitIndex[node] {
-				for {
-					member := component[len(component)-1]
-					component = component[:len(component)-1]
-					onStack[member] = false
-					graph.group[member] = groups
-					if member == node {
-						break
-					}
-				}
-				groups++
+			if t.visitIndex[target] == 0 {
+				t.pending = append(t.pending, groupFrame{node: target})
+				descended = true
+				break
 			}
+			if t.onStack[target] && t.visitIndex[target] < t.lowLink[node] {
+				t.lowLink[node] = t.visitIndex[target]
+			}
+		}
+		if descended {
+			continue
+		}
 
-			pending = pending[:len(pending)-1]
-			if len(pending) > 0 {
-				parent := pending[len(pending)-1].node
-				if lowLink[node] < lowLink[parent] {
-					lowLink[parent] = lowLink[node]
-				}
+		if t.lowLink[node] == t.visitIndex[node] {
+			start := len(t.component) - 1
+			for t.component[start] != node {
+				start--
+			}
+			members := t.component[start:]
+			for _, member := range members {
+				t.onStack[member] = false
+				graph.group[member] = t.groups
+			}
+			// Every outgoing edge from members targets either another member of
+			// this SCC or an SCC that closed strictly earlier, so publishing
+			// explored after all group assignments makes the entire reachable
+			// subgraph visible to lock-free readers.
+			for _, member := range members {
+				graph.explored[member].Store(true)
+			}
+			t.component = t.component[:start]
+			t.groups++
+		}
+
+		t.pending = t.pending[:len(t.pending)-1]
+		if len(t.pending) > 0 {
+			parent := t.pending[len(t.pending)-1].node
+			if t.lowLink[node] < t.lowLink[parent] {
+				t.lowLink[parent] = t.lowLink[node]
 			}
 		}
 	}
