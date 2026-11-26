@@ -94,6 +94,57 @@ func destructureReportRange(sourceFile *ast.SourceFile, receiverNode *ast.Node, 
 	return core.NewTextRange(receiverRange.Pos(), utils.TrimNodeTextRange(sourceFile, defaultValue).End())
 }
 
+// isGuaranteedNonAnyNonTypeRef reports whether evaluating node via
+// Checker.GetTypeAtLocation is syntactically guaranteed to yield a type that
+// is neither `any` (TypeFlagsAny, including errorType) nor a TypeReference
+// (ObjectFlagsReference), even with strictNullChecks disabled.
+//
+// Only use this in non-destructuring sender positions, where checkAssignment
+// (and array spread checking) can report only on `any` or `TypeReference`
+// sender types.
+func isGuaranteedNonAnyNonTypeRef(node *ast.Node) bool {
+	if node == nil || node.Flags&ast.NodeFlagsInWithStatement != 0 {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+
+	switch node.Kind {
+	case ast.KindStringLiteral,
+		ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword,
+		ast.KindTypeOfExpression,
+		ast.KindDeleteExpression,
+		ast.KindVoidExpression,
+		ast.KindArrowFunction,
+		ast.KindFunctionExpression:
+		return true
+	case ast.KindObjectLiteralExpression:
+		props := node.AsObjectLiteralExpression().Properties
+		if props == nil {
+			return true
+		}
+		for _, prop := range props.Nodes {
+			if prop.Kind == ast.KindSpreadAssignment {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func isDestructuringPattern(node *ast.Node) bool {
+	return ast.IsArrayBindingPattern(node) ||
+		ast.IsObjectBindingPattern(node) ||
+		ast.IsArrayLiteralExpression(node) ||
+		ast.IsObjectLiteralExpression(node)
+}
+
 func markAssignmentPatternLiterals(node *ast.Node, marked *map[*ast.Node]struct{}) {
 	if node == nil {
 		return
@@ -838,6 +889,10 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			if id == nil || init == nil {
 				return
 			}
+			isDestructuring := isDestructuringPattern(id)
+			if !isDestructuring && isGuaranteedNonAnyNonTypeRef(init) {
+				return
+			}
 			senderType := typeResolver.typeAtLocation(init)
 			didReport := checkAssignment(
 				id,
@@ -848,10 +903,10 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				senderType,
 			)
 
-			if !didReport {
+			if !didReport && isDestructuring {
 				didReport = checkArrayDestructureHelper(id, senderType, init)
 			}
-			if !didReport {
+			if !didReport && isDestructuring {
 				checkObjectDestructureHelper(id, senderType, init)
 			}
 		}
@@ -867,7 +922,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 			// ESTree PropertyDefinition, AccessorProperty
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				initializer := node.Initializer()
-				if initializer == nil {
+				if initializer == nil || isGuaranteedNonAnyNonTypeRef(initializer) {
 					return
 				}
 				checkAssignment(
@@ -913,6 +968,10 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				}
 
 				id := node.Name()
+				isDestructuring := isDestructuringPattern(id)
+				if !isDestructuring && isGuaranteedNonAnyNonTypeRef(init) {
+					return
+				}
 				senderType := typeResolver.typeAtLocation(init)
 				didReport := checkAssignment(
 					id,
@@ -922,10 +981,10 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 					senderType,
 				)
 
-				if !didReport {
+				if !didReport && isDestructuring {
 					didReport = checkArrayDestructureHelper(id, senderType, init)
 				}
-				if !didReport {
+				if !didReport && isDestructuring {
 					checkObjectDestructureHelper(id, senderType, init)
 				}
 			},
@@ -958,6 +1017,9 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 						continue
 					}
 					init = ast.SkipParentheses(init)
+					if isGuaranteedNonAnyNonTypeRef(init) {
+						continue
+					}
 
 					checkAssignment(
 						node.Name(),
@@ -978,7 +1040,11 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 						continue
 					}
 
-					restType := typeResolver.typeAtLocation(node.Expression())
+					expr := node.Expression()
+					if isGuaranteedNonAnyNonTypeRef(expr) {
+						continue
+					}
+					restType := typeResolver.typeAtLocation(expr)
 					if utils.IsTypeAnyType(restType) || utils.IsTypeAnyArrayType(restType, ctx.TypeChecker) {
 						ctx.ReportNode(node, buildUnsafeArraySpreadMessage(restType))
 					}
@@ -992,7 +1058,7 @@ var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 				}
 
 				expr := init.AsJsxExpression().Expression
-				if expr == nil {
+				if expr == nil || isGuaranteedNonAnyNonTypeRef(expr) {
 					return
 				}
 
