@@ -74,3 +74,22 @@ func TestIsImportEqualsOfModules(t *testing.T) {
 		t.Fatal("expected nil declaration to return false")
 	}
 }
+
+func TestIsModuleRequireCallModulesIgnoresShadowedRequire(t *testing.T) {
+	modules := []string{"@rstest/core"}
+
+	_, globalCall := parseFirstCall(t, `require("@rstest/core");`)
+	if !IsModuleRequireCallModules(globalCall, modules) {
+		t.Fatal("expected global require call to match")
+	}
+
+	_, shadowedByVar := parseFirstCall(t, `const require = () => ({}); require("@rstest/core");`)
+	if IsModuleRequireCallModules(shadowedByVar, modules) {
+		t.Fatal("expected locally declared require to be ignored")
+	}
+
+	_, shadowedByParam := parseFirstCall(t, `function run(require: any) { return require("@rstest/core"); }`)
+	if IsModuleRequireCallModules(shadowedByParam, modules) {
+		t.Fatal("expected parameter-shadowed require to be ignored")
+	}
+}

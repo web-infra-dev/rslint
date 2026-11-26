@@ -20,17 +20,22 @@ import (
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
-func isPromiseMethodCall(node *ast.Node) bool {
+func promiseMethodName(node *ast.Node) (string, bool) {
 	if node == nil || node.Kind != ast.KindCallExpression {
-		return false
+		return "", false
 	}
 
 	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
 	if !ast.IsAccessExpression(callee) {
-		return false
+		return "", false
 	}
 
-	return testFramework.CalleeChainName(internalUtils.AccessExpressionObject(callee)) == "Promise"
+	if testFramework.CalleeChainName(internalUtils.AccessExpressionObject(callee)) != "Promise" {
+		return "", false
+	}
+
+	_, method := testFramework.AccessorPropertyAndName(callee)
+	return method, true
 }
 
 // outermostTransparentExpression walks upward across parentheses and
@@ -59,11 +64,28 @@ func getPromiseCallExpressionNode(node *ast.Node) *ast.Node {
 		return nil
 	}
 
-	if outer := outermostTransparentExpression(node); node.Kind == ast.KindArrayLiteralExpression && outer.Parent != nil && outer.Parent.Kind == ast.KindCallExpression {
-		node = outer.Parent
+	if node.Kind == ast.KindArrayLiteralExpression {
+		outer := outermostTransparentExpression(node)
+		if outer == nil || outer.Parent == nil || outer.Parent.Kind != ast.KindCallExpression {
+			return nil
+		}
+		call := outer.Parent
+		args := call.AsCallExpression().Arguments
+		if args == nil || len(args.Nodes) == 0 || args.Nodes[0] != outer {
+			return nil
+		}
+		method, ok := promiseMethodName(call)
+		// `Promise.resolve([...])` and `Promise.reject([...])` resolve/reject
+		// immediately with the array itself without awaiting its elements,
+		// unlike `Promise.all` / `allSettled` / `race` / `any` (or custom
+		// array combinators such as `Promise.x`).
+		if !ok || method == "resolve" || method == "reject" {
+			return nil
+		}
+		return call
 	}
 
-	if isPromiseMethodCall(node) {
+	if _, ok := promiseMethodName(node); ok {
 		return node
 	}
 
@@ -75,10 +97,17 @@ func findPromiseCallExpressionNode(node *ast.Node) *ast.Node {
 	if node == nil || node.Parent == nil || node.Parent.Parent == nil {
 		return nil
 	}
-	if node.Parent.Kind != ast.KindCallExpression && node.Parent.Kind != ast.KindArrayLiteralExpression {
-		return nil
+	if node.Parent.Kind == ast.KindCallExpression {
+		args := node.Parent.AsCallExpression().Arguments
+		if args == nil || len(args.Nodes) == 0 || args.Nodes[0] != node {
+			return nil
+		}
+		return getPromiseCallExpressionNode(node.Parent)
 	}
-	return getPromiseCallExpressionNode(node.Parent)
+	if node.Parent.Kind == ast.KindArrayLiteralExpression {
+		return getPromiseCallExpressionNode(node.Parent)
+	}
+	return nil
 }
 
 func getParentIfPromiseChained(node *ast.Node) *ast.Node {
@@ -108,20 +137,45 @@ func getParentIfPromiseChained(node *ast.Node) *ast.Node {
 	return node
 }
 
-func isAcceptableReturnNode(node *ast.Node, allowReturn bool) bool {
-	if node == nil {
+func isAcceptableReturnNode(child, parent *ast.Node, allowReturn bool) bool {
+	if parent == nil {
 		return false
 	}
 
-	if allowReturn && node.Kind == ast.KindReturnStatement {
-		return true
+	if allowReturn && parent.Kind == ast.KindReturnStatement {
+		return parent.AsReturnStatement().Expression == child
 	}
-	if node.Kind == ast.KindConditionalExpression {
-		outer := outermostTransparentExpression(node)
-		return isAcceptableReturnNode(outer.Parent, allowReturn)
+	if parent.Kind == ast.KindConditionalExpression {
+		cond := parent.AsConditionalExpression()
+		// Only a value-producing branch can forward the assertion promise;
+		// testing the promise in the condition discards it as always-truthy.
+		if cond == nil || (cond.WhenTrue != child && cond.WhenFalse != child) {
+			return false
+		}
+		outer := outermostTransparentExpression(parent)
+		return isAcceptableReturnNode(outer, outer.Parent, allowReturn)
+	}
+	if parent.Kind == ast.KindArrowFunction {
+		return parent.AsArrowFunction().Body == child
+	}
+	if parent.Kind == ast.KindAwaitExpression {
+		return parent.AsAwaitExpression().Expression == child
 	}
 
-	return node.Kind == ast.KindArrowFunction || node.Kind == ast.KindAwaitExpression
+	return false
+}
+
+func isTerminalFunctionReturn(ret *ast.Node) bool {
+	if ret == nil || ret.Kind != ast.KindReturnStatement || ret.Parent == nil || ret.Parent.Kind != ast.KindBlock {
+		return false
+	}
+	block := ret.Parent
+	fn := block.Parent
+	if fn == nil || !testFramework.IsFunction(fn) {
+		return false
+	}
+	stmts := block.AsBlock().Statements.Nodes
+	return len(stmts) > 0 && stmts[len(stmts)-1] == ret
 }
 
 // PromiseArrayExceptionKey identifies a Promise.all([...]) call by source range,
@@ -145,21 +199,31 @@ func AsyncInsertFix(sourceFile *ast.SourceFile, fn *ast.Node) rule.RuleFix {
 	}
 }
 
-// AwaitFix awaits an async assertion, replacing a `return` with `await` when
-// returning it is not accepted.
+// AwaitFix awaits an async assertion, replacing a terminal `return` with
+// `await` when returning it is not accepted. Early returns keep `return await`
+// so control flow does not fall through to subsequent statements.
 func AwaitFix(sourceFile *ast.SourceFile, node *ast.Node, alwaysAwait bool) rule.RuleFix {
 	outer := outermostTransparentExpression(node)
 	if alwaysAwait && outer.Parent != nil && outer.Parent.Kind == ast.KindReturnStatement {
 		ret := outer.Parent
 		retRange := internalUtils.TrimNodeTextRange(sourceFile, ret)
 		outerRange := internalUtils.TrimNodeTextRange(sourceFile, outer)
+		if isTerminalFunctionReturn(ret) {
+			if outer.Kind == ast.KindAsExpression || outer.Kind == ast.KindSatisfiesExpression {
+				return rule.RuleFixReplaceRange(
+					core.NewTextRange(retRange.Pos(), outerRange.End()),
+					"await ("+sourceFile.Text()[outerRange.Pos():outerRange.End()]+")",
+				)
+			}
+			return rule.RuleFixReplaceRange(core.NewTextRange(retRange.Pos(), outerRange.Pos()), "await ")
+		}
 		if outer.Kind == ast.KindAsExpression || outer.Kind == ast.KindSatisfiesExpression {
 			return rule.RuleFixReplaceRange(
-				core.NewTextRange(retRange.Pos(), outerRange.End()),
+				outerRange,
 				"await ("+sourceFile.Text()[outerRange.Pos():outerRange.End()]+")",
 			)
 		}
-		return rule.RuleFixReplaceRange(core.NewTextRange(retRange.Pos(), outerRange.Pos()), "await ")
+		return rule.RuleFixInsertBefore(sourceFile, outer, "await ")
 	}
 	// If the assertion is wrapped in a TypeScript assertion (`as`, `<T>`,
 	// `satisfies`, `!`), await the outermost wrapper so `await` binds to the
@@ -197,18 +261,18 @@ func ResolveAsyncAssertionReportNode(
 
 	promiseChainedAssertionNode := getParentIfPromiseChained(assertionNode)
 	outerChained := outermostTransparentExpression(promiseChainedAssertionNode)
-	insideAssertionArray = outerChained.Parent != nil && outerChained.Parent.Kind == ast.KindArrayLiteralExpression
 	reportNode = promiseChainedAssertionNode
 	if promiseCallNode := findPromiseCallExpressionNode(promiseChainedAssertionNode); promiseCallNode != nil {
 		reportNode = promiseCallNode
 		promiseWrapped = true
 	}
+	insideAssertionArray = promiseWrapped && outerChained.Parent != nil && outerChained.Parent.Kind == ast.KindArrayLiteralExpression
 
 	// Parentheses and TypeScript assertion wrappers around the assertion are
 	// erased at runtime, so the await or return that consumes the Promise may
 	// sit above one or more wrappers. reportNode itself stays the report range.
 	outermost := outermostTransparentExpression(reportNode)
-	if outermost.Parent == nil || isAcceptableReturnNode(outermost.Parent, !alwaysAwait) {
+	if outermost.Parent == nil || isAcceptableReturnNode(outermost, outermost.Parent, !alwaysAwait) {
 		return reportNode, promiseWrapped, insideAssertionArray, false
 	}
 

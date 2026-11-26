@@ -296,6 +296,28 @@ func TestValidExpectRule(t *testing.T) {
 				Output: []string{"test(\"valid-expect\", async () => { await (expect(Promise.resolve(2)).resolves.toBeDefined()); });"},
 			},
 			{
+				Code:    "test(\"early return\", (ready) => { if (ready) return expect(Promise.resolve(1)).resolves.toBe(1) as Promise<void>; throw new Error('fell through'); });",
+				Options: map[string]interface{}{"alwaysAwait": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{"test(\"early return\", async (ready) => { if (ready) return await (expect(Promise.resolve(1)).resolves.toBe(1) as Promise<void>); throw new Error('fell through'); });"},
+			},
+			{
+				Code: "test(\"valid-expect\", async () => { await Promise.resolve([expect(Promise.resolve(1)).resolves.toBe(1)] as const); });",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{"test(\"valid-expect\", async () => { await Promise.resolve([await expect(Promise.resolve(1)).resolves.toBe(1)] as const); });"},
+			},
+			{
+				Code: "test(\"valid-expect\", () => { return (expect(Promise.resolve(1)).resolves.toBe(1) as unknown) ? Promise.resolve() : Promise.reject(); });",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{"test(\"valid-expect\", async () => { return await (expect(Promise.resolve(1)).resolves.toBe(1) as unknown) ? Promise.resolve() : Promise.reject(); });"},
+			},
+			{
 				Code: `expect.extend({
   toResolve(obj) {
     this.isNot

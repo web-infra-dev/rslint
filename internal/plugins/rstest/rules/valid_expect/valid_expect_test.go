@@ -307,6 +307,40 @@ func TestValidExpectRule(t *testing.T) {
 				},
 				Output: []string{`test("t", async () => { await (expect(p).resolves.toBe(1) as Promise<void>); });`},
 			},
+			// Early return with alwaysAwait must keep `return await` so control
+			// flow does not fall through to subsequent statements.
+			{
+				Code: `test.each([true])('early return', (ready) => {
+  const p = Promise.resolve(1);
+  if (ready) return expect(p).resolves.toBe(1) as Promise<void>;
+  throw new Error('fell through');
+});`,
+				Options: map[string]any{"alwaysAwait": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test.each([true])('early return', async (ready) => {
+  const p = Promise.resolve(1);
+  if (ready) return await (expect(p).resolves.toBe(1) as Promise<void>);
+  throw new Error('fell through');
+});`},
+			},
+			// `Promise.resolve([...])` resolves to the array without awaiting its elements.
+			{
+				Code: `test("t", async () => { await Promise.resolve([expect(p).resolves.toBe(1)] as const); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await Promise.resolve([await expect(p).resolves.toBe(1)] as const); });`},
+			},
+			// A conditional test position discards the assertion promise rather than forwarding it.
+			{
+				Code: `test("t", () => { return (expect(p).resolves.toBe(1) as unknown) ? Promise.resolve() : Promise.reject(); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { return await (expect(p).resolves.toBe(1) as unknown) ? Promise.resolve() : Promise.reject(); });`},
+			},
 		},
 	)
 }

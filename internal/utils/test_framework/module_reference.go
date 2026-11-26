@@ -416,6 +416,10 @@ func IsModuleRequireCallModules(node *ast.Node, importModules []string) bool {
 	if node == nil || !ast.IsRequireCall(node, false /* requireStringLiteralLikeArgument */) {
 		return false
 	}
+	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+	if callee == nil || callee.Kind != ast.KindIdentifier || internalUtils.IsShadowed(callee, callee.AsIdentifier().Text) {
+		return false
+	}
 
 	arguments := node.Arguments()
 	if len(arguments) == 0 || arguments[0] == nil {
