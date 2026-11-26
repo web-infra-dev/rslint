@@ -488,11 +488,18 @@ func resolveImportMetaRstestBinding(symbol *ast.Symbol) (string, *ast.Node, bool
 		if declaration == nil || declaration.Kind != ast.KindBindingElement {
 			continue
 		}
-		variable := internalUtils.EnclosingVariableDeclarationOfBindingElement(declaration)
-		if variable == nil || !isImportMetaRstest(variable.AsVariableDeclaration().Initializer) {
+		binding := declaration.AsBindingElement()
+		if binding == nil || binding.DotDotDotToken != nil {
 			continue
 		}
-		binding := declaration.AsBindingElement()
+		variable := internalUtils.EnclosingVariableDeclarationOfBindingElement(declaration)
+		if variable == nil ||
+			declaration.Parent == nil ||
+			declaration.Parent.Kind != ast.KindObjectBindingPattern ||
+			declaration.Parent != variable.Name() ||
+			!isImportMetaRstest(variable.AsVariableDeclaration().Initializer) {
+			continue
+		}
 		if binding.PropertyName != nil {
 			// The property names the API; the local name only names the
 			// binding. Falling through to the local name when the key cannot
@@ -681,12 +688,10 @@ func profileImportModules(profile rstestAPIProfile) []string {
 var rstestAllProfiles = [...]rstestAPIProfile{rstestProfileCore, rstestProfilePlaywright}
 
 func isImportMetaRstest(node *ast.Node) bool {
-	// SkipParentheses dereferences its argument, so the nil check has to come
-	// first: callers pass initializers, which are nil for a bare `let x;`.
-	if node == nil {
-		return false
-	}
-	node = ast.SkipParentheses(node)
+	// SkipAssertionsAndParens handles nil safely and unwraps erased TypeScript
+	// assertions (`import.meta.rstest!`, `import.meta.rstest as ...`) so
+	// destructuring and aliases of optional `import.meta.rstest` resolve cleanly.
+	node = internalUtils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
 	}

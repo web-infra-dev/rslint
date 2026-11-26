@@ -208,40 +208,70 @@ func resolveAsyncAssertionReportNode(
 	matcherEntry *utils.ParsedJestFnMemberEntry,
 	alwaysAwait bool,
 ) (reportNode *ast.Node, promiseWrapped bool, insideAssertionArray bool, shouldReport bool) {
-	if matcherEntry == nil || matcherEntry.Node == nil || matcherEntry.Node.Parent == nil {
+	if matcherEntry == nil {
+		return nil, false, false, false
+	}
+	assertionExpr := testFramework.DirectMemberCall(matcherEntry)
+	if assertionExpr == nil {
+		assertionExpr = matcherEntry.Call
+	}
+	if assertionExpr == nil {
 		return nil, false, false, false
 	}
 
-	matcherMemberNode := matcherEntry.Node.Parent
-	if matcherMemberNode.Parent == nil {
-		return nil, false, false, false
-	}
+	return sharedValidExpect.ResolveAsyncAssertionReportNode(assertionExpr, alwaysAwait)
+}
 
-	return sharedValidExpect.ResolveAsyncAssertionReportNode(matcherMemberNode.Parent, alwaysAwait)
+type asyncFixTracker struct {
+	asyncInserted map[*ast.Node]bool
+	deferredFn    map[*ast.Node]bool
+	fnFixable     map[*ast.Node]bool
+	emittedRanges []core.TextRange
+}
+
+func (t *asyncFixTracker) overlaps(pos int) bool {
+	for _, r := range t.emittedRanges {
+		if r.Pos() <= pos && pos <= r.End() {
+			return true
+		}
+	}
+	return false
 }
 
 func reportAsyncDescriptor(
 	ctx rule.RuleContext,
 	descriptor asyncDescriptor,
 	alwaysAwait bool,
-	asyncInserted map[*ast.Node]bool,
+	tracker *asyncFixTracker,
 ) {
 	msg := buildAsyncDescriptorMessage(descriptor, alwaysAwait)
 
-	var fixes []rule.RuleFix
-	if fn := ast.GetContainingFunction(descriptor.node); fn != nil {
-		if !ast.IsAsyncFunction(fn) && !asyncInserted[fn] {
-			fixes = append(fixes, sharedValidExpect.AsyncInsertFix(ctx.SourceFile, fn))
-			asyncInserted[fn] = true
+	ctx.ReportNodeWithDeferredFixes(descriptor.node, msg, func() []rule.RuleFix {
+		fn, ok := sharedValidExpect.FindFixableContainingFunctionCached(descriptor.node, tracker.fnFixable)
+		if !ok || !sharedValidExpect.CanSafelyAwaitFix(descriptor.node) {
+			return nil
 		}
-		fixes = append(fixes, sharedValidExpect.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait))
-	}
-
-	if len(fixes) > 0 {
-		ctx.ReportNodeWithFixes(descriptor.node, msg, fixes...)
-		return
-	}
-	ctx.ReportNode(descriptor.node, msg)
+		if tracker.deferredFn[fn] {
+			return nil
+		}
+		var fixes []rule.RuleFix
+		if !sharedValidExpect.IsAsyncFunctionLike(fn) && !tracker.asyncInserted[fn] {
+			asyncFix := sharedValidExpect.AsyncInsertFix(ctx.SourceFile, fn)
+			if tracker.overlaps(asyncFix.Range.Pos()) {
+				// An earlier fix span covers this function's `async` insertion
+				// point; defer all fixes in `fn` to the next pass so later
+				// diagnostics never emit a bare `await` in a sync function.
+				tracker.deferredFn[fn] = true
+				return nil
+			}
+			fixes = append(fixes, asyncFix)
+			tracker.asyncInserted[fn] = true
+		}
+		awaitFix := sharedValidExpect.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait)
+		fixes = append(fixes, awaitFix)
+		tracker.emittedRanges = append(tracker.emittedRanges, core.NewTextRange(fixes[0].Range.Pos(), fixes[len(fixes)-1].Range.End()))
+		return fixes
+	})
 }
 
 func findTopLevelMemberAccess(node *ast.Node) *ast.Node {
@@ -259,7 +289,11 @@ var ValidExpectRule = rule.Rule{
 		opts := parseOptions(options)
 		analysis := utils.GetJestCallAnalysis(ctx)
 		arrayExceptions := map[string]bool{}
-		asyncInserted := map[*ast.Node]bool{}
+		tracker := &asyncFixTracker{
+			asyncInserted: map[*ast.Node]bool{},
+			deferredFn:    map[*ast.Node]bool{},
+			fnFixable:     map[*ast.Node]bool{},
+		}
 		var descriptors []asyncDescriptor
 
 		return rule.RuleListeners{
@@ -287,7 +321,7 @@ var ValidExpectRule = rule.Rule{
 							ctx.ReportNode(reportNode, buildErrorMatcherNotCalledMessage())
 							return
 						}
-						if propName != "" && utils.EXPECT_MODIFIER_NAMES[propName] {
+						if propName != "" && !testFramework.IsComputedIdentifierAccessor(propNode) && utils.EXPECT_MODIFIER_NAMES[propName] {
 							ctx.ReportNode(propNode, buildErrorMatcherNotFoundMessage())
 							return
 						}
@@ -301,7 +335,7 @@ var ValidExpectRule = rule.Rule{
 					return
 				}
 
-				expectCall := parsed.Head.Local.Node.Parent
+				expectCall := ast.WalkUpParenthesizedExpressions(parsed.Head.Local.Node.Parent)
 				if expectCall == nil || expectCall.Kind != ast.KindCallExpression {
 					return
 				}
@@ -334,6 +368,7 @@ var ValidExpectRule = rule.Rule{
 
 				reportNodeKey := sharedValidExpect.PromiseArrayExceptionKey(ctx.SourceFile, reportNode)
 				if shouldReport && !arrayExceptions[reportNodeKey] {
+					arrayExceptions[reportNodeKey] = true
 					descriptors = append(descriptors, asyncDescriptor{
 						node:           reportNode,
 						promiseWrapped: promiseWrapped,
@@ -347,7 +382,7 @@ var ValidExpectRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindEndOfFile): func(node *ast.Node) {
 				_ = node
 				for _, descriptor := range descriptors {
-					reportAsyncDescriptor(ctx, descriptor, opts.AlwaysAwait, asyncInserted)
+					reportAsyncDescriptor(ctx, descriptor, opts.AlwaysAwait, tracker)
 				}
 			},
 		}

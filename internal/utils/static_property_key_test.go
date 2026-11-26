@@ -109,3 +109,27 @@ func TestStaticSymbolValueSemantics(t *testing.T) {
 		t.Fatal("different well-known Symbols must compare unequal")
 	}
 }
+
+func TestHasStaticComputedPropertyKey(t *testing.T) {
+	for _, test := range []struct {
+		code  string
+		known bool
+	}{
+		{`const { ["foo"]: x } = obj;`, true},
+		{`const { [Symbol.iterator]: x } = obj;`, true},
+		{`const { [Symbol.for("x")]: x } = obj;`, true},
+		{`const { ["foo" + "bar"]: x } = obj;`, true},
+		{`const { [getKey()]: x } = obj;`, false},
+		{`const { [{ __proto__: ["expect"] } as any]: x } = obj;`, false},
+		{`const { [Symbol("x")]: x } = obj;`, false},
+	} {
+		t.Run(test.code, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/key.ts", Path: "/key.ts"}, test.code, core.ScriptKindTS)
+			computed := findFirstNodeOfKind(t, source, ast.KindComputedPropertyName)
+			evaluator := NewStaticStringEvaluatorWithSourceFile(nil, source)
+			if got := evaluator.HasStaticComputedPropertyKey(computed); got != test.known {
+				t.Fatalf("known computed key = %v, want %v", got, test.known)
+			}
+		})
+	}
+}

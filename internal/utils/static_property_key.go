@@ -15,6 +15,20 @@ func (staticEvaluator *StaticStringEvaluator) HasStaticAccessExpressionKey(node 
 		return known
 	}
 	expression := node.AsElementAccessExpression().ArgumentExpression
+	return staticEvaluator.hasStaticPropertyKeyExpression(expression)
+}
+
+// HasStaticComputedPropertyKey reports whether a ComputedPropertyName has a
+// statically known JavaScript property key (a string-convertible primitive or
+// a known static Symbol value).
+func (staticEvaluator *StaticStringEvaluator) HasStaticComputedPropertyKey(node *ast.Node) bool {
+	if staticEvaluator == nil || node == nil || node.Kind != ast.KindComputedPropertyName {
+		return false
+	}
+	return staticEvaluator.hasStaticPropertyKeyExpression(node.AsComputedPropertyName().Expression)
+}
+
+func (staticEvaluator *StaticStringEvaluator) hasStaticPropertyKeyExpression(expression *ast.Node) bool {
 	if value := staticEvaluator.evalValue(expression); value.ok {
 		if _, isSymbol := value.value.(staticSymbolValue); isSymbol {
 			return true

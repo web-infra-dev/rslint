@@ -86,6 +86,8 @@ func TestUnboundMethodExtras(t *testing.T) {
 		`const check = expect; { const check = other; check.extend({ toBeDefined() {} }); } expect(service.method).toBeDefined();`,
 		`import { expect } from '@rstest/core'; const { ...mock } = expect; mock.extend = () => {}; mock.extend({ toBeDefined() {} }); expect(service.method).toBeDefined();`,
 		`function mockRequire(require: any) { require('@rstest/core').expect.extend({ toBeDefined() {} }); } expect(service.method).toBeDefined();`,
+		`import * as r from '@rstest/core'; let install: any; install?.({ toBeDefined() {} }); install = r.expect.extend; r.expect(service.method).toBeDefined();`,
+		`import * as r from '@rstest/core'; let install: any; function setup() { install = r.expect.extend; } install?.({ toBeDefined() {} }); setup(); r.expect(service.method).toBeDefined();`,
 		`rs?.mocked(service.method);`,
 		`rs.mocked?.(service.method);`,
 		`(rs.mocked)(service.method);`,

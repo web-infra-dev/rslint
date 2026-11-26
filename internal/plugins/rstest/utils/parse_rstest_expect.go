@@ -336,7 +336,7 @@ func parseRstestExpectCallOptions(
 	if !match.ok {
 		return nil
 	}
-	return classifyRstestExpectCall(expression, entries, match)
+	return classifyRstestExpectCall(expression, entries, match, throughTransparentExpressions)
 }
 
 // IsStaticRstestExpectCall reports calls of a single static member on the
@@ -403,7 +403,8 @@ func findTopMostCallExpression(node *ast.Node, throughTransparentExpressions boo
 					return top
 				}
 			case ast.KindElementAccessExpression:
-				if parent.AsElementAccessExpression().Expression != current {
+				elem := parent.AsElementAccessExpression()
+				if elem.Expression != current || !isSupportedRstestExpectElementKey(elem.ArgumentExpression, throughTransparentExpressions) {
 					return top
 				}
 			default:
@@ -433,7 +434,8 @@ func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTransparent
 				}
 				top = parent
 			case ast.KindElementAccessExpression:
-				if parent.AsElementAccessExpression().Expression != current {
+				elem := parent.AsElementAccessExpression()
+				if elem.Expression != current || !isSupportedRstestExpectElementKey(elem.ArgumentExpression, throughTransparentExpressions) {
 					return top
 				}
 				top = parent
@@ -444,6 +446,31 @@ func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTransparent
 		current, parent = parent, parent.Parent
 	}
 	return top
+}
+
+func isSupportedRstestExpectElementKey(arg *ast.Node, throughTransparentExpressions bool) bool {
+	if arg == nil {
+		return false
+	}
+	var key *ast.Node
+	if throughTransparentExpressions {
+		key = internalUtils.SkipAssertionsAndParens(arg)
+	} else {
+		key = ast.SkipParentheses(arg)
+	}
+	if key == nil {
+		return false
+	}
+	switch key.Kind {
+	case ast.KindIdentifier:
+		return key.AsIdentifier().Text != ""
+	case ast.KindStringLiteral:
+		return key.AsStringLiteral().Text != ""
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return key.AsNoSubstitutionTemplateLiteral().Text != ""
+	default:
+		return false
+	}
 }
 
 // rstestExpectMatch locates the expect member inside an assertion chain.
@@ -672,14 +699,19 @@ func classifyRstestExpectCall(
 	expression *ast.Node,
 	entries []testFramework.MemberEntry,
 	match rstestExpectMatch,
+	throughTransparentExpressions bool,
 ) *ParsedRstestExpectCall {
 	expectEntry := entries[match.index]
+	expectCall := testFramework.DirectMemberCall(&expectEntry)
+	if expectCall == nil {
+		expectCall = expectEntry.Call
+	}
 	rest := entries[match.index+1:]
 	parsed := &ParsedRstestExpectCall{
 		Expression:      expression,
 		Entry:           RstestExpectEntryCall,
-		Head:            expectEntry.Call,
-		rootInvoked:     expectEntry.Call != nil,
+		Head:            expectCall,
+		rootInvoked:     expectCall != nil,
 		trailingMembers: len(rest),
 		FromTestContext: match.fromTestContext,
 	}
@@ -700,12 +732,18 @@ func classifyRstestExpectCall(
 			// has trailing members. Defensive only.
 			return nil
 		}
-		if entry, ok := rstestExpectFactoryEntries[rest[0].Name]; ok && rest[0].Call != nil {
+		factoryCall := testFramework.DirectMemberCall(&rest[0])
+		if factoryCall == nil {
+			factoryCall = rest[0].Call
+		}
+		if entry, ok := rstestExpectFactoryEntries[rest[0].Name]; ok &&
+			!isComputedDynamicMemberName(rest[0].Node) &&
+			factoryCall != nil {
 			// expect.soft(x) / expect.poll(fn) / expect.element(loc): the factory
 			// call replaces expect(x) as the assertion head and the chain resumes
 			// after it.
 			parsed.Entry = entry
-			parsed.Head = rest[0].Call
+			parsed.Head = factoryCall
 			chain = rest[1:]
 		} else {
 			// Static member access on the expect object. The chain keeps the
@@ -720,11 +758,34 @@ func classifyRstestExpectCall(
 		!parsed.rootInvoked && parsed.Head == nil,
 	)
 	parsed.Reason = reason
-	if reason == RstestExpectParseReasonMatcherNotFound &&
-		len(chain) > 0 &&
-		isMemberAccessNode(expression) &&
-		!hasComputedDynamicRstestExpectMember(chain) {
-		parsed.Reason = RstestExpectParseReasonMatcherNotCalled
+	if reason == RstestExpectParseReasonMatcherNotFound {
+		// If chain ascent stopped before an unsupported computed element
+		// access that IS immediately invoked (such as `expect(1)['to' + 'Be'](1)`
+		// or `expect(p).resolves[getMatcher()](1)`), treat that call as a
+		// dynamic matcher call — unless the preceding chain already ended on an
+		// unknown member (such as `expect(1).foo['to' + 'Be'](1)`), which is an
+		// unknown modifier.
+		if elemCall, elemArg := directTrailingDynamicMatcherCall(expression, throughTransparentExpressions); elemCall != nil {
+			if endsWithUnknownChainMember(chain) {
+				parsed.Reason = RstestExpectParseReasonModifierUnknown
+				parsed.Expression = elemCall
+			} else {
+				parsed.Reason = RstestExpectParseReasonNone
+				parsed.Expression = elemCall
+				matchers = []ParsedRstestExpectMatcher{{
+					Name: "",
+					Entry: ParsedRstestFnMemberEntry{
+						Node: elemArg,
+						Call: elemCall,
+					},
+					Kind: RstestExpectMatcherCall,
+				}}
+			}
+		} else if len(chain) > 0 &&
+			isMemberAccessNode(expression) &&
+			!hasComputedDynamicRstestExpectMember(chain) {
+			parsed.Reason = RstestExpectParseReasonMatcherNotCalled
+		}
 	}
 	if len(matchers) > 0 {
 		parsed.Matchers = matchers
@@ -739,6 +800,65 @@ func classifyRstestExpectCall(
 		}
 	}
 	return parsed
+}
+
+func endsWithUnknownChainMember(chain []testFramework.MemberEntry) bool {
+	if len(chain) == 0 {
+		return false
+	}
+	last := chain[len(chain)-1]
+	if last.Node == nil || isComputedDynamicMemberName(last.Node) {
+		return true
+	}
+	return classifyRstestExpectChainEntry(last, false).Kind == rstestExpectChainUnknown
+}
+
+func directTrailingDynamicMatcherCall(expression *ast.Node, throughTransparentExpressions bool) (*ast.Node, *ast.Node) {
+	outer := expression
+	for outer != nil && outer.Parent != nil {
+		parent := outer.Parent
+		if parent.Kind == ast.KindParenthesizedExpression {
+			outer = parent
+			continue
+		}
+		if throughTransparentExpressions {
+			if expr, ok := internalUtils.TransparentExpression(parent); ok && expr == outer {
+				outer = parent
+				continue
+			}
+		}
+		break
+	}
+	if outer == nil || outer.Parent == nil || outer.Parent.Kind != ast.KindElementAccessExpression {
+		return nil, nil
+	}
+	elem := outer.Parent
+	if elem.AsElementAccessExpression().Expression != outer {
+		return nil, nil
+	}
+	cur := elem
+	for cur.Parent != nil {
+		parent := cur.Parent
+		if parent.Kind == ast.KindParenthesizedExpression {
+			cur = parent
+			continue
+		}
+		if throughTransparentExpressions {
+			if expr, ok := internalUtils.TransparentExpression(parent); ok && expr == cur {
+				cur = parent
+				continue
+			}
+		}
+		if parent.Kind == ast.KindCallExpression && parent.AsCallExpression().Expression == cur {
+			arg := elem.AsElementAccessExpression().ArgumentExpression
+			if arg != nil {
+				arg = ast.SkipParentheses(arg)
+			}
+			return parent, arg
+		}
+		return nil, nil
+	}
+	return nil, nil
 }
 
 func hasComputedDynamicRstestExpectMember(entries []testFramework.MemberEntry) bool {
@@ -852,7 +972,7 @@ func findRstestExpectModifiersAndMatchers(
 	}
 
 	if matcherIndex == -1 {
-		return nil, nil, RstestExpectParseReasonMatcherNotFound
+		return modifiers, nil, RstestExpectParseReasonMatcherNotFound
 	}
 
 	matchers := make([]ParsedRstestExpectMatcher, 0, len(chains)-matcherIndex)
@@ -944,20 +1064,11 @@ func classifyRstestExpectChainEntry(
 }
 
 // isComputedDynamicMemberName reports member name nodes that came from a
-// computed element access with an identifier key, e.g. expect(x)[matcherName].
-// GetMemberEntries records the identifier's text as the member name, but the
-// runtime value is unknowable statically. String literal keys are fine.
+// computed element access with an identifier key, e.g. expect(x)[matcherName]
+// or expect(x)[matcherName as any]. GetMemberEntries records the identifier's
+// text as the member name, but the runtime value is unknowable statically.
 func isComputedDynamicMemberName(node *ast.Node) bool {
-	if node.Kind != ast.KindIdentifier {
-		return false
-	}
-	parent := node.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
-	}
-	return parent != nil &&
-		parent.Kind == ast.KindElementAccessExpression &&
-		parent.AsElementAccessExpression().Expression != node
+	return testFramework.IsComputedIdentifierAccessor(node)
 }
 
 func isMemberAccessNode(node *ast.Node) bool {
@@ -1000,7 +1111,7 @@ func classifyRstestExpectRoot(
 			if internalUtils.IsVariableWriteReference(declaration.Name()) {
 				initializations++
 			}
-		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindFunctionDeclaration:
+		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration, ast.KindFunctionDeclaration, ast.KindClassDeclaration:
 			initializations++
 		}
 		if initializations > 1 {

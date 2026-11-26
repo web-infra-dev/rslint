@@ -240,6 +240,10 @@ func TestParseRstestExpectCallEntries(t *testing.T) {
 				Errors: parsedExpectError("entry=soft head=true modifiers=[] matcher=toBe reason=none static=false"),
 			},
 			{
+				Code:   `const soft = 'toBe'; expect[soft](x).toBe(1);`,
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher= reason=modifier-unknown static=false"),
+			},
+			{
 				Code:   `expect.poll(fn).toBe(1);`,
 				Errors: parsedExpectError("entry=poll head=true modifiers=[] matcher=toBe reason=none static=false"),
 			},
@@ -864,6 +868,30 @@ func TestParseRstestExpectCallSources(t *testing.T) {
 					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
 				),
 			},
+			{
+				Code: `const { expect: check } = import.meta.rstest!; check(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `const { expect: check } = (import.meta.rstest as typeof import('@rstest/core')); check(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(1).toBe(1)[0];`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(1)[0];`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher= reason=matcher-not-found static=false",
+				),
+			},
 			// Non-null assertion on `import.meta.rstest!` is unwrapped, while a
 			// non-null assertion after `expect(1)` still stops ordinary
 			// `ParseExpectCall` matcher parsing (matching `expect(1)!.toBe(1)`).
@@ -965,7 +993,10 @@ func TestParseRstestExpectCallIgnoresForeignExpect(t *testing.T) {
 			{Code: "(import.meta.rstest!)`tag`.expect(1).toBe(1);"},
 			{Code: `(0, import.meta.rstest.expect)(1).toBe(1);`},
 			{Code: `(import.meta as any).rstest.expect(1).toBe(1);`},
-			{Code: `expect(1).toBe(1)[0];`},
+			{Code: `const { ...expect } = import.meta.rstest; expect(1).toBe(1);`},
+			{Code: `const { other: { expect } } = import.meta.rstest; expect(1).toBe(1);`},
+			{Code: `const [expect] = import.meta.rstest!; expect(1).toBe(1);`},
+			{Code: `import * as core from '@rstest/core'; const expect = 'other'; core[expect as any](1);`},
 		},
 		[]rule_tester.InvalidTestCase{},
 	)
@@ -1037,13 +1068,13 @@ func TestIsRstestExpectCallRecognizesChaiPropertyStyleOnce(t *testing.T) {
 			{Code: "(import.meta.rstest!)`tag`.expect(1).toBe(1);"},
 			{Code: `(0, import.meta.rstest.expect)(1).toBe(1);`},
 			{Code: `(import.meta as any).rstest.expect(1).toBe(1);`},
-			{Code: `expect(1).toBe(1)[0];`},
-			{Code: `expect(1)[0];`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `expect(value).to.be.ok;`, Errors: expectCall},
 			{Code: `expect(spy).to.have.been.calledOnce;`, Errors: expectCall},
 			{Code: `expect(value).to.equal(expected);`, Errors: expectCall},
+			{Code: `expect(1).toBe(1)[0];`, Errors: expectCall},
+			{Code: `expect(1)[0];`, Errors: expectCall},
 			{Code: `import.meta.rstest!.expect(1).toBe(1);`, Errors: expectCall},
 			{Code: `(import.meta.rstest as typeof import('@rstest/core')).expect(1).toBe(1);`, Errors: expectCall},
 			{Code: `import * as r from '@rstest/core'; const expect = 'expect'; r[expect](1).toBe(1);`, Errors: expectCall},

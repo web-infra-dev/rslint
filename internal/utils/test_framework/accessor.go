@@ -52,6 +52,10 @@ func IsComputedIdentifierAccessor(node *ast.Node) bool {
 			child = parent
 			continue
 		}
+		if expr, ok := utils.TransparentExpression(parent); ok && expr == child {
+			child = parent
+			continue
+		}
 		return parent.Kind == ast.KindElementAccessExpression &&
 			parent.AsElementAccessExpression().ArgumentExpression == child
 	}
@@ -59,15 +63,27 @@ func IsComputedIdentifierAccessor(node *ast.Node) bool {
 }
 
 // AccessorReceiverAndParent returns the receiver and accessor expression that
-// own entry. Parentheses around a computed key are transparent.
+// own entry. Parentheses and erased TypeScript assertion wrappers around a
+// computed key are transparent.
 func AccessorReceiverAndParent(entry *MemberEntry) (*ast.Node, *ast.Node) {
 	if entry == nil || entry.Node == nil {
 		return nil, nil
 	}
 
+	child := entry.Node
 	parent := entry.Node.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
+	for parent != nil {
+		if parent.Kind == ast.KindParenthesizedExpression {
+			child = parent
+			parent = parent.Parent
+			continue
+		}
+		if expr, ok := utils.TransparentExpression(parent); ok && expr == child {
+			child = parent
+			parent = parent.Parent
+			continue
+		}
+		break
 	}
 	if parent == nil {
 		return nil, nil
@@ -82,13 +98,44 @@ func AccessorReceiverAndParent(entry *MemberEntry) (*ast.Node, *ast.Node) {
 		return property.Expression, parent
 	case ast.KindElementAccessExpression:
 		element := parent.AsElementAccessExpression()
-		if ast.SkipParentheses(element.ArgumentExpression) != entry.Node {
+		if utils.SkipAssertionsAndParens(element.ArgumentExpression) != entry.Node {
 			return nil, nil
 		}
 		return element.Expression, parent
 	default:
 		return nil, nil
 	}
+}
+
+// DirectMemberCall returns the CallExpression that directly invokes entry's
+// member expression (or identifier, when entry is the root of a call chain),
+// unwrapping parentheses and erased TypeScript assertion wrappers. Unlike
+// MemberEntry.Call, it is not overwritten by subsequent chained calls such as
+// `expect(p).resolves.toBe(1)()` or `expect()(1).toBe(1)`.
+func DirectMemberCall(entry *MemberEntry) *ast.Node {
+	if entry == nil || entry.Node == nil {
+		return nil
+	}
+	base := entry.Node
+	if _, accessor := AccessorReceiverAndParent(entry); accessor != nil {
+		base = accessor
+	}
+	current := base
+	for parent := current.Parent; parent != nil; parent = parent.Parent {
+		if parent.Kind == ast.KindParenthesizedExpression {
+			current = parent
+			continue
+		}
+		if expr, ok := utils.TransparentExpression(parent); ok && expr == current {
+			current = parent
+			continue
+		}
+		if parent.Kind == ast.KindCallExpression && parent.AsCallExpression().Expression == current {
+			return parent
+		}
+		return nil
+	}
+	return nil
 }
 
 // AccessorQuestionDotToken returns the optional-chain token owned by accessor.

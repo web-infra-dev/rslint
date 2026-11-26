@@ -94,7 +94,12 @@ func getMemberEntries(
 		if len(left) == 0 || element.ArgumentExpression == nil {
 			return nil
 		}
-		nameNode := ast.SkipParentheses(element.ArgumentExpression)
+		var nameNode *ast.Node
+		if throughTransparentExpressions {
+			nameNode = internalUtils.SkipAssertionsAndParens(element.ArgumentExpression)
+		} else {
+			nameNode = ast.SkipParentheses(element.ArgumentExpression)
+		}
 		if name := elementAccessName(nameNode); name != "" {
 			return append(left, MemberEntry{
 				Name: name,

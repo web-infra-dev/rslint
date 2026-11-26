@@ -115,7 +115,7 @@ func classifyRstestAssertRoot(
 			if internalUtils.IsVariableWriteReference(declaration.Name()) {
 				initializations++
 			}
-		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration, ast.KindFunctionDeclaration:
+		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration, ast.KindFunctionDeclaration, ast.KindClassDeclaration:
 			initializations++
 		}
 		if initializations > 1 {

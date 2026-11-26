@@ -75,21 +75,156 @@ func TestIsImportEqualsOfModules(t *testing.T) {
 	}
 }
 
+func findRequireCallForModule(sourceFile *ast.SourceFile, moduleName string) *ast.Node {
+	var reqCall *ast.Node
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		if node.Kind == ast.KindCallExpression && ast.IsRequireCall(node, false) {
+			if args := node.AsCallExpression().Arguments; args != nil && len(args.Nodes) == 1 {
+				if arg := ast.SkipParentheses(args.Nodes[0]); arg != nil &&
+					arg.Kind == ast.KindStringLiteral && arg.AsStringLiteral().Text == moduleName {
+					reqCall = node
+				}
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(sourceFile.AsNode())
+	return reqCall
+}
+
 func TestIsModuleRequireCallModulesIgnoresShadowedRequire(t *testing.T) {
 	modules := []string{"@rstest/core"}
 
-	_, globalCall := parseFirstCall(t, `require("@rstest/core");`)
-	if !IsModuleRequireCallModules(globalCall, modules) {
-		t.Fatal("expected global require call to match")
+	for _, code := range []string{
+		`const require = () => ({}); require("@rstest/core");`,
+		`function run(require: any) { return require("@rstest/core"); }`,
+		`if (true) { var require = () => ({}); } require("@rstest/core");`,
+		`function f() { if (true) { var require = () => ({}); } return require("@rstest/core"); }`,
+		`class C { static { var require = () => ({}); require("@rstest/core"); } }`,
+		`namespace N { var require = () => ({}); require("@rstest/core"); }`,
+		`if (true) function require() {} require("@rstest/core");`,
+		`import { createRequire } from "node:module"; const { resolve: require } = createRequire(import.meta.url); require("@rstest/core");`,
+		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); require = () => ({}); require("@rstest/core");`,
+		// Same-scope TDZ self-reference must terminate cleanly without stack overflow.
+		`const { createRequire } = require("node:module"); const require = createRequire(import.meta.url); require("@rstest/core");`,
+		`const mod = require("node:module"); const require = mod.createRequire(import.meta.url); require("@rstest/core");`,
+		// Hoisted var in block reassigned outside block.
+		`import { createRequire } from "node:module"; let fn: any; { var require = createRequire(import.meta.url); fn = () => require("@rstest/core"); } require = () => ({});`,
+		// Parameter shadowed by unexecuted hoisted var.
+		`import { createRequire } from "node:module"; function run(require: any) { if (false) { var require = createRequire(import.meta.url); } return require("@rstest/core"); }`,
+		// Unexecuted hoisted var + unbraced hoisted function declaration.
+		`import { createRequire } from "node:module"; if (false) { var require = createRequire(import.meta.url); } if (true) function require() { return {}; } require("@rstest/core");`,
+		// Catch binding TDZ default referencing catch's own `require` binding.
+		`import { createRequire } from "node:module"; const require = createRequire(import.meta.url); try {} catch ({ a = require("@rstest/core"), require }) {}`,
+		// Default parameter / computed method key reassigns outer `let require` even when body declares `let require`.
+		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); function hijack(x = (require = () => ({}))) { let require = 1; } hijack(); require("@rstest/core");`,
+		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); const o = { [(require = () => ({}))]() { let require = 1; } }; require("@rstest/core");`,
+	} {
+		t.Run("shadowed/"+code, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts",
+				Path:     "/test.ts",
+			}, code, core.ScriptKindTS)
+			reqCall := findRequireCallForModule(sourceFile, "@rstest/core")
+			if reqCall == nil {
+				t.Fatal("expected a require call in test code")
+			}
+			if IsModuleRequireCallModules(reqCall, modules) {
+				t.Fatalf("expected shadowed require call to be ignored: %s", code)
+			}
+		})
 	}
 
-	_, shadowedByVar := parseFirstCall(t, `const require = () => ({}); require("@rstest/core");`)
-	if IsModuleRequireCallModules(shadowedByVar, modules) {
-		t.Fatal("expected locally declared require to be ignored")
+	for _, code := range []string{
+		`require("@rstest/core");`,
+		`declare const require: any; require("@rstest/core");`,
+		`declare function require(id: string): any; require("@rstest/core");`,
+		`import { createRequire } from "node:module"; const require = createRequire(import.meta.url); require("@rstest/core");`,
+		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); require("@rstest/core");`,
+		`import { createRequire } from "node:module"; const cr = createRequire; const require = cr(import.meta.url); require("@rstest/core");`,
+		`import { createRequire as makeReq } from "module"; const require = makeReq(import.meta.url); require("@rstest/core");`,
+		`import * as mod from "node:module"; const require = mod.createRequire(import.meta.url); require("@rstest/core");`,
+		`import mod from "node:module"; const require = mod.createRequire(import.meta.url); require("@rstest/core");`,
+		`import { default as mod } from "node:module"; const require = mod.createRequire(import.meta.url); require("@rstest/core");`,
+		`import mod from "node:module"; const { createRequire } = mod; const require = createRequire(import.meta.url); require("@rstest/core");`,
+		`const { createRequire } = require("node:module"); function run() { const require = createRequire(import.meta.url); require("@rstest/core"); }`,
+		`let { createRequire } = require("node:module"); { const require = createRequire(import.meta.url); require("@rstest/core"); }`,
+		`const mod = require("node:module"); { const require = mod.createRequire(import.meta.url); require("@rstest/core"); }`,
+		`const make = require("node:module").createRequire; { const require = make(import.meta.url); require("@rstest/core"); }`,
+		`import type { require } from "./types"; require("@rstest/core");`,
+		`import { type require } from "./types"; require("@rstest/core");`,
+		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); function helper() { const require = () => ({}); return require; } require("@rstest/core");`,
+		`import { createRequire } from "node:module"; const require = createRequire(import.meta.url); function run() { { using require = makeDisposable(); } require("@rstest/core"); }`,
+		`class C { @dec(require("@rstest/core")) m(require: any) {} }`,
+		`import { createRequire } from "node:module"; const require = createRequire(import.meta.url); class C { m(@dec(() => require("@rstest/core")) require: any) {} }`,
+		`function f() { { function require() {} } return require("@rstest/core"); }`,
+		`function f(x = require("@rstest/core")) { var require = () => ({}); return x; }`,
+	} {
+		t.Run("genuine/"+code, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts",
+				Path:     "/test.ts",
+			}, code, core.ScriptKindTS)
+			reqCall := findRequireCallForModule(sourceFile, "@rstest/core")
+			if reqCall == nil {
+				t.Fatal("expected a require call in test code")
+			}
+			if !IsModuleRequireCallModules(reqCall, modules) {
+				t.Fatalf("expected genuine require call to match: %s", code)
+			}
+		})
 	}
+}
 
-	_, shadowedByParam := parseFirstCall(t, `function run(require: any) { return require("@rstest/core"); }`)
-	if IsModuleRequireCallModules(shadowedByParam, modules) {
-		t.Fatal("expected parameter-shadowed require to be ignored")
+func TestResolveModuleRequireBinding(t *testing.T) {
+	modules := []string{"@rstest/core"}
+	for _, tc := range []struct {
+		code     string
+		wantName string
+		wantOK   bool
+	}{
+		{`const { expect } = require("@rstest/core");`, "expect", true},
+		{`const { expect: check } = require("@rstest/core");`, "expect", true},
+		{`const { ["expect"]: check } = require("@rstest/core");`, "expect", true},
+		{`const { "other": expect } = require("@rstest/core");`, "other", true},
+		{`const { ...expect } = require("@rstest/core");`, "", false},
+		{`const { nested: { expect } } = require("@rstest/core");`, "", false},
+		{`const [expect] = require("@rstest/core");`, "", false},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts",
+				Path:     "/test.ts",
+			}, tc.code, core.ScriptKindTS)
+			var lastBinding *ast.Node
+			var visit func(*ast.Node)
+			visit = func(node *ast.Node) {
+				if node == nil {
+					return
+				}
+				if node.Kind == ast.KindBindingElement {
+					lastBinding = node
+				}
+				node.ForEachChild(func(child *ast.Node) bool {
+					visit(child)
+					return false
+				})
+			}
+			visit(sourceFile.AsNode())
+			if lastBinding == nil {
+				t.Fatal("expected a binding element")
+			}
+			gotName, _, gotOK := resolveModuleRequireBinding(lastBinding, modules)
+			if gotOK != tc.wantOK || gotName != tc.wantName {
+				t.Fatalf("resolveModuleRequireBinding = (%q, %v), want (%q, %v)", gotName, gotOK, tc.wantName, tc.wantOK)
+			}
+		})
 	}
 }
