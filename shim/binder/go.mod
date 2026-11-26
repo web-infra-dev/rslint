@@ -1,6 +1,6 @@
 module github.com/microsoft/TypeScript/tsc/shim/binder
 
-go 1.26
+go 1.27.4
 
 require github.com/microsoft/TypeScript/tsc v0.0.0-20260904213532-1f70213d4922
 
