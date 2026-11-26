@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 )
@@ -163,12 +164,18 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	if err := coordinator.ctx.Err(); err != nil {
 		return discoveryWalkResult{err: err}
 	}
-	walkGovernsFailure := node.targets == nil || node.recursive
-	subtreeHasScanned := walkGovernsFailure || node.targets.hasScannedSubtree
-	if node.ignoreMatcher.BlocksDirectory(node.directory, node.canonicalDirectory) {
-		return discoveryWalkResult{directoriesPruned: 1, configFailed: node.configFailed && subtreeHasScanned}
-	}
 	result := discoveryWalkResult{}
+	walkGovernsFailure := node.targets == nil || node.recursive
+	recordPrunedFailure := func(targets *discoveryTargetTrie) {
+		if node.configFailed && (walkGovernsFailure || (targets != nil && targets.hasScannedSubtree)) {
+			result.configFailed = true
+		}
+	}
+	if node.ignoreMatcher.BlocksDirectory(node.directory, node.canonicalDirectory) {
+		result.directoriesPruned = 1
+		recordPrunedFailure(node.targets)
+		return result
+	}
 
 	if discoverConfigs && node.configReachable {
 		if candidate, found := coordinator.findCandidateForOwner(
@@ -203,9 +210,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	// its hidden children for another repository.
 	if node.gitEntryBlocked && !node.ignoreMatcher.MayReopenGitDescendants(node.directory, node.canonicalDirectory) {
 		result.directoriesPruned = 1
-		if node.configFailed && subtreeHasScanned {
-			result.configFailed = true
-		}
+		recordPrunedFailure(node.targets)
 		return result
 	}
 	walkTargets := node.targets
@@ -242,51 +247,56 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 		if rslintconfig.IsDefaultExcludedPath(name, "", coordinator.fs.UseCaseSensitiveFileNames()) {
 			continue
 		}
-		childHasScanned := walkGovernsFailure || (childTargets != nil && childTargets.hasScannedSubtree)
-		if isSymlinkDirectoryChild(coordinator.fs, node.canonicalDirectory, parentRealPath, name, entries) {
-			if node.configFailed && childHasScanned {
-				result.configFailed = true
-			}
-			continue
+		if child, ok := coordinator.resolveWalkChild(node, name, parentRealPath, entries, childTargets, &result); ok {
+			children = append(children, child)
+		} else {
+			recordPrunedFailure(childTargets)
 		}
-		child := tspath.CombinePaths(node.directory, name)
-		canonicalChild := ""
-		if node.canonicalDirectory != "" {
-			canonicalChild = tspath.CombinePaths(node.canonicalDirectory, name)
-		}
-		if node.ignoreMatcher.BlocksDirectory(child, canonicalChild) {
-			result.directoriesPruned++
-			if node.configFailed && childHasScanned {
-				result.configFailed = true
-			}
-			continue
-		}
-		nextCursor, entryBlocked := coordinator.git.Enter(node.gitCursor, canonicalChild)
-		gitBlocked := node.gitEntryBlocked || entryBlocked || !nextCursor.SourceReachable()
-		childConfigReachable := !gitBlocked || node.ignoreMatcher.ReopensDirectoryNode(child, canonicalChild)
-		if gitBlocked && !node.ignoreMatcher.MayReopenGitDescendants(child, canonicalChild) {
-			result.directoriesPruned++
-			if node.configFailed && childHasScanned {
-				result.configFailed = true
-			}
-			continue
-		}
-		children = append(children, discoveryWalkNode{
-			directory:          child,
-			canonicalDirectory: canonicalChild,
-			ownerDir:           node.ownerDir,
-			ownerPath:          node.ownerPath,
-			ignoreMatcher:      node.ignoreMatcher,
-			configReachable:    childConfigReachable,
-			configFailed:       node.configFailed,
-			gitEntryBlocked:    gitBlocked && !childConfigReachable,
-			gitCursor:          nextCursor,
-			targets:            childTargets,
-			recursive:          node.recursive,
-		})
 	}
 	result.children = children
 	return result
+}
+
+func (coordinator *discoveryCoordinator) resolveWalkChild(
+	node discoveryWalkNode,
+	name string,
+	parentRealPath string,
+	entries vfs.Entries,
+	childTargets *discoveryTargetTrie,
+	result *discoveryWalkResult,
+) (discoveryWalkNode, bool) {
+	if isSymlinkDirectoryChild(coordinator.fs, node.canonicalDirectory, parentRealPath, name, entries) {
+		return discoveryWalkNode{}, false
+	}
+	child := tspath.CombinePaths(node.directory, name)
+	canonicalChild := ""
+	if node.canonicalDirectory != "" {
+		canonicalChild = tspath.CombinePaths(node.canonicalDirectory, name)
+	}
+	if node.ignoreMatcher.BlocksDirectory(child, canonicalChild) {
+		result.directoriesPruned++
+		return discoveryWalkNode{}, false
+	}
+	nextCursor, entryBlocked := coordinator.git.Enter(node.gitCursor, canonicalChild)
+	gitBlocked := node.gitEntryBlocked || entryBlocked || !nextCursor.SourceReachable()
+	childConfigReachable := !gitBlocked || node.ignoreMatcher.ReopensDirectoryNode(child, canonicalChild)
+	if gitBlocked && !node.ignoreMatcher.MayReopenGitDescendants(child, canonicalChild) {
+		result.directoriesPruned++
+		return discoveryWalkNode{}, false
+	}
+	return discoveryWalkNode{
+		directory:          child,
+		canonicalDirectory: canonicalChild,
+		ownerDir:           node.ownerDir,
+		ownerPath:          node.ownerPath,
+		ignoreMatcher:      node.ignoreMatcher,
+		configReachable:    childConfigReachable,
+		configFailed:       node.configFailed,
+		gitEntryBlocked:    gitBlocked && !childConfigReachable,
+		gitCursor:          nextCursor,
+		targets:            childTargets,
+		recursive:          node.recursive,
+	}, true
 }
 
 func (coordinator *discoveryCoordinator) isGloballyIgnoredDirectory(ownerPath string, directory string, canonicalDirectory string) bool {

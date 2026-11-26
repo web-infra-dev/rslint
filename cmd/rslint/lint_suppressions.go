@@ -9,22 +9,63 @@ import (
 	"github.com/web-infra-dev/rslint/internal/suppressions"
 )
 
+type suppressionStatus uint8
+
+const (
+	suppressionOK suppressionStatus = iota
+	suppressionUnused
+	suppressionError
+)
+
+type suppressionOutcome struct {
+	diagnostics []rule.RuleDiagnostic
+	status      suppressionStatus
+	reason      string
+}
+
+func (o suppressionOutcome) failed() bool {
+	return o.status != suppressionOK
+}
+
+func (o suppressionOutcome) message() string {
+	switch o.status {
+	case suppressionError:
+		return o.reason
+	case suppressionUnused:
+		return "Unused suppressions remain. Run with --prune-suppressions to remove them, or --pass-on-unpruned-suppressions to allow them."
+	default:
+		return ""
+	}
+}
+
 func applyLintSuppressions(
 	ctx context.Context,
 	baseline *suppressions.File,
 	observation linter.ObservationResult,
 	diagnostics []rule.RuleDiagnostic,
 	args lintArgs,
-) ([]rule.RuleDiagnostic, string) {
+) suppressionOutcome {
 	pluginFailures, dispatchErr := observation.PluginFailures()
 	if args.ConfigCatalog.TargetConfigFailure {
 		if args.Suppressions.Mode == suppressions.Check {
-			return diagnostics, "Cannot apply suppressions because a lint configuration failed to load."
+			return suppressionOutcome{
+				diagnostics: diagnostics,
+				status:      suppressionError,
+				reason:      "Cannot apply suppressions because a lint configuration failed to load.",
+			}
 		}
-		return diagnostics, "Cannot update suppressions because a lint configuration failed to load."
+		return suppressionOutcome{
+			diagnostics: diagnostics,
+			status:      suppressionError,
+			reason:      "Cannot update suppressions because a lint configuration failed to load.",
+		}
 	}
 	if dispatchErr != nil && args.Suppressions.Mode != suppressions.Check {
-		return diagnostics, "Cannot update suppressions because plugin lint dispatch failed."
+		return suppressionOutcome{
+			diagnostics: diagnostics,
+			status:      suppressionError,
+			reason:      "Cannot update suppressions because plugin lint dispatch failed.",
+		}
 	}
 	pluginIncomplete := dispatchErr != nil
 	files := observation.Native.Files
@@ -46,13 +87,27 @@ func applyLintSuppressions(
 	}
 	visible, unused, err := baseline.Apply(ctx, results, diagnostics)
 	if err != nil {
-		return diagnostics, err.Error()
+		return suppressionOutcome{
+			diagnostics: diagnostics,
+			status:      suppressionError,
+			reason:      err.Error(),
+		}
 	}
 	if pluginIncomplete {
-		return visible, "Plugin lint results are incomplete."
+		return suppressionOutcome{
+			diagnostics: visible,
+			status:      suppressionError,
+			reason:      "Plugin lint results are incomplete.",
+		}
 	}
 	if unused && !args.PassOnUnpruned {
-		return visible, "Unused suppressions remain. Run with --prune-suppressions to remove them, or --pass-on-unpruned-suppressions to allow them."
+		return suppressionOutcome{
+			diagnostics: visible,
+			status:      suppressionUnused,
+		}
 	}
-	return visible, ""
+	return suppressionOutcome{
+		diagnostics: visible,
+		status:      suppressionOK,
+	}
 }

@@ -97,3 +97,4 @@ Pass `--suppressions-location` on every subsequent run that should use that file
 - **One mode per run**: choose at most one of `--suppress-all`, `--suppress-rule`, or `--prune-suppressions` in a single invocation.
 - **`--type-check-only`**: skips the suppressions file and cannot be combined with `--suppress-all`, `--suppress-rule`, or `--prune-suppressions`.
 - **Safe on incomplete runs**: ignored files, files with syntax errors, and rules or files that could not finish checking (such as during a config or plugin error) keep their existing suppression counts instead of being cleared unexpectedly.
+- **Avoid concurrent writes to the same file**: do not run multiple recording or pruning processes against the same suppressions file at the same time. Run Rslint once from the project root, or give each parallel job its own `--suppressions-location`.

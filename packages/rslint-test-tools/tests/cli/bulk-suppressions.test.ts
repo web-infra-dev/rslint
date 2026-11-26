@@ -703,62 +703,6 @@ describe('CLI bulk suppressions', () => {
     }
   });
 
-  test('preserves all updates from parallel recording processes', async () => {
-    const files: Record<string, string> = {
-      'rslint.config.mjs': "export default [{rules:{'no-debugger':'error'}}];",
-      'rslint-suppressions.json': JSON.stringify({
-        'existing.js': { 'no-debugger': { count: 1 } },
-      }),
-    };
-    const targets = ['w0.js', 'w1.js', 'w2.js', 'w3.js'];
-    for (const target of targets) {
-      files[target] = 'debugger;';
-    }
-    const cwd = await project(files);
-
-    const workerTmpDirs = await Promise.all(
-      targets.map(async (_, idx) => {
-        const dir = path.join(cwd, `.tmp-worker-${idx}`);
-        await fs.mkdir(dir);
-        return dir;
-      }),
-    );
-
-    const results = await Promise.all(
-      targets.map((target, idx) =>
-        runCliProcess(
-          process.execPath,
-          [RSLINT_BIN, '--suppress-all', target],
-          {
-            cwd,
-            env: {
-              ...process.env,
-              TMPDIR: workerTmpDirs[idx],
-              TEMP: workerTmpDirs[idx],
-              TMP: workerTmpDirs[idx],
-            },
-          },
-        ),
-      ),
-    );
-    for (const result of results) {
-      expect(result.exitCode, result.stderr).toBe(0);
-    }
-
-    const baseline = await readBaseline(cwd);
-    expect(baseline).toEqual({
-      'existing.js': { 'no-debugger': { count: 1 } },
-      'w0.js': { 'no-debugger': { count: 1 } },
-      'w1.js': { 'no-debugger': { count: 1 } },
-      'w2.js': { 'no-debugger': { count: 1 } },
-      'w3.js': { 'no-debugger': { count: 1 } },
-    });
-    const leftovers = (await fs.readdir(cwd)).filter((name) =>
-      name.startsWith('.rslint-suppressions'),
-    );
-    expect(leftovers).toEqual([]);
-  });
-
   test('preserves caller-owned baselines named .rslint-suppressions.lock', async () => {
     const cwd = await project({
       'rslint.config.mjs': "export default [{rules:{'no-debugger':'error'}}];",

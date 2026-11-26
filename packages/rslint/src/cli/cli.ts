@@ -33,6 +33,11 @@ export async function run(
     return runEngine({ binPath, goArgs: ['--init'], cwd });
   }
 
+  if (!args.help && args.argumentError) {
+    process.stderr.write(`error: ${args.argumentError}\n`);
+    return 2;
+  }
+
   // Reject an invalid stdout protocol before config discovery/evaluation.
   // Help retains its existing priority and is forwarded to Go, which owns the
   // usage text. Go validates format again after the IPC init payload is merged
@@ -61,11 +66,6 @@ export async function run(
       );
       return 1;
     }
-  }
-
-  if (!args.help && args.argumentError) {
-    process.stderr.write(`error: ${args.argumentError}\n`);
-    return 2;
   }
 
   // Build Go args: start-time flag BEFORE positional args, because Go's

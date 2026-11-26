@@ -1506,16 +1506,12 @@ checks the filesystem for missing paths outside the observation. The package
 counts error-level lint findings by rule and by the selected target path
 (relative to the caller working directory for files inside it, and to the
 physical working directory for external paths). It owns comparison and scoped
-updates, skipping locking when an existing baseline needs no change, otherwise
-serializing writes directly on the baseline file itself (sharing the same
-beyond-EOF single-byte lock range on Linux OFD locks and Windows `LockFileEx` +
-POSIX-semantics rename, `flock` on macOS/BSD, and atomic exclusive-create
-publication on first write, falling back to a short-lived same-directory
-coordination lock only on Unix filesystems without exclusive rename or hard
-links so the baseline path is never empty or partial), validating writable parent
-paths before autofix, creating missing parent directories on first record, and
-writing the complete JSON to a temporary file in the same directory before
-replacing the baseline. The CLI renders the remaining
+updates, validates writable parent paths before autofix via `ValidateWritable`,
+creates missing parent directories on first record, skips disk writes when an
+existing baseline needs no change, and writes the complete JSON to a temporary
+file in the same directory before atomically replacing the baseline (matching
+ESLint, concurrent processes writing to the same suppressions file are not
+synchronized). The CLI renders the remaining
 diagnostics and sets the exit code. See the [bulk suppressions guide](website/docs/en/guide/bulk-suppressions.md)
 for how recording and pruning handle incomplete checks.
 

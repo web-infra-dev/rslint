@@ -2,28 +2,23 @@ package suppressions
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
-	"syscall"
 
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
 
-// Open reads the baseline for cwd. A check without a default baseline returns nil.
+// Open reads and validates the baseline for cwd without creating or modifying
+// files on disk. A check without a default baseline returns (nil, nil).
 func Open(cwd string, options Options) (*File, error) {
 	if cwd == "" {
 		var err error
@@ -76,11 +71,6 @@ func Open(cwd string, options Options) (*File, error) {
 		if err = f.missing(f.path); err != nil {
 			return nil, err
 		}
-		if options.Mode != Check {
-			if parentErr := validateParentDirectory(filepath.Dir(f.path)); parentErr != nil {
-				return nil, parentErr
-			}
-		}
 	}
 	if err != nil || f.entries == nil && options.Mode == Check {
 		return nil, err
@@ -88,155 +78,16 @@ func Open(cwd string, options Options) (*File, error) {
 	return f, nil
 }
 
-func resolveLocationPath(cwd, location string) string {
-	if filepath.IsAbs(location) {
-		return filepath.Clean(location)
+// ValidateWritable checks that a not-yet-created baseline's nearest existing
+// ancestor directory is writable by creating and removing a temporary probe
+// file. Callers can invoke this before mutating lint targets (such as --fix)
+// to fail fast on invalid or read-only destinations. Existing baselines are
+// left untouched so no-op runs in read-only directories still succeed.
+func (f *File) ValidateWritable() error {
+	if f.options.Mode == Check || f.entries != nil {
+		return nil
 	}
-	if runtime.GOOS == "windows" {
-		if vol := filepath.VolumeName(location); vol != "" {
-			if strings.EqualFold(vol, filepath.VolumeName(cwd)) {
-				return filepath.Join(cwd, location[len(vol):])
-			}
-			if abs, err := filepath.Abs(location); err == nil {
-				return abs
-			}
-		} else if len(location) > 0 && os.IsPathSeparator(location[0]) {
-			if vol := filepath.VolumeName(cwd); vol != "" {
-				return filepath.Clean(vol + location)
-			}
-		}
-	}
-	return filepath.Join(cwd, location)
-}
-
-func validateParentDirectory(dir string) error {
-	for cur := dir; ; {
-		info, err := os.Stat(cur)
-		if err == nil {
-			if !info.IsDir() {
-				return fmt.Errorf("suppressions parent path %q is not a directory", cur)
-			}
-			return probeDirectoryWritable(cur)
-		}
-		if !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
-		if link, lstatErr := os.Lstat(cur); lstatErr == nil && link.Mode()&fs.ModeSymlink != 0 {
-			return fmt.Errorf("cannot resolve suppressions parent directory %q", cur)
-		}
-		parent := filepath.Dir(cur)
-		if parent == cur {
-			return err
-		}
-		cur = parent
-	}
-}
-
-func probeDirectoryWritable(dir string) error {
-	probePath := filepath.Join(dir, ".rslint-suppressions-"+rand.Text()+".tmp")
-	probe, err := os.OpenFile(probePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	_ = probe.Close()
-	_ = os.Remove(probePath)
-	return nil
-}
-
-func resolvePhysicalDirectory(cwd string) string {
-	if runtime.GOOS == "windows" {
-		if resolved := osvfs.FS().Realpath(filepath.ToSlash(cwd)); resolved != "" {
-			return filepath.FromSlash(resolved)
-		}
-		return cwd
-	}
-	// When cwd is the process working directory, syscall.Getwd returns the
-	// kernel's physical path (including stored casing on case-insensitive
-	// volumes), matching Node's process.cwd().
-	if wd, err := syscall.Getwd(); err == nil {
-		if cwdInfo, err1 := os.Stat(cwd); err1 == nil {
-			if wdInfo, err2 := os.Stat(wd); err2 == nil && os.SameFile(cwdInfo, wdInfo) {
-				return wd
-			}
-		}
-	}
-	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
-		return resolved
-	}
-	return cwd
-}
-
-// Keep the linted spelling within the working directory so symlinks to the
-// checkout root produce portable keys, while intra-repo aliases stay distinct.
-func (f *File) fileKey(path string) string {
-	if f.logicalCwd != "" && f.logicalCwd != f.cwd {
-		if rel, ok := relativeWithinBase(f.logicalCwd, path); ok {
-			return rel
-		}
-	}
-	return relativeToBase(f.cwd, path)
-}
-
-func relativeWithinBase(base, path string) (string, bool) {
-	rel := relativeToBase(base, path)
-	if rel == "" || rel == "." || rel == ".." || strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, "/") || filepath.IsAbs(rel) {
-		return "", false
-	}
-	if runtime.GOOS == "windows" && filepath.VolumeName(rel) != "" {
-		return "", false
-	}
-	return rel, true
-}
-
-func relativeToBase(base, path string) string {
-	if runtime.GOOS == "windows" {
-		from, to := filepath.ToSlash(filepath.VolumeName(base)), filepath.ToSlash(filepath.VolumeName(path))
-		if !strings.EqualFold(from, to) {
-			return utils.NormalizeAbsoluteDrive(path) // Another drive or share has no relative path.
-		}
-		// Windows volumes are case-insensitive. Inside a volume, preserve the
-		// file and directory spellings that the rule actually received.
-		return tspath.GetRelativePathFromDirectory(
-			cmp.Or(filepath.ToSlash(base[len(from):]), "/"), cmp.Or(path[len(to):], "/"),
-			tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true},
-		)
-	}
-	relative, err := filepath.Rel(base, path)
-	if err != nil {
-		return path
-	}
-	return relative
-}
-
-func (f *File) fileMissing(key string) bool {
-	if strings.HasPrefix(key, "//") {
-		return false // Do not contact a network share to prune an unchecked file.
-	}
-	path := filepath.FromSlash(key)
-	if filepath.VolumeName(path) == "" && len(key) >= 3 && key[1:3] == ":/" && tspath.IsVolumeCharacter(key[0]) {
-		return false // A Unix host cannot check a Windows drive.
-	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(f.cwd, path)
-	}
-	// A missing child under a dangling directory link or detached drive may
-	// become reachable again. Only treat a path as missing when its nearest
-	// existing ancestor resolves cleanly.
-	for current := path; ; {
-		_, err := os.Lstat(current)
-		if err == nil {
-			if current == path {
-				return false
-			}
-			_, err = os.Stat(current) // Follow directory links and Windows junctions.
-			return err == nil
-		}
-		parent := filepath.Dir(current)
-		if parent == current || (!errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR)) {
-			return false
-		}
-		current = parent
-	}
+	return validateParentDirectory(filepath.Dir(f.path))
 }
 
 func (f *File) missing(path string) error {
@@ -247,15 +98,7 @@ func (f *File) missing(path string) error {
 }
 
 func readEntries(path string) (entries, error) {
-	content, err := readBaselineFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return decodeEntries(content, path)
-}
-
-func readEntriesFromFile(file *os.File, path string) (entries, error) {
-	content, err := io.ReadAll(file)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -320,9 +163,10 @@ func normalizeDriveKeys(data entries) error {
 	return nil
 }
 
-// update checks whether the baseline needs modification, then serializes
-// writes on the baseline file itself, re-reads the latest contents, applies
-// change, and replaces the baseline atomically via a temporary file.
+// update re-reads the latest baseline on disk, applies change, and atomically
+// replaces the baseline via a temporary file in the same directory when needed.
+// Matching ESLint, concurrent processes writing to the same baseline are not
+// synchronized with cross-process locks.
 func (f *File) update(ctx context.Context, change func(entries) bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -336,29 +180,48 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 		return fmt.Errorf("cannot resolve suppressions destination %q", f.path)
 	}
 
-	// Avoid taking a write lock when an existing baseline already matches the
-	// desired counts, so no-op runs succeed even inside a read-only directory.
-	if info, err := os.Stat(path); err == nil {
+	var data entries
+	var existingMode fs.FileMode
+	exists := false
+	info, err := os.Stat(path)
+	switch {
+	case err == nil:
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("suppressions file %q must be a regular file", path)
 		}
-		snapshot, readErr := readEntries(path)
-		if readErr != nil {
-			if !errors.Is(readErr, fs.ErrNotExist) {
-				return readErr
-			}
-		} else if !change(snapshot) {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			f.entries = snapshot
-			return nil
+		data, err = readEntries(path)
+		if err != nil {
+			return err
 		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
+		exists = true
+		existingMode = info.Mode().Perm()
+	case errors.Is(err, fs.ErrNotExist):
+		if err := f.missing(path); err != nil {
+			return err
+		}
+		data = make(entries)
+	default:
 		return err
 	}
 
-	if f.options.Mode == Record {
+	changed := change(data)
+	if exists && !changed {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		f.entries = data
+		return nil
+	}
+
+	if exists {
+		// Verify write permission on the existing baseline before replacing it
+		// via rename, which otherwise only requires directory write access on Unix.
+		probe, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			return err
+		}
+		_ = probe.Close()
+	} else if f.options.Mode == Record {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
@@ -367,62 +230,14 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 		path = filepath.Join(realDir, filepath.Base(path))
 	}
 
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		locked, err := lockExistingBaseline(ctx, path)
-		switch {
-		case err == nil:
-			data, readErr := readEntriesFromFile(locked.file, path)
-			if readErr != nil {
-				locked.unlock()
-				return readErr
-			}
-			if change(data) {
-				if writeErr := writeAndPublishBaseline(ctx, path, data, locked); writeErr != nil {
-					locked.unlock()
-					return writeErr
-				}
-			}
-			locked.unlock()
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			f.entries = data
-			return nil
-		case errors.Is(err, fs.ErrNotExist):
-			if link, lstatErr := os.Lstat(path); lstatErr == nil && link.Mode()&fs.ModeSymlink != 0 {
-				return fmt.Errorf("cannot resolve suppressions destination %q", path)
-			}
-			if err := f.missing(path); err != nil {
-				return err
-			}
-			data := make(entries)
-			change(data)
-			err = writeAndPublishBaseline(ctx, path, data, nil)
-			if errors.Is(err, fs.ErrExist) {
-				// Another writer created the baseline first; lock and merge into it.
-				continue
-			}
-			if err != nil {
-				return err
-			}
-			f.entries = data
-			return nil
-		default:
-			return err
-		}
+	if err := writeBaselineAtomically(ctx, path, data, exists, existingMode); err != nil {
+		return err
 	}
+	f.entries = data
+	return nil
 }
 
-func writeAndPublishBaseline(ctx context.Context, path string, data entries, locked *lockedBaseline) error {
-	preserveMode := locked != nil
-	if !preserveMode {
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
-		}
-	}
+func writeBaselineAtomically(ctx context.Context, path string, data entries, preserveMode bool, mode fs.FileMode) error {
 	tempName := filepath.Join(filepath.Dir(path), ".rslint-suppressions-"+rand.Text()+".tmp")
 	perm := fs.FileMode(0o666)
 	if preserveMode {
@@ -440,7 +255,7 @@ func writeAndPublishBaseline(ctx context.Context, path string, data entries, loc
 		}
 	}()
 	if preserveMode {
-		if err := stage.Chmod(locked.mode); err != nil {
+		if err := stage.Chmod(mode); err != nil {
 			return err
 		}
 	}
@@ -456,14 +271,8 @@ func writeAndPublishBaseline(ctx context.Context, path string, data entries, loc
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if preserveMode {
-		if err := replaceLockedBaseline(ctx, tempName, path, locked); err != nil {
-			return err
-		}
-	} else {
-		if err := publishNewBaseline(ctx, tempName, path); err != nil {
-			return err
-		}
+	if err := os.Rename(tempName, path); err != nil {
+		return err
 	}
 	published = true
 	return nil

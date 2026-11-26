@@ -266,6 +266,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	if !typeCheckOnly {
 		var err error
 		baseline, err = suppressions.Open(workingDirectory, args.Suppressions)
+		if err == nil && baseline != nil {
+			err = baseline.ValidateWritable()
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 2
@@ -623,11 +626,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
-	var suppressionError string
+	var suppression suppressionOutcome
 	if baseline != nil {
-		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, args)
+		suppression = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, args)
+		allDiags = suppression.diagnostics
 	}
-	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
+	if !suppression.failed() && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0
 	}
 
@@ -665,7 +669,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		Diagnostics:   allDiags,
 		Summary:       summary,
 		MaxWarnings:   maxWarnings,
-		Failed:        suppressionError != "",
+		Failed:        suppression.failed(),
 		IncludeSource: format == output.FormatDefault,
 	})
 	if err != nil {
@@ -688,8 +692,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	if format != output.FormatDefault && outcome.Kind == output.OutcomeWarningLimitExceeded {
 		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)
 	}
-	if suppressionError != "" {
-		fmt.Fprintln(os.Stderr, suppressionError)
+	if message := suppression.message(); message != "" {
+		fmt.Fprintln(os.Stderr, message)
 	}
 
 	// The timing table goes to stderr so machine-readable stdout formats
@@ -707,7 +711,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
-	if suppressionError != "" {
+	if suppression.failed() {
 		return 2
 	}
 	if outcome.Failed() {

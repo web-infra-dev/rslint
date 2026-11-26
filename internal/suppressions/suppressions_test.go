@@ -5,14 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -452,23 +449,34 @@ func TestRecordCreatesMissingParentDirectoryAndRejectsInvalidParent(t *testing.T
 	}
 
 	for _, invalid := range []string{"a.js/base.json", "a.js/sub/"} {
-		if _, err := Open(cwd, Options{Mode: Record, Location: invalid}); err == nil {
-			t.Fatalf("Open(%q) unexpectedly succeeded for non-directory parent", invalid)
+		f, err := Open(cwd, Options{Mode: Record, Location: invalid})
+		if err == nil {
+			err = f.ValidateWritable()
+		}
+		if err == nil {
+			t.Fatalf("Open/ValidateWritable(%q) unexpectedly succeeded for non-directory parent", invalid)
 		}
 	}
 
 	if runtime.GOOS != "windows" {
 		assert.NilError(t, os.Symlink("missing-target", filepath.Join(cwd, "dangling-dir")))
-		if _, err := Open(cwd, Options{Mode: Record, Location: "dangling-dir/base.json"}); err == nil {
-			t.Fatal("Open unexpectedly succeeded for dangling parent directory symlink")
+		dangling, err := Open(cwd, Options{Mode: Record, Location: "dangling-dir/base.json"})
+		if err == nil {
+			err = dangling.ValidateWritable()
+		}
+		if err == nil {
+			t.Fatal("Open/ValidateWritable unexpectedly succeeded for dangling parent directory symlink")
 		}
 		readonlyDir := filepath.Join(cwd, "readonly")
 		assert.NilError(t, os.Mkdir(readonlyDir, 0o555))
 		t.Cleanup(func() { _ = os.Chmod(readonlyDir, 0o755) })
 		if err := probeDirectoryWritable(readonlyDir); errors.Is(err, os.ErrPermission) {
 			for _, loc := range []string{"readonly/base.json", "readonly/missing/base.json"} {
-				if _, err := Open(cwd, Options{Mode: Record, Location: loc}); !errors.Is(err, os.ErrPermission) {
-					t.Fatalf("Open(%q) = %v, want permission error", loc, err)
+				// Open itself stays read-only; ValidateWritable fails fast before autofix.
+				f, err := Open(cwd, Options{Mode: Record, Location: loc})
+				assert.NilError(t, err)
+				if err := f.ValidateWritable(); !errors.Is(err, os.ErrPermission) {
+					t.Fatalf("ValidateWritable(%q) = %v, want permission error", loc, err)
 				}
 			}
 		}
@@ -522,195 +530,42 @@ func TestResolveLocationPathWindowsDriveRelative(t *testing.T) {
 	assert.Equal(t, f.path, filepath.Join(cwd, "drive-dir", "rslint-suppressions_"+cwdHash(cwd)))
 }
 
-func TestConcurrentProcessUpdatesHelper(t *testing.T) {
-	if os.Getenv("RSLINT_SUPPRESSIONS_CONCURRENT_WORKER") == "" {
-		return
+func TestUpdateInNonListableWritableDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("0333 write-only directory mode applies only on Unix")
 	}
-	cwd := os.Getenv("RSLINT_SUPPRESSIONS_CONCURRENT_CWD")
-	location := os.Getenv("RSLINT_SUPPRESSIONS_CONCURRENT_LOCATION")
-	file := os.Getenv("RSLINT_SUPPRESSIONS_CONCURRENT_FILE")
-	f, err := Open(cwd, Options{Mode: Record, Location: location})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	if _, _, err := reportError(t.Context(), f, filepath.Join(cwd, file), "no-debugger"); err != nil {
-		t.Fatalf("apply: %v", err)
-	}
-}
-
-func TestConcurrentProcessUpdatesPreserveAllEntries(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
-	seed := make(entries, 2000)
-	for i := range 2000 {
-		seed[fmt.Sprintf("existing/file-%04d.js", i)] = map[string]entry{
-			"no-debugger": {Count: 1},
-		}
-	}
-	encoded, err := json.MarshalIndent(seed, "", "  ")
-	assert.NilError(t, err)
-	assert.NilError(t, os.WriteFile(filepath.Join(cwd, DefaultFilename), encoded, 0o644))
-
-	exe, err := os.Executable()
-	assert.NilError(t, err)
-	const workers = 4
-	var wg sync.WaitGroup
-	errs := make([]error, workers)
-	readerDone := make(chan struct{})
-	var readerErr error
-	var readerWG sync.WaitGroup
-	readerWG.Add(1)
-	go func() {
-		defer readerWG.Done()
-		for {
-			select {
-			case <-readerDone:
-				return
-			default:
-				if _, openErr := Open(cwd, Options{}); openErr != nil {
-					readerErr = openErr
-					return
-				}
-			}
-		}
-	}()
-	for i := range workers {
-		workerTmp := t.TempDir()
-		wg.Add(1)
-		go func(idx int, tmpDir string) {
-			defer wg.Done()
-			cmd := exec.Command(exe, "-test.run=^TestConcurrentProcessUpdatesHelper$")
-			cmd.Env = append(os.Environ(),
-				"TMPDIR="+tmpDir,
-				"TEMP="+tmpDir,
-				"TMP="+tmpDir,
-				"RSLINT_SUPPRESSIONS_CONCURRENT_WORKER=1",
-				"RSLINT_SUPPRESSIONS_CONCURRENT_CWD="+cwd,
-				fmt.Sprintf("RSLINT_SUPPRESSIONS_CONCURRENT_FILE=worker-%d.js", idx),
-			)
-			if out, runErr := cmd.CombinedOutput(); runErr != nil {
-				errs[idx] = fmt.Errorf("worker %d failed: %w\n%s", idx, runErr, out)
-			}
-		}(i, workerTmp)
-	}
-	wg.Wait()
-	close(readerDone)
-	readerWG.Wait()
-	assert.NilError(t, readerErr)
-	for _, runErr := range errs {
-		assert.NilError(t, runErr)
+	dir := filepath.Join(cwd, "write-only")
+	assert.NilError(t, os.Mkdir(dir, 0o333))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if _, err := os.ReadDir(dir); err == nil {
+		t.Skip("current user can list a 0333 directory")
+	} else if !errors.Is(err, os.ErrPermission) {
+		t.Fatal(err)
 	}
 
-	final, err := Open(cwd, Options{})
+	const location = "write-only/base.json"
+	first, err := Open(cwd, Options{Mode: Record, Location: location})
 	assert.NilError(t, err)
-	assert.Assert(t, final != nil)
-	assert.Equal(t, len(final.entries), 2000+workers)
-	for i := range workers {
-		key := fmt.Sprintf("worker-%d.js", i)
-		assert.Equal(t, final.entries[key]["no-debugger"].Count, 1)
-	}
-	dirEntries, err := os.ReadDir(cwd)
+	assert.NilError(t, first.ValidateWritable())
+	_, _, err = reportError(t.Context(), first, filepath.Join(cwd, "a.js"), "no-debugger")
 	assert.NilError(t, err)
-	assert.Equal(t, len(dirEntries), 1)
-	assert.Equal(t, dirEntries[0].Name(), DefaultFilename)
 
-	// Concurrent first-time creation into a missing nested custom directory.
-	const nestedLocation = ".cache/concurrent/"
-	var nestedWG sync.WaitGroup
-	nestedErrs := make([]error, workers)
-	for i := range workers {
-		nestedWG.Add(1)
-		go func(idx int) {
-			defer nestedWG.Done()
-			f, openErr := Open(cwd, Options{Mode: Record, Location: nestedLocation})
-			if openErr != nil {
-				nestedErrs[idx] = openErr
-				return
-			}
-			_, _, nestedErrs[idx] = reportError(t.Context(), f, filepath.Join(cwd, fmt.Sprintf("first-%d.js", idx)), "no-debugger")
-		}(i)
-	}
-	nestedWG.Wait()
-	for _, runErr := range nestedErrs {
-		assert.NilError(t, runErr)
-	}
-	nested, err := Open(cwd, Options{Location: nestedLocation})
+	second, err := Open(cwd, Options{Mode: Record, Location: location})
 	assert.NilError(t, err)
-	assert.Assert(t, nested != nil)
-	assert.Equal(t, len(nested.entries), workers)
-	for i := range workers {
-		key := fmt.Sprintf("first-%d.js", i)
-		assert.Equal(t, nested.entries[key]["no-debugger"].Count, 1)
-	}
-	nestedEntries, err := os.ReadDir(filepath.Join(cwd, ".cache", "concurrent"))
+	_, _, err = reportError(t.Context(), second, filepath.Join(cwd, "b.js"), "no-debugger")
 	assert.NilError(t, err)
-	assert.Equal(t, len(nestedEntries), 1)
+
+	reopened, err := Open(cwd, Options{Location: location})
+	assert.NilError(t, err)
+	assert.Assert(t, reopened != nil)
+	assert.DeepEqual(t, reopened.entries, entries{
+		"a.js": {"no-debugger": {Count: 1}},
+		"b.js": {"no-debugger": {Count: 1}},
+	})
 }
 
-func TestConcurrentProcessUpdatesEquivalentUnicodeNames(t *testing.T) {
-	cwd := tempWorkingDirectory(t)
-	// cspell:disable-next-line
-	const nfc = "r\u00e9sum\u00e9.json"
-	// cspell:disable-next-line
-	const nfd = "re\u0301sume\u0301.json"
-
-	seed := make(entries, 2000)
-	for i := range 2000 {
-		seed[fmt.Sprintf("existing/file-%04d.js", i)] = map[string]entry{
-			"no-debugger": {Count: 1},
-		}
-	}
-	encoded, err := json.MarshalIndent(seed, "", "  ")
-	assert.NilError(t, err)
-	assert.NilError(t, os.WriteFile(filepath.Join(cwd, nfc), encoded, 0o644))
-
-	nfcInfo, err := os.Stat(filepath.Join(cwd, nfc))
-	assert.NilError(t, err)
-	nfdInfo, err := os.Stat(filepath.Join(cwd, nfd))
-	if err != nil || !os.SameFile(nfcInfo, nfdInfo) {
-		t.Skip("filesystem does not equate NFC and NFD filename spellings")
-	}
-
-	exe, err := os.Executable()
-	assert.NilError(t, err)
-	const workers = 4
-	spellings := []string{nfc, nfd, nfc, nfd}
-	var wg sync.WaitGroup
-	errs := make([]error, workers)
-	for i := range workers {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			cmd := exec.Command(exe, "-test.run=^TestConcurrentProcessUpdatesHelper$")
-			cmd.Env = append(os.Environ(),
-				"RSLINT_SUPPRESSIONS_CONCURRENT_WORKER=1",
-				"RSLINT_SUPPRESSIONS_CONCURRENT_CWD="+cwd,
-				"RSLINT_SUPPRESSIONS_CONCURRENT_LOCATION="+spellings[idx],
-				fmt.Sprintf("RSLINT_SUPPRESSIONS_CONCURRENT_FILE=unicode-%d.js", idx),
-			)
-			if out, runErr := cmd.CombinedOutput(); runErr != nil {
-				errs[idx] = fmt.Errorf("worker %d (%q) failed: %w\n%s", idx, spellings[idx], runErr, out)
-			}
-		}(i)
-	}
-	wg.Wait()
-	for _, runErr := range errs {
-		assert.NilError(t, runErr)
-	}
-
-	final, err := Open(cwd, Options{Location: nfc})
-	assert.NilError(t, err)
-	assert.Assert(t, final != nil)
-	assert.Equal(t, len(final.entries), 2000+workers)
-	for i := range workers {
-		key := fmt.Sprintf("unicode-%d.js", i)
-		assert.Equal(t, final.entries[key]["no-debugger"].Count, 1)
-	}
-	dirEntries, err := os.ReadDir(cwd)
-	assert.NilError(t, err)
-	assert.Equal(t, len(dirEntries), 1)
-}
-
-func TestLockDoesNotTouchCallerNamedLockFile(t *testing.T) {
+func TestUpdateDoesNotTouchCallerNamedLockFile(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
 	const lockNamed = ".rslint-suppressions.lock"
 
@@ -727,7 +582,7 @@ func TestLockDoesNotTouchCallerNamedLockFile(t *testing.T) {
 	assert.NilError(t, err)
 
 	// Recording to the default baseline in the same directory preserves the
-	// separate .rslint-suppressions.lock file untouched.
+	// separate .rslint-suppressions.lock file untouched and leaves no temp files.
 	def, err := Open(cwd, Options{Mode: Record})
 	assert.NilError(t, err)
 	_, _, err = reportError(t.Context(), def, filepath.Join(cwd, "c.js"), "no-debugger")
@@ -747,51 +602,8 @@ func TestLockDoesNotTouchCallerNamedLockFile(t *testing.T) {
 	assert.DeepEqual(t, reopenedDefault.entries, entries{
 		"c.js": {"no-debugger": {Count: 1}},
 	})
-}
 
-func TestPublishNewBaselineExclusive(t *testing.T) {
-	cwd := tempWorkingDirectory(t)
-	target := filepath.Join(cwd, "first-publish.json")
-
-	const writers = 16
-	start := make(chan struct{})
-	var winners atomic.Int32
-	var winnerContent atomic.Value
-	errs := make([]error, writers)
-	var wg sync.WaitGroup
-
-	for i := range writers {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			tempName := filepath.Join(cwd, fmt.Sprintf(".publish-%02d.tmp", idx))
-			content := fmt.Sprintf(`{"w-%02d.js":{"no-debugger":{"count":1}}}`, idx)
-			if err := os.WriteFile(tempName, []byte(content), 0o666); err != nil {
-				errs[idx] = err
-				return
-			}
-			<-start
-			err := publishNewBaseline(t.Context(), tempName, target)
-			switch {
-			case err == nil:
-				winners.Add(1)
-				winnerContent.Store(content)
-			case errors.Is(err, fs.ErrExist):
-				_ = os.Remove(tempName)
-			default:
-				_ = os.Remove(tempName)
-				errs[idx] = fmt.Errorf("writer %d: %w", idx, err)
-			}
-		}(i)
-	}
-	close(start)
-	wg.Wait()
-
-	for _, err := range errs {
-		assert.NilError(t, err)
-	}
-	assert.Equal(t, winners.Load(), int32(1))
-	got, err := os.ReadFile(target)
+	dirEntries, err := os.ReadDir(cwd)
 	assert.NilError(t, err)
-	assert.Equal(t, string(got), winnerContent.Load().(string))
+	assert.Equal(t, len(dirEntries), 2)
 }

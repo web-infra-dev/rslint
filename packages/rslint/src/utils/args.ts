@@ -18,6 +18,18 @@ export function isJSConfigFile(filePath: string): boolean {
   return /\.(ts|mts|cts|js|mjs|cjs)$/.test(filePath);
 }
 
+// Register known Go string-valued flags so their values are not mistaken for
+// positional file/dir arguments, and so missing values fail before reordering.
+const GO_STRING_OPTIONS = {
+  format: { type: 'string' },
+  'max-warnings': { type: 'string' },
+  rule: { type: 'string', multiple: true },
+  'suppress-rule': { type: 'string', multiple: true },
+  'suppressions-location': { type: 'string' },
+  trace: { type: 'string' },
+  cpuprof: { type: 'string' },
+} as const;
+
 export function parseArgs(argv: string[]) {
   const { values, tokens } = nodeParseArgs({
     args: argv,
@@ -31,15 +43,7 @@ export function parseArgs(argv: string[]) {
       // single worker. NOT skipped below, so it still forwards to Go in
       // `rest` (Go's native pass honors the same flag independently).
       singleThreaded: { type: 'boolean' },
-      // Register known Go string-valued flags so their values are not
-      // mistaken for positional file/dir arguments.
-      format: { type: 'string' },
-      'max-warnings': { type: 'string' },
-      rule: { type: 'string', multiple: true },
-      'suppress-rule': { type: 'string', multiple: true },
-      'suppressions-location': { type: 'string' },
-      trace: { type: 'string' },
-      cpuprof: { type: 'string' },
+      ...GO_STRING_OPTIONS,
       // Consumed by the JS entry point; must not reach Go from user input.
       'start-time': { type: 'string' },
     },
@@ -81,32 +85,31 @@ export function parseArgs(argv: string[]) {
         }
         continue;
       }
-      switch (token.name) {
-        case 'suppress-all':
-        case 'no-suppress-all':
-        case 'prune-suppressions':
-        case 'no-prune-suppressions':
-        case 'pass-on-unpruned-suppressions':
-        case 'no-pass-on-unpruned-suppressions':
-          flags.push(argv[token.index]); // Preserve an explicit =false.
-          continue;
-        case 'suppress-rule':
-        case 'suppressions-location': {
-          // Bind before reordering so a missing value cannot consume a file.
-          const value = token.value;
-          if (
-            value == null ||
-            (!token.inlineValue && value.startsWith('-') && value !== '-')
-          ) {
-            argumentError ??= `expected a value for ${token.rawName}`;
-          } else {
-            flags.push(`${token.rawName}=${value}`);
-          }
-          continue;
+      if (Object.hasOwn(GO_STRING_OPTIONS, token.name)) {
+        // Validate missing values before reordering so a trailing flag cannot
+        // consume a preceding file path once flags are moved ahead of positionals.
+        const value = token.value;
+        if (
+          value == null ||
+          (!token.inlineValue &&
+            value.startsWith('-') &&
+            value !== '-' &&
+            !/^-\d+$/.test(value))
+        ) {
+          argumentError ??= `expected a value for ${token.rawName}`;
+        } else {
+          flags.push(token.rawName, value);
         }
+        continue;
       }
-      flags.push(token.rawName);
-      if (token.value != null) flags.push(token.value);
+      if (token.inlineValue) {
+        // Keep inline values (e.g. --no-prune-suppressions=false) attached to
+        // non-string options because Go's flag.Parse only accepts boolean values inline.
+        flags.push(argv[token.index]);
+      } else {
+        flags.push(token.rawName);
+        if (token.value != null) flags.push(token.value);
+      }
     } else if (token.kind === 'option-terminator') {
       seenTerminator = true;
     } else if (token.kind === 'positional') {
