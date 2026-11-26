@@ -88,13 +88,13 @@ export function parseArgs(argv: string[]) {
       if (Object.hasOwn(GO_STRING_OPTIONS, token.name)) {
         // Validate missing values before reordering so a trailing flag cannot
         // consume a preceding file path once flags are moved ahead of positionals.
+        // Only treat double-hyphen flags and known short options (-c, -h) as
+        // missing values so hyphen-prefixed filenames like `-cpu.pprof` still work.
         const value = token.value;
         if (
           value == null ||
           (!token.inlineValue &&
-            value.startsWith('-') &&
-            value !== '-' &&
-            !/^-\d+$/.test(value))
+            (value.startsWith('--') || value === '-h' || value === '-c'))
         ) {
           argumentError ??= `expected a value for ${token.rawName}`;
         } else {

@@ -263,6 +263,11 @@ describe('parseArgs rest ordering', () => {
     expect(
       parseArgs(['--max-warnings', '-1', 'a.js']).argumentError,
     ).toBeUndefined();
+    expect(parseArgs(['--cpuprof', '-cpu.pprof', 'a.js']).rest).toEqual([
+      '--cpuprof',
+      '-cpu.pprof',
+      'a.js',
+    ]);
     expect(parseArgs([`${location}=-custom.json`, 'a.js']).rest).toEqual([
       location,
       '-custom.json',

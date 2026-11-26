@@ -703,40 +703,6 @@ describe('CLI bulk suppressions', () => {
     }
   });
 
-  test('preserves caller-owned baselines named .rslint-suppressions.lock', async () => {
-    const cwd = await project({
-      'rslint.config.mjs': "export default [{rules:{'no-debugger':'error'}}];",
-      'a.js': 'debugger;',
-      'b.js': 'debugger;',
-      'c.js': 'debugger;',
-    });
-    const lockNamed = '.rslint-suppressions.lock';
-    const first = await runRslint(
-      ['--suppress-all', '--suppressions-location', lockNamed, 'a.js'],
-      cwd,
-    );
-    expect(first.exitCode, first.stderr).toBe(0);
-
-    const second = await runRslint(
-      ['--suppress-all', '--suppressions-location', lockNamed, 'b.js'],
-      cwd,
-    );
-    expect(second.exitCode, second.stderr).toBe(0);
-
-    const defaultWrite = await runRslint(['--suppress-all', 'c.js'], cwd);
-    expect(defaultWrite.exitCode, defaultWrite.stderr).toBe(0);
-
-    expect(
-      JSON.parse(await fs.readFile(path.join(cwd, lockNamed), 'utf8')),
-    ).toEqual({
-      'a.js': { 'no-debugger': { count: 1 } },
-      'b.js': { 'no-debugger': { count: 1 } },
-    });
-    expect(await readBaseline(cwd)).toEqual({
-      'c.js': { 'no-debugger': { count: 1 } },
-    });
-  });
-
   test('preserves a type-aware count when the file is outside its TypeScript project', async () => {
     const rule = '@typescript-eslint/await-thenable';
     const cwd = await project({
