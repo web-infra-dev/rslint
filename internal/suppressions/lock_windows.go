@@ -139,21 +139,24 @@ func verifyLockedHandle(root *os.Root, base string, locked *os.File) (bool, fs.F
 }
 
 func publishNewBaseline(_ context.Context, tempName, path string) error {
-	root, err := os.OpenRoot(filepath.Dir(path))
+	from, err := windows.UTF16PtrFromString(tempName)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = root.Close() }()
-	tempBase, base := filepath.Base(tempName), filepath.Base(path)
-	err = root.Link(tempBase, base)
+	to, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	// MoveFileEx with flags=0 atomically publishes only when path is absent on
+	// every Windows filesystem (including exFAT and FAT32).
+	err = windows.MoveFileEx(from, to, 0)
 	if err == nil {
-		_ = os.Remove(tempName)
 		return nil
 	}
-	if errors.Is(err, windows.ERROR_INVALID_FUNCTION) || errors.Is(err, windows.ERROR_NOT_SUPPORTED) {
-		return root.Rename(tempBase, base)
+	if errors.Is(err, windows.ERROR_ALREADY_EXISTS) || errors.Is(err, windows.ERROR_FILE_EXISTS) {
+		return fs.ErrExist
 	}
-	return err
+	return &os.LinkError{Op: "rename", Old: tempName, New: path, Err: err}
 }
 
 func replaceLockedBaseline(ctx context.Context, tempName, path string, locked *lockedBaseline) error {

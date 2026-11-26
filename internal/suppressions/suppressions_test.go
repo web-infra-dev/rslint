@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -745,4 +747,51 @@ func TestLockDoesNotTouchCallerNamedLockFile(t *testing.T) {
 	assert.DeepEqual(t, reopenedDefault.entries, entries{
 		"c.js": {"no-debugger": {Count: 1}},
 	})
+}
+
+func TestPublishNewBaselineExclusive(t *testing.T) {
+	cwd := tempWorkingDirectory(t)
+	target := filepath.Join(cwd, "first-publish.json")
+
+	const writers = 16
+	start := make(chan struct{})
+	var winners atomic.Int32
+	var winnerContent atomic.Value
+	errs := make([]error, writers)
+	var wg sync.WaitGroup
+
+	for i := range writers {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			tempName := filepath.Join(cwd, fmt.Sprintf(".publish-%02d.tmp", idx))
+			content := fmt.Sprintf(`{"w-%02d.js":{"no-debugger":{"count":1}}}`, idx)
+			if err := os.WriteFile(tempName, []byte(content), 0o666); err != nil {
+				errs[idx] = err
+				return
+			}
+			<-start
+			err := publishNewBaseline(t.Context(), tempName, target)
+			switch {
+			case err == nil:
+				winners.Add(1)
+				winnerContent.Store(content)
+			case errors.Is(err, fs.ErrExist):
+				_ = os.Remove(tempName)
+			default:
+				_ = os.Remove(tempName)
+				errs[idx] = fmt.Errorf("writer %d: %w", idx, err)
+			}
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	for _, err := range errs {
+		assert.NilError(t, err)
+	}
+	assert.Equal(t, winners.Load(), int32(1))
+	got, err := os.ReadFile(target)
+	assert.NilError(t, err)
+	assert.Equal(t, string(got), winnerContent.Load().(string))
 }
