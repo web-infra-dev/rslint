@@ -14,6 +14,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const publishCreateExtraFlags = 0
+
 func lockUnixFile(f *os.File) (bool, error) {
 	lk := unix.Flock_t{
 		Type:   unix.F_WRLCK,

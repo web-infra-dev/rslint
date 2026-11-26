@@ -13,6 +13,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const publishCreateExtraFlags = unix.O_EXLOCK
+
 func lockUnixFile(f *os.File) (bool, error) {
 	return false, flockExclusive(f)
 }

@@ -225,14 +225,14 @@ func TestPublishWithLockFileContentionAndPublicReaders(t *testing.T) {
 func TestPublishWithLockFilePausedAndInterrupted(t *testing.T) {
 	cwd := tempWorkingDirectory(t)
 	target := filepath.Join(cwd, DefaultFilename)
-	lockPath := filepath.Join(cwd, publishLockName(0))
+	lockPath := publishLockPath(target)
 
 	// Hold the coordination lock as a writer paused before renaming into target.
-	held, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	held, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o666)
 	assert.NilError(t, err)
 	ofd, err := lockUnixFile(held)
 	assert.NilError(t, err)
-	_, err = held.WriteAt([]byte(publishLockPrefix+"paused-writer-token-012345"), 0)
+	_, err = held.WriteAt([]byte(publishLockMagic+"ABCDEFGHIJKLMNOPQRSTUVWXYZ\n"), 0)
 	assert.NilError(t, err)
 
 	// While the first writer is paused inside its lock, public readers must
@@ -282,50 +282,192 @@ func TestPublishWithLockFilePausedAndInterrupted(t *testing.T) {
 	assert.Equal(t, dirEntries[0].Name(), DefaultFilename)
 }
 
-func TestPublishWithLockFilePreservesUserFiles(t *testing.T) {
-	cwd := tempWorkingDirectory(t)
-	lockName := publishLockName(0)
+func TestPublishWithLockFilePreservesPreExistingUserFiles(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+	}{
+		{name: "empty", content: ""},
+		{name: "similar-prefix", content: "rslint-lock: personal build note"},
+		{name: "ordinary-text", content: "keep this file untouched\n"},
+	}
 
-	// Case 1: target baseline is literally named after the primary publish lock.
-	targetNamedLock := filepath.Join(cwd, lockName)
-	temp1 := filepath.Join(cwd, ".stage-1.tmp")
-	payload1 := `{"a.js":{"no-debugger":{"count":1}}}`
-	assert.NilError(t, os.WriteFile(temp1, []byte(payload1), 0o666))
-	assert.NilError(t, publishWithLockFile(t.Context(), temp1, targetNamedLock))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cwd := tempWorkingDirectory(t)
+			target := filepath.Join(cwd, DefaultFilename)
+			lockPath := publishLockPath(target)
+			assert.NilError(t, os.WriteFile(lockPath, []byte(tc.content), 0o644))
 
-	got1, err := os.ReadFile(targetNamedLock)
-	assert.NilError(t, err)
-	assert.Equal(t, string(got1), payload1)
+			// Concurrent writers must still serialize on the pre-existing file
+			// and preserve all updates without modifying or deleting it.
+			const writers = 8
+			start := make(chan struct{})
+			var firstWinners atomic.Int32
+			errs := make([]error, writers)
+			var wg sync.WaitGroup
+			for i := range writers {
+				wg.Add(1)
+				go func(idx int) {
+					defer wg.Done()
+					key := fmt.Sprintf("u-%02d.js", idx)
+					tempName := filepath.Join(cwd, fmt.Sprintf(".stage-%02d.tmp", idx))
+					payload, err := json.Marshal(entries{key: {"no-debugger": {Count: 1}}})
+					if err != nil {
+						errs[idx] = err
+						return
+					}
+					if err := os.WriteFile(tempName, payload, 0o666); err != nil {
+						errs[idx] = err
+						return
+					}
+					<-start
+					err = publishWithLockFile(t.Context(), tempName, target)
+					if err == nil {
+						firstWinners.Add(1)
+						return
+					}
+					_ = os.Remove(tempName)
+					if !errors.Is(err, fs.ErrExist) {
+						errs[idx] = fmt.Errorf("writer %d: %w", idx, err)
+						return
+					}
+					locked, lockErr := lockExistingBaseline(t.Context(), target)
+					if lockErr != nil {
+						errs[idx] = lockErr
+						return
+					}
+					data, readErr := readEntriesFromFile(locked.file, target)
+					if readErr != nil {
+						locked.unlock()
+						errs[idx] = readErr
+						return
+					}
+					data[key] = map[string]entry{"no-debugger": {Count: 1}}
+					writeErr := writeAndPublishBaseline(t.Context(), target, data, locked)
+					locked.unlock()
+					if writeErr != nil {
+						errs[idx] = writeErr
+					}
+				}(i)
+			}
+			close(start)
+			wg.Wait()
+			for _, err := range errs {
+				assert.NilError(t, err)
+			}
+			assert.Equal(t, firstWinners.Load(), int32(1))
 
-	// Case 2: publishing another baseline in the same directory must not
-	// overwrite or delete the user's file at publishLockName(0), nor fail on a
-	// directory at publishLockName(1), symlink at publishLockName(2), or
-	// read-only file at publishLockName(3).
-	assert.NilError(t, os.Mkdir(filepath.Join(cwd, publishLockName(1)), 0o755))
-	assert.NilError(t, os.Symlink(targetNamedLock, filepath.Join(cwd, publishLockName(2))))
-	readOnlyUserFile := filepath.Join(cwd, publishLockName(3))
-	assert.NilError(t, os.WriteFile(readOnlyUserFile, []byte("keep"), 0o444))
-	t.Cleanup(func() { _ = os.Chmod(readOnlyUserFile, 0o644) })
+			gotLock, err := os.ReadFile(lockPath)
+			assert.NilError(t, err)
+			assert.Equal(t, string(gotLock), tc.content)
 
-	targetDefault := filepath.Join(cwd, DefaultFilename)
-	temp2 := filepath.Join(cwd, ".stage-2.tmp")
-	payload2 := `{"b.js":{"no-debugger":{"count":2}}}`
-	assert.NilError(t, os.WriteFile(temp2, []byte(payload2), 0o666))
-	assert.NilError(t, publishWithLockFile(t.Context(), temp2, targetDefault))
+			reopened, err := Open(cwd, Options{})
+			assert.NilError(t, err)
+			assert.Assert(t, reopened != nil)
+			assert.Equal(t, len(reopened.entries), writers)
+		})
+	}
 
-	got1After, err := os.ReadFile(targetNamedLock)
-	assert.NilError(t, err)
-	assert.Equal(t, string(got1After), payload1)
-	gotReadOnly, err := os.ReadFile(readOnlyUserFile)
-	assert.NilError(t, err)
-	assert.Equal(t, string(gotReadOnly), "keep")
-	got2, err := os.ReadFile(targetDefault)
-	assert.NilError(t, err)
-	assert.Equal(t, string(got2), payload2)
+	t.Run("baseline-named-after-primary-lock", func(t *testing.T) {
+		cwd := tempWorkingDirectory(t)
+		targetNamedLock := publishLockPath(filepath.Join(cwd, DefaultFilename))
+		tempName := filepath.Join(cwd, ".stage-named-lock.tmp")
+		payload := `{"a.js":{"no-debugger":{"count":1}}}`
+		assert.NilError(t, os.WriteFile(tempName, []byte(payload), 0o666))
+		assert.NilError(t, publishWithLockFile(t.Context(), tempName, targetNamedLock))
 
-	// The fifth candidate lock file used for targetDefault must be cleaned up.
-	_, err = os.Lstat(filepath.Join(cwd, publishLockName(4)))
-	assert.Assert(t, errors.Is(err, fs.ErrNotExist))
+		got, err := os.ReadFile(targetNamedLock)
+		assert.NilError(t, err)
+		assert.Equal(t, string(got), payload)
+		_, err = os.Lstat(publishLockPath(targetNamedLock))
+		assert.Assert(t, errors.Is(err, fs.ErrNotExist))
+	})
+}
+
+func TestPublishWithLockFileRejectsInaccessibleLockInsteadOfBypassing(t *testing.T) {
+	t.Run("directory", func(t *testing.T) {
+		cwd := tempWorkingDirectory(t)
+		target := filepath.Join(cwd, DefaultFilename)
+		lockPath := publishLockPath(target)
+		assert.NilError(t, os.Mkdir(lockPath, 0o755))
+
+		tempName := filepath.Join(cwd, ".stage-dir.tmp")
+		assert.NilError(t, os.WriteFile(tempName, []byte(`{"a.js":{"no-debugger":{"count":1}}}`), 0o666))
+		err := publishWithLockFile(t.Context(), tempName, target)
+		assert.Assert(t, err != nil)
+		_, statErr := os.Lstat(target)
+		assert.Assert(t, errors.Is(statErr, fs.ErrNotExist))
+		info, lockStatErr := os.Lstat(lockPath)
+		assert.NilError(t, lockStatErr)
+		assert.Assert(t, info.IsDir())
+	})
+
+	t.Run("symlink", func(t *testing.T) {
+		cwd := tempWorkingDirectory(t)
+		target := filepath.Join(cwd, DefaultFilename)
+		lockPath := publishLockPath(target)
+		victim := filepath.Join(cwd, "victim.txt")
+		assert.NilError(t, os.WriteFile(victim, []byte("keep"), 0o644))
+		assert.NilError(t, os.Symlink(victim, lockPath))
+
+		tempName := filepath.Join(cwd, ".stage-link.tmp")
+		assert.NilError(t, os.WriteFile(tempName, []byte(`{"a.js":{"no-debugger":{"count":1}}}`), 0o666))
+		err := publishWithLockFile(t.Context(), tempName, target)
+		assert.Assert(t, err != nil)
+		_, statErr := os.Lstat(target)
+		assert.Assert(t, errors.Is(statErr, fs.ErrNotExist))
+		gotVictim, readErr := os.ReadFile(victim)
+		assert.NilError(t, readErr)
+		assert.Equal(t, string(gotVictim), "keep")
+	})
+
+	t.Run("read-only-file", func(t *testing.T) {
+		cwd := tempWorkingDirectory(t)
+		target := filepath.Join(cwd, DefaultFilename)
+		lockPath := publishLockPath(target)
+		assert.NilError(t, os.WriteFile(lockPath, []byte("keep"), 0o444))
+		t.Cleanup(func() { _ = os.Chmod(lockPath, 0o644) })
+		if f, err := os.OpenFile(lockPath, os.O_RDWR, 0); err == nil {
+			_ = f.Close()
+			t.Skip("current user can open 0444 files read-write")
+		}
+
+		tempName := filepath.Join(cwd, ".stage-ro.tmp")
+		assert.NilError(t, os.WriteFile(tempName, []byte(`{"a.js":{"no-debugger":{"count":1}}}`), 0o666))
+		err := publishWithLockFile(t.Context(), tempName, target)
+		assert.Assert(t, errors.Is(err, os.ErrPermission), "expected permission error, got %v", err)
+		_, statErr := os.Lstat(target)
+		assert.Assert(t, errors.Is(statErr, fs.ErrNotExist))
+		got, readErr := os.ReadFile(lockPath)
+		assert.NilError(t, readErr)
+		assert.Equal(t, string(got), "keep")
+	})
+
+	t.Run("respects-umask-for-shared-writers", func(t *testing.T) {
+		cwd := tempWorkingDirectory(t)
+		lockPath := publishLockPath(filepath.Join(cwd, DefaultFilename))
+		probe := filepath.Join(cwd, ".umask-probe")
+		pf, err := os.OpenFile(probe, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o666)
+		assert.NilError(t, err)
+		probeInfo, err := pf.Stat()
+		assert.NilError(t, err)
+		assert.NilError(t, pf.Close())
+
+		f, createdByUs, alreadyLocked, err := openOrCreatePublishLock(lockPath)
+		assert.NilError(t, err)
+		defer func() {
+			_ = os.Remove(lockPath)
+			if alreadyLocked {
+				unlockUnixFile(f, false)
+			}
+			_ = f.Close()
+		}()
+		assert.Assert(t, createdByUs)
+		lockInfo, err := f.Stat()
+		assert.NilError(t, err)
+		assert.Equal(t, lockInfo.Mode().Perm(), probeInfo.Mode().Perm())
+	})
 }
 
 func TestPublishWithLockFileInNonListableDir(t *testing.T) {
@@ -346,6 +488,6 @@ func TestPublishWithLockFileInNonListableDir(t *testing.T) {
 	got, err := os.ReadFile(target)
 	assert.NilError(t, err)
 	assert.Equal(t, string(got), payload)
-	_, err = os.Lstat(filepath.Join(dir, publishLockName(0)))
+	_, err = os.Lstat(publishLockPath(target))
 	assert.Assert(t, errors.Is(err, fs.ErrNotExist))
 }

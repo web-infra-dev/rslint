@@ -91,15 +91,39 @@ func replaceLockedBaseline(_ context.Context, tempName, path string, _ *lockedBa
 }
 
 const (
-	publishLockPrefix        = "rslint-lock:"
-	publishLockMaxCandidates = 128
+	// Binary signature written only into coordination files created by rslint.
+	// Leading NUL bytes and fixed RFC 4648 base32 token length avoid matching
+	// pre-existing user files.
+	publishLockMagic    = "\x00rslint-suppressions-publish-lock-v1\x00"
+	publishLockTokenLen = 26 // crypto/rand.Text() produces 26 uppercase base32 chars.
+	publishLockSize     = len(publishLockMagic) + publishLockTokenLen + 1
 )
 
-func publishLockName(idx int) string {
-	if idx == 0 {
-		return ".rslint-suppressions-publish.lock"
+func publishLockPath(path string) string {
+	dir, base := filepath.Dir(path), filepath.Base(path)
+	name := ".rslint-suppressions-publish.lock"
+	if strings.EqualFold(base, name) {
+		name = ".rslint-suppressions-publish-alt.lock"
 	}
-	return fmt.Sprintf(".rslint-suppressions-publish-%d.lock", idx)
+	return filepath.Join(dir, name)
+}
+
+func isOwnedPublishLockBytes(b []byte) bool {
+	if len(b) != publishLockSize {
+		return false
+	}
+	if string(b[:len(publishLockMagic)]) != publishLockMagic {
+		return false
+	}
+	if b[publishLockSize-1] != '\n' {
+		return false
+	}
+	for _, ch := range b[len(publishLockMagic) : publishLockSize-1] {
+		if (ch < 'A' || ch > 'Z') && (ch < '2' || ch > '7') {
+			return false
+		}
+	}
+	return true
 }
 
 func publishWithHardLink(tempName, path string) (bool, error) {
@@ -119,14 +143,40 @@ func publishWithHardLink(tempName, path string) (bool, error) {
 	return true, err
 }
 
+func openOrCreatePublishLock(lockPath string) (f *os.File, createdByUs bool, alreadyLocked bool, err error) {
+	// Use mode 0o666 (umask-adjusted, matching the staged baseline file) so
+	// collaborating accounts with shared write access contend on the same lock.
+	createFlags := os.O_CREATE | os.O_EXCL | os.O_RDWR | publishCreateExtraFlags
+	f, err = os.OpenFile(lockPath, createFlags, 0o666)
+	if err == nil {
+		return f, true, publishCreateExtraFlags != 0, nil
+	}
+	if publishCreateExtraFlags != 0 &&
+		(errors.Is(err, unix.ENOTSUP) || errors.Is(err, unix.EOPNOTSUPP) || errors.Is(err, unix.EINVAL)) {
+		f, err = os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o666)
+		if err == nil {
+			return f, true, false, nil
+		}
+	}
+	if !errors.Is(err, fs.ErrExist) {
+		return nil, false, false, err
+	}
+	f, err = os.OpenFile(lockPath, os.O_RDWR|unix.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, false, false, err
+	}
+	return f, false, false, nil
+}
+
 // publishWithLockFile serializes first-time publication on filesystems that
 // support neither exclusive rename nor hard links (such as macOS exFAT).
-// It keeps path strictly absent until os.Rename publishes the complete JSON
-// temp file, so concurrent readers or an interrupted first save never leave an
-// empty file at path.
+// All writers targeting path coordinate on one deterministic lock path so
+// concurrent accounts either contend on the same inode or fail before renaming.
+// Pre-existing files without an rslint ownership signature are never modified
+// or removed, and path stays strictly absent until os.Rename publishes the
+// complete JSON temp file.
 func publishWithLockFile(ctx context.Context, tempName, path string) error {
-	dir, base := filepath.Dir(path), filepath.Base(path)
-	candidateIdx := 0
+	lockPath := publishLockPath(path)
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -137,38 +187,26 @@ func publishWithLockFile(ctx context.Context, tempName, path string) error {
 			return err
 		}
 
-		var lockPath string
-		for {
-			if candidateIdx >= publishLockMaxCandidates {
-				return fmt.Errorf("cannot allocate suppressions publish lock in %q", dir)
-			}
-			name := publishLockName(candidateIdx)
-			if !strings.EqualFold(base, name) {
-				lockPath = filepath.Join(dir, name)
-				break
-			}
-			candidateIdx++
-		}
-
-		f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR|unix.O_NOFOLLOW, 0o600)
+		f, createdByUs, alreadyLocked, err := openOrCreatePublishLock(lockPath)
 		if err != nil {
-			if errors.Is(err, syscall.EISDIR) || errors.Is(err, syscall.ELOOP) || errors.Is(err, syscall.EMLINK) {
-				candidateIdx++
+			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			if errors.Is(err, os.ErrPermission) {
-				if _, statErr := os.Lstat(lockPath); statErr == nil {
-					candidateIdx++
-					continue
-				}
+			// If another writer already finished publishing path while we failed
+			// to open the transient lock file, let the caller merge into path.
+			if _, statErr := os.Lstat(path); statErr == nil {
+				return fs.ErrExist
 			}
-			return err
+			return fmt.Errorf("cannot open suppressions publish lock %q: %w", lockPath, err)
 		}
 
-		ofd, err := lockUnixFile(f)
-		if err != nil {
-			_ = f.Close()
-			return err
+		var ofd bool
+		if !alreadyLocked {
+			ofd, err = lockUnixFile(f)
+			if err != nil {
+				_ = f.Close()
+				return err
+			}
 		}
 
 		fdInfo, fdErr := f.Stat()
@@ -180,40 +218,35 @@ func publishWithLockFile(ctx context.Context, tempName, path string) error {
 		if !fdInfo.Mode().IsRegular() {
 			unlockUnixFile(f, ofd)
 			_ = f.Close()
-			candidateIdx++
-			continue
+			return fmt.Errorf("suppressions publish lock %q must be a regular file", lockPath)
 		}
 
-		// Never modify or remove an unrelated non-empty user file at lockPath.
-		var header [len(publishLockPrefix)]byte
-		n, readErr := f.ReadAt(header[:], 0)
-		if readErr != nil && !errors.Is(readErr, io.EOF) {
-			unlockUnixFile(f, ofd)
-			_ = f.Close()
-			return readErr
-		}
-		if fdInfo.Size() > 0 && (n < len(publishLockPrefix) || string(header[:n]) != publishLockPrefix) {
-			unlockUnixFile(f, ofd)
-			_ = f.Close()
-			candidateIdx++
-			continue
+		owned := createdByUs
+		if !owned && fdInfo.Size() == int64(publishLockSize) {
+			var existing [publishLockSize + 1]byte
+			n, readErr := f.ReadAt(existing[:], 0)
+			if readErr != nil && !errors.Is(readErr, io.EOF) {
+				unlockUnixFile(f, ofd)
+				_ = f.Close()
+				return readErr
+			}
+			owned = isOwnedPublishLockBytes(existing[:n])
 		}
 
-		// Write a unique per-acquisition token and read it back by path so
-		// verification remains exact even on filesystems (like exFAT) that may
-		// reuse inode numbers after an unlink.
-		token := publishLockPrefix + rand.Text()
-		if fdInfo.Size() != 0 && fdInfo.Size() != int64(len(token)) {
-			if err := f.Truncate(0); err != nil {
+		var token string
+		if owned {
+			// Write a unique per-acquisition token so verification remains exact
+			// even on filesystems (like exFAT) that may reuse inode numbers
+			// after an unlink.
+			token = publishLockMagic + rand.Text() + "\n"
+			if _, err := f.WriteAt([]byte(token), 0); err != nil {
+				if createdByUs {
+					_ = os.Remove(lockPath)
+				}
 				unlockUnixFile(f, ofd)
 				_ = f.Close()
 				return err
 			}
-		}
-		if _, err := f.WriteAt([]byte(token), 0); err != nil {
-			unlockUnixFile(f, ofd)
-			_ = f.Close()
-			return err
 		}
 
 		verifyFile, verifyErr := os.OpenFile(lockPath, os.O_RDONLY|unix.O_NOFOLLOW, 0)
@@ -227,21 +260,25 @@ func publishWithLockFile(ctx context.Context, tempName, path string) error {
 			return verifyErr
 		}
 		verifyInfo, verifyStatErr := verifyFile.Stat()
-		var verifyBuf [len(publishLockPrefix) + 64]byte
-		verifyN, verifyReadErr := io.ReadFull(verifyFile, verifyBuf[:len(token)+1])
+		var verifyBuf [publishLockSize + 1]byte
+		var verifyN int
+		var verifyReadErr error
+		if owned {
+			verifyN, verifyReadErr = io.ReadFull(verifyFile, verifyBuf[:])
+		}
 		_ = verifyFile.Close()
 		if verifyStatErr != nil {
 			unlockUnixFile(f, ofd)
 			_ = f.Close()
 			return verifyStatErr
 		}
-		if verifyReadErr != nil && !errors.Is(verifyReadErr, io.EOF) && !errors.Is(verifyReadErr, io.ErrUnexpectedEOF) {
+		if owned && verifyReadErr != nil && !errors.Is(verifyReadErr, io.EOF) && !errors.Is(verifyReadErr, io.ErrUnexpectedEOF) {
 			unlockUnixFile(f, ofd)
 			_ = f.Close()
 			return verifyReadErr
 		}
 		if !verifyInfo.Mode().IsRegular() || !os.SameFile(fdInfo, verifyInfo) ||
-			verifyN != len(token) || string(verifyBuf[:verifyN]) != token {
+			(owned && (verifyN != len(token) || string(verifyBuf[:verifyN]) != token)) {
 			unlockUnixFile(f, ofd)
 			_ = f.Close()
 			continue
@@ -256,7 +293,9 @@ func publishWithLockFile(ctx context.Context, tempName, path string) error {
 			publishErr = os.Rename(tempName, path)
 		}
 
-		_ = os.Remove(lockPath)
+		if owned {
+			_ = os.Remove(lockPath)
+		}
 		unlockUnixFile(f, ofd)
 		_ = f.Close()
 		return publishErr
