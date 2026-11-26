@@ -1031,7 +1031,10 @@ define.test({
       ],
       exclude: ['./tests/eslint-plugin/pool-isolation/harness.test.ts'],
       setupFiles: ['./tests/eslint-plugin/setup-worker-entry.ts'],
-      globalSetup: ['./tests/languages/js/setup-projector.ts'],
+      globalSetup: [
+        './tests/languages/js/setup-projector.ts',
+        './tests/eslint-plugin/type-services/setup-server.ts',
+      ],
     },
   ],
 });

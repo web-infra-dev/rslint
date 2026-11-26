@@ -277,33 +277,87 @@ export class TypePacketReader {
     });
   }
 
-  private diagnostics(at: number, depth = 0): readonly DiagnosticFact[] {
-    if (!at) return [];
-    if (depth > 64) return invalid();
+  private diagnostics(rootAt: number): readonly DiagnosticFact[] {
+    if (!rootAt) return [];
     const bytes = this.buf();
-    const count = this.word(at);
-    if (at + 4 + count * 44 > bytes.length) return invalid();
-    return Array.from({ length: count }, (_, i) => {
-      const pos = at + 4 + i * 44;
-      const file = this.word(pos);
-      const source = this.word(pos + 24);
-      const flags = this.word(pos + 28);
-      const filePath = this.word(pos + 40);
-      return {
-        fileName: file ? this.text(file) : undefined,
-        filePath: filePath ? this.text(filePath) : undefined,
-        start: this.word(pos + 4),
-        length: this.word(pos + 8),
-        category: this.word(pos + 12),
-        code: this.word(pos + 16),
-        text: this.text(this.word(pos + 20)),
-        source: source ? this.text(source) : undefined,
-        reportsDeprecated: flags & 1 ? true : undefined,
-        reportsUnnecessary: flags & 2 ? true : undefined,
-        chain: this.diagnostics(this.word(pos + 32), depth + 1),
-        related: this.diagnostics(this.word(pos + 36), depth + 1),
-      };
-    });
+    const seen = new Set<number>();
+    type MutableDiagnosticFact = {
+      -readonly [K in keyof DiagnosticFact]: DiagnosticFact[K];
+    };
+    interface PendingList {
+      readonly fact: MutableDiagnosticFact;
+      readonly field: 'chain' | 'related';
+      readonly at: number;
+      readonly minOffset: number;
+    }
+    const readList = (
+      at: number,
+      minOffset: number,
+    ): {
+      readonly facts: MutableDiagnosticFact[];
+      readonly listEnd: number;
+      readonly pending: readonly PendingList[];
+    } => {
+      if (at < minOffset || seen.has(at)) return invalid();
+      seen.add(at);
+      const count = this.word(at);
+      const listEnd = at + 4 + count * 44;
+      if (listEnd > bytes.length) return invalid();
+      const facts: MutableDiagnosticFact[] = [];
+      const pending: PendingList[] = [];
+      for (let i = 0; i < count; i++) {
+        const pos = at + 4 + i * 44;
+        const file = this.word(pos);
+        const source = this.word(pos + 24);
+        const flags = this.word(pos + 28);
+        const chainAt = this.word(pos + 32);
+        const relatedAt = this.word(pos + 36);
+        const filePath = this.word(pos + 40);
+        const fact: MutableDiagnosticFact = {
+          fileName: file ? this.text(file) : undefined,
+          filePath: filePath ? this.text(filePath) : undefined,
+          start: this.word(pos + 4),
+          length: this.word(pos + 8),
+          category: this.word(pos + 12),
+          code: this.word(pos + 16),
+          text: this.text(this.word(pos + 20)),
+          source: source ? this.text(source) : undefined,
+          reportsDeprecated: flags & 1 ? true : undefined,
+          reportsUnnecessary: flags & 2 ? true : undefined,
+          chain: [],
+          related: [],
+        };
+        facts.push(fact);
+        if (relatedAt) {
+          pending.push({
+            fact,
+            field: 'related',
+            at: relatedAt,
+            minOffset: listEnd,
+          });
+        }
+        if (chainAt) {
+          pending.push({
+            fact,
+            field: 'chain',
+            at: chainAt,
+            minOffset: listEnd,
+          });
+        }
+      }
+      return { facts, listEnd, pending };
+    };
+
+    const root = readList(rootAt, 12);
+    const stack: PendingList[] = [...root.pending];
+    while (stack.length > 0) {
+      const next = stack.pop();
+      if (!next) continue;
+      const child = readList(next.at, next.minOffset);
+      next.fact[next.field] = child.facts;
+      for (const item of child.pending) stack.push(item);
+    }
+    return root.facts;
   }
 
   scalar<K extends ScalarOperation>(operation: K): QueryResults[K] {

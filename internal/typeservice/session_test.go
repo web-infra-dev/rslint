@@ -6,9 +6,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -18,6 +18,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
@@ -500,34 +501,223 @@ func TestInvalidHandlesAndNodeKindsReturnErrorsWithoutPoisoningSession(t *testin
 	}
 }
 
+type hookContext struct {
+	context.Context
+	calls atomic.Int32
+	onErr func(call int32) error
+}
+
+func (c *hookContext) Err() error {
+	if c.onErr != nil {
+		if err := c.onErr(c.calls.Add(1)); err != nil {
+			return err
+		}
+	}
+	return c.Context.Err()
+}
+
+type gateRequest struct {
+	op   Operation
+	onOp func()
+}
+
+func (r *gateRequest) operation() Operation {
+	if r.onOp != nil {
+		r.onOp()
+	}
+	return r.op
+}
+
+func TestSessionConcurrentBatchRejectedAfterPoison(t *testing.T) {
+	t.Run("paused mixed batch", func(t *testing.T) {
+		p, _, _ := buildTestProgram(t, map[string]string{
+			"input.ts": "export const value = 1;",
+		}, []string{"input.ts"})
+		session, err := New(t.Context(), p, p.SourceFiles())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer session.Close()
+		desc, err := session.Descriptor()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		paused := make(chan struct{})
+		resume := make(chan struct{})
+		var gateOnce sync.Once
+		batchDone := make(chan error, 1)
+		go func() {
+			_, err := session.QueryBatch(t.Context(), []Query{
+				{Scope: Scope{Generation: desc.Generation}, Request: &ProgramRequest{Op: "rootFileNames"}},
+				{Scope: Scope{Generation: desc.Generation}, Request: &CheckerRequest{Op: "stringType"}},
+				{Scope: Scope{Generation: desc.Generation}, Request: &gateRequest{
+					op: "nodeRecord",
+					onOp: func() {
+						gateOnce.Do(func() {
+							close(paused)
+							<-resume
+						})
+					},
+				}},
+			})
+			batchDone <- err
+		}()
+
+		<-paused
+
+		// Trigger a controlled panic inside checkBatch while the mixed batch is
+		// already past QueryBatch's initial poison check.
+		panicCtx := &hookContext{
+			Context: t.Context(),
+			onErr: func(call int32) error {
+				if call == 2 {
+					panic("controlled internal failure")
+				}
+				return nil
+			},
+		}
+		if _, err := session.Query(panicCtx, Query{
+			Scope:   Scope{Generation: desc.Generation},
+			Request: &CheckerRequest{Op: "stringType"},
+		}); err == nil || !strings.Contains(err.Error(), "controlled internal failure") {
+			t.Fatalf("expected recovered internal failure, got %v", err)
+		}
+		if _, err := session.Query(t.Context(), Query{
+			Scope:   Scope{Generation: desc.Generation},
+			Request: &CheckerRequest{Op: "stringType"},
+		}); !errors.Is(err, ErrPoisoned) {
+			t.Fatalf("expected ErrPoisoned on fresh query, got %v", err)
+		}
+
+		close(resume)
+		if err := <-batchDone; !errors.Is(err, ErrPoisoned) {
+			t.Fatalf("expected paused mixed batch to return ErrPoisoned, got %v", err)
+		}
+	})
+
+	t.Run("waiter queued on checkMu", func(t *testing.T) {
+		p, _, _ := buildTestProgram(t, map[string]string{
+			"input.ts": "export const value = 1;",
+		}, []string{"input.ts"})
+		session, err := New(t.Context(), p, p.SourceFiles())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer session.Close()
+		desc, err := session.Descriptor()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		holdingCheckMu := make(chan struct{})
+		triggerPanic := make(chan struct{})
+		panicDone := make(chan error, 1)
+		panicCtx := &hookContext{
+			Context: t.Context(),
+			onErr: func(call int32) error {
+				if call == 2 {
+					close(holdingCheckMu)
+					<-triggerPanic
+					panic("controlled checkMu panic")
+				}
+				return nil
+			},
+		}
+		go func() {
+			_, err := session.Query(panicCtx, Query{
+				Scope:   Scope{Generation: desc.Generation},
+				Request: &CheckerRequest{Op: "stringType"},
+			})
+			panicDone <- err
+		}()
+
+		<-holdingCheckMu
+
+		waiterEntered := make(chan struct{})
+		waiterDone := make(chan error, 1)
+		waiterCtx := &hookContext{
+			Context: t.Context(),
+			onErr: func(call int32) error {
+				if call == 1 {
+					close(waiterEntered)
+				}
+				return nil
+			},
+		}
+		go func() {
+			_, err := session.Query(waiterCtx, Query{
+				Scope:   Scope{Generation: desc.Generation},
+				Request: &CheckerRequest{Op: "stringType"},
+			})
+			waiterDone <- err
+		}()
+
+		<-waiterEntered
+		time.Sleep(10 * time.Millisecond)
+		close(triggerPanic)
+
+		if err := <-panicDone; err == nil || !strings.Contains(err.Error(), "controlled checkMu panic") {
+			t.Fatalf("expected recovered checkMu panic, got %v", err)
+		}
+		if err := <-waiterDone; !errors.Is(err, ErrPoisoned) {
+			t.Fatalf("expected waiter on checkMu to observe ErrPoisoned, got %v", err)
+		}
+	})
+}
+
 func TestProtocolOperationsMatchTypeScriptTables(t *testing.T) {
 	protocolPath := filepath.Join("..", "..", "packages", "rslint", "src", "languages", "js", "type-service-protocol.ts")
 	raw, err := os.ReadFile(protocolPath)
 	if err != nil {
 		t.Fatalf("read TS protocol file: %v", err)
 	}
-	src := string(raw)
+	const virtualPath = "/type-service-protocol.ts"
+	sf := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: virtualPath,
+		Path:     tspath.Path(virtualPath),
+	}, string(raw), core.ScriptKindTS)
 
-	// Extract SCALAR_KINDS keys (+ the 4 record ops) and verify every TS op
-	// decodes in Go Query.UnmarshalJSON.
-	scalarStart := strings.Index(src, "export const SCALAR_KINDS")
-	if scalarStart < 0 {
-		t.Fatal("SCALAR_KINDS not found")
+	var scalarInit, directInit *ast.Node
+	var findDecls ast.Visitor
+	findDecls = func(node *ast.Node) bool {
+		if node.Kind == ast.KindVariableDeclaration {
+			vd := node.AsVariableDeclaration()
+			if vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier && vd.Initializer != nil {
+				switch vd.Name().Text() {
+				case "SCALAR_KINDS":
+					scalarInit = ast.SkipOuterExpressions(vd.Initializer, ast.OEKAll)
+				case "DIRECT_RECORD_OPS":
+					directInit = ast.SkipOuterExpressions(vd.Initializer, ast.OEKAll)
+				}
+			}
+		}
+		node.ForEachChild(findDecls)
+		return false
 	}
-	scalarEnd := strings.Index(src[scalarStart:], "};")
-	if scalarEnd < 0 {
-		t.Fatal("SCALAR_KINDS closing brace not found")
+	sf.ForEachChild(findDecls)
+
+	if scalarInit == nil || scalarInit.Kind != ast.KindObjectLiteralExpression {
+		t.Fatal("SCALAR_KINDS object literal not found in TS AST")
 	}
-	scalarBlock := src[scalarStart : scalarStart+scalarEnd]
-	keyRe := regexp.MustCompile(`(?m)^\s+([a-zA-Z0-9_]+):\s+\d+,`)
 	tsOps := map[Operation]bool{
 		"typeRecord":      true,
 		"symbolRecord":    true,
 		"signatureRecord": true,
 		"nodeRecord":      true,
 	}
-	for _, m := range keyRe.FindAllStringSubmatch(scalarBlock, -1) {
-		tsOps[Operation(m[1])] = true
+	for _, prop := range scalarInit.AsObjectLiteralExpression().Properties.Nodes {
+		if prop.Kind != ast.KindPropertyAssignment {
+			continue
+		}
+		name := prop.AsPropertyAssignment().Name()
+		if name == nil {
+			continue
+		}
+		switch name.Kind {
+		case ast.KindIdentifier, ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+			tsOps[Operation(name.Text())] = true
+		}
 	}
 	if len(tsOps) < 50 {
 		t.Fatalf("unexpectedly few TS operations parsed: %d", len(tsOps))
@@ -547,20 +737,22 @@ func TestProtocolOperationsMatchTypeScriptTables(t *testing.T) {
 		}
 	}
 
-	// Extract DIRECT_RECORD_OPS from TS and assert exact 1:1 match with Go directRecordKind.
-	directStart := strings.Index(src, "export const DIRECT_RECORD_OPS")
-	if directStart < 0 {
-		t.Fatal("DIRECT_RECORD_OPS not found")
+	if directInit == nil || directInit.Kind != ast.KindNewExpression {
+		t.Fatal("DIRECT_RECORD_OPS new Set(...) expression not found in TS AST")
 	}
-	directEnd := strings.Index(src[directStart:], "]);")
-	if directEnd < 0 {
-		t.Fatal("DIRECT_RECORD_OPS closing bracket not found")
+	directArgs := directInit.AsNewExpression().Arguments
+	if directArgs == nil || len(directArgs.Nodes) == 0 {
+		t.Fatal("DIRECT_RECORD_OPS Set argument missing")
 	}
-	directBlock := src[directStart : directStart+directEnd]
-	strRe := regexp.MustCompile(`'([a-zA-Z0-9_]+)'`)
+	directArray := ast.SkipOuterExpressions(directArgs.Nodes[0], ast.OEKAll)
+	if directArray == nil || directArray.Kind != ast.KindArrayLiteralExpression {
+		t.Fatal("DIRECT_RECORD_OPS array literal argument not found in TS AST")
+	}
 	tsDirect := make(map[Operation]bool)
-	for _, m := range strRe.FindAllStringSubmatch(directBlock, -1) {
-		tsDirect[Operation(m[1])] = true
+	for _, elem := range directArray.AsArrayLiteralExpression().Elements.Nodes {
+		if elem.Kind == ast.KindStringLiteral || elem.Kind == ast.KindNoSubstitutionTemplateLiteral {
+			tsDirect[Operation(elem.Text())] = true
+		}
 	}
 	for op := range tsOps {
 		inGo := directRecordKind(op) != ""

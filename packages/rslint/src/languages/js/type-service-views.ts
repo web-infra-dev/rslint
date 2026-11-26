@@ -942,20 +942,46 @@ export function createIndexInfoView(
   });
 }
 
-function diagnosticMessage(fact: DiagnosticFact): ts.DiagnosticMessageChain {
-  return {
-    code: fact.code,
-    category: fact.category,
-    messageText: fact.text,
-    next: fact.chain.length ? fact.chain.map(diagnosticMessage) : undefined,
+function diagnosticMessage(root: DiagnosticFact): ts.DiagnosticMessageChain {
+  const rootNode: ts.DiagnosticMessageChain = {
+    code: root.code,
+    category: root.category,
+    messageText: root.text,
+    next: undefined,
   };
+  const stack: {
+    readonly fact: DiagnosticFact;
+    readonly node: ts.DiagnosticMessageChain;
+  }[] = [{ fact: root, node: rootNode }];
+  while (stack.length > 0) {
+    const entry = stack.pop();
+    if (!entry || entry.fact.chain.length === 0) continue;
+    const next: ts.DiagnosticMessageChain[] = [];
+    for (const child of entry.fact.chain) {
+      const childNode: ts.DiagnosticMessageChain = {
+        code: child.code,
+        category: child.category,
+        messageText: child.text,
+        next: undefined,
+      };
+      next.push(childNode);
+      if (child.chain.length > 0) {
+        stack.push({ fact: child, node: childNode });
+      }
+    }
+    entry.node.next = next;
+  }
+  return rootNode;
 }
 
 export function createDiagnosticView(
   host: Readonly<ViewHost>,
-  d: DiagnosticFact,
+  root: DiagnosticFact,
 ): DiagnosticView {
-  return {
+  type MutableDiagnosticView = {
+    -readonly [K in keyof DiagnosticView]: DiagnosticView[K];
+  };
+  const makeView = (d: DiagnosticFact): MutableDiagnosticView => ({
     file: d.fileName
       ? host.diagnosticSourceView(d.fileName, d.filePath)
       : undefined,
@@ -967,8 +993,25 @@ export function createDiagnosticView(
     messageText: d.chain.length ? diagnosticMessage(d) : d.text,
     reportsDeprecated: d.reportsDeprecated,
     reportsUnnecessary: d.reportsUnnecessary,
-    relatedInformation: d.related.length
-      ? d.related.map((item) => createDiagnosticView(host, item))
-      : undefined,
-  };
+    relatedInformation: undefined,
+  });
+  const rootView = makeView(root);
+  const stack: {
+    readonly fact: DiagnosticFact;
+    readonly view: MutableDiagnosticView;
+  }[] = [{ fact: root, view: rootView }];
+  while (stack.length > 0) {
+    const entry = stack.pop();
+    if (!entry || entry.fact.related.length === 0) continue;
+    const related: MutableDiagnosticView[] = [];
+    for (const item of entry.fact.related) {
+      const itemView = makeView(item);
+      related.push(itemView);
+      if (item.related.length > 0) {
+        stack.push({ fact: item, view: itemView });
+      }
+    }
+    entry.view.relatedInformation = related;
+  }
+  return rootView;
 }

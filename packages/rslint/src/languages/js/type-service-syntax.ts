@@ -1593,12 +1593,12 @@ export class FileSyntaxViews {
   private nodes: DecodedFrame['nodes'] | undefined;
   private lineStarts: number[] = [];
   private readonly sequenceMembers = new Map<number, readonly ESTreeNode[]>();
-  private attached = false;
 
   constructor(
     private readonly registry: GenerationSyntaxViews,
     private readonly binding: FileBinding,
     private readonly ensureGeneration: () => void,
+    private readonly state: { attached: boolean } = { attached: false },
   ) {}
 
   private ensure(): void {
@@ -1607,14 +1607,17 @@ export class FileSyntaxViews {
   }
 
   close(): void {
+    if (this.closed) return;
     this.closed = true;
     this.forward = new WeakMap();
     this.reverse = undefined;
     this.aliases.clear();
     this.materializedAliases.clear();
     this.sequenceMembers.clear();
-    if (this.attached) this.registry.releaseFile(this.binding.sourceFileName);
-    this.attached = false;
+    if (this.state.attached) {
+      this.state.attached = false;
+      this.registry.releaseFile(this.binding.sourceFileName);
+    }
     this.nodes = undefined;
     this.lineStarts = [];
   }
@@ -1625,7 +1628,8 @@ export class FileSyntaxViews {
     sourceFileName: string,
   ): void {
     this.ensure();
-    if (this.attached) throw new Error('file type services already attached');
+    if (this.state.attached)
+      throw new Error('file type services already attached');
     if (
       projection.binding.generation !== this.binding.generation ||
       projection.origins.length !== frame.nodes.length
@@ -1645,7 +1649,7 @@ export class FileSyntaxViews {
       file: this.binding.sourceFileName,
       text: frame.text,
     });
-    this.attached = true;
+    this.state.attached = true;
     this.nodes = frame.nodes;
     this.lineStarts = frame.lineStarts;
     for (let id = 1; id < frame.nodes.length; id++) {

@@ -1,6 +1,8 @@
 import { expect, test } from 'rstack/test';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import v8 from 'node:v8';
+import vm from 'node:vm';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
 import typedPlugin from '@typescript-eslint/eslint-plugin';
@@ -10,6 +12,7 @@ import {
   typeQueryKey,
   type TypeServiceDescriptor,
 } from '../../../../rslint/src/languages/js/type-service.js';
+import { TypePacketReader } from '../../../../rslint/src/languages/js/type-service-codec.js';
 import { TARGET_DEFAULT_LIB } from '../../../../rslint/src/languages/js/scope-factory.js';
 import { lintFile } from '../../../../rslint/src/eslint-plugin/linter/ecma-language-plugin.js';
 import { decodeFrame } from '../../../../rslint/src/languages/js/frame.js';
@@ -1173,12 +1176,23 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
   }
 });
 
-test('TARGET_DEFAULT_LIB aligns with TypeScript ScriptTarget and withFile closes handles cleanly', async () => {
+test('TARGET_DEFAULT_LIB aligns with TypeScript ScriptTarget', () => {
   expect(TARGET_DEFAULT_LIB[ts.ScriptTarget.ES2015]).toBe('es6');
   expect(TARGET_DEFAULT_LIB[ts.ScriptTarget.ES2016]).toBe('es2016.full');
   expect(TARGET_DEFAULT_LIB[ts.ScriptTarget.ES2022]).toBe('es2022.full');
   expect(TARGET_DEFAULT_LIB[ts.ScriptTarget.ES2025]).toBe('es2025.full');
   expect(TARGET_DEFAULT_LIB[ts.ScriptTarget.ESNext]).toBe('esnext.full');
+});
+
+test('withFile supports sync/async callbacks and GC preserves live node maps', async () => {
+  v8.setFlagsFromString('--expose_gc');
+  const runGC = vm.runInNewContext('gc') as () => void;
+  const forceGC = async () => {
+    for (let i = 0; i < 4; i++) {
+      runGC();
+      await new Promise((done) => setTimeout(done, 10));
+    }
+  };
 
   const dir = mkdtempSync(resolve(harness.temp, 'file-lifecycle-'));
   const file = resolve(dir, 'input.ts');
@@ -1197,6 +1211,265 @@ test('TARGET_DEFAULT_LIB aligns with TypeScript ScriptTarget and withFile closes
     }),
   );
   const host = harness.createHost();
+  const syntaxHost = harness.createHost();
+  const typedDescriptor = host.request({
+    method: 'init',
+    config,
+  }) as TypeServiceDescriptor;
+  const syntaxDescriptor = syntaxHost.request({
+    method: 'init',
+    config,
+    syntaxOnly: true,
+  }) as TypeServiceDescriptor;
+  const client = new TypeServiceClient(
+    enums,
+    typedDescriptor,
+    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
+    host.source,
+    { maxFactsBytes: 1 << 20 },
+  );
+  const syntaxClient = new TypeServiceClient(
+    enums,
+    syntaxDescriptor,
+    (query) =>
+      Buffer.from(syntaxHost.request({ method: 'query', query }), 'base64'),
+    syntaxHost.source,
+    { maxFactsBytes: 1 << 20 },
+  );
+  try {
+    const encoded = host.request({
+      method: 'project',
+      file,
+    });
+    const projection = {
+      ...encoded,
+      tree: Buffer.from(encoded.tree, 'base64'),
+    };
+    const decoded = decodeFrame(Buffer.from(encoded.frame, 'base64'));
+    const stmt = (decoded.ast.body as readonly any[])[0];
+
+    const syntaxEncoded = syntaxHost.request({
+      method: 'project',
+      file,
+    });
+    const syntaxProjection = {
+      ...syntaxEncoded,
+      tree: Buffer.from(syntaxEncoded.tree, 'base64'),
+    };
+    const syntaxDecoded = decodeFrame(
+      Buffer.from(syntaxEncoded.frame, 'base64'),
+    );
+    const syntaxStmt = (syntaxDecoded.ast.body as readonly any[])[0];
+
+    // Sync withFile closes both the handle and its node maps upon return.
+    let syncHandle: ReturnType<TypeServiceClient['file']> | undefined;
+    let syncServices: ReturnType<TypeServiceClient['file']> extends {
+      parserServices: (...args: any[]) => infer R;
+    }
+      ? R
+      : never;
+    const syncKind = client.withFile(projection.binding, (handle) => {
+      syncHandle = handle;
+      syncServices = handle.parserServices(decoded, projection);
+      return (syncServices.esTreeNodeToTSNodeMap.get(stmt) as any)?.kind;
+    });
+    expect(syncKind).toBe(ts.SyntaxKind.VariableStatement);
+    expect(() => syncHandle!.parserServices(decoded, projection)).toThrow(
+      'file type services are closed',
+    );
+    expect(() => syncServices!.esTreeNodeToTSNodeMap.get(stmt)).toThrow(
+      'file type services are closed',
+    );
+
+    // Async withFile keeps the handle open across awaits and closes on resolve.
+    let asyncServices: typeof syncServices | undefined;
+    const asyncKind = await client.withFile(
+      projection.binding,
+      async (handle) => {
+        asyncServices = handle.parserServices(decoded, projection);
+        await Promise.resolve();
+        return (asyncServices.esTreeNodeToTSNodeMap.get(stmt) as any)?.kind;
+      },
+    );
+    expect(asyncKind).toBe(ts.SyntaxKind.VariableStatement);
+    expect(() => asyncServices!.esTreeNodeToTSNodeMap.get(stmt)).toThrow(
+      'file type services are closed',
+    );
+
+    // Async withFile also closes when the returned promise rejects.
+    let rejectedServices: typeof syncServices | undefined;
+    await expect(
+      client.withFile(projection.binding, async (handle) => {
+        rejectedServices = handle.parserServices(decoded, projection);
+        await Promise.resolve();
+        expect(
+          (rejectedServices.esTreeNodeToTSNodeMap.get(stmt) as any)?.kind,
+        ).toBe(ts.SyntaxKind.VariableStatement);
+        throw new Error('async failure');
+      }),
+    ).rejects.toThrow('async failure');
+    expect(() => rejectedServices!.esTreeNodeToTSNodeMap.get(stmt)).toThrow(
+      'file type services are closed',
+    );
+
+    // Explicit Symbol.dispose closes handles and maps immediately.
+    const disposed = client.file(projection.binding);
+    const disposedServices = disposed.parserServices(decoded, projection);
+    expect(
+      (disposedServices.esTreeNodeToTSNodeMap.get(stmt) as any)?.kind,
+    ).toBe(ts.SyntaxKind.VariableStatement);
+    disposed[Symbol.dispose]();
+    expect(() => disposed.parserServices(decoded, projection)).toThrow(
+      'file type services are closed',
+    );
+    expect(() => disposedServices.esTreeNodeToTSNodeMap.get(stmt)).toThrow(
+      'file type services are closed',
+    );
+
+    // Collecting an unreferenced TypeServiceFile handle must NOT close live
+    // syntax-only parserServices or detached node maps that callers still hold.
+    const detachedSyntaxServices = (() => {
+      const handle = syntaxClient.file(syntaxProjection.binding);
+      return {
+        weakHandle: new WeakRef(handle),
+        services: handle.parserServices(syntaxDecoded, syntaxProjection),
+      };
+    })();
+    const detachedSyntaxMap = (() => {
+      const handle = syntaxClient.file(syntaxProjection.binding);
+      return {
+        weakHandle: new WeakRef(handle),
+        map: handle.parserServices(syntaxDecoded, syntaxProjection)
+          .esTreeNodeToTSNodeMap,
+      };
+    })();
+    const detachedTypedMap = (() => {
+      const handle = client.file(projection.binding);
+      return {
+        weakHandle: new WeakRef(handle),
+        map: handle.parserServices(decoded, projection).esTreeNodeToTSNodeMap,
+      };
+    })();
+
+    expect(
+      (
+        detachedSyntaxServices.services.esTreeNodeToTSNodeMap.get(
+          syntaxStmt,
+        ) as any
+      )?.kind,
+    ).toBe(ts.SyntaxKind.VariableStatement);
+    expect((detachedSyntaxMap.map.get(syntaxStmt) as any)?.kind).toBe(
+      ts.SyntaxKind.VariableStatement,
+    );
+    expect((detachedTypedMap.map.get(stmt) as any)?.kind).toBe(
+      ts.SyntaxKind.VariableStatement,
+    );
+
+    await forceGC();
+
+    expect(detachedSyntaxServices.weakHandle.deref()).toBeUndefined();
+    expect(detachedSyntaxMap.weakHandle.deref()).toBeUndefined();
+    expect(detachedTypedMap.weakHandle.deref()).toBeUndefined();
+
+    expect(
+      (
+        detachedSyntaxServices.services.esTreeNodeToTSNodeMap.get(
+          syntaxStmt,
+        ) as any
+      )?.kind,
+    ).toBe(ts.SyntaxKind.VariableStatement);
+    expect((detachedSyntaxMap.map.get(syntaxStmt) as any)?.kind).toBe(
+      ts.SyntaxKind.VariableStatement,
+    );
+    expect((detachedTypedMap.map.get(stmt) as any)?.kind).toBe(
+      ts.SyntaxKind.VariableStatement,
+    );
+
+    // Closing the owning client still invalidates all live detached maps.
+    client[Symbol.dispose]();
+    syntaxClient[Symbol.dispose]();
+    expect(() => detachedTypedMap.map.get(stmt)).toThrow(
+      'type service client is closed',
+    );
+    expect(() => detachedSyntaxMap.map.get(syntaxStmt)).toThrow(
+      'type service client is closed',
+    );
+  } finally {
+    client[Symbol.dispose]();
+    syntaxClient[Symbol.dispose]();
+    await host.close();
+    await syntaxHost.close();
+  }
+});
+
+test('decodes deep diagnostic message chains above 64 levels and rejects cyclic diagnostic packets', async () => {
+  const depth = 70;
+  let targetType = 'number';
+  let sourceType = 'string';
+  for (let i = 0; i < depth; i++) {
+    targetType = `() => ${targetType}`;
+    sourceType = `() => ${sourceType}`;
+  }
+  const sourceText = [
+    `declare const deepSource: ${sourceType};`,
+    `export const deepTarget: ${targetType} = deepSource;`,
+    `export const shallowTarget: number = 'oops';`,
+  ].join('\n');
+
+  const dir = mkdtempSync(resolve(harness.temp, 'deep-diagnostics-'));
+  const file = resolve(dir, 'deep.ts');
+  const config = resolve(dir, 'tsconfig.json');
+  writeFileSync(file, `${sourceText}\n`);
+  writeFileSync(
+    config,
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: 'ES2022',
+        module: 'ESNext',
+        skipLibCheck: true,
+      },
+      include: ['deep.ts'],
+    }),
+  );
+
+  const chainDepth = (message: string | ts.DiagnosticMessageChain): number => {
+    let level = 1;
+    let cur = typeof message === 'string' ? undefined : message;
+    while (cur?.next && cur.next.length > 0) {
+      level++;
+      cur = cur.next[0];
+    }
+    return level;
+  };
+
+  const parsedConfig = ts.parseJsonConfigFileContent(
+    JSON.parse(
+      JSON.stringify({
+        compilerOptions: {
+          strict: true,
+          target: 'ES2022',
+          module: 'ESNext',
+          skipLibCheck: true,
+        },
+        include: ['deep.ts'],
+      }),
+    ),
+    ts.sys,
+    dir,
+  );
+  const nativeProgram = ts.createProgram({
+    rootNames: parsedConfig.fileNames,
+    options: parsedConfig.options,
+  });
+  const nativeSf = nativeProgram.getSourceFile(file);
+  expect(nativeSf).toBeDefined();
+  const nativeDiags = nativeProgram.getSemanticDiagnostics(nativeSf);
+  expect(nativeDiags).toHaveLength(2);
+  expect(chainDepth(nativeDiags[0].messageText)).toBeGreaterThan(64);
+  expect(chainDepth(nativeDiags[1].messageText)).toBe(1);
+
+  const host = harness.createHost();
   const descriptor = host.request({
     method: 'init',
     config,
@@ -1209,28 +1482,66 @@ test('TARGET_DEFAULT_LIB aligns with TypeScript ScriptTarget and withFile closes
     { maxFactsBytes: 1 << 20 },
   );
   try {
-    const encoded = host.request({ method: 'project', file });
-    const projection = {
-      ...encoded,
-      tree: Buffer.from(encoded.tree, 'base64'),
-    };
-    const decoded = decodeFrame(Buffer.from(encoded.frame, 'base64'));
-    let captured: ReturnType<TypeServiceClient['file']> | undefined;
-    const services = client.withFile(projection.binding, (handle) => {
-      captured = handle;
-      return handle.parserServices(decoded, projection);
-    });
-    expect(services.program).toBe(client.program);
-    expect(() => captured!.parserServices(decoded, projection)).toThrow(
-      'file type services are closed',
+    const sf = client.program.getSourceFile(file);
+    expect(sf).toBeDefined();
+    const diags = client.program.getSemanticDiagnostics(sf);
+    expect(diags).toHaveLength(2);
+    expect(diags.map((d) => d.code)).toEqual(nativeDiags.map((d) => d.code));
+    expect(diags.map((d) => chainDepth(d.messageText))).toEqual(
+      nativeDiags.map((d) => chainDepth(d.messageText)),
     );
-    const disposed = client.file(projection.binding);
-    disposed[Symbol.dispose]();
-    expect(() => disposed.parserServices(decoded, projection)).toThrow(
-      'file type services are closed',
+    const leafMessage = (
+      message: string | ts.DiagnosticMessageChain,
+    ): string => {
+      if (typeof message === 'string') return message;
+      let cur = message;
+      while (cur.next && cur.next.length > 0) cur = cur.next[0];
+      return cur.messageText;
+    };
+    expect(leafMessage(diags[0].messageText)).toBe(
+      leafMessage(nativeDiags[0].messageText),
+    );
+    expect(ts.flattenDiagnosticMessageText(diags[1].messageText, '\n')).toBe(
+      ts.flattenDiagnosticMessageText(nativeDiags[1].messageText, '\n'),
     );
   } finally {
     client[Symbol.dispose]();
     await host.close();
   }
+
+  // Crafted cyclic diagnostic packet (chain pointing to its own list at offset 12)
+  // must still be rejected cleanly without overflowing the stack.
+  const cyclic = Buffer.alloc(12 + 4 + 44 + 4);
+  cyclic.writeUInt32LE(0x35535452, 0); // "RTS5"
+  cyclic.writeUInt32LE(15, 4); // packetDiagnostics
+  cyclic.writeUInt32LE(12, 8); // root list offset
+  cyclic.writeUInt32LE(1, 12); // count = 1
+  const emptyStrOffset = 12 + 4 + 44;
+  cyclic.writeUInt32LE(emptyStrOffset, 16 + 20); // message text offset
+  cyclic.writeUInt32LE(12, 16 + 32); // cyclic chain -> offset 12
+  const cyclicReader = new TypePacketReader(cyclic);
+  expect(() => cyclicReader.scalar('semanticDiagnostics')).toThrow(
+    'invalid type service packet',
+  );
+  cyclicReader.close();
+
+  // Crafted diamond-DAG diagnostic packet (chain and related sharing a child list)
+  // must also be rejected to prevent exponential blowup.
+  const childOffset = 12 + 4 + 44;
+  const strOffset = childOffset + 4 + 44;
+  const diamond = Buffer.alloc(strOffset + 4);
+  diamond.writeUInt32LE(0x35535452, 0);
+  diamond.writeUInt32LE(15, 4);
+  diamond.writeUInt32LE(12, 8);
+  diamond.writeUInt32LE(1, 12); // root count = 1
+  diamond.writeUInt32LE(strOffset, 16 + 20);
+  diamond.writeUInt32LE(childOffset, 16 + 32); // chain -> childOffset
+  diamond.writeUInt32LE(childOffset, 16 + 36); // related -> same childOffset
+  diamond.writeUInt32LE(1, childOffset); // child count = 1
+  diamond.writeUInt32LE(strOffset, childOffset + 4 + 20);
+  const diamondReader = new TypePacketReader(diamond);
+  expect(() => diamondReader.scalar('semanticDiagnostics')).toThrow(
+    'invalid type service packet',
+  );
+  diamondReader.close();
 });

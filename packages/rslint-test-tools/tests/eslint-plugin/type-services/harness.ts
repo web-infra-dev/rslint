@@ -70,6 +70,11 @@ export function useTypeServiceHarness() {
   let binary = '';
   beforeAll(() => {
     temp = mkdtempSync(resolve(tmpdir(), 'rslint-types-'));
+    const shared = process.env.RSLINT_TYPE_SERVICE_SERVER;
+    if (shared) {
+      binary = shared;
+      return;
+    }
     binary = resolve(
       temp,
       process.platform === 'win32' ? 'types.exe' : 'types',

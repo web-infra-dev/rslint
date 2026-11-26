@@ -130,17 +130,21 @@ export class TypeServiceClient {
   private readonly syntax: GenerationSyntaxViews;
   private readonly typeFactory: TypeFactory;
   private readonly viewHost: ViewHost;
-  private readonly files = new Set<WeakRef<TypeServiceFile>>();
+  private readonly files = new Set<WeakRef<FileSyntaxViews>>();
   private readonly fileRefs = new WeakMap<
-    TypeServiceFile,
-    WeakRef<TypeServiceFile>
+    FileSyntaxViews,
+    WeakRef<FileSyntaxViews>
   >();
   private readonly fileCleanup = new FinalizationRegistry<{
-    readonly ref: WeakRef<TypeServiceFile>;
-    readonly syntax: FileSyntaxViews;
+    readonly ref: WeakRef<FileSyntaxViews>;
+    readonly sourceFileName: string;
+    readonly state: { attached: boolean };
   }>((held) => {
     this.files.delete(held.ref);
-    held.syntax.close();
+    if (held.state.attached) {
+      held.state.attached = false;
+      this.syntax.releaseFile(held.sourceFileName);
+    }
   });
   private factBytes = 0;
   readonly program: ProgramView;
@@ -821,7 +825,13 @@ export class TypeServiceClient {
     this.symbols.clear();
     this.signatures.clear();
     this.indexInfos.clear();
-    for (const ref of [...this.files]) ref.deref()?.close();
+    for (const ref of [...this.files]) {
+      const syntax = ref.deref();
+      if (syntax) {
+        this.releaseSyntax(syntax);
+        syntax.close();
+      }
+    }
     this.files.clear();
     this.syntax.close();
     this.transport = undefined;
@@ -1077,38 +1087,78 @@ export class TypeServiceClient {
     if (binding.generation !== this.descriptor.generation) {
       throw new Error('foreign file binding');
     }
-    const syntax = new FileSyntaxViews(this.syntax, binding, () => {
-      this.ensure();
-    });
-    const file = new TypeServiceFile(this, binding, syntax);
-    const ref = new WeakRef(file);
+    const state = { attached: false };
+    const syntax = new FileSyntaxViews(
+      this.syntax,
+      binding,
+      () => {
+        this.ensure();
+      },
+      state,
+    );
+    const ref = new WeakRef(syntax);
     this.files.add(ref);
-    this.fileRefs.set(file, ref);
-    this.fileCleanup.register(file, { ref, syntax }, file);
-    return file;
+    this.fileRefs.set(syntax, ref);
+    // Track FileSyntaxViews (retained by the handle and every returned node
+    // map) rather than TypeServiceFile so collecting the temporary handle
+    // cannot close maps that callers still hold.
+    this.fileCleanup.register(
+      syntax,
+      { ref, sourceFileName: binding.sourceFileName, state },
+      syntax,
+    );
+    return new TypeServiceFile(this, binding, syntax, () => {
+      this.releaseSyntax(syntax);
+    });
   }
 
   /**
    * Open a file handle for the duration of `run` and close it automatically
-   * in `finally` so callers cannot leak per-file ESTree mappings.
+   * when `run` returns (or when a returned promise settles) so callers cannot
+   * leak per-file ESTree mappings.
    */
-  withFile<T>(binding: FileBinding, run: (file: TypeServiceFile) => T): T {
+  withFile<T>(
+    binding: FileBinding,
+    run: (file: TypeServiceFile) => PromiseLike<T>,
+  ): Promise<T>;
+  withFile<T>(binding: FileBinding, run: (file: TypeServiceFile) => T): T;
+  withFile<T>(
+    binding: FileBinding,
+    run: (file: TypeServiceFile) => T | PromiseLike<T>,
+  ): T | Promise<T> {
     const file = this.file(binding);
+    let pending = false;
     try {
-      return run(file);
+      const result = run(file);
+      if (isPromiseLike(result)) {
+        const settled = Promise.resolve(result).finally(() => {
+          file.close();
+        });
+        pending = true;
+        return settled;
+      }
+      return result;
     } finally {
-      file.close();
+      if (!pending) file.close();
     }
   }
 
-  releaseFile(file: TypeServiceFile): void {
-    const ref = this.fileRefs.get(file);
+  private releaseSyntax(syntax: FileSyntaxViews): void {
+    const ref = this.fileRefs.get(syntax);
     if (ref) {
       this.files.delete(ref);
-      this.fileRefs.delete(file);
+      this.fileRefs.delete(syntax);
     }
-    this.fileCleanup.unregister(file);
+    this.fileCleanup.unregister(syntax);
   }
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    (typeof value === 'object' || typeof value === 'function') &&
+    value !== null &&
+    typeof Reflect.get(value, 'then') === 'function'
+  );
 }
 
 type NodeMaps = Pick<
@@ -1143,13 +1193,14 @@ export class TypeServiceFile {
     private readonly owner: TypeServiceClient,
     readonly binding: FileBinding,
     private readonly syntax: FileSyntaxViews,
+    private readonly onClose: () => void,
   ) {}
 
   close(): void {
     if (this.closed) return;
     this.closed = true;
     this.syntax.close();
-    this.owner.releaseFile(this);
+    this.onClose();
   }
 
   [Symbol.dispose](): void {
@@ -1194,33 +1245,34 @@ export class TypeServiceFile {
     }
     // A typed Program is authoritative for project compiler flags; ignore
     // per-file parserOptions overrides to match @typescript-eslint/parser.
+    const owner = this.owner;
     const toTS = this.syntax.esTreeNodeToTSNodeMap.get;
     return {
-      program: this.owner.program,
+      program: owner.program,
       esTreeNodeToTSNodeMap: this.syntax.esTreeNodeToTSNodeMap,
       tsNodeToESTreeNodeMap: this.syntax.tsNodeToESTreeNodeMap,
       getContextualType: (node: Readonly<ESTreeNode>) =>
-        this.owner.checker.getContextualType(toTS(node)),
+        owner.checker.getContextualType(toTS(node)),
       getResolvedSignature: (
         node: Readonly<ESTreeNode>,
         candidatesOutArray?: SignatureView[],
         argumentCount?: number,
       ) =>
-        this.owner.checker.getResolvedSignature(
+        owner.checker.getResolvedSignature(
           toTS(node),
           candidatesOutArray,
           argumentCount,
         ),
       getTypeAtLocation: (node: Readonly<ESTreeNode>) =>
-        this.owner.checker.getTypeAtLocation(toTS(node)),
+        owner.checker.getTypeAtLocation(toTS(node)),
       getSymbolAtLocation: (node: Readonly<ESTreeNode>) =>
-        this.owner.checker.getSymbolAtLocation(toTS(node)),
+        owner.checker.getSymbolAtLocation(toTS(node)),
       getTypeFromTypeNode: (node: Readonly<ESTreeNode>) =>
-        this.owner.checker.getTypeFromTypeNode(toTS(node)),
+        owner.checker.getTypeFromTypeNode(toTS(node)),
       getTypeOfSymbolAtLocation: (
         symbol: Readonly<SymbolView>,
         node: Readonly<ESTreeNode>,
-      ) => this.owner.checker.getTypeOfSymbolAtLocation(symbol, toTS(node)),
+      ) => owner.checker.getTypeOfSymbolAtLocation(symbol, toTS(node)),
       emitDecoratorMetadata: options.emitDecoratorMetadata === true,
       experimentalDecorators: options.experimentalDecorators === true,
       isolatedDeclarations: options.isolatedDeclarations === true,

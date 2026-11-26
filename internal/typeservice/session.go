@@ -405,6 +405,14 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	}
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
+	// Mark the session poisoned before releasing lifeMu so concurrent callers
+	// synchronized with lifeMu cannot miss a panic during unwind.
+	defer func() {
+		if value := recover(); value != nil {
+			s.poisoned.Store(true)
+			panic(value)
+		}
+	}()
 	if s.poisoned.Load() {
 		return nil, ErrPoisoned
 	}
@@ -442,6 +450,9 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	// Program diagnostics may acquire multiple checker shards; run them outside
 	// the single-file exclusive checker lease while preserving request order.
 	for start := 0; start < len(queries); {
+		if s.poisoned.Load() {
+			return nil, ErrPoisoned
+		}
 		if r, ok := queries[start].Request.(*ProgramRequest); ok {
 			results[start], err = programQuery(ctx, s, p, r, natives[start])
 			if err != nil {
@@ -468,8 +479,14 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 		}
 		start = end
 	}
+	if s.poisoned.Load() {
+		return nil, ErrPoisoned
+	}
 	packets = make([][]byte, len(queries))
 	for i, result := range results {
+		if s.poisoned.Load() {
+			return nil, ErrPoisoned
+		}
 		materializeReferences(p, result)
 		for _, record := range records[i] {
 			materializeReferences(p, record.Fact)
@@ -532,6 +549,18 @@ func materializeReferences(p *program.Program, result Result) {
 func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*ast.Node, results []Result, records [][]Record) error {
 	s.checkMu.Lock()
 	defer s.checkMu.Unlock()
+	if s.poisoned.Load() {
+		return ErrPoisoned
+	}
+	// Mark the session poisoned while still holding checkMu so any goroutine
+	// waiting on checkMu is happens-before guaranteed to observe ErrPoisoned
+	// instead of touching a potentially inconsistent checker.
+	defer func() {
+		if value := recover(); value != nil {
+			s.poisoned.Store(true)
+			panic(value)
+		}
+	}()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -552,6 +581,9 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 		return errors.New("type service checker identity changed")
 	}
 	for i, q := range queries {
+		if s.poisoned.Load() {
+			return ErrPoisoned
+		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
