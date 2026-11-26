@@ -16,7 +16,7 @@
     "build": "pnpm -r --filter=@rslint/test-tools... build",
     "build:npm": "zx scripts/build-npm.mjs rslint",
     "build:npm:tsgo": "zx scripts/build-npm.mjs tsgo-server",
-    "build:website": "pnpm --filter @rslint/core run build:js && pnpm --filter=!@rslint/core --filter=!@rslint/native --filter @rslint/website... -r build",
+    "build:website": "pnpm --filter @rslint/core run build:js && pnpm --filter @rslint/website... --filter=!@rslint/core --filter=!@rslint/native -r build",
     "bench:cli": "pnpm --filter rslint-bench-cli run bench",
     "bench:go": "go test -bench=. -benchtime=5s ./tests/bench-go/",
     "check-spell": "pnpx cspell lint --no-progress --show-context",
