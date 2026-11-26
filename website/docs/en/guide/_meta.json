@@ -33,6 +33,11 @@
     "label": "Inline Directives"
   },
   {
+    "type": "file",
+    "name": "bulk-suppressions",
+    "label": "Bulk Suppressions"
+  },
+  {
     "type": "section-header",
     "label": "Reference"
   },

@@ -18,6 +18,22 @@ export function isJSConfigFile(filePath: string): boolean {
   return /\.(ts|mts|cts|js|mjs|cjs)$/.test(filePath);
 }
 
+// Register known Go string-valued flags so their values are not mistaken for
+// positional file/dir arguments, and so missing values fail before reordering.
+const GO_STRING_OPTIONS = {
+  format: { type: 'string' },
+  'max-warnings': { type: 'string' },
+  rule: { type: 'string', multiple: true },
+  'suppress-rule': { type: 'string', multiple: true },
+  'suppressions-location': { type: 'string' },
+  trace: { type: 'string' },
+  cpuprof: { type: 'string' },
+} as const;
+
+function parseBooleanOption(value: unknown): boolean {
+  return value === true || value === 'true';
+}
+
 export function parseArgs(argv: string[]) {
   const { values, tokens } = nodeParseArgs({
     args: argv,
@@ -31,13 +47,7 @@ export function parseArgs(argv: string[]) {
       // single worker. NOT skipped below, so it still forwards to Go in
       // `rest` (Go's native pass honors the same flag independently).
       singleThreaded: { type: 'boolean' },
-      // Register known Go string-valued flags so their values are not
-      // mistaken for positional file/dir arguments.
-      format: { type: 'string' },
-      'max-warnings': { type: 'string' },
-      rule: { type: 'string', multiple: true },
-      trace: { type: 'string' },
-      cpuprof: { type: 'string' },
+      ...GO_STRING_OPTIONS,
       // Consumed by the JS entry point; must not reach Go from user input.
       'start-time': { type: 'string' },
     },
@@ -53,18 +63,30 @@ export function parseArgs(argv: string[]) {
   // When "--" is present, positionals before it and after it are tracked
   // separately so the rebuilt rest preserves their relative position to "--".
   const flags: string[] = [];
+  let argumentError: string | undefined;
   const positionalsBefore: string[] = [];
   const positionalsAfter: string[] = [];
   let seenTerminator = false;
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     if (token.kind === 'option') {
-      if (
-        token.name === 'config' ||
-        token.name === 'init' ||
-        token.name === 'start-time'
-      )
+      if (token.name === 'config') {
+        if (token.value == null) {
+          argumentError ??= `expected a value for ${token.rawName}`;
+        }
         continue;
+      }
+      if (token.name === 'init') {
+        if (
+          token.inlineValue &&
+          token.value !== 'true' &&
+          token.value !== 'false'
+        ) {
+          argumentError ??= `invalid boolean value ${JSON.stringify(token.value)} for ${token.rawName}`;
+        }
+        continue;
+      }
+      if (token.name === 'start-time') continue;
       // Go's --timing requires a value ("all" or a top rule count) but the
       // value is optional on the Node CLI: consume the next argument only
       // when it matches, otherwise fill in the default "all".
@@ -78,8 +100,31 @@ export function parseArgs(argv: string[]) {
         }
         continue;
       }
-      flags.push(token.rawName);
-      if (token.value != null) flags.push(token.value);
+      if (Object.hasOwn(GO_STRING_OPTIONS, token.name)) {
+        // Validate missing values before reordering so a trailing flag cannot
+        // consume a preceding file path once flags are moved ahead of positionals.
+        // Only treat double-hyphen flags and known short options (-c, -h) as
+        // missing values so hyphen-prefixed filenames like `-cpu.pprof` still work.
+        const value = token.value;
+        if (
+          value == null ||
+          (!token.inlineValue &&
+            (value.startsWith('--') || value === '-h' || value === '-c'))
+        ) {
+          argumentError ??= `expected a value for ${token.rawName}`;
+        } else {
+          flags.push(token.rawName, value);
+        }
+        continue;
+      }
+      if (token.inlineValue) {
+        // Keep inline values (e.g. --no-prune-suppressions=false) attached to
+        // non-string options because Go's flag.Parse only accepts boolean values inline.
+        flags.push(argv[token.index]);
+      } else {
+        flags.push(token.rawName);
+        if (token.value != null) flags.push(token.value);
+      }
     } else if (token.kind === 'option-terminator') {
       seenTerminator = true;
     } else if (token.kind === 'positional') {
@@ -99,17 +144,13 @@ export function parseArgs(argv: string[]) {
     : [...flags, ...positionalsBefore];
 
   return {
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    config: (values.config as string) ?? null,
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    init: (values.init as boolean) ?? false,
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    help: (values.help as boolean) ?? false,
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    singleThreaded: (values.singleThreaded as boolean) ?? false,
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    format: (values.format as string) ?? null,
+    config: typeof values.config === 'string' ? values.config : null,
+    init: parseBooleanOption(values.init),
+    help: parseBooleanOption(values.help),
+    singleThreaded: parseBooleanOption(values.singleThreaded),
+    format: typeof values.format === 'string' ? values.format : null,
     rest,
     positionals,
+    argumentError,
   };
 }

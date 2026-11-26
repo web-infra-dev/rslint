@@ -33,6 +33,8 @@ type LintPlan struct {
 type programLintPlan struct {
 	program *program.Program
 	files   []lintFilePlan
+	// When requested, retain the original config of each target that lost rules to the checker gate.
+	rulesBeforeFilter [][]rule.ConfiguredRule
 }
 
 // lintFilePlan freezes one AST generation, its shared prepared rule set, and
@@ -42,6 +44,7 @@ type lintFilePlan struct {
 	file           *ast.SourceFile
 	rules          *preparedRuleSet
 	hasTypeChecker bool
+	syntaxError    bool
 }
 
 type lintPlanFileRef struct {
@@ -122,6 +125,9 @@ func PrepareLintPlanContext(ctx context.Context, opts PrepareLintPlanOptions) (*
 			return nil, fmt.Errorf("linter: Program index %d: %w", programIndex, err)
 		}
 		plan.programs[programIndex] = programLintPlanFromFiles(opts.Programs[programIndex], files)
+		if opts.collectSkippedErrorRules {
+			plan.programs[programIndex].rulesBeforeFilter = make([][]rule.ConfiguredRule, len(files))
+		}
 		totalFiles += len(plan.programs[programIndex].files)
 	}
 
@@ -280,6 +286,7 @@ func resolveProgramLintPlanFile(
 	if !opts.SkipSyntaxCheck {
 		diagnostics := CollectFileSyntacticDiagnostics(ctx, opts.Program, file)
 		if len(diagnostics) > 0 {
+			filePlan.syntaxError = true
 			return diagnostics
 		}
 	}
@@ -292,6 +299,10 @@ func resolveProgramLintPlanFile(
 	// configured rule set before planning without inspecting Program adapters.
 	filePlan.hasTypeChecker = opts.Program.CanProvideTypeChecker(file)
 	filePlan.rules = ruleSets.prepare(rules, filePlan.hasTypeChecker)
+	if plan.rulesBeforeFilter != nil && !filePlan.hasTypeChecker &&
+		(filePlan.rules == nil || len(filePlan.rules.all) != len(rules)) {
+		plan.rulesBeforeFilter[fileIndex] = rules
+	}
 	return nil
 }
 

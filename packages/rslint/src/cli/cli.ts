@@ -2,9 +2,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 import {
   OUTPUT_FORMATS,
-  parseArgs,
   isJSConfigFile,
   isOutputFormat,
+  parseArgs,
 } from '../utils/args.js';
 import { resolveRslintBinary } from '../internal/resolve-binary.js';
 
@@ -31,6 +31,11 @@ export async function run(
   if (args.init) {
     const { runEngine } = await import('./engine.js');
     return runEngine({ binPath, goArgs: ['--init'], cwd });
+  }
+
+  if (!args.help && args.argumentError) {
+    process.stderr.write(`error: ${args.argumentError}\n`);
+    return 2;
   }
 
   // Reject an invalid stdout protocol before config discovery/evaluation.

@@ -105,6 +105,7 @@ const (
 	OutcomePassed OutcomeKind = iota
 	OutcomeDiagnosticsFailed
 	OutcomeWarningLimitExceeded
+	OutcomeFailed
 )
 
 type Outcome struct {

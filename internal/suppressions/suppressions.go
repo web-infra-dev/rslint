@@ -1,0 +1,205 @@
+// Package suppressions manages per-file, per-rule error counts for the file CLI.
+package suppressions
+
+import (
+	"context"
+	"encoding/json"
+	"slices"
+
+	"github.com/web-infra-dev/rslint/internal/rule"
+)
+
+type Mode uint8
+
+const (
+	Check Mode = iota
+	Record
+	Prune
+)
+
+type Options struct {
+	Location string
+	Mode     Mode
+	Rules    []string // In Record mode nil selects all rules and an empty list selects none.
+}
+
+type entry struct {
+	Count int                        `json:"count,case:strict"`
+	Extra map[string]json.RawMessage `json:",embed"`
+}
+
+type entries map[string]map[string]entry
+
+type File struct {
+	cwd        string // Physical working directory.
+	logicalCwd string // Caller working directory (may differ from cwd when entered via a symlink).
+	path       string
+	options    Options
+	entries    entries
+}
+
+// FileResult identifies one target in the final lint observation. A completed
+// rule with no diagnostics has a count of zero.
+type FileResult struct {
+	Path         string // Absolute, slash-separated filename of the lint result.
+	SkippedRules []string
+	Unchecked    bool // Syntax or config failure left no reliable rule counts.
+	Incomplete   bool // Plugin results are incomplete. Completed native rules remain usable.
+}
+
+type checkedFile struct {
+	key             string
+	counts          map[string]int
+	skippedRules    []string
+	preserveEntries bool
+}
+
+// Apply checks the final lint results against the baseline, updating counts in
+// record or prune mode. Results include all observed targets, including clean
+// files and files whose syntax or config prevented checking their rules.
+func (f *File) Apply(ctx context.Context, results []FileResult, diagnostics []rule.RuleDiagnostic) ([]rule.RuleDiagnostic, bool, error) {
+	if f.options.Mode == Check && len(f.entries) == 0 {
+		return diagnostics, false, nil
+	}
+	files := make(map[string]*checkedFile)
+	// Named recording needs only the selected rule's result. Updating the
+	// entire file requires a complete file result.
+	recordNamedRules := f.options.Mode == Record && f.options.Rules != nil
+	var uncheckedKeys []string
+	hasUnchecked := false
+	hasUpdatableFile := false
+	for _, result := range results {
+		if result.Unchecked {
+			hasUnchecked = true
+			if f.options.Mode == Prune {
+				uncheckedKeys = append(uncheckedKeys, f.fileKey(result.Path))
+			}
+			continue
+		}
+		key := f.fileKey(result.Path)
+		if f.options.Mode == Check && f.entries[key] == nil {
+			continue
+		}
+		preserve := result.Incomplete && !recordNamedRules
+		files[result.Path] = &checkedFile{
+			key:             key,
+			skippedRules:    result.SkippedRules,
+			preserveEntries: preserve,
+		}
+		hasUpdatableFile = hasUpdatableFile || !preserve
+	}
+	for _, diagnostic := range diagnostics {
+		file := files[diagnostic.FilePath]
+		if file == nil || !eligible(diagnostic) || slices.Contains(file.skippedRules, diagnostic.RuleName) {
+			continue
+		}
+		if file.counts == nil {
+			file.counts = make(map[string]int)
+		}
+		file.counts[diagnostic.RuleName]++
+	}
+	// An empty target set can still create a baseline or prune deleted files,
+	// but a run whose only targets were unchecked must not mutate the baseline.
+	if f.options.Mode != Check && (hasUpdatableFile || (len(files) == 0 && !hasUnchecked)) {
+		err := f.update(ctx, func(latest entries) bool {
+			if f.options.Mode == Record {
+				return f.record(latest, files)
+			}
+			return f.prune(latest, files, uncheckedKeys)
+		})
+		if err != nil {
+			return diagnostics, false, err
+		}
+	}
+
+	unused := false
+	for _, file := range files {
+		for id, recorded := range f.entries[file.key] {
+			if file.counts[id] < recorded.Count && !slices.Contains(file.skippedRules, id) {
+				unused = true
+			}
+		}
+	}
+	visible := slices.DeleteFunc(diagnostics, func(diagnostic rule.RuleDiagnostic) bool {
+		file := files[diagnostic.FilePath]
+		if file == nil || !eligible(diagnostic) {
+			return false
+		}
+		count := file.counts[diagnostic.RuleName]
+		return count != 0 && count <= f.entries[file.key][diagnostic.RuleName].Count
+	})
+	return visible, unused, nil
+}
+
+func eligible(d rule.RuleDiagnostic) bool {
+	return d.Origin == rule.DiagnosticOriginLint && d.Severity == rule.SeverityError && d.RuleName != ""
+}
+
+func (f *File) record(data entries, files map[string]*checkedFile) bool {
+	changed := false
+	for _, file := range files {
+		if file.preserveEntries {
+			continue
+		}
+		for id, count := range file.counts {
+			if f.options.Rules != nil && !slices.Contains(f.options.Rules, id) {
+				continue
+			}
+			previous := data[file.key][id]
+			if previous.Count == count && len(previous.Extra) == 0 {
+				continue
+			}
+			if data[file.key] == nil {
+				data[file.key] = make(map[string]entry)
+			}
+			data[file.key][id] = entry{Count: count}
+			changed = true
+		}
+	}
+	return changed
+}
+
+func (f *File) prune(data entries, files map[string]*checkedFile, uncheckedKeys []string) bool {
+	changed := false
+	// Check the disk only for entries outside the final lint observation.
+	observed := make(map[string]bool)
+	for _, key := range uncheckedKeys {
+		if data[key] != nil {
+			observed[key] = true
+		}
+	}
+	for _, file := range files {
+		rules := data[file.key]
+		if rules == nil {
+			continue
+		}
+		observed[file.key] = true
+		if file.preserveEntries {
+			continue
+		}
+		for id, recorded := range rules {
+			count := file.counts[id]
+			if count >= recorded.Count || slices.Contains(file.skippedRules, id) {
+				continue
+			}
+			changed = true
+			if count == 0 {
+				delete(rules, id)
+			} else {
+				recorded.Count = count
+				rules[id] = recorded
+			}
+		}
+		if len(rules) == 0 {
+			delete(data, file.key)
+			changed = true
+		}
+	}
+	for key := range data {
+		if !observed[key] && f.fileMissing(key) {
+			delete(data, key)
+			changed = true
+		}
+	}
+	return changed
+}

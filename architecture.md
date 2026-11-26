@@ -718,7 +718,9 @@ the original frames until source identity checks and fix text freezing finish.
 Producer finalization waits for actual generation borrowers; detached plugin
 work continues with frozen inputs. Frames are shared by source object identity,
 not by file path, and compute ECMAScript line maps lazily. `LintedFiles` requests
-selected target paths; `SourceFiles` additionally retains their original ASTs.
+selected target paths. `IncompleteRuleResults` also reports error-level rules
+skipped for lack of a type checker and incomplete plugin file or rule results.
+`SourceFiles` retains the original ASTs for selected targets.
 The API requests ASTs only for its encoded-source response. Diagnostic
 projection does not invalidate those explicitly retained artifacts.
 
@@ -1486,6 +1488,32 @@ selection remains in `internal/config/target`, source-to-config rule resolution
 in `internal/config/lint`, Program construction in `internal/program/loader`,
 the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
+
+With an active bulk suppressions file, the CLI opens and validates the baseline
+before linting or autofixing, and applies it to the final observation from the
+same run. The native lint plan identifies syntax errors and rules skipped for
+lack of type information. Plugin dispatch identifies incomplete file or rule
+results. The CLI passes the final targets, their completeness, and their
+diagnostics to `internal/suppressions`, including clean files with zero errors.
+If config discovery reports `TargetConfigFailure` (a failed config module on
+the ownership route of any requested file, directory, or glob target, even if
+the fallback config later ignored it), check mode refuses to apply suppressions
+(leaving fallback diagnostics visible) and record/prune modes refuse to modify
+the baseline; healthy child packages shadowing a broken ancestor remain
+unaffected. Plugin dispatch failures likewise prevent record and prune modes
+from modifying the baseline. Pruning uses those results for observed files and
+checks the filesystem for missing paths outside the observation. The package
+counts error-level lint findings by rule and by the selected target path
+(relative to the caller working directory for files inside it, and to the
+physical working directory for external paths). It owns comparison and scoped
+updates, validates writable parent paths before autofix via `ValidateWritable`,
+creates missing parent directories on first record, skips disk writes when an
+existing baseline needs no change, and writes the complete JSON to a temporary
+file in the same directory before atomically replacing the baseline (matching
+ESLint, concurrent processes writing to the same suppressions file are not
+synchronized). The CLI renders the remaining
+diagnostics and sets the exit code. See the [bulk suppressions guide](website/docs/en/guide/bulk-suppressions.md)
+for how recording and pruning handle incomplete checks.
 
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider

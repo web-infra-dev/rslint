@@ -46,6 +46,7 @@ type lintReportInput struct {
 	Diagnostics   []rule.RuleDiagnostic
 	Summary       *output.Summary
 	MaxWarnings   int
+	Failed        bool
 	IncludeSource bool
 }
 
@@ -86,6 +87,9 @@ func assembleLintReport(input lintReportInput) (output.Report, error) {
 	}
 	counts.LintErrors = counts.Errors - counts.TypeErrors
 	outcome := lintReportOutcome(counts, input.MaxWarnings)
+	if input.Failed && outcome.Kind == output.OutcomePassed {
+		outcome.Kind = output.OutcomeFailed
+	}
 	return output.NewReport(input.Mode, diagnostics, counts, input.Summary, outcome), nil
 }
 
@@ -166,7 +170,7 @@ func projectLintReportDiagnostic(
 
 func lintReportDiagnosticHasTypeScriptOrigin(origin rule.DiagnosticOrigin) (bool, error) {
 	switch origin {
-	case rule.DiagnosticOriginLint:
+	case rule.DiagnosticOriginLint, rule.DiagnosticOriginPluginFailure:
 		return false, nil
 	case rule.DiagnosticOriginTypeScript:
 		return true, nil

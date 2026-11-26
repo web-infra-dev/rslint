@@ -221,6 +221,85 @@ describe('parseArgs positionals', () => {
 });
 
 describe('parseArgs rest ordering', () => {
+  test('preserves negated suppression flags and their inline values', () => {
+    const flags = [
+      '--no-suppress-all',
+      '--no-prune-suppressions=false',
+      '--no-pass-on-unpruned-suppressions=true',
+    ];
+    expect(parseArgs(['a.js', ...flags]).rest).toEqual([...flags, 'a.js']);
+  });
+
+  test('forwards repeated --suppress-rule flags before positionals', () => {
+    const args = parseArgs([
+      'a.js',
+      '--suppress-rule',
+      '[no-var,no-debugger]',
+      '--suppress-rule=p/second,p/third',
+      '--suppress-rule',
+      '',
+      '--suppress-rule=',
+    ]);
+    expect(args.argumentError).toBeUndefined();
+    expect(args.rest).toEqual([
+      '--suppress-rule',
+      '[no-var,no-debugger]',
+      '--suppress-rule',
+      'p/second,p/third',
+      '--suppress-rule',
+      '',
+      '--suppress-rule',
+      '',
+      'a.js',
+    ]);
+  });
+
+  test('forwards empty string flag values and rejects missing values uniformly', () => {
+    const location = '--suppressions-location';
+    expect(
+      parseArgs(['a.js', location, 'custom.json', location, '', `${location}=`])
+        .rest,
+    ).toEqual([location, 'custom.json', location, '', location, '', 'a.js']);
+    expect(
+      parseArgs(['--max-warnings', '-1', 'a.js']).argumentError,
+    ).toBeUndefined();
+    expect(parseArgs(['--cpuprof', '-cpu.pprof', 'a.js']).rest).toEqual([
+      '--cpuprof',
+      '-cpu.pprof',
+      'a.js',
+    ]);
+    expect(parseArgs([`${location}=-custom.json`, 'a.js']).rest).toEqual([
+      location,
+      '-custom.json',
+      'a.js',
+    ]);
+    for (const flag of ['--format', '--rule', '--suppress-rule', location]) {
+      expect(parseArgs(['a.js', flag]).argumentError).toContain(flag);
+      expect(parseArgs([flag, '--fix', 'a.js']).argumentError).toContain(flag);
+    }
+    const missingConfig = parseArgs(['a.js', '--config']);
+    expect(missingConfig.config).toBeNull();
+    expect(missingConfig.argumentError).toContain('--config');
+
+    const disabledFlags = parseArgs([
+      '--singleThreaded=false',
+      '--help=false',
+      '--init=false',
+      'a.js',
+    ]);
+    expect(disabledFlags.singleThreaded).toBe(false);
+    expect(disabledFlags.help).toBe(false);
+    expect(disabledFlags.init).toBe(false);
+    expect(disabledFlags.rest).toEqual([
+      '--singleThreaded=false',
+      '--help=false',
+      'a.js',
+    ]);
+    expect(parseArgs(['--init=maybe', 'a.js']).argumentError).toContain(
+      '--init',
+    );
+  });
+
   test('flags are placed before positionals in rest', () => {
     const result = parseArgs(['src/a.ts', '--format', 'jsonline']);
     expect(result.rest).toEqual(['--format', 'jsonline', 'src/a.ts']);

@@ -341,19 +341,11 @@ export function mergeListeners(
       } else {
         const compilation = getSelectorCompilation(cleanSelector);
         if (compilation.kind === 'invalid') {
-          // #3: a buggy plugin rule's invalid esquery selector must not
-          // throw out of `mergeListeners` → `lintFile` (whose contract is
-          // to never throw; per-rule failures surface via `ruleErrors`).
-          // Record it against the owning rule(s) and skip this selector —
-          // ESLint isolates a broken rule the same way, leaving sibling
-          // rules running.
-          for (const tl of tagged) {
-            merged.selectorErrors.push({
-              ruleName: tl.ruleName,
-              selector: cleanSelector,
-              message: compilation.message,
-            });
-          }
+          merged.selectorErrors.push({
+            ruleName,
+            selector: cleanSelector,
+            message: compilation.message,
+          });
           continue;
         }
         entry = {
@@ -706,6 +698,7 @@ export function visit(
   };
   const result: VisitResult = { cancelled: false, visitedNodes: 0 };
   const errH = opts.onListenerError;
+  let reportedMatchErrors: Map<EsqEntry, Set<string>> | undefined;
   const cancelFlag = opts.cancelFlag;
 
   // No-ESQuery fast path. When the merged set contains no esquery
@@ -729,13 +722,19 @@ export function visit(
       try {
         matched = esquery().matches(node, entry.selector!, reversedAncestry());
       } catch (err) {
-        // Attribute a bad selector to its first listener and keep dispatching.
-        errH?.({
-          ruleName: entry.listeners[0]?.ruleName,
-          selector: entry.raw,
-          node,
-          err,
-        });
+        if (!errH) return;
+        // Different branches of one selector can fail for different reasons.
+        const message = err instanceof Error ? err.message : String(err);
+        const messages = reportedMatchErrors?.get(entry) ?? new Set<string>();
+        if (messages.has(message)) return;
+        messages.add(message);
+        (reportedMatchErrors ??= new Map()).set(entry, messages);
+        const owners = new Set(
+          entry.listeners.map((listener) => listener.ruleName),
+        );
+        for (const ruleName of owners) {
+          errH({ ruleName, selector: entry.raw, node, err });
+        }
         return;
       }
       if (!matched) return;

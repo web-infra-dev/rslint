@@ -36,80 +36,54 @@ import type { ESTreeNode } from '../../../src/languages/js/types.js';
 const require = createRequire(import.meta.url);
 const esquery = require('esquery') as { parse: (s: string) => object };
 
-describe('visit: esquery match throw is isolated, does not kill file', () => {
-  // Regression for review P0 #3 — `esq.matches` can throw at runtime
-  // for selectors that parsed cleanly but reference an unknown
-  // pseudo-class (`Identifier:enter` etc.). Without the outer
-  // try/catch in `fire`, the throw cascaded up through dfs → visit →
-  // lintFile and the file's diagnostics came back empty. The fix
-  // wraps `esq.matches` and reports the throw via the
-  // `onListenerError` callback, leaving the remaining listeners free
-  // to fire.
-  test('selector that throws on matches is reported via onListenerError; siblings still fire', () => {
-    const errors: Array<{
-      ruleName: string | undefined;
-      selector: string;
-      message: string;
-    }> = [];
-    const goodSelectorHits: ESTreeNode[] = [];
-
-    // Hand-built tiny AST. visit() doesn't need a parsed program — it
-    // walks via visitorKeys / Object.keys, and an Identifier inside an
-    // ExpressionStatement triggers both bucketed dispatch + wildcard.
-    const ast = {
-      type: 'Program',
-      body: [
-        {
-          type: 'ExpressionStatement',
-          expression: { type: 'Identifier', name: 'foo' },
-        },
-      ],
-    } as unknown as ESTreeNode;
-
-    const merged = mergeListeners([
-      {
-        ruleName: 'bad-rule',
-        listeners: {
-          // `Identifier:enter` parses as a class-pseudo esquery
-          // doesn't recognise → `esq.matches` throws "Unknown class
-          // name: enter" at runtime.
-          'Identifier:enter'() {
-            /* never reached — esq.matches throws first */
-          },
+test('reports each distinct selector failure once per owner and visit', () => {
+  const ast = {
+    type: 'Program',
+    body: ['a', 'a', 'b', 'ok'].map((name) => ({
+      type: 'ExpressionStatement',
+      expression: { type: 'Identifier', name },
+    })),
+  } as unknown as ESTreeNode;
+  const selector =
+    'Identifier[name="ok"], Identifier[name="a"]:bad-a, Identifier[name="b"]:bad-b';
+  let matches = 0;
+  const merged = mergeListeners([
+    { ruleName: 'first-owner', listeners: { [selector]: () => matches++ } },
+    {
+      ruleName: 'other-owner',
+      listeners: { [selector]: [() => {}, () => {}] },
+    },
+    {
+      ruleName: 'throws',
+      listeners: {
+        Identifier() {
+          throw new Error('listener failure');
         },
       },
-      {
-        ruleName: 'good-rule',
-        listeners: {
-          Identifier(node) {
-            goodSelectorHits.push(node);
-          },
-        },
-      },
-    ]);
+    },
+  ]);
 
-    const result = visit(ast, merged, {
-      onListenerError: (rec) => {
-        errors.push({
-          ruleName: rec.ruleName,
-          selector: rec.selector,
-          message: rec.err instanceof Error ? rec.err.message : String(rec.err),
-        });
-      },
+  const visitFile = () => {
+    const errors: Array<[string | undefined, string]> = [];
+    visit(ast, merged, {
+      onListenerError: ({ ruleName, err }) =>
+        errors.push([
+          ruleName,
+          err instanceof Error ? err.message : String(err),
+        ]),
     });
-
-    // Pre-fix: throw propagated, visit returned early, goodSelectorHits
-    // was empty. Post-fix: bad selector goes to onListenerError, good
-    // selector still fires.
-    expect(result.visitedNodes).toBeGreaterThan(0);
-    expect(goodSelectorHits.length).toBeGreaterThan(0);
-    expect(goodSelectorHits[0].type).toBe('Identifier');
-
-    // Bad selector reported with rule attribution.
-    const badErr = errors.find((e) => e.selector === 'Identifier:enter');
-    expect(badErr).toBeDefined();
-    expect(badErr?.ruleName).toBe('bad-rule');
-  });
+    return errors.sort();
+  };
+  const expected = [
+    ['first-owner', 'Unknown class name: bad-a'],
+    ['first-owner', 'Unknown class name: bad-b'],
+    ['other-owner', 'Unknown class name: bad-a'],
+    ['other-owner', 'Unknown class name: bad-b'],
+    ...Array.from({ length: 4 }, () => ['throws', 'listener failure']),
+  ];
+  expect(visitFile()).toEqual(expected);
+  expect(visitFile()).toEqual(expected);
+  expect(matches).toBe(2);
 });
 
 test('nested visits preserve outer ancestry for later enter and exit selectors', () => {
@@ -602,7 +576,10 @@ describe('mergeListeners — selector compilation cache', () => {
   test('cached invalid message is attributed to the current rule on every merge', () => {
     const raw = 'Foo > ';
     const first = mergeListeners([
-      { ruleName: 'first-bad-rule', listeners: { [raw]: () => {} } },
+      {
+        ruleName: 'first-bad-rule',
+        listeners: { [raw]: [() => {}, () => {}] },
+      },
     ]);
     const second = mergeListeners([
       { ruleName: 'second-bad-rule', listeners: { [raw]: () => {} } },

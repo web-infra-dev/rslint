@@ -34,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/suppressions"
 	"github.com/web-infra-dev/rslint/internal/testutil/estree"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -2734,6 +2735,48 @@ func TestReadPhysicalFileTextPreservesEncodingAndSourceBOM(t *testing.T) {
 				t.Fatalf("physical fix source = %q, want %q", got, test.want)
 			}
 		})
+	}
+}
+
+func TestParseLintFlagsSuppressRuleList(t *testing.T) {
+	args, _, code := parseLintFlags([]string{
+		"--suppress-rule=[]",
+		`--suppress-rule=['p/one,two', "no-\u0076ar",]`,
+		"--suppress-rule=p/second,p/third",
+		"--suppress-rule=[no-console,]",
+		"--suppress-rule=no-debugger,",
+		"--suppress-rule", "@typescript-eslint/no-explicit-any",
+	})
+	want := []string{"p/one,two", "no-var", "p/second", "p/third", "no-console", "no-debugger", "@typescript-eslint/no-explicit-any"}
+	if code != 0 || !slices.Equal(args.Suppressions.Rules, want) {
+		t.Fatalf("rule selection = %q, want %q, exit code %d", args.Suppressions.Rules, want, code)
+	}
+	for _, raw := range []string{"[]", ""} {
+		empty, _, code := parseLintFlags([]string{"--suppress-rule=" + raw})
+		if code != 0 || empty.Suppressions.Mode != suppressions.Record || empty.Suppressions.Rules == nil || len(empty.Suppressions.Rules) != 0 {
+			t.Fatalf("explicit empty selection %q = %+v, exit code %d", raw, empty.Suppressions, code)
+		}
+	}
+	for _, invalid := range []string{"[p/first", "p/first]", "[,]", "a,,b", "[a,,]", ",a", "'unterminated", `"a"extra`, "[a,[b]]"} {
+		if _, _, code := parseLintFlags([]string{"--suppress-rule=" + invalid}); code != 2 {
+			t.Errorf("invalid --suppress-rule=%q returned exit code %d, want 2", invalid, code)
+		}
+	}
+	if _, help, code := parseLintFlags([]string{"--help", "--suppress-all", "--suppress-rule=[unclosed"}); !help || code != 0 {
+		t.Fatalf("help with invalid/conflicting suppression flags: help=%t, exit code %d", help, code)
+	}
+}
+
+func TestParseLintFlagsNegatedSuppressions(t *testing.T) {
+	args, _, code := parseLintFlags([]string{
+		"--suppress-all", "--no-suppress-all", "--no-prune-suppressions=false",
+		"--pass-on-unpruned-suppressions", "--no-pass-on-unpruned-suppressions=true", "file.ts",
+	})
+	if code != 0 || args.Suppressions.Mode != suppressions.Prune || args.PassOnUnpruned || !slices.Equal(args.Positional, []string{"file.ts"}) {
+		t.Fatalf("expected only prune to be enabled for file.ts, got %+v and exit code %d", args, code)
+	}
+	if _, _, code := parseLintFlags([]string{"--help", "--no-suppress-all=1"}); code != 2 {
+		t.Errorf("help with an invalid negated boolean returned %d, want exit code 2", code)
 	}
 }
 

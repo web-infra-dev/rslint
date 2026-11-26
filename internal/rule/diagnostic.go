@@ -67,6 +67,7 @@ type DiagnosticOrigin uint8
 const (
 	DiagnosticOriginLint DiagnosticOrigin = iota
 	DiagnosticOriginTypeScript
+	DiagnosticOriginPluginFailure
 )
 
 type RuleDiagnostic struct {

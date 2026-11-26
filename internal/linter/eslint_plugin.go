@@ -318,7 +318,7 @@ func dispatchEslintPluginRules(
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 ) ([]EslintPluginProtocolNotice, error) {
-	return newPluginDispatchResources().dispatch(ctx, dispatch, files, collectFixes, suggestionsMode, timing, onDiagnostic, nil)
+	return newPluginDispatchResources().dispatch(ctx, dispatch, files, collectFixes, suggestionsMode, timing, onDiagnostic, nil, nil)
 }
 
 // One observation owns one bounded set of projection and transport windows.
@@ -337,7 +337,7 @@ func newPluginDispatchResources() *pluginDispatchResources {
 func (resources *pluginDispatchResources) dispatch(
 	ctx context.Context, dispatch EslintPluginDispatcher, files []EslintPluginFileInput,
 	collectFixes bool, suggestionsMode string, timing *TimingCollector, onDiagnostic DiagnosticHandler,
-	onBatch func(pluginBatchRange),
+	onBatch func(pluginBatchRange), onFailure pluginFileFailureHandler,
 ) ([]EslintPluginProtocolNotice, error) {
 	if resources == nil {
 		resources = newPluginDispatchResources()
@@ -393,6 +393,7 @@ func (resources *pluginDispatchResources) dispatch(
 				func(notice EslintPluginProtocolNotice) {
 					batchNotices[i] = append(batchNotices[i], notice)
 				},
+				onFailure,
 			)
 			return nil
 		})
@@ -431,9 +432,8 @@ func (resources *pluginDispatchResources) dispatch(
 	return notices, canceledErr
 }
 
-// EslintPluginProtocolNoticeKind identifies a recoverable worker-protocol
-// anomaly. Integrations decide how to present these structured notices; the
-// linter never writes process output.
+// EslintPluginProtocolNoticeKind identifies an unexpected or incomplete
+// plugin result. Integrations decide how to present these notices.
 type EslintPluginProtocolNoticeKind uint8
 
 const (
@@ -457,6 +457,7 @@ type EslintPluginProtocolNotice struct {
 type EslintPluginDispatchOutcome struct {
 	batches       []pluginBatchRange
 	failurePath   string
+	fileFailures  pluginFileFailures
 	Diagnostics   []rule.RuleDiagnostic
 	Notices       []EslintPluginProtocolNotice
 	DispatchError error
@@ -584,6 +585,7 @@ func dispatchOneBatch(
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 	onNotice func(EslintPluginProtocolNotice),
+	onFailure pluginFileFailureHandler,
 ) (err error) {
 	defer clear(batch)
 	defer func() {
@@ -711,7 +713,7 @@ func dispatchOneBatch(
 		}
 		if len(ready) == 0 {
 			releaseOutput()
-			if err := applyEslintPluginResults(window, failures, timing, onDiagnostic, onNotice); err != nil {
+			if err := applyEslintPluginResults(window, failures, timing, onDiagnostic, onNotice, onFailure); err != nil {
 				return err
 			}
 			continue
@@ -732,17 +734,22 @@ func dispatchOneBatch(
 		res, dispatchErr := output.Dispatch(ctx, req)
 		releaseOutput()
 		releaseBuilder()
-		if dispatchErr != nil || res == nil {
-			if err := applyEslintPluginResults(failed, failures, timing, onDiagnostic, onNotice); err != nil {
+		if dispatchErr != nil {
+			if err := applyEslintPluginResults(failed, failures, timing, onDiagnostic, onNotice, onFailure); err != nil {
 				return err
 			}
-			if dispatchErr != nil {
-				return dispatchErr
+			for _, f := range ready {
+				onFailure.incomplete(f)
 			}
-			continue
+			for _, f := range batch[offset:] {
+				onFailure.incomplete(f)
+			}
+			return dispatchErr
 		}
-		failures.Results = append(failures.Results, res.Results...)
-		if err := applyEslintPluginResults(window, failures, timing, onDiagnostic, onNotice); err != nil {
+		if res != nil {
+			failures.Results = append(failures.Results, res.Results...)
+		}
+		if err := applyEslintPluginResults(window, failures, timing, onDiagnostic, onNotice, onFailure); err != nil {
 			return err
 		}
 	}
@@ -845,6 +852,7 @@ func applyEslintPluginResults(
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 	onNotice func(EslintPluginProtocolNotice),
+	onFailure pluginFileFailureHandler,
 ) error {
 	byPath := map[string]*EslintPluginFileResult{}
 	for i := range res.Results {
@@ -859,6 +867,7 @@ func applyEslintPluginResults(
 					FilePath: f.Path,
 				})
 			}
+			onFailure.incomplete(f)
 			continue
 		}
 		if fr.Cancelled {
@@ -868,18 +877,21 @@ func applyEslintPluginResults(
 			timing.addFileRuleTimesMS(fr.FilePath, fr.RuleTimes)
 		}
 
+		tsf, ok := eslintPluginSourceFile(f)
+		if !ok || fr.ParseError != "" {
+			onFailure.incomplete(f)
+			if !ok {
+				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, newTextSourceFile(""),
+					"rslint/plugin-lint-error", "ESLint plugin lint failed: no source frame for "+f.Path))
+			} else if fr.ParseError != eslintPluginShutdownSentinel {
+				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf,
+					"rslint/plugin-lint-error", "ESLint plugin lint failed: "+fr.ParseError))
+			}
+			continue
+		}
 		sevByRule := map[string]rule.DiagnosticSeverity{}
 		for _, cr := range f.Rules {
 			sevByRule[cr.Name] = cr.Severity
-		}
-		tsf, ok := eslintPluginSourceFile(f)
-		if !ok {
-			// No frame to rebuild against (neither a native SourceFile nor an
-			// overlay was provided) — shouldn't happen; surface rather than
-			// collapse every diagnostic to offset 0.
-			onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, newTextSourceFile(""),
-				"rslint/plugin-lint-error", "ESLint plugin lint failed: no source frame for "+f.Path))
-			continue
 		}
 		text := tsf.Text()
 		// The worker computes every offset against the BOM-stripped source (it
@@ -896,35 +908,24 @@ func applyEslintPluginResults(
 			return p
 		}
 
-		// Program owns syntax errors. Projection/decoder and worker failures
-		// use this existing error field and must remain visible. The sole benign
-		// value is the "shutdown" sentinel (graceful pool teardown racing a task).
-		if fr.ParseError != "" {
-			if fr.ParseError != eslintPluginShutdownSentinel {
-				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf,
-					"rslint/plugin-lint-error", "ESLint plugin lint failed: "+fr.ParseError))
-			}
-			continue
-		}
+		unknownRule := false
 		// Rule throws are authoritative — the editor never renders stderr,
 		// so surface each as a visible diagnostic.
+		var failedRules []string
 		for _, re := range fr.RuleErrors {
+			if onFailure != nil {
+				if severity, known := sevByRule[re.Rule]; !known {
+					unknownRule = true
+				} else if severity == rule.SeverityError && !slices.Contains(failedRules, re.Rule) {
+					failedRules = append(failedRules, re.Rule)
+				}
+			}
 			onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf, re.Rule,
 				"rule error: "+re.Message))
 		}
 
 		for _, d := range fr.Diagnostics {
 			sev, known := sevByRule[d.RuleName]
-			if !known {
-				sev = rule.SeverityError
-				if onNotice != nil {
-					onNotice(EslintPluginProtocolNotice{
-						Kind:     EslintPluginUnconfiguredDiagnostic,
-						FilePath: f.Path,
-						RuleName: d.RuleName,
-					})
-				}
-			}
 			start := clamp(d.StartPos)
 			end := clamp(d.EndPos)
 			if end < start {
@@ -940,10 +941,40 @@ func applyEslintPluginResults(
 				FixesPtr:    rebuildEslintPluginFixes(d.Fixes, text, clamp),
 				Suggestions: rebuildEslintPluginSuggestions(d.Suggestions, text, clamp),
 			}
+			if !known {
+				unknownRule = true
+				if onNotice != nil {
+					onNotice(EslintPluginProtocolNotice{Kind: EslintPluginUnconfiguredDiagnostic, FilePath: f.Path, RuleName: d.RuleName})
+				}
+				rd.Severity = rule.SeverityError
+				// The worker may have claimed the name of a completed native rule.
+				rd.Origin = rule.DiagnosticOriginPluginFailure
+			}
 			onDiagnostic(rd)
+		}
+		if unknownRule {
+			// A mislabeled finding leaves the configured plugin counts ambiguous.
+			onFailure.incomplete(f)
+		} else if len(failedRules) != 0 {
+			onFailure(f.Path, PluginFileFailure{Rules: failedRules})
 		}
 	}
 	return nil
+}
+
+type pluginFileFailureHandler func(path string, failure PluginFileFailure)
+
+func (report pluginFileFailureHandler) incomplete(file EslintPluginFileInput) {
+	if report == nil {
+		return
+	}
+	failure := PluginFileFailure{FileIncomplete: true}
+	for _, configured := range file.Rules {
+		if configured.Severity == rule.SeverityError {
+			failure.Rules = append(failure.Rules, configured.Name)
+		}
+	}
+	report(file.Path, failure)
 }
 
 // Diagnostics use the same BOM-stripped source that was frozen in the frame.
@@ -963,6 +994,7 @@ func eslintPluginSourceFile(f EslintPluginFileInput) (ast.SourceFileLike, bool) 
 
 func makeEslintPluginErrorDiagnostic(path string, sf ast.SourceFileLike, ruleName, msg string) rule.RuleDiagnostic {
 	return rule.RuleDiagnostic{
+		Origin:     rule.DiagnosticOriginPluginFailure,
 		RuleName:   ruleName,
 		Range:      core.NewTextRange(0, 0),
 		Message:    rule.RuleMessage{Description: msg},

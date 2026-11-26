@@ -13,14 +13,16 @@ import (
 // invocation target. A nil trie means the current subtree is unbounded. A
 // leaf still visits that directory so its sources can govern files within it.
 type discoveryTargetTrie struct {
-	children map[tspath.Path]*discoveryTargetTrie
-	files    []*rslintconfig.PathIdentity
+	children          map[tspath.Path]*discoveryTargetTrie
+	files             []*rslintconfig.PathIdentity
+	hasScannedFiles   bool
+	hasScannedSubtree bool
 }
 
 func addDiscoveryTarget(
 	root *discoveryTargetTrie,
 	configDir string,
-	file *rslintconfig.PathIdentity,
+	file *DiscoveryFile,
 	useCaseSensitive bool,
 ) bool {
 	relative, within := rslintconfig.RelativePathWithinConfigRoot(
@@ -32,7 +34,11 @@ func addDiscoveryTarget(
 		return false
 	}
 
+	scanned := !file.Explicit
 	node := root
+	if scanned {
+		node.hasScannedSubtree = true
+	}
 	for _, component := range splitDiscoveryPath(relative) {
 		if node.children == nil {
 			node.children = make(map[tspath.Path]*discoveryTargetTrie)
@@ -44,8 +50,14 @@ func addDiscoveryTarget(
 			node.children[identity] = child
 		}
 		node = child
+		if scanned {
+			node.hasScannedSubtree = true
+		}
 	}
-	node.files = append(node.files, file)
+	node.files = append(node.files, &file.PathIdentity)
+	if scanned {
+		node.hasScannedFiles = true
+	}
 	return true
 }
 
@@ -148,7 +160,7 @@ func (coordinator *discoveryCoordinator) targetAncestorTries(
 			if trie == nil {
 				trie = &discoveryTargetTrie{}
 			}
-			if addDiscoveryTarget(trie, root, &file.PathIdentity, useCaseSensitive) {
+			if addDiscoveryTarget(trie, root, file, useCaseSensitive) {
 				tries[root] = trie
 			}
 		}

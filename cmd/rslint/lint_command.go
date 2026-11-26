@@ -25,6 +25,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/suppressions"
 	"github.com/web-infra-dev/rslint/internal/term"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -259,6 +260,19 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			fmt.Fprintf(os.Stderr, "error: %s\n", optionError.Error())
 		}
 		return 1
+	}
+
+	var baseline *suppressions.File
+	if !typeCheckOnly {
+		var err error
+		baseline, err = suppressions.Open(workingDirectory, args.Suppressions)
+		if err == nil && baseline != nil {
+			err = baseline.ValidateWritable()
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 2
+		}
 	}
 
 	outputOptions := output.Options{
@@ -532,7 +546,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
-	demand := linter.ArtifactDemand{}
+	demand := linter.ArtifactDemand{IncompleteRuleResults: baseline != nil}
 	if fix {
 		demand.Native = rule.EditDemandAutofix
 		demand.Plugin = rule.EditDemandAll
@@ -551,8 +565,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			linter.AutofixPolicy{
 				VerifyAfterLastRound: true,
 				VerificationDemand: linter.ArtifactDemand{
-					Native: rule.EditDemandNone,
-					Plugin: rule.EditDemandAll,
+					IncompleteRuleResults: baseline != nil,
+					Native:                rule.EditDemandNone,
+					Plugin:                rule.EditDemandAll,
 				},
 			},
 			dispatch,
@@ -611,7 +626,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
-	if format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
+	var suppression suppressionOutcome
+	if baseline != nil {
+		suppression = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, args)
+		allDiags = suppression.diagnostics
+	}
+	if !suppression.failed() && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0
 	}
 
@@ -649,6 +669,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		Diagnostics:   allDiags,
 		Summary:       summary,
 		MaxWarnings:   maxWarnings,
+		Failed:        suppression.failed(),
 		IncludeSource: format == output.FormatDefault,
 	})
 	if err != nil {
@@ -671,6 +692,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	if format != output.FormatDefault && outcome.Kind == output.OutcomeWarningLimitExceeded {
 		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)
 	}
+	if message := suppression.message(); message != "" {
+		fmt.Fprintln(os.Stderr, message)
+	}
 
 	// The timing table goes to stderr so machine-readable stdout formats
 	// (jsonline/github/gitlab) stay parseable with --timing enabled. It is
@@ -687,6 +711,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
+	if suppression.failed() {
+		return 2
+	}
 	if outcome.Failed() {
 		return 1
 	}

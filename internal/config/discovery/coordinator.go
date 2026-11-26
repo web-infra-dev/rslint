@@ -25,6 +25,7 @@ type discoveryCoordinator struct {
 	targetFiles         []rslintconfig.PathIdentity
 	targetDirectories   []rslintconfig.DirectoryIdentity
 	reachableFiles      map[string]bool
+	targetConfigFailure bool
 }
 
 func newDiscoveryCoordinator(
@@ -212,6 +213,9 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 		return nil, err
 	}
 	for _, seed := range seeds {
+		if seed.configFailed && (seed.explicitFile || directorySeedByPath[seed.path] == nil) {
+			coordinator.targetConfigFailure = true
+		}
 		if seed.ownerDir == "" {
 			continue
 		}
@@ -251,6 +255,7 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 			ownerPath:          seed.ownerPath,
 			ignoreMatcher:      ignoreMatcher,
 			configReachable:    true,
+			configFailed:       seed.configFailed,
 			gitCursor:          seed.gitCursor,
 			targets:            targetsByRoot[directory],
 			recursive:          coordinator.recursiveDirectory(directory),
@@ -317,16 +322,17 @@ func (coordinator *discoveryCoordinator) catalog() (*ConfigCatalog, error) {
 		}
 	}
 	return &ConfigCatalog{
-		TransactionID:      coordinator.transactionID,
-		GitPolicy:          rslintconfig.NewGitPolicy(coordinator.git.Snapshot()),
-		PathSpaces:         coordinator.modules.pathSpaces,
-		TargetFiles:        targetFiles,
-		TargetDirectories:  coordinator.targetDirectories,
-		Configs:            configs,
-		EffectiveConfigIDs: effectiveIDs,
-		EslintPlugins:      eslintPlugins,
-		Scopes:             scopes,
-		Failures:           coordinator.modules.failures(),
+		TransactionID:       coordinator.transactionID,
+		GitPolicy:           rslintconfig.NewGitPolicy(coordinator.git.Snapshot()),
+		PathSpaces:          coordinator.modules.pathSpaces,
+		TargetFiles:         targetFiles,
+		TargetDirectories:   coordinator.targetDirectories,
+		Configs:             configs,
+		EffectiveConfigIDs:  effectiveIDs,
+		EslintPlugins:       eslintPlugins,
+		Scopes:              scopes,
+		Failures:            coordinator.modules.failures(),
+		TargetConfigFailure: coordinator.targetConfigFailure,
 		Stats: ConfigDiscoveryStats{
 			DirectoriesVisited: coordinator.walkStats.directoriesVisited,
 			ConfigsRequested:   coordinator.modules.configsRequested,

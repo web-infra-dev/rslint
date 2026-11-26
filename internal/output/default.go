@@ -111,6 +111,10 @@ func renderSummary(w *bufio.Writer, report Report, elapsed time.Duration, colors
 			pluralize(report.counts.Warnings, "warning", "warnings"),
 			report.outcome.WarningLimit,
 		)
+	case OutcomeFailed:
+		label = "error"
+		labelColor = colors.ErrorText
+		message = fmt.Sprintf("%s failed%s in %s", subject, fixes, formatElapsed(elapsed))
 	default:
 		label = "success"
 		labelColor = colors.SuccessText
