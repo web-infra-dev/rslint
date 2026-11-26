@@ -19,6 +19,12 @@ func TestValidTitleRule(t *testing.T) {
 	valid := []rule_tester.ValidTestCase{
 		{Code: `describe("the correct way to properly handle all the things", () => {});`},
 		{Code: `test("that all is as it should be", () => {});`},
+		// Non-identifier and broken-chain receivers must not be treated as Jest tests (#2630).
+		{Code: `const re = /a/; const text = "a"; /a/.test(text); re.test(text);`},
+		{Code: `new RegExp("a").test(text);`},
+		{Code: `patterns[0].test(text);`},
+		{Code: `re!.test(text);`},
+		{Code: `this.test(text);`},
 		{
 			Code: `it("correctly sets the value", () => {});`,
 			Options: []interface{}{

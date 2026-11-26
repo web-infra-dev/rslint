@@ -335,7 +335,13 @@ func (analysis *RstestCallAnalysis) expectConfigMember(node *ast.Node) string {
 	if len(entries) > 1 {
 		secondName = entries[1].Name
 	}
-	match := rstestExpectRootMatch(entries[0].Node, secondName, len(entries) > 1, analysis)
+	match := rstestExpectRootMatch(
+		entries[0].Node,
+		secondName,
+		len(entries) > 1,
+		isReceiverEntryInvoked(entries, false),
+		analysis,
+	)
 	if match.ok && match.index == len(entries)-1 {
 		return "expect"
 	}
@@ -564,6 +570,8 @@ func (analysis *RstestCallAnalysis) indexSourceFile() {
 		switch node.Kind {
 		case ast.KindImportDeclaration:
 			analysis.collectImportCandidates(node.AsImportDeclaration())
+		case ast.KindImportEqualsDeclaration:
+			analysis.collectImportEqualsCandidates(node)
 		case ast.KindVariableDeclaration:
 			analysis.collectVariableCandidates(node, &aliases)
 			analysis.recordFunction(node)
@@ -658,6 +666,19 @@ func (analysis *RstestCallAnalysis) collectImportCandidates(
 	}
 }
 
+func (analysis *RstestCallAnalysis) collectImportEqualsCandidates(node *ast.Node) {
+	if node == nil || node.Kind != ast.KindImportEqualsDeclaration {
+		return
+	}
+	declaration := node.AsImportEqualsDeclaration()
+	if declaration == nil || declaration.IsTypeOnly || declaration.Name() == nil {
+		return
+	}
+	if testFramework.IsImportEqualsOfModules(node, RstestAllImportModules) {
+		analysis.candidates[declaration.Name().Text()] |= rstestCandidateAll
+	}
+}
+
 func (analysis *RstestCallAnalysis) collectVariableCandidates(
 	node *ast.Node,
 	aliases *[]rstestAliasCandidate,
@@ -705,14 +726,22 @@ func (analysis *RstestCallAnalysis) collectVariableCandidates(
 		}
 		return
 	}
-	if name.Kind != ast.KindIdentifier || node.Parent == nil ||
-		node.Parent.Kind != ast.KindVariableDeclarationList ||
-		node.Parent.Flags&ast.NodeFlagsConst == 0 {
+	if name.Kind != ast.KindIdentifier {
 		return
 	}
 	localName := name.AsIdentifier().Text
+	isConst := node.Parent != nil &&
+		node.Parent.Kind == ast.KindVariableDeclarationList &&
+		node.Parent.Flags&ast.NodeFlagsConst != 0
 	if isRstestRequireCall(initializer) || isImportMetaRstest(initializer) {
-		analysis.candidates[localName] |= rstestCandidateAll
+		if isConst {
+			analysis.candidates[localName] |= rstestCandidateAll
+		} else {
+			analysis.candidates[localName] |= rstestCandidateExpect | rstestCandidateAssert
+		}
+		return
+	}
+	if !isConst {
 		return
 	}
 	root := testFramework.ResolveFirstIdentifier(initializer)

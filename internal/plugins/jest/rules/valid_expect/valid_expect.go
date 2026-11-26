@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 	sharedValidExpect "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/valid_expect"
 	"slices"
 	"strconv"
@@ -281,19 +282,22 @@ var ValidExpectRule = rule.Rule{
 					case utils.ExpectParseReasonMatcherNotFound:
 						ctx.ReportNode(reportNode, buildErrorMatcherNotFoundMessage())
 					case utils.ExpectParseReasonMatcherNotCalled:
-						entries := utils.GetJestFnMemberEntries(reportNode)
-						last := entries[len(entries)-1]
-						if utils.EXPECT_MODIFIER_NAMES[last.Name] {
-							ctx.ReportNode(last.Node, buildErrorMatcherNotFoundMessage())
+						propNode, propName := testFramework.AccessorPropertyAndName(reportNode)
+						if propNode == nil {
+							ctx.ReportNode(reportNode, buildErrorMatcherNotCalledMessage())
 							return
 						}
-						ctx.ReportNode(last.Node, buildErrorMatcherNotCalledMessage())
+						if propName != "" && utils.EXPECT_MODIFIER_NAMES[propName] {
+							ctx.ReportNode(propNode, buildErrorMatcherNotFoundMessage())
+							return
+						}
+						ctx.ReportNode(propNode, buildErrorMatcherNotCalledMessage())
 					case utils.ExpectParseReasonModifierUnknown:
 						ctx.ReportNode(reportNode, buildErrorModifierUnknownMessage())
 					}
 					return
 				}
-				if parsed.Kind != utils.JestFnTypeExpect {
+				if parsed.Kind != utils.JestFnTypeExpect || parsed.Head.Local.Node == nil {
 					return
 				}
 

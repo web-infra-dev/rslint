@@ -115,6 +115,11 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: "test(\"valid-expect\", async () => { await expect(Promise.resolve(2)).toResolve(); });", Options: map[string]interface{}{"asyncMatchers": []interface{}{"toResolveWith"}}},
 			{Code: "test(\"valid-expect\", async () => { expect(Promise.resolve(2)).toResolve(); });", Options: map[string]interface{}{"asyncMatchers": []interface{}{"toResolveWith"}}},
 			{Code: "expect().pass();", Options: map[string]interface{}{"minArgs": 0}},
+			{Code: "this.expect(1).toBe(2);"},
+			{Code: "/a/.expect(1).toBe(2);"},
+			{Code: "this.expect(1);"},
+			{Code: "patterns[0].expect(1).toBe(2);"},
+			{Code: "new Foo().expect(1).toBe(2);"},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -795,6 +800,24 @@ func TestValidExpectRule(t *testing.T) {
 				Code: "expect(true).assertions;",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "matcherNotCalled", Column: 14, EndColumn: 24},
+				},
+			},
+			{
+				Code: "expect(1)[0];",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matcherNotCalled", Column: 11, EndColumn: 12},
+				},
+			},
+			{
+				Code: "expect(1)[0].foo;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matcherNotCalled", Column: 14, EndColumn: 17},
+				},
+			},
+			{
+				Code: "expect(1)[0].not;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matcherNotFound", Column: 14, EndColumn: 17},
 				},
 			},
 			{

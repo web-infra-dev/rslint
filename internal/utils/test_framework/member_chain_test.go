@@ -98,6 +98,129 @@ func TestGetMemberEntriesRejectsDynamicElementAccess(t *testing.T) {
 	}
 }
 
+func TestGetMemberEntriesRejectsNonIdentifierRoots(t *testing.T) {
+	cases := []string{
+		`/a/.test(text)`,
+		`(/a/).test(text)`,
+		`/a/["test"](text)`,
+		`new RegExp("a").test(text)`,
+		`this.test()`,
+		`class C extends Base { m() { super.test(); } }`,
+		`({ test() {} }).test()`,
+		`[].describe()`,
+		`"something".describe()`,
+		"``.test()",
+		`(a || b).test()`,
+		`(cond ? a : b).test()`,
+		`patterns[0].test(text)`,
+		`map[getKey()].test(text)`,
+		`a[""].test(text)`,
+		`re!.test(text)`,
+		`(re as RegExp).test(text)`,
+		`import.meta.rstest.expect(1).toBe(1)`,
+		`(/a/)().test(text)`,
+		`this.expect(1).toBe(2)`,
+	}
+	for _, code := range cases {
+		t.Run(code, func(t *testing.T) {
+			_, call := parseFirstCall(t, code)
+			if entries := GetMemberEntries(call); len(entries) != 0 {
+				t.Fatalf("GetMemberEntries(%s) = %#v, want nil", code, entries)
+			}
+		})
+	}
+}
+
+func TestGetMemberEntriesFromRoot(t *testing.T) {
+	matchImportMetaRstest := func(node *ast.Node) (MemberEntry, bool) {
+		node = ast.SkipParentheses(node)
+		if node == nil || node.Kind != ast.KindPropertyAccessExpression {
+			return MemberEntry{}, false
+		}
+		prop := node.AsPropertyAccessExpression()
+		if prop.Name() == nil || prop.Name().Text() != "rstest" {
+			return MemberEntry{}, false
+		}
+		expr := ast.SkipParentheses(prop.Expression)
+		if expr == nil || expr.Kind != ast.KindMetaProperty {
+			return MemberEntry{}, false
+		}
+		return MemberEntry{Name: "rstest", Node: prop.Name()}, true
+	}
+
+	_, call := parseFirstCall(t, `import.meta.rstest.expect(1).toBe(1)`)
+	entries := GetMemberEntriesFromRoot(call, false, matchImportMetaRstest)
+	if got := JoinMemberEntries(entries); got != "rstest.expect.toBe" {
+		t.Fatalf("GetMemberEntriesFromRoot = %q, want %q", got, "rstest.expect.toBe")
+	}
+
+	for _, code := range []string{
+		`import.meta.other.rstest.expect(1).toBe(1)`,
+		`expect(1).toBe(1)`,
+		`(import.meta.rstest.expect(1) as any).resolves.toBe(1)`,
+	} {
+		_, c := parseFirstCall(t, code)
+		if got := GetMemberEntriesFromRoot(c, false, matchImportMetaRstest); len(got) != 0 {
+			t.Fatalf("GetMemberEntriesFromRoot(%s, false) = %#v, want nil", code, got)
+		}
+	}
+
+	_, wrapped := parseFirstCall(t, `(import.meta.rstest.expect(1) as any).resolves.toBe(1)`)
+	entries = GetMemberEntriesFromRoot(wrapped, true, matchImportMetaRstest)
+	if got := JoinMemberEntries(entries); got != "rstest.expect.resolves.toBe" {
+		t.Fatalf("GetMemberEntriesFromRoot(wrapped, true) = %q, want %q", got, "rstest.expect.resolves.toBe")
+	}
+
+	if got := GetMemberEntriesFromRoot(call, false, func(n *ast.Node) (MemberEntry, bool) {
+		return MemberEntry{Name: "", Node: n}, true
+	}); len(got) != 0 {
+		t.Fatalf("empty root name entries = %#v, want nil", got)
+	}
+	if got := GetMemberEntriesFromRoot(call, false, func(*ast.Node) (MemberEntry, bool) {
+		return MemberEntry{Name: "rstest", Node: nil}, true
+	}); len(got) != 0 {
+		t.Fatalf("nil root node entries = %#v, want nil", got)
+	}
+
+	_, identCall := parseFirstCall(t, `expect(1).toBe(1)`)
+	if got := JoinMemberEntries(GetMemberEntriesFromRoot(identCall, false, nil)); got != "expect.toBe" {
+		t.Fatalf("GetMemberEntriesFromRoot(nil matcher) = %q, want %q", got, "expect.toBe")
+	}
+}
+
+func TestAccessorPropertyAndName(t *testing.T) {
+	tests := []struct {
+		code     string
+		wantName string
+		wantKind ast.Kind
+	}{
+		{`a.then()`, "then", ast.KindIdentifier},
+		{`(a.then)()`, "then", ast.KindIdentifier},
+		{`a["then"]()`, "then", ast.KindStringLiteral},
+		{"a[`catch`]()", "catch", ast.KindNoSubstitutionTemplateLiteral},
+		{`a[("then")]()`, "then", ast.KindStringLiteral},
+		{`a[key]()`, "key", ast.KindIdentifier},
+		{`a[0]()`, "", ast.KindNumericLiteral},
+		{`a[getKey()]()`, "", ast.KindCallExpression},
+	}
+	for _, test := range tests {
+		t.Run(test.code, func(t *testing.T) {
+			_, call := parseFirstCall(t, test.code)
+			propNode, name := AccessorPropertyAndName(call.AsCallExpression().Expression)
+			if propNode == nil || propNode.Kind != test.wantKind || name != test.wantName {
+				t.Fatalf("AccessorPropertyAndName(%s) = (%v, %q), want (%v, %q)", test.code, propNode, name, test.wantKind, test.wantName)
+			}
+		})
+	}
+	_, bareCall := parseFirstCall(t, `a()`)
+	if propNode, name := AccessorPropertyAndName(bareCall.AsCallExpression().Expression); propNode != nil || name != "" {
+		t.Fatalf("AccessorPropertyAndName(identifier) = (%v, %q), want (nil, \"\")", propNode, name)
+	}
+	if propNode, name := AccessorPropertyAndName(nil); propNode != nil || name != "" {
+		t.Fatalf("AccessorPropertyAndName(nil) = (%v, %q), want (nil, \"\")", propNode, name)
+	}
+}
+
 func TestMemberChainTransparentExpressionPolicy(t *testing.T) {
 	tests := []string{
 		`(expect(value) as any).resolves.toBe(1)`,
@@ -109,15 +232,10 @@ func TestMemberChainTransparentExpressionPolicy(t *testing.T) {
 	for _, code := range tests {
 		t.Run(code, func(t *testing.T) {
 			_, call := parseFirstCall(t, code)
-			entries := GetMemberEntries(call)
-			defaultNames := make([]string, len(entries))
-			for i, entry := range entries {
-				defaultNames[i] = entry.Name
+			if entries := GetMemberEntries(call); len(entries) != 0 {
+				t.Fatalf("default member entries = %#v, want nil past transparent wrapper", entries)
 			}
-			if want := []string{"resolves", "toBe"}; !slices.Equal(defaultNames, want) {
-				t.Fatalf("default member names = %v, want wrapper-bounded suffix %v", defaultNames, want)
-			}
-			entries = GetMemberEntriesThroughTransparentExpressions(call)
+			entries := GetMemberEntriesThroughTransparentExpressions(call)
 			names := make([]string, len(entries))
 			for i, entry := range entries {
 				names[i] = entry.Name
@@ -171,6 +289,11 @@ func TestResolveFirstIdentifier(t *testing.T) {
 	if identifier := ResolveFirstIdentifier(logicalCall.AsCallExpression().Expression); identifier != nil {
 		t.Fatalf("logical expression identifier = %#v, want nil", identifier)
 	}
+
+	_, missingReceiverCall := parseFirstCall(t, "().test()")
+	if identifier := ResolveFirstIdentifier(missingReceiverCall.AsCallExpression().Expression); identifier != nil {
+		t.Fatalf("missing receiver identifier = %#v, want nil", identifier)
+	}
 }
 
 func TestCalleeChainName(t *testing.T) {
@@ -186,8 +309,7 @@ func TestCalleeChainName(t *testing.T) {
 		// Identifier keys are supported accessor names upstream, matching
 		// getNodeName's treatment of computed identifier properties.
 		{`foo[bar]();`, "foo.bar"},
-		// Unsupported computed keys break the chain entirely, unlike
-		// GetMemberEntries which truncates.
+		// Unsupported computed keys break the chain entirely.
 		{`foo[bar.baz]();`, ""},
 		{`foo[1]();`, ""},
 		{"foo[`bar${x}`]();", ""},
@@ -202,9 +324,9 @@ func TestCalleeChainName(t *testing.T) {
 		{`foo?.bar();`, "foo.bar"},
 		// Tagged templates resolve through their tag.
 		{"foo.bar`x`();", "foo.bar"},
-		// A non-identifier root yields no name, and property access on it
-		// keeps the empty left side.
+		// A non-identifier root or incomplete property access yields no name.
 		{`"str".includes();`, ""},
+		{`foo.();`, ""},
 	}
 	for _, test := range tests {
 		t.Run(test.code, func(t *testing.T) {

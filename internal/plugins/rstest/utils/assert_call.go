@@ -78,7 +78,7 @@ func (analysis *RstestCallAnalysis) resolveAssertCall(node *ast.Node) bool {
 	case rstestExpectRootDirect:
 		return true
 	case rstestExpectRootReceiver:
-		return entries.count > 1 && entries.secondName == rstestAssertAPIName
+		return !entries.firstInvoked && entries.count > 1 && entries.secondName == rstestAssertAPIName
 	default:
 		return false
 	}
@@ -99,6 +99,20 @@ func classifyRstestAssertRoot(
 	analysis *RstestCallAnalysis,
 ) rstestExpectRootKind {
 	ctx := analysis.ctx
+	initializations := 0
+	for _, declaration := range symbol.Declarations {
+		switch declaration.Kind {
+		case ast.KindVariableDeclaration, ast.KindBindingElement:
+			if internalUtils.IsVariableWriteReference(declaration.Name()) {
+				initializations++
+			}
+		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration, ast.KindFunctionDeclaration:
+			initializations++
+		}
+		if initializations > 1 {
+			return rstestExpectRootNone
+		}
+	}
 	if ctx.Refs != nil {
 		for _, reference := range ctx.Refs.References(symbol) {
 			if internalUtils.IsWriteReference(reference) {
@@ -139,6 +153,9 @@ func isImportMetaRstestAssertCall(node *ast.Node) bool {
 	if call == nil {
 		return false
 	}
-	_, parts, _, ok := parseImportMetaRstestChain(call.Expression)
-	return ok && len(parts) > 0 && parts[0].name == rstestAssertAPIName
+	return isImportMetaRstestMemberCall(
+		importMetaRstestMemberEntries(call.Expression, false),
+		rstestAssertAPIName,
+		false,
+	)
 }

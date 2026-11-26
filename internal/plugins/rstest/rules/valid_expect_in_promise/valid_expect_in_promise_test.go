@@ -83,6 +83,9 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `let handler; test("case", () => promise.then(handler));`},
 			{Code: `declare const handler: () => void; test("case", () => promise.then(handler));`},
 			{Code: `let handler: (value: unknown) => void; beforeEach(() => { handler = value => expect(value).toBe(1); }); test("case", () => promise.then(handler));`},
+			{Code: `test("case", () => { promise.then(value => this.assert(value)); });`},
+			{Code: `test("case", () => { promise.then(value => /a/.assert(value)); });`},
+			{Code: `test("case", () => { promise.then(value => this.expect(value).toBe(1)); });`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// A key behind parentheses is a chain the identifier table cannot
@@ -169,6 +172,30 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 					MessageId: "expectInFloatingPromise",
 					Line:      1,
 					Column:    58,
+				}},
+			},
+			{
+				Code: `let api = import.meta.rstest; test("case", () => { promise.then(value => api.assert.equal(value, 1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
+				Code: `let rstest = require("@rstest/core"); test("case", () => { promise.then(value => rstest.assert.equal(value, 1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
+				Code: `import r = require("@rstest/core"); test("case", () => { promise.then(value => r.assert.equal(value, 1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
+				Code: `const method = "equal"; test("case", () => { promise.then(value => import.meta.rstest.assert[method](value, 1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
 				}},
 			},
 			{

@@ -30,6 +30,10 @@ func TestNoDeprecatedFunctionsRule(t *testing.T) {
 			{Code: `jest.genMockFromModule`, Settings: jestSettings("25")},
 			{Code: `jest.genMockFromModule`, Settings: jestSettings("25.1.1")},
 			{Code: `require.requireActual`, Settings: jestSettings("17.2")},
+			{Code: `this.jest.resetModuleRegistry()`, Settings: jestSettings("21")},
+			{Code: `arr[0].jest.resetModuleRegistry()`, Settings: jestSettings("21")},
+			{Code: `(/a/).jest.addMatchers()`, Settings: jestSettings("24")},
+			{Code: `re!.jest.runTimersToTime()`, Settings: jestSettings("22")},
 		},
 		[]rule_tester.InvalidTestCase{
 			// jest.resetModuleRegistry -> jest.resetModules (Jest 21)

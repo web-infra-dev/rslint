@@ -168,25 +168,26 @@ func isRstestExpectCall(
 	if node == nil || node.Kind != ast.KindCallExpression || FindTopMostCallExpression(node) != node {
 		return false
 	}
-	if isImportMetaRstestExpectCall(node) {
-		return true
+	expression := findTopMostRstestExpectExpressionOptions(node, false)
+	entries := firstRstestExpectEntries(expression)
+	if entries.count > 0 && entries.first != nil && entries.first.Kind == ast.KindIdentifier {
+		return rstestExpectRootMatch(
+			entries.first,
+			entries.secondName,
+			entries.count > 1,
+			entries.firstInvoked,
+			analysis,
+		).ok
 	}
-	entries := firstRstestExpectEntries(node)
-	if entries.count == 0 || entries.first == nil || entries.first.Kind != ast.KindIdentifier {
-		return false
-	}
-	return rstestExpectRootMatch(
-		entries.first,
-		entries.secondName,
-		entries.count > 1,
-		analysis,
-	).ok
+	metaEntries := importMetaRstestMemberEntries(expression, false)
+	return isImportMetaRstestMemberCall(metaEntries, "expect", false)
 }
 
 type rstestExpectEntries struct {
-	first      *ast.Node
-	secondName string
-	count      uint8
+	first        *ast.Node
+	secondName   string
+	count        uint8
+	firstInvoked bool
 }
 
 func (entries *rstestExpectEntries) append(name string, node *ast.Node) {
@@ -205,6 +206,9 @@ func (entries *rstestExpectEntries) append(name string, node *ast.Node) {
 }
 
 func firstRstestExpectEntries(node *ast.Node) rstestExpectEntries {
+	if node == nil {
+		return rstestExpectEntries{}
+	}
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return rstestExpectEntries{}
@@ -212,6 +216,9 @@ func firstRstestExpectEntries(node *ast.Node) rstestExpectEntries {
 
 	switch node.Kind {
 	case ast.KindIdentifier:
+		if node.AsIdentifier().Text == "" {
+			return rstestExpectEntries{}
+		}
 		return rstestExpectEntries{
 			first: node,
 			count: 1,
@@ -219,38 +226,66 @@ func firstRstestExpectEntries(node *ast.Node) rstestExpectEntries {
 	case ast.KindPropertyAccessExpression:
 		property := node.AsPropertyAccessExpression()
 		entries := firstRstestExpectEntries(property.Expression)
+		if entries.count == 0 {
+			return rstestExpectEntries{}
+		}
 		name := property.Name()
-		if name != nil {
-			switch name.Kind {
-			case ast.KindIdentifier:
-				entries.append(name.AsIdentifier().Text, name)
-			case ast.KindPrivateIdentifier:
-				entries.append(name.AsPrivateIdentifier().Text, name)
+		if name == nil {
+			return rstestExpectEntries{}
+		}
+		switch name.Kind {
+		case ast.KindIdentifier:
+			if text := name.AsIdentifier().Text; text != "" {
+				entries.append(text, name)
+				return entries
+			}
+		case ast.KindPrivateIdentifier:
+			if text := name.AsPrivateIdentifier().Text; text != "" {
+				entries.append(text, name)
+				return entries
 			}
 		}
-		return entries
+		return rstestExpectEntries{}
 	case ast.KindElementAccessExpression:
 		element := node.AsElementAccessExpression()
 		entries := firstRstestExpectEntries(element.Expression)
+		if entries.count == 0 || element.ArgumentExpression == nil {
+			return rstestExpectEntries{}
+		}
 		name := ast.SkipParentheses(element.ArgumentExpression)
 		if name == nil {
 			return rstestExpectEntries{}
 		}
 		switch name.Kind {
 		case ast.KindIdentifier:
-			entries.append(name.AsIdentifier().Text, name)
+			if text := name.AsIdentifier().Text; text != "" {
+				entries.append(text, name)
+				return entries
+			}
 		case ast.KindStringLiteral:
-			entries.append(name.AsStringLiteral().Text, name)
+			if text := name.AsStringLiteral().Text; text != "" {
+				entries.append(text, name)
+				return entries
+			}
 		case ast.KindNoSubstitutionTemplateLiteral:
-			entries.append(name.AsNoSubstitutionTemplateLiteral().Text, name)
-		default:
-			return rstestExpectEntries{}
+			if text := name.AsNoSubstitutionTemplateLiteral().Text; text != "" {
+				entries.append(text, name)
+				return entries
+			}
+		}
+		return rstestExpectEntries{}
+	case ast.KindCallExpression:
+		entries := firstRstestExpectEntries(node.AsCallExpression().Expression)
+		if entries.count == 1 {
+			entries.firstInvoked = true
 		}
 		return entries
-	case ast.KindCallExpression:
-		return firstRstestExpectEntries(node.AsCallExpression().Expression)
 	case ast.KindTaggedTemplateExpression:
-		return firstRstestExpectEntries(node.AsTaggedTemplateExpression().Tag)
+		entries := firstRstestExpectEntries(node.AsTaggedTemplateExpression().Tag)
+		if entries.count == 1 {
+			entries.firstInvoked = true
+		}
+		return entries
 	default:
 		return rstestExpectEntries{}
 	}
@@ -279,11 +314,19 @@ func parseRstestExpectCallOptions(
 		return nil
 	}
 	expression := findTopMostRstestExpectExpressionOptions(node, throughTransparentExpressions)
-	entries := testFramework.GetMemberEntries(expression)
+	var entries []testFramework.MemberEntry
 	if throughTransparentExpressions {
 		entries = testFramework.GetMemberEntriesThroughTransparentExpressions(expression)
+	} else {
+		entries = testFramework.GetMemberEntries(expression)
 	}
-	match := rstestExpectMemberMatch(node, entries, analysis, throughTransparentExpressions)
+	var match rstestExpectMatch
+	if len(entries) > 0 {
+		match = rstestExpectMemberMatch(entries, analysis, throughTransparentExpressions)
+	} else if metaEntries := importMetaRstestMemberEntries(expression, throughTransparentExpressions); isImportMetaRstestMemberCall(metaEntries, "expect", throughTransparentExpressions) {
+		entries = metaEntries
+		match = rstestExpectMatch{index: 1, ok: true}
+	}
 	if !match.ok {
 		return nil
 	}
@@ -413,23 +456,111 @@ type rstestExpectMatch struct {
 	fromTestContext bool
 }
 
-// rstestExpectMemberMatch resolves whether node is an expect call and where the
-// expect member sits in entries.
-func rstestExpectMemberMatch(
+// importMetaRstestMemberEntries extracts a call/member chain rooted at
+// `import.meta.rstest` with the same accessor and transparent-wrapper rules as
+// identifier-rooted chains.
+func importMetaRstestMemberEntries(
 	node *ast.Node,
+	throughTransparentExpressions bool,
+) []testFramework.MemberEntry {
+	return testFramework.GetMemberEntriesFromRoot(
+		node,
+		throughTransparentExpressions,
+		func(candidate *ast.Node) (testFramework.MemberEntry, bool) {
+			return importMetaRstestRootEntryOptions(candidate, throughTransparentExpressions)
+		},
+	)
+}
+
+func isImportMetaRstestMemberCall(
+	entries []testFramework.MemberEntry,
+	memberName string,
+	throughTransparentExpressions bool,
+) bool {
+	return len(entries) > 1 &&
+		!isReceiverEntryInvoked(entries, throughTransparentExpressions) &&
+		entries[1].Name == memberName &&
+		!isComputedDynamicMemberName(entries[1].Node)
+}
+
+func isReceiverEntryInvoked(
+	entries []testFramework.MemberEntry,
+	throughTransparentExpressions bool,
+) bool {
+	if len(entries) < 2 {
+		return false
+	}
+	if entries[0].Call != nil {
+		return true
+	}
+	receiver, _ := testFramework.AccessorReceiverAndParent(&entries[1])
+	for receiver != nil {
+		receiver = ast.SkipParentheses(receiver)
+		if receiver == nil {
+			return false
+		}
+		if throughTransparentExpressions {
+			if expr, ok := internalUtils.TransparentExpression(receiver); ok {
+				receiver = expr
+				continue
+			}
+		}
+		return receiver.Kind == ast.KindCallExpression ||
+			receiver.Kind == ast.KindTaggedTemplateExpression
+	}
+	return false
+}
+
+func importMetaRstestRootEntryOptions(
+	node *ast.Node,
+	throughTransparentExpressions bool,
+) (testFramework.MemberEntry, bool) {
+	if node == nil {
+		return testFramework.MemberEntry{}, false
+	}
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return testFramework.MemberEntry{}, false
+	}
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		property := node.AsPropertyAccessExpression()
+		nameNode := property.Name()
+		if nameNode == nil || nameNode.Text() != "rstest" ||
+			!isImportMetaOptions(property.Expression, throughTransparentExpressions) {
+			return testFramework.MemberEntry{}, false
+		}
+		return testFramework.MemberEntry{
+			Name: "rstest",
+			Node: nameNode,
+		}, true
+	case ast.KindElementAccessExpression:
+		element := node.AsElementAccessExpression()
+		if element.ArgumentExpression == nil {
+			return testFramework.MemberEntry{}, false
+		}
+		nameNode := ast.SkipParentheses(element.ArgumentExpression)
+		name, ok := internalUtils.GetStaticStringLiteralValue(nameNode)
+		if !ok || name != "rstest" ||
+			!isImportMetaOptions(element.Expression, throughTransparentExpressions) {
+			return testFramework.MemberEntry{}, false
+		}
+		return testFramework.MemberEntry{
+			Name: name,
+			Node: nameNode,
+		}, true
+	default:
+		return testFramework.MemberEntry{}, false
+	}
+}
+
+// rstestExpectMemberMatch resolves whether an identifier-rooted chain is an
+// expect call and where the expect member sits in entries.
+func rstestExpectMemberMatch(
 	entries []testFramework.MemberEntry,
 	analysis *RstestCallAnalysis,
 	throughTransparentExpressions bool,
 ) rstestExpectMatch {
-	if isImportMetaRstestExpectCallOptions(node, throughTransparentExpressions) {
-		// GetMemberEntries cannot represent the import.meta prefix and starts
-		// the chain at the rstest property, so expect sits at index 1.
-		if len(entries) > 1 && entries[1].Name == "expect" {
-			return rstestExpectMatch{index: 1, ok: true}
-		}
-		return rstestExpectMatch{}
-	}
-
 	if len(entries) == 0 || entries[0].Node == nil || entries[0].Node.Kind != ast.KindIdentifier {
 		return rstestExpectMatch{}
 	}
@@ -441,6 +572,7 @@ func rstestExpectMemberMatch(
 		entries[0].Node,
 		secondName,
 		len(entries) > 1,
+		isReceiverEntryInvoked(entries, throughTransparentExpressions),
 		analysis,
 	)
 }
@@ -449,6 +581,7 @@ func rstestExpectRootMatch(
 	root *ast.Node,
 	secondName string,
 	hasSecond bool,
+	firstInvoked bool,
 	analysis *RstestCallAnalysis,
 ) rstestExpectMatch {
 	if root == nil || root.Kind != ast.KindIdentifier {
@@ -478,7 +611,7 @@ func rstestExpectRootMatch(
 	case rstestExpectRootReceiver:
 		return rstestExpectMatch{
 			index:           1,
-			ok:              hasSecond && secondName == "expect",
+			ok:              !firstInvoked && hasSecond && secondName == "expect",
 			fromTestContext: rootInfo.FromTestContext,
 		}
 	default:
@@ -863,19 +996,6 @@ func classifyRstestExpectRoot(
 		return rstestExpectRoot{Kind: rstestExpectRootReceiver}
 	}
 	return rstestExpectRoot{Kind: rstestExpectRootNone}
-}
-
-func isImportMetaRstestExpectCall(node *ast.Node) bool {
-	return isImportMetaRstestExpectCallOptions(node, false)
-}
-
-func isImportMetaRstestExpectCallOptions(node *ast.Node, throughTransparentExpressions bool) bool {
-	call := node.AsCallExpression()
-	if call == nil {
-		return false
-	}
-	_, parts, _, ok := parseImportMetaRstestChainOptions(call.Expression, throughTransparentExpressions)
-	return ok && len(parts) > 0 && parts[0].name == "expect"
 }
 
 func isImportMetaRstestObjectAlias(symbol *ast.Symbol) bool {

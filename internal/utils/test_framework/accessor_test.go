@@ -354,7 +354,7 @@ func TestAccessorRejectsUnsupportedNodes(t *testing.T) {
 	})
 
 	t.Run("private identifier cannot be renamed", func(t *testing.T) {
-		sourceFile, node := lastAccessor(t, "class C { #b() {} m() { this.#b() } }")
+		sourceFile, node := lastAccessor(t, "class C { #b() {} m(c: C) { c.#b() } }")
 		if node.Kind != ast.KindPrivateIdentifier {
 			t.Fatalf("expected a private identifier, got %v", node.Kind)
 		}
@@ -363,6 +363,10 @@ func TestAccessorRejectsUnsupportedNodes(t *testing.T) {
 		}
 		if _, _, ok := AccessorReplacement(sourceFile, node, "x"); ok {
 			t.Error("AccessorReplacement on a private identifier = true, want false")
+		}
+		_, thisCall := parseFirstCall(t, "class C { #b() {} m() { this.#b() } }")
+		if entries := GetMemberEntries(thisCall); len(entries) != 0 {
+			t.Errorf("GetMemberEntries(this.#b()) = %#v, want nil", entries)
 		}
 	})
 

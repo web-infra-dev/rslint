@@ -48,18 +48,22 @@ func ResolveFunctionReferenceForModules(
 	sourceFile *ast.SourceFile,
 	importModules []string,
 ) (string, *ast.Node, ReferenceMode) {
-	if typeChecker == nil {
-		return localName, localNode, ReferenceModeGlobal
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return "", nil, ReferenceModeGlobal
 	}
 
 	callExpr := node.AsCallExpression()
 	if callExpr == nil {
-		return localName, localNode, ReferenceModeGlobal
+		return "", nil, ReferenceModeGlobal
 	}
 
 	identifier := ResolveFirstIdentifier(callExpr.Expression)
 	if identifier == nil || identifier.Kind != ast.KindIdentifier {
-		return localName, localNode, ReferenceModeGlobal
+		return "", nil, ReferenceModeGlobal
+	}
+
+	if typeChecker == nil {
+		return localName, identifier, ReferenceModeGlobal
 	}
 
 	return ResolveFunctionIdentifierReferenceModules(
@@ -305,7 +309,7 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 		// `import core = require('m')` binds the module namespace the same way
 		// a namespace import does.
 		if declaration.Kind == ast.KindImportEqualsDeclaration {
-			if isImportEqualsOfModules(declaration, importModules) {
+			if IsImportEqualsOfModules(declaration, importModules) {
 				return true
 			}
 		}
@@ -314,9 +318,12 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 	return false
 }
 
-// isImportEqualsOfModules reports whether declaration is
+// IsImportEqualsOfModules reports whether declaration is
 // `import name = require(module)` for any of importModules.
-func isImportEqualsOfModules(declaration *ast.Node, importModules []string) bool {
+func IsImportEqualsOfModules(declaration *ast.Node, importModules []string) bool {
+	if declaration == nil || declaration.Kind != ast.KindImportEqualsDeclaration {
+		return false
+	}
 	importEquals := declaration.AsImportEqualsDeclaration()
 	if importEquals == nil || importEquals.ModuleReference == nil ||
 		importEquals.ModuleReference.Kind != ast.KindExternalModuleReference {

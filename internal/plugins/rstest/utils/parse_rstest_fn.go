@@ -706,11 +706,23 @@ func isImportMetaRstest(node *ast.Node) bool {
 }
 
 func isImportMeta(node *ast.Node) bool {
+	return isImportMetaOptions(node, false)
+}
+
+func isImportMetaOptions(node *ast.Node, throughTransparentExpressions bool) bool {
 	if node == nil {
 		return false
 	}
 	node = ast.SkipParentheses(node)
-	if node == nil || node.Kind != ast.KindMetaProperty {
+	if node == nil {
+		return false
+	}
+	if throughTransparentExpressions {
+		if expression, ok := internalUtils.TransparentExpression(node); ok {
+			return isImportMetaOptions(expression, true)
+		}
+	}
+	if node.Kind != ast.KindMetaProperty {
 		return false
 	}
 	meta := node.AsMetaProperty()

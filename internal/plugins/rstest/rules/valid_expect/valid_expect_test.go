@@ -64,6 +64,7 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `test("t", async () => { await ((expect(p).resolves.to.be.true)); });`},
 			{Code: `test("t", async () => { await Promise.all([(expect(p).resolves.toBe(1)), expect(q).resolves.toBe(2)]); });`},
 			{Code: `test("t", async () => { await (expect(p).resolves.toBe(1)).then(() => {}); });`},
+			{Code: `test("t", async () => { await import.meta.rstest.expect(p).resolves.toBe(1).then(() => {}); });`},
 			{Code: `test("t", async () => { await expect(p).resolves.to.be.a("string").that.contains("x"); });`},
 			{Code: `test("t", async () => { await expect(p).resolves.to.be.an("object").that.is.ok; });`},
 			{Code: `test("t", () => { return expect(p).resolves.to.be.a("string").that.contains("x"); });`},
@@ -238,6 +239,13 @@ func TestValidExpectRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "matcherNotFound"},
 				},
+			},
+			{
+				Code: `test("t", () => { import.meta.rstest.expect(p).resolves.toBe(1).then(() => {}); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited", Line: 1, Column: 19, EndColumn: 79},
+				},
+				Output: []string{`test("t", async () => { await import.meta.rstest.expect(p).resolves.toBe(1).then(() => {}); });`},
 			},
 		},
 	)

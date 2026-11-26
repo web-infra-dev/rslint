@@ -62,22 +62,24 @@ func findPromiseCallExpressionNode(node *ast.Node) *ast.Node {
 
 func getParentIfPromiseChained(node *ast.Node) *ast.Node {
 	outer := internalUtils.OutermostParenthesizedExpression(node)
-	if outer == nil || outer.Parent == nil || outer.Parent.Parent == nil {
+	if outer == nil || outer.Parent == nil {
 		return node
 	}
 
-	grandParent := outer.Parent.Parent
-	if grandParent.Kind != ast.KindCallExpression || !ast.IsAccessExpression(grandParent.AsCallExpression().Expression) {
+	member := outer.Parent
+	if !ast.IsAccessExpression(member) || internalUtils.AccessExpressionObject(member) != outer {
 		return node
 	}
 
-	member := grandParent.AsCallExpression().Expression
-	entries := testFramework.GetMemberEntries(member)
-	if len(entries) == 0 {
+	outerMember := internalUtils.OutermostParenthesizedExpression(member)
+	grandParent := outerMember.Parent
+	if grandParent == nil ||
+		grandParent.Kind != ast.KindCallExpression ||
+		grandParent.AsCallExpression().Expression != outerMember {
 		return node
 	}
 
-	last := entries[len(entries)-1].Name
+	_, last := testFramework.AccessorPropertyAndName(member)
 	if last == "then" || last == "catch" {
 		return getParentIfPromiseChained(grandParent)
 	}
