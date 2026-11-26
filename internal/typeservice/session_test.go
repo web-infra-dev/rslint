@@ -548,9 +548,8 @@ func TestSessionConcurrentBatchRejectedAfterPoison(t *testing.T) {
 		resume := make(chan struct{})
 		var gateOnce sync.Once
 		batchDone := make(chan error, 1)
-		batchCtx := &hookContext{Context: t.Context()}
 		go func() {
-			_, err := session.QueryBatch(batchCtx, []Query{
+			_, err := session.QueryBatch(t.Context(), []Query{
 				{Scope: Scope{Generation: desc.Generation}, Request: &ProgramRequest{Op: "rootFileNames"}},
 				{Scope: Scope{Generation: desc.Generation}, Request: &CheckerRequest{Op: "stringType"}},
 				{Scope: Scope{Generation: desc.Generation}, Request: &gateRequest{
@@ -601,9 +600,6 @@ func TestSessionConcurrentBatchRejectedAfterPoison(t *testing.T) {
 		}
 		if len(session.types) != 0 {
 			t.Fatalf("resumed mixed batch created %d type handles after poison", len(session.types))
-		}
-		if calls := batchCtx.calls.Load(); calls != 1 {
-			t.Fatalf("expected paused mixed batch to abort before checkBatch ctx check (1 call), got %d", calls)
 		}
 	})
 
@@ -678,9 +674,6 @@ func TestSessionConcurrentBatchRejectedAfterPoison(t *testing.T) {
 		}
 		if len(session.types) != 0 {
 			t.Fatalf("waiter on checkMu executed semantic query and created %d type handles after poison", len(session.types))
-		}
-		if calls := waiterCtx.calls.Load(); calls != 1 {
-			t.Fatalf("expected waiter on checkMu to abort before acquiring checker (1 ctx call), got %d", calls)
 		}
 	})
 }

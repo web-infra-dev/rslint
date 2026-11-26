@@ -1117,10 +1117,14 @@ export class TypeServiceClient {
    * when `run` returns (or when a returned promise/thenable settles) so
    * callers cannot leak per-file ESTree mappings.
    *
-   * Any `PromiseLike` return branch (including union members or `Promise`
-   * subclasses) is normalized to a plain `Promise<Awaited<...>>` so custom
-   * subclass methods are not promised after wrapping.
+   * Any thenable return branch (including union members, `Promise` subclasses,
+   * or minimal `void`-returning thenables) is normalized to a plain
+   * `Promise<Awaited<...>>` so custom methods are not promised after wrapping.
    */
+  withFile<T>(
+    binding: FileBinding,
+    run: (file: TypeServiceFile) => PromiseLike<T>,
+  ): Promise<Awaited<T>>;
   withFile<T>(
     binding: FileBinding,
     run: (file: TypeServiceFile) => T,
@@ -1137,12 +1141,18 @@ export class TypeServiceClient {
         (typeof result === 'object' || typeof result === 'function') &&
         result !== null
       ) {
-        // Read `then` at most once so custom thenables with one-shot or
-        // side-effecting getters match native `await` / `Promise.resolve`.
+        // Read `then` at most once, then delegate adoption to Promise.resolve
+        // via a wrapper thenable so V8 schedules invoking the captured method
+        // in a PromiseResolveThenableJob microtask after withFile returns.
         const then: unknown = Reflect.get(result, 'then');
         if (typeof then === 'function') {
-          const settled = new Promise<unknown>((resolve, reject) => {
-            Reflect.apply(then, result, [resolve, reject]);
+          const settled = Promise.resolve({
+            then(
+              resolve: (value: unknown) => void,
+              reject: (reason?: unknown) => void,
+            ) {
+              Reflect.apply(then, result, [resolve, reject]);
+            },
           }).finally(() => {
             file.close();
           });
@@ -1166,8 +1176,11 @@ export class TypeServiceClient {
   }
 }
 
-export type WithFileResult<T> =
-  T extends PromiseLike<infer U> ? Promise<Awaited<U>> : T;
+export type WithFileResult<T> = T extends null | undefined
+  ? T
+  : T extends object & { then(...args: readonly never[]): unknown }
+    ? Promise<Awaited<T>>
+    : T;
 
 type NodeMaps = Pick<
   FileSyntaxViews,

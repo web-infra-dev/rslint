@@ -1313,35 +1313,58 @@ test('withFile supports sync/async callbacks and GC preserves live node maps', a
     );
 
     // Custom thenables with one-shot `then` getters must only have `then` read
-    // once, matching native `await` / `Promise.resolve`.
+    // once and invoked asynchronously in a promise job after `withFile` returns,
+    // matching native `Promise.resolve` / `await`.
     let thenReads = 0;
+    let readyAfterReturn = false;
+    const thenTrace: string[] = [];
     let thenableServices: typeof syncServices | undefined;
-    const thenableValue = await client.withFile(
-      projection.binding,
-      (handle) => {
-        thenableServices = handle.parserServices(decoded, projection);
-        return {
-          get then() {
-            thenReads++;
-            if (thenReads > 1) {
-              throw new Error('then was read twice');
-            }
-            return (resolveThenable: (value: number) => void) => {
-              expect(
-                (thenableServices!.esTreeNodeToTSNodeMap.get(stmt) as any)
-                  ?.kind,
-              ).toBe(ts.SyntaxKind.VariableStatement);
-              resolveThenable(42);
-            };
-          },
-        };
-      },
-    );
+    const thenablePromise = client.withFile(projection.binding, (handle) => {
+      thenableServices = handle.parserServices(decoded, projection);
+      return {
+        get then() {
+          thenReads++;
+          thenTrace.push('get then');
+          if (thenReads > 1) {
+            throw new Error('then was read twice');
+          }
+          return (resolveThenable: (value: number) => void) => {
+            thenTrace.push('run then');
+            expect(readyAfterReturn).toBe(true);
+            expect(
+              (thenableServices!.esTreeNodeToTSNodeMap.get(stmt) as any)?.kind,
+            ).toBe(ts.SyntaxKind.VariableStatement);
+            resolveThenable(42);
+          };
+        },
+        cancel() {
+          return 'cancelled';
+        },
+      };
+    });
+    thenTrace.push('returned to caller');
+    readyAfterReturn = true;
+    // @ts-expect-error minimal void-returning thenable is normalized to Promise<number>
+    thenablePromise.cancel;
+    expect(typeof thenablePromise.finally).toBe('function');
+    const thenableValue = await thenablePromise;
     expect(thenableValue).toBe(42);
     expect(thenReads).toBe(1);
+    expect(thenTrace).toEqual(['get then', 'returned to caller', 'run then']);
     expect(() => thenableServices!.esTreeNodeToTSNodeMap.get(stmt)).toThrow(
       'file type services are closed',
     );
+
+    // Explicit generic type arguments work for both async and sync callbacks.
+    const explicitAsync = await client.withFile<number>(
+      projection.binding,
+      async (handle) => {
+        const s = handle.parserServices(decoded, projection);
+        await Promise.resolve();
+        return (s.esTreeNodeToTSNodeMap.get(stmt) as any)?.kind as number;
+      },
+    );
+    expect(explicitAsync).toBe(ts.SyntaxKind.VariableStatement);
 
     // Union return types containing a Promise subclass normalize the pending
     // branch to a plain Promise at the type level (no stale subclass methods).
