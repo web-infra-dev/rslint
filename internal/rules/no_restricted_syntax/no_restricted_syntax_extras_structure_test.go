@@ -1325,6 +1325,25 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 
 			// Specifiers and import attributes belong to separate arrays.
 			{Code: "import { x } from 'str' with { type: 'json' };\n", Options: []any{"ImportSpecifier + ImportAttribute"}},
+
+			// Reverse sibling-subject selectors must not strip right-hand attributes.
+			{Code: "import { y, z } from 'a';\n", Options: []any{"!ImportSpecifier ~ ImportSpecifier[local.name='y']"}},
+			{Code: "import { y, z } from 'a';\n", Options: []any{"ImportSpecifier + !ImportSpecifier[local.name='y']"}},
+			{Code: "[a + b, c * d];\n", Options: []any{"!BinaryExpression ~ BinaryExpression[operator='+']"}},
+
+			// importKind and phase negative filters must not false-positive.
+			{Code: "import type Def from 'a';\n", Options: []any{"ImportDeclaration[importKind!='type']"}},
+			{Code: "import Def from 'a';\n", Options: []any{"ImportDeclaration[importKind='type']", "ImportDeclaration[phase!=null]", "ImportDefaultSpecifier[importKind]"}},
+			{Code: "import * as NS from 'a';\n", Options: []any{"ImportNamespaceSpecifier[importKind]"}},
+			{Code: "import { type A } from 'a';\n", Options: []any{"ImportSpecifier[importKind!='type']"}},
+			{Code: "import type { T } from 'a';\n", Options: []any{"ImportSpecifier[importKind='type']"}},
+			{Code: "import defer * as NS from 'a';\n", Options: []any{"ImportDeclaration[phase!='defer']"}},
+
+			// Symmetric export specifier and namespace export boundaries.
+			{Code: "export { x, y as z } from 'a';\n", Options: []any{"ExportSpecifier.elements", "ExportNamedDeclaration[kind='value']"}},
+			{Code: "export * from 'a';\n", Options: []any{"ExportAllDeclaration[kind='value']"}},
+			{Code: "export {} from 'a';\n", Options: []any{"ExportNamedDeclaration:has(> :not(Literal))"}},
+			{Code: "export * as \"ns\" from 'a';\n", Options: []any{"ExportAllDeclaration:has(> :not(Literal))"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Issue #2631 exact reproduction with multiple selectors in specificity order.
@@ -1576,6 +1595,18 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 				},
 			},
 			{
+				Code:    "import Def, { a as b, c as d } from 'lib';\n",
+				Options: []any{"Identifier[parent.type='ImportSpecifier']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 20, EndLine: 1, EndColumn: 21},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 23, EndLine: 1, EndColumn: 24},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 28, EndLine: 1, EndColumn: 29},
+				},
+			},
+			{
+				// Shorthand ImportSpecifier (`{ x }`) has one physical Identifier
+				// node in tsgo (matching ShorthandPropertyAssignment and ExportSpecifier).
 				Code:    defaultAndNamed,
 				Options: []any{"Identifier[parent.type='ImportSpecifier']"},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -1627,6 +1658,175 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 18},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 39, EndLine: 1, EndColumn: 51},
+				},
+			},
+
+			// :exit order on combined imports must exit ImportDefaultSpecifier
+			// right after its binding identifier and before sibling bindings enter.
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDefaultSpecifier:exit", "ImportNamespaceSpecifier:exit"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"Identifier:exit", "ImportDefaultSpecifier:exit"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDefaultSpecifier:exit", "ImportNamespaceSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"[parent.type='ImportDeclaration']:exit"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 24},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 32, EndLine: 1, EndColumn: 37},
+				},
+			},
+
+			// Reverse sibling-subject selectors with typed right-hand attributes.
+			{
+				Code:    "import { x, y } from 'a';\n",
+				Options: []any{"!ImportSpecifier ~ ImportSpecifier[local.name='y']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code:    "import { x, y } from 'a';\n",
+				Options: []any{"ImportSpecifier + !ImportSpecifier[local.name='y']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code:    "[a * b, c + d];\n",
+				Options: []any{"!BinaryExpression ~ BinaryExpression[operator='+']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 2, EndLine: 1, EndColumn: 7},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 9, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{"!LogicalExpression ~ BinaryExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
+
+			// importKind and phase attributes.
+			{
+				Code:    "import type Def from 'a';\nimport Def2 from 'b';\n",
+				Options: []any{"ImportDeclaration[importKind='type']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "import type { T } from 'a';\nimport { type A, B } from 'b';\n",
+				Options: []any{"ImportSpecifier[importKind='type']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 10, EndLine: 2, EndColumn: 16},
+				},
+			},
+			{
+				Code:    "import type { T } from 'a';\n",
+				Options: []any{"ImportSpecifier[importKind='value']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code:    "import defer * as NS from 'a';\nimport * as NS2 from 'b';\n",
+				Options: []any{"ImportDeclaration[phase='defer']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "import defer * as NS from 'a';\nimport * as NS2 from 'b';\n",
+				Options: []any{"ImportDeclaration[phase=null]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 26},
+				},
+			},
+
+			// Contextual keywords, comments, and default + empty braces.
+			{
+				Code:    "import type from 'a';\nimport type type from 'b';\nimport /* c1 */ Def /* c2 */, {} from 'c';\n",
+				Options: []any{"ImportDeclaration > ImportDefaultSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 12},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 13, EndLine: 2, EndColumn: 17},
+					{MessageId: "restrictedSyntax", Line: 3, Column: 17, EndLine: 3, EndColumn: 20},
+				},
+			},
+
+			// Symmetric export specifier and namespace export selectors.
+			{
+				Code:    "export { x, y as z } from 'a';\n",
+				Options: []any{"ExportNamedDeclaration > ExportSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:    "export { x, y as z } from 'a';\n",
+				Options: []any{"ExportSpecifier[parent.type='ExportNamedDeclaration'][parent.source.value='a']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:    "export { x, y as z } from 'a';\n",
+				Options: []any{"ExportSpecifier.specifiers"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:    "export { x, y as z } from 'a';\n",
+				Options: []any{"ExportSpecifier + ExportSpecifier", "ExportNamedDeclaration:has(> ExportSpecifier)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:    "export * as ns from 'a';\n",
+				Options: []any{"ExportAllDeclaration > Identifier.exported", "Identifier[parent.type='ExportAllDeclaration']", "ExportAllDeclaration:has(> Identifier)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 25},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 15},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    "export * as \"ns\" from 'a';\n",
+				Options: []any{"ExportAllDeclaration > Literal.exported"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 17},
 				},
 			},
 		})

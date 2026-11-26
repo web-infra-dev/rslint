@@ -672,6 +672,45 @@ func hasReverseSiblingSubject(sel combinatorSelector) bool {
 		sel.Kind == combAdjacent && isSubjectSelector(sel.Right)
 }
 
+// matchesTopLevelReverseSubjectHost mirrors ESLint's NodeEventGenerator
+// dispatch boundary for top-level reverse sibling-subject selectors (`!A ~ B`
+// / `A + !B`). When tsgo maps multiple ESTree types to one ast.Kind (such as
+// LogicalExpression and BinaryExpression), a named rightmost selector must
+// still only fire on nodes matching that ESTree type.
+func matchesTopLevelReverseSubjectHost(sel selector, node *ast.Node, target string) bool {
+	comb, ok := sel.(combinatorSelector)
+	if !ok || !hasReverseSiblingSubject(comb) {
+		return true
+	}
+	ident, ok := rightmostIdentifierSelector(comb.Right)
+	if !ok {
+		return true
+	}
+	return matchesInScopeTarget(ident, node, nil, nil, target)
+}
+
+func rightmostIdentifierSelector(sel selector) (identifierSelector, bool) {
+	for {
+		switch value := sel.(type) {
+		case subjectSelector:
+			sel = value.Inner
+		case attrSelector:
+			sel = value.Inner
+		case classSelector:
+			sel = value.Inner
+		case combinedPseudo:
+			sel = value.Inner
+		case identifierSelector:
+			if value.Name == "*" {
+				return identifierSelector{}, false
+			}
+			return value, true
+		default:
+			return identifierSelector{}, false
+		}
+	}
+}
+
 func isClassLikeNode(node *ast.Node) bool {
 	return node != nil && (node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression)
 }
@@ -1280,6 +1319,26 @@ func forEachLogicalChild(node *ast.Node, target string, mc *matchContext, visit 
 		if name := node.AsImportClause().Name(); name != nil {
 			visit(name, "physical")
 		}
+	case node.Kind == ast.KindExportDeclaration:
+		if isNamedExportDeclaration(node) {
+			for _, specifier := range collectExportSpecifiers(node) {
+				if visit(specifier, "physical") {
+					return
+				}
+			}
+		} else if clause := node.AsExportDeclaration().ExportClause; clause != nil && clause.Name() != nil {
+			if visit(clause.Name(), "physical") {
+				return
+			}
+		}
+		if source := node.AsExportDeclaration().ModuleSpecifier; source != nil && visit(source, childTarget(source)) {
+			return
+		}
+		for _, attr := range importAttributes(node.AsExportDeclaration().Attributes) {
+			if visit(attr, "physical") {
+				return
+			}
+		}
 	default:
 		visitPhysicalChildren(nil)
 	}
@@ -1744,7 +1803,8 @@ func isTransparentEstreeContainer(node *ast.Node) bool {
 	}
 	switch node.Kind {
 	case ast.KindParenthesizedExpression, ast.KindComputedPropertyName, ast.KindSemicolonClassElement,
-		ast.KindImportAttributes, ast.KindNamedImports, ast.KindJsxAttributes, ast.KindHeritageClause, ast.KindExpressionWithTypeArguments:
+		ast.KindImportAttributes, ast.KindNamedImports, ast.KindNamedExports, ast.KindNamespaceExport,
+		ast.KindJsxAttributes, ast.KindHeritageClause, ast.KindExpressionWithTypeArguments:
 		return true
 	case ast.KindImportClause:
 		return node.AsImportClause().Name() == nil
@@ -1927,6 +1987,26 @@ func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, b
 			if isNamedExportDeclaration(node) {
 				return nil, true
 			}
+		}
+	case "importKind":
+		switch node.Kind {
+		case ast.KindImportDeclaration:
+			if clause := node.AsImportDeclaration().ImportClause; clause != nil && clause.IsTypeOnly() {
+				return "type", true
+			}
+			return "value", true
+		case ast.KindImportSpecifier:
+			if node.IsTypeOnly() {
+				return "type", true
+			}
+			return "value", true
+		}
+	case "phase":
+		if node.Kind == ast.KindImportDeclaration {
+			if clause := node.AsImportDeclaration().ImportClause; clause != nil && clause.AsImportClause().PhaseModifier == ast.KindDeferKeyword {
+				return "defer", true
+			}
+			return nil, true
 		}
 	case "exportKind":
 		if node.Kind == ast.KindExportAssignment && !node.AsExportAssignment().IsExportEquals {
@@ -2594,8 +2674,6 @@ func readKindAttr(node *ast.Node) (interface{}, bool) {
 		return "set", true
 	case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment:
 		return "init", true
-	case ast.KindExportDeclaration:
-		return "value", true
 	}
 	return nil, false
 }
