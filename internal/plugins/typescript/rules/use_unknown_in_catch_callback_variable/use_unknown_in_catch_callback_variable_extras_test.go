@@ -156,3 +156,11 @@ func TestUseUnknownInCatchCallbackVariableCapturedValues(t *testing.T) {
 		{Code: "const methods = { current: 'catch' as const };\nconst key = methods.current;\nfunction change(value: { current: string }) {\n  value.current = 'then';\n}\nchange(methods);\nconst second = key + '';\nPromise.resolve(1)[second]((error: any) => {});\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useUnknown", Message: "Prefer the safe `: unknown` for a `catch` callback variable.", Line: 8, Column: 29, EndLine: 8, EndColumn: 39, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "wrongTypeAnnotationSuggestion", Output: "const methods = { current: 'catch' as const };\nconst key = methods.current;\nfunction change(value: { current: string }) {\n  value.current = 'then';\n}\nchange(methods);\nconst second = key + '';\nPromise.resolve(1)[second]((error: unknown) => {});\n"}}}}},
 	})
 }
+
+func TestUseUnknownInCatchCallbackVariableTopLevelCapture(t *testing.T) {
+	const declarations = `const methods:{current:'catch'|'then'}={current:'catch'}; function change(o:{current:string}){o.current='then'} `
+	const body = `(()=>{const key=methods.current; Promise.resolve(1)[key]((error: any)=>change(methods));})();`
+	code := declarations + body
+	// Resolving outer-object captures by executing an IIFE is outside the shared evaluator's scope.
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &UseUnknownInCatchCallbackVariableRule, []rule_tester.ValidTestCase{{Code: declarations + `change(methods); ` + body}, {Code: code}, {Code: `const methods:{current:'catch'|'finally'}={current:'catch'}; function change(o:{current:string}){o.current='finally'} ((_: void)=>{const key=methods.current; Promise.resolve(1)[key]((error: any)=>{});})(change(methods));`}}, nil)
+}

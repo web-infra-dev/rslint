@@ -821,7 +821,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			}
 
 			// Check array method calls with predicates
-			if utils.IsArrayMethodCallWithPredicate(tc, callExpr) && len(callExpr.Arguments.Nodes) > 0 {
+			if utils.IsArrayMethodCallWithPredicate(tc, callExpr, nil) && len(callExpr.Arguments.Nodes) > 0 {
 				callback := callExpr.Arguments.Nodes[0]
 
 				// An async or generator callback returns a Promise or generator
