@@ -1,0 +1,58 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "properties": {
+        "src": {
+          "description": "files/paths to be analyzed (only for unused exports)",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "ignoreExports": {
+          "description": "files/paths for which unused exports will not be reported (e.g module entry points)",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "missingExports": {
+          "description": "report modules without any exports",
+          "type": "boolean"
+        },
+        "unusedExports": {
+          "description": "report exports without any usage",
+          "type": "boolean"
+        },
+        "ignoreUnusedTypeExports": {
+          "description": "ignore type exports without any usage",
+          "type": "boolean"
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "unusedExports": { "enum": [true] },
+            "src": {
+              "minItems": 1
+            }
+          },
+          "required": ["unusedExports"]
+        },
+        {
+          "properties": {
+            "missingExports": { "enum": [true] }
+          },
+          "required": ["missingExports"]
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

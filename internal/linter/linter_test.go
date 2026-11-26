@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -762,5 +763,61 @@ func TestRunLinterCachesOncePerFileAcrossRules(t *testing.T) {
 	}
 	if first[0] == second[0] {
 		t.Fatal("different files shared a cached value")
+	}
+}
+
+type linterGenerationCacheTestKey struct{}
+
+// ProjectAnalysis gives every file of every Program in one pass the same
+// generation scope, over the plan's Programs; each pass gets a fresh one, and
+// a pass without it gets none.
+func TestRunLinterSharesGenerationScopeAcrossPrograms(t *testing.T) {
+	programA, pathsA := createTestProgramWithFiles(t, map[string]string{"a.ts": "const a = 1;", "a2.ts": "const a2 = 1;"})
+	programB, pathsB := createTestProgramWithFiles(t, map[string]string{"b.ts": "const b = 2;"})
+	programs := wrapTestPrograms(programA, programB)
+
+	run := func(projectAnalysis bool) (values []*int, builds int, scopePrograms int) {
+		var mu sync.Mutex
+		lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+			Programs:         programs,
+			TargetsByProgram: [][]string{{pathsA["a.ts"], pathsA["a2.ts"]}, {pathsB["b.ts"]}},
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
+					Name:     "scope",
+					Severity: rule.SeverityWarning,
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						value, ok := rule.CachedByGeneration(ctx, linterGenerationCacheTestKey{}, func(scope *rule.GenerationScope) *int {
+							mu.Lock()
+							defer mu.Unlock()
+							builds++
+							scopePrograms = len(scope.Programs())
+							return new(int)
+						})
+						mu.Lock()
+						defer mu.Unlock()
+						if ok {
+							values = append(values, value)
+						}
+						return nil
+					},
+				}}
+			},
+		})
+		if _, err := RunLinter(RunLinterOptions{LintPlan: lintPlan, ProjectAnalysis: projectAnalysis}); err != nil {
+			t.Fatalf("RunLinter error: %v", err)
+		}
+		return values, builds, scopePrograms
+	}
+
+	first, builds, scopePrograms := run(true)
+	if builds != 1 || len(first) != 3 || first[0] != first[1] || first[1] != first[2] || scopePrograms != 2 {
+		t.Fatalf("builds = %d, values = %#v, scope Programs = %d", builds, first, scopePrograms)
+	}
+	second, _, _ := run(true)
+	if len(second) != 3 || second[0] == first[0] {
+		t.Fatal("a later pass reused an earlier pass's generation scope")
+	}
+	if none, builds, _ := run(false); len(none) != 0 || builds != 0 {
+		t.Fatalf("pass without ProjectAnalysis built %d scoped values", builds)
 	}
 }
