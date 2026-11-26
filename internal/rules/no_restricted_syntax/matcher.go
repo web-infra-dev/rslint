@@ -18,7 +18,25 @@ import (
 // path resolution can reach the original source text (for attributes like
 // `regex.flags` or `source.value` that depend on the lexed form).
 type matchContext struct {
-	sf *ast.SourceFile
+	sf               *ast.SourceFile
+	importSpecifiers map[*ast.Node][]*ast.Node
+}
+
+var emptyNodeSlice = []*ast.Node{}
+
+func (mc *matchContext) importSpecifiersFor(node *ast.Node) []*ast.Node {
+	if mc == nil {
+		return collectImportSpecifiers(node)
+	}
+	if cached, ok := mc.importSpecifiers[node]; ok {
+		return cached
+	}
+	specifiers := collectImportSpecifiers(node)
+	if mc.importSpecifiers == nil {
+		mc.importSpecifiers = make(map[*ast.Node][]*ast.Node)
+	}
+	mc.importSpecifiers[node] = specifiers
+	return specifiers
 }
 
 // kindSet is the result of computing the set of tsgo kinds a selector might
@@ -630,7 +648,7 @@ func matchesCombinatorTarget(c combinatorSelector, node *ast.Node, mc *matchCont
 			parent, parentTarget, ok = logicalParentTarget(parent, parentTarget, scopeRoot)
 		}
 	case combAdjacent, combSibling:
-		siblings, idx := siblingsOf(node, target, scopeRoot)
+		siblings, idx := siblingsOf(node, target, scopeRoot, mc)
 		if idx < 0 {
 			return false
 		}
@@ -672,42 +690,102 @@ func hasReverseSiblingSubject(sel combinatorSelector) bool {
 		sel.Kind == combAdjacent && isSubjectSelector(sel.Right)
 }
 
+func containsReverseSiblingSubject(sel selector) bool {
+	switch value := sel.(type) {
+	case combinatorSelector:
+		return hasReverseSiblingSubject(value)
+	case pseudoSelector:
+		if value.Name == "is" || value.Name == "matches" {
+			for _, arg := range value.Args {
+				if containsReverseSiblingSubject(arg) {
+					return true
+				}
+			}
+		}
+	case unionSelector:
+		for _, child := range value.Selectors {
+			if containsReverseSiblingSubject(child) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // matchesTopLevelReverseSubjectHost mirrors ESLint's NodeEventGenerator
 // dispatch boundary for top-level reverse sibling-subject selectors (`!A ~ B`
 // / `A + !B`). When tsgo maps multiple ESTree types to one ast.Kind (such as
-// LogicalExpression and BinaryExpression), a named rightmost selector must
-// still only fire on nodes matching that ESTree type.
+// LogicalExpression and BinaryExpression), a named rightmost selector (direct
+// or inside `:matches`/`:is`/unions) must still only fire on nodes matching
+// that ESTree type.
 func matchesTopLevelReverseSubjectHost(sel selector, node *ast.Node, target string) bool {
-	comb, ok := sel.(combinatorSelector)
-	if !ok || !hasReverseSiblingSubject(comb) {
-		return true
-	}
-	ident, ok := rightmostIdentifierSelector(comb.Right)
-	if !ok {
-		return true
-	}
-	return matchesInScopeTarget(ident, node, nil, nil, target)
+	constrained, matched := matchesRightmostHostType(sel, node, target)
+	return !constrained || matched
 }
 
-func rightmostIdentifierSelector(sel selector) (identifierSelector, bool) {
-	for {
-		switch value := sel.(type) {
-		case subjectSelector:
-			sel = value.Inner
-		case attrSelector:
-			sel = value.Inner
-		case classSelector:
-			sel = value.Inner
-		case combinedPseudo:
-			sel = value.Inner
-		case identifierSelector:
-			if value.Name == "*" {
-				return identifierSelector{}, false
-			}
-			return value, true
+func matchesRightmostHostType(sel selector, node *ast.Node, target string) (constrained bool, matched bool) {
+	switch value := sel.(type) {
+	case subjectSelector:
+		return matchesRightmostHostType(value.Inner, node, target)
+	case attrSelector:
+		return matchesRightmostHostType(value.Inner, node, target)
+	case classSelector:
+		return matchesRightmostHostType(value.Inner, node, target)
+	case combinedPseudo:
+		innerConstrained, innerMatched := matchesRightmostHostType(value.Inner, node, target)
+		pseudoConstrained, pseudoMatched := matchesRightmostHostType(value.Pseudo, node, target)
+		switch {
+		case innerConstrained && pseudoConstrained:
+			return true, innerMatched && pseudoMatched
+		case innerConstrained:
+			return true, innerMatched
+		case pseudoConstrained:
+			return true, pseudoMatched
 		default:
-			return identifierSelector{}, false
+			return false, true
 		}
+	case identifierSelector:
+		if value.Name == "*" {
+			return false, true
+		}
+		return true, matchesInScopeTarget(value, node, nil, nil, target)
+	case pseudoSelector:
+		if value.Name == "is" || value.Name == "matches" {
+			if len(value.Args) == 0 {
+				return false, true
+			}
+			anyMatched := false
+			for _, arg := range value.Args {
+				argConstrained, argMatched := matchesRightmostHostType(arg, node, target)
+				if !argConstrained {
+					return false, true
+				}
+				if argMatched {
+					anyMatched = true
+				}
+			}
+			return true, anyMatched
+		}
+		return false, true
+	case unionSelector:
+		if len(value.Selectors) == 0 {
+			return false, true
+		}
+		anyMatched := false
+		for _, child := range value.Selectors {
+			childConstrained, childMatched := matchesRightmostHostType(child, node, target)
+			if !childConstrained {
+				return false, true
+			}
+			if childMatched {
+				anyMatched = true
+			}
+		}
+		return true, anyMatched
+	case combinatorSelector:
+		return matchesRightmostHostType(value.Right, node, target)
+	default:
+		return false, true
 	}
 }
 
@@ -1108,10 +1186,10 @@ func matchesPseudoTarget(p pseudoSelector, node *ast.Node, mc *matchContext, sco
 		}
 		return false
 	case "nth-child":
-		idx, _ := nodeIndexInListFieldTarget(node, scopeRoot, target)
+		idx, _ := nodeIndexInListFieldTarget(node, scopeRoot, target, mc)
 		return idx >= 0 && idx == p.N-1
 	case "nth-last-child":
-		idx, total := nodeIndexInListFieldTarget(node, scopeRoot, target)
+		idx, total := nodeIndexInListFieldTarget(node, scopeRoot, target, mc)
 		if idx < 0 {
 			return false
 		}
@@ -1302,9 +1380,28 @@ func forEachLogicalChild(node *ast.Node, target string, mc *matchContext, visit 
 	case isEmptyJSXExpression(node):
 		visit(node, "JSXEmptyExpression")
 	case node.Kind == ast.KindImportDeclaration:
-		for _, specifier := range collectImportSpecifiers(node) {
-			if visit(specifier, "physical") {
-				return
+		if clause := node.AsImportDeclaration().ImportClause; clause != nil {
+			c := clause.AsImportClause()
+			if c != nil {
+				if c.Name() != nil && visit(clause, "physical") {
+					return
+				}
+				if c.NamedBindings != nil {
+					switch c.NamedBindings.Kind {
+					case ast.KindNamespaceImport:
+						if visit(c.NamedBindings, "physical") {
+							return
+						}
+					case ast.KindNamedImports:
+						if ni := c.NamedBindings.AsNamedImports(); ni != nil && ni.Elements != nil {
+							for _, specifier := range ni.Elements.Nodes {
+								if visit(specifier, "physical") {
+									return
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 		if source := node.AsImportDeclaration().ModuleSpecifier; source != nil && visit(source, childTarget(source)) {
@@ -1705,12 +1802,12 @@ func attrTypeOf(v interface{}) string {
 	}
 }
 
-func nodeIndexInListFieldTarget(node *ast.Node, scopeRoot *virtualNodeFacade, target string) (int, int) {
-	siblings, index := siblingsOf(node, target, scopeRoot)
+func nodeIndexInListFieldTarget(node *ast.Node, scopeRoot *virtualNodeFacade, target string, mc *matchContext) (int, int) {
+	siblings, index := siblingsOf(node, target, scopeRoot, mc)
 	return index, len(siblings)
 }
 
-func siblingsOf(node *ast.Node, target string, scopeRoot *virtualNodeFacade) ([]*ast.Node, int) {
+func siblingsOf(node *ast.Node, target string, scopeRoot *virtualNodeFacade, mc *matchContext) ([]*ast.Node, int) {
 	// All folded children occupy scalar fields, never a sibling array.
 	if target != "physical" && target != "ChainExpression" && !isExportWrapperTarget(target) ||
 		target == "physical" && (isChainRoot(node) || exportWrapperTarget(node) != "") {
@@ -1731,7 +1828,18 @@ func siblingsOf(node *ast.Node, target string, scopeRoot *virtualNodeFacade) ([]
 	case "JSXOpeningElement":
 		lists = listChildrenOf(parent)
 	case "physical":
-		lists = listChildrenOf(parent)
+		if parent.Kind == ast.KindImportDeclaration && mc != nil {
+			if specifiers := mc.importSpecifiersFor(parent); len(specifiers) > 0 {
+				lists = append(lists, specifiers)
+			}
+			if attributes := parent.AsImportDeclaration().Attributes; attributes != nil {
+				if nodes := statements(attributes.AsImportAttributes().Attributes); len(nodes) > 0 {
+					lists = append(lists, nodes)
+				}
+			}
+		} else {
+			lists = listChildrenOf(parent)
+		}
 	}
 	for _, list := range lists {
 		if index, _ := indexInNodeList(node, list); index >= 0 {
@@ -1953,7 +2061,7 @@ func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, b
 	case "generator":
 		return readGeneratorAttr(node)
 	case "specifiers":
-		return readSpecifiersAttr(node)
+		return readSpecifiersAttr(node, mc)
 	case "selfClosing":
 		if node.Kind == ast.KindJsxOpeningElement {
 			return false, true
@@ -3449,54 +3557,72 @@ func readGeneratorAttr(node *ast.Node) (interface{}, bool) {
 	return nil, false
 }
 
-func readSpecifiersAttr(node *ast.Node) (interface{}, bool) {
+func readSpecifiersAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 	switch node.Kind {
 	case ast.KindImportDeclaration:
-		return collectImportSpecifiers(node), true
+		return mc.importSpecifiersFor(node), true
 	case ast.KindExportDeclaration:
-		return collectExportSpecifiers(node), true
+		if isNamedExportDeclaration(node) {
+			return collectExportSpecifiers(node), true
+		}
 	}
 	return nil, false
 }
 
 func collectImportSpecifiers(node *ast.Node) []*ast.Node {
-	out := []*ast.Node{}
 	clause := node.AsImportDeclaration().ImportClause
 	if clause == nil {
-		return out
+		return emptyNodeSlice
 	}
 	c := clause.AsImportClause()
 	if c == nil {
-		return out
+		return emptyNodeSlice
 	}
-	if c.Name() != nil {
-		out = append(out, clause)
-	}
-	if c.NamedBindings != nil {
-		switch c.NamedBindings.Kind {
-		case ast.KindNamespaceImport:
-			out = append(out, c.NamedBindings)
-		case ast.KindNamedImports:
-			ni := c.NamedBindings.AsNamedImports()
-			if ni != nil && ni.Elements != nil {
-				out = append(out, ni.Elements.Nodes...)
-			}
+	hasDefault := c.Name() != nil
+	if c.NamedBindings == nil {
+		if hasDefault {
+			return []*ast.Node{clause}
 		}
+		return emptyNodeSlice
 	}
-	return out
+	switch c.NamedBindings.Kind {
+	case ast.KindNamespaceImport:
+		if hasDefault {
+			return []*ast.Node{clause, c.NamedBindings}
+		}
+		return []*ast.Node{c.NamedBindings}
+	case ast.KindNamedImports:
+		var named []*ast.Node
+		if ni := c.NamedBindings.AsNamedImports(); ni != nil && ni.Elements != nil {
+			named = ni.Elements.Nodes
+		}
+		if !hasDefault {
+			if len(named) == 0 {
+				return emptyNodeSlice
+			}
+			// Reuse the AST-owned slice directly to avoid copying large import lists.
+			return named
+		}
+		if len(named) == 0 {
+			return []*ast.Node{clause}
+		}
+		out := make([]*ast.Node, 1, 1+len(named))
+		out[0] = clause
+		return append(out, named...)
+	}
+	if hasDefault {
+		return []*ast.Node{clause}
+	}
+	return emptyNodeSlice
 }
 
 func collectExportSpecifiers(node *ast.Node) []*ast.Node {
-	out := []*ast.Node{}
 	ed := node.AsExportDeclaration()
-	if ed == nil || ed.ExportClause == nil {
-		return out
-	}
-	if ed.ExportClause.Kind == ast.KindNamedExports {
-		ne := ed.ExportClause.AsNamedExports()
-		if ne != nil && ne.Elements != nil {
-			out = append(out, ne.Elements.Nodes...)
+	if ed != nil && ed.ExportClause != nil && ed.ExportClause.Kind == ast.KindNamedExports {
+		if ne := ed.ExportClause.AsNamedExports(); ne != nil && ne.Elements != nil && len(ne.Elements.Nodes) > 0 {
+			// Reuse the AST-owned slice directly to avoid copying large export lists.
+			return ne.Elements.Nodes
 		}
 	}
-	return out
+	return emptyNodeSlice
 }

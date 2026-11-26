@@ -263,7 +263,9 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 		case ast.KindImportDeclaration:
 			return collectImportSpecifiers(parent)
 		case ast.KindExportDeclaration:
-			return collectExportSpecifiers(parent)
+			if isNamedExportDeclaration(parent) {
+				return collectExportSpecifiers(parent)
+			}
 		}
 	}
 	return nil

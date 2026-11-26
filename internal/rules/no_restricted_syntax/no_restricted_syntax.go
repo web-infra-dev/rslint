@@ -169,10 +169,11 @@ var NoRestrictedSyntaxRule = rule.Rule{
 // ruleEntry is a parsed option entry: the original selector string,
 // the compiled selector tree, and the message (custom or default).
 type ruleEntry struct {
-	selector string
-	compiled selector
-	message  string
-	exit     bool
+	selector          string
+	compiled          selector
+	message           string
+	exit              bool
+	hasReverseSubject bool
 	// Some export hosts have no supported physical ESTree identity. Broad
 	// selectors still need their wrappers without exposing extra tsgo nodes.
 	virtualOnly bool
@@ -253,6 +254,7 @@ func buildRulePlan(options []any) *rulePlan {
 	// a universe selector is interleaved with kind-specific selectors.
 	perKind := make(map[ast.Kind][]ruleEntry)
 	for _, entry := range entries {
+		entry.hasReverseSubject = containsReverseSiblingSubject(entry.compiled)
 		kinds := candidateKinds(entry.compiled)
 		listenerKind := func(kind ast.Kind) ast.Kind {
 			if entry.exit {
@@ -517,7 +519,7 @@ func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchCont
 	if isPlainParameter(node) && !isBareWildcardSelector(entry.compiled) {
 		return
 	}
-	if !matchesTopLevelReverseSubjectHost(entry.compiled, node, "physical") {
+	if entry.hasReverseSubject && !matchesTopLevelReverseSubjectHost(entry.compiled, node, "physical") {
 		return
 	}
 	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
@@ -544,7 +546,7 @@ func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, target string,
 	entry := &bucket.entries[index]
 	// Preserve the documented bare-wildcard traversal. Other broad selectors
 	// must see the folded child, including regex and negative selectors.
-	if isBareWildcardSelector(entry.compiled) || !matchesTopLevelReverseSubjectHost(entry.compiled, node, target) || !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
+	if isBareWildcardSelector(entry.compiled) || entry.hasReverseSubject && !matchesTopLevelReverseSubjectHost(entry.compiled, node, target) || !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
 		return
 	}
 	message := rule.RuleMessage{Id: "restrictedSyntax", Description: entry.formatMessage()}

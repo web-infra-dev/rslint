@@ -1,8 +1,13 @@
 package no_restricted_syntax
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	tsparser "github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -1330,6 +1335,7 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 			{Code: "import { y, z } from 'a';\n", Options: []any{"!ImportSpecifier ~ ImportSpecifier[local.name='y']"}},
 			{Code: "import { y, z } from 'a';\n", Options: []any{"ImportSpecifier + !ImportSpecifier[local.name='y']"}},
 			{Code: "[a + b, c * d];\n", Options: []any{"!BinaryExpression ~ BinaryExpression[operator='+']"}},
+			{Code: "[a && b, c + d];\n", Options: []any{"!LogicalExpression ~ :matches(BinaryExpression):matches(LogicalExpression)"}},
 
 			// importKind and phase negative filters must not false-positive.
 			{Code: "import type Def from 'a';\n", Options: []any{"ImportDeclaration[importKind!='type']"}},
@@ -1341,7 +1347,8 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 
 			// Symmetric export specifier and namespace export boundaries.
 			{Code: "export { x, y as z } from 'a';\n", Options: []any{"ExportSpecifier.elements", "ExportNamedDeclaration[kind='value']"}},
-			{Code: "export * from 'a';\n", Options: []any{"ExportAllDeclaration[kind='value']"}},
+			{Code: "export * from 'a';\n", Options: []any{"ExportAllDeclaration[kind='value']", "ExportAllDeclaration[specifiers]"}},
+			{Code: "export * as ns from 'lib';\n", Options: []any{"Identifier[parent.specifiers]", "ExportAllDeclaration[specifiers]"}},
 			{Code: "export {} from 'a';\n", Options: []any{"ExportNamedDeclaration:has(> :not(Literal))"}},
 			{Code: "export * as \"ns\" from 'a';\n", Options: []any{"ExportAllDeclaration:has(> :not(Literal))"}},
 		},
@@ -1731,6 +1738,72 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
 				},
 			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{"!LogicalExpression ~ :matches(BinaryExpression)[operator='+']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{"!LogicalExpression ~ :matches(BinaryExpression, CallExpression)[operator='+']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{"!LogicalExpression ~ :is(BinaryExpression)[operator='+']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{"!LogicalExpression ~ [operator='+']:matches(BinaryExpression)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{":matches(!LogicalExpression ~ BinaryExpression[operator='+'], Identifier[name='missing'])"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{"!LogicalExpression ~ BinaryExpression[operator='+'], Identifier[name='missing']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{"!LogicalExpression ~ :matches(BinaryExpression, LogicalExpression)[operator='+']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 2, EndLine: 1, EndColumn: 8},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{"!LogicalExpression ~ :matches(BinaryExpression, [operator='+'])"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 2, EndLine: 1, EndColumn: 8},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
+				Code:    "[a && b, c + d];\n",
+				Options: []any{":matches(!LogicalExpression ~ BinaryExpression[operator='+'], LogicalExpression[operator='||'])"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 2, EndLine: 1, EndColumn: 8},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+				},
+			},
 
 			// importKind and phase attributes.
 			{
@@ -1824,10 +1897,84 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 			},
 			{
 				Code:    "export * as \"ns\" from 'a';\n",
-				Options: []any{"ExportAllDeclaration > Literal.exported"},
+				Options: []any{"ExportAllDeclaration > Literal.exported", "ExportAllDeclaration[specifiers=undefined]"},
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 27},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 17},
 				},
 			},
 		})
+}
+
+func BenchmarkNoRestrictedSyntaxLargeSpecifierLists(b *testing.B) {
+	var names strings.Builder
+	for i := range 1000 {
+		if i > 0 {
+			names.WriteString(", ")
+		}
+		names.WriteByte('a')
+		names.WriteString(strconv.Itoa(i))
+	}
+	list := names.String()
+
+	cases := []struct {
+		name     string
+		code     string
+		selector string
+		kind     ast.Kind
+	}{
+		{
+			name:     "ExportNamed1000",
+			code:     "export { " + list + " } from 'lib';\n",
+			selector: "ExportSpecifier:first-child",
+			kind:     ast.KindExportSpecifier,
+		},
+		{
+			name:     "ImportNamed1000",
+			code:     "import { " + list + " } from 'lib';\n",
+			selector: "ImportSpecifier:first-child",
+			kind:     ast.KindImportSpecifier,
+		},
+		{
+			name:     "ImportDefaultAndNamed1000",
+			code:     "import Def, { " + list + " } from 'lib';\n",
+			selector: "ImportSpecifier:first-child",
+			kind:     ast.KindImportSpecifier,
+		},
+	}
+
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			sf := tsparser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/bench.ts",
+				Path:     "/bench.ts",
+			}, tc.code, core.ScriptKindTS)
+			compiled, err := parseSelector(tc.selector)
+			if err != nil {
+				b.Fatalf("parseSelector(%q): %v", tc.selector, err)
+			}
+			var specifiers []*ast.Node
+			var collect func(*ast.Node) bool
+			collect = func(n *ast.Node) bool {
+				if n.Kind == tc.kind {
+					specifiers = append(specifiers, n)
+				}
+				n.ForEachChild(collect)
+				return false
+			}
+			collect(sf.AsNode())
+			if len(specifiers) != 1000 {
+				b.Fatalf("expected 1000 specifiers, got %d", len(specifiers))
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				mc := &matchContext{sf: sf}
+				for _, node := range specifiers {
+					matches(compiled, node, mc)
+				}
+			}
+		})
+	}
 }
