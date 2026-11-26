@@ -1158,6 +1158,11 @@ func ExtractLanguageOptions(langOpts *LanguageOptions) rule.LanguageOptions {
 	if sourceType, ok := langOpts.Raw["sourceType"].(string); ok && rule.IsValidSourceType(sourceType) {
 		result.SourceType = sourceType
 	}
+	if parser, ok := langOpts.Raw["parserOptions"].(map[string]any); ok {
+		if features, ok := parser["ecmaFeatures"].(map[string]any); ok {
+			result.GlobalReturn, _ = features["globalReturn"].(bool)
+		}
+	}
 	return result
 }
 

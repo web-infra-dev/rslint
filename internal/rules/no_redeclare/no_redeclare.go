@@ -464,7 +464,10 @@ func reportScope(ctx rule.RuleContext, s *scopeDecls, o options, isProgram bool,
 	}
 
 	globals := newProgramGlobalDeclarations(ctx, o, variant.builtinMode)
-	hasNonGlobalTopLevelScope := ctx.Refs != nil && ctx.Refs.HasNonGlobalProgramScope()
+	// ecmaFeatures.globalReturn also moves top-level declarations out of the
+	// global scope (ESLint wraps the program in a function scope).
+	hasNonGlobalTopLevelScope := ctx.LanguageOptions.GlobalReturn ||
+		(ctx.Refs != nil && ctx.Refs.HasNonGlobalProgramScope())
 	var handled map[string]bool
 	if len(globals.inlineOrder) > 0 {
 		handled = make(map[string]bool, len(s.order))

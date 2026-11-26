@@ -3,7 +3,7 @@ import type { LanguageOptions } from '@rslint/core';
 /** Preserves upstream parser metadata; JSX parsing follows the filename. */
 type TestLanguageOptions = Omit<LanguageOptions, 'parserOptions'> & {
   parserOptions?: LanguageOptions['parserOptions'] & {
-    ecmaFeatures?: { jsx?: boolean };
+    ecmaFeatures?: { jsx?: boolean; globalReturn?: boolean };
   };
 };
 
