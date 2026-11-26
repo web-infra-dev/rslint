@@ -1,6 +1,7 @@
-// Package estree projects the existing Program syntax into the final ESTree
-// representation consumed by third-party JavaScript rules. It owns no parser,
-// filesystem, configuration, checker, transport, or rule execution.
+// Package estree projects an existing Program SourceFile into either a binary
+// ESTree wire frame (for JavaScript plugins) or a scoped read-only in-memory
+// Tree (for ESTree selector evaluation). It owns no parser, filesystem,
+// configuration, checker, transport, or rule execution.
 package estree
 
 import (
@@ -49,23 +50,31 @@ type nodeRecord struct {
 	start, end, valueStart uint32
 }
 type estreeProjector struct {
-	ctx              context.Context
-	file             *ast.SourceFile
-	text, sourceType string
-	offsets          utf16Offsets
-	nodes            []nodeRecord
-	values, lists    []uint32
-	emptyList        uint32
-	strings          []string
-	stringBytes      int
-	stringIDs        map[string]uint32
-	numbers          []float64
-	tokenCovers      []tokenCover
-	triviaStarts     map[int]int
-	frameBytes       uint64
-	scan             scanner.Scanner
-	origin           *ast.Node
-	mapping          *originProjection
+	ctx             context.Context
+	file            *ast.SourceFile
+	text            string
+	sourceType      string
+	isJS            bool
+	treeMode        bool
+	needTokens      bool
+	offsets         utf16Offsets
+	nodes           []nodeRecord
+	values, lists   []uint32
+	listScratch     []uint32
+	links           []nodeLink
+	emptyList       uint32
+	strings         []string
+	stringBytes     int
+	stringIDs       map[string]uint32
+	numbers         []float64
+	tokenCovers     []tokenCover
+	triviaStarts    map[int]int
+	lastTriviaPos   int
+	lastTriviaStart int
+	frameBytes      uint64
+	scan            scanner.Scanner
+	origin          *ast.Node
+	mapping         *originProjection
 }
 
 // Options are syntax metadata already resolved by the linter.
@@ -94,9 +103,19 @@ func (b *Builder) Reset() {
 	b.p.clearSource()
 	// Evict the largest columns first. One oversized column must not discard
 	// every other reusable buffer and force the next file to rebuild them all.
-	sizes := [...]int{cap(b.p.nodes) * 16, cap(b.p.values) * 4, cap(b.p.lists) * 4,
-		cap(b.p.strings) * 16, cap(b.p.numbers) * 8, cap(b.tokens) * 12,
-		cap(b.comments) * 12, cap(b.p.tokenCovers) * 12, cap(b.p.offsets.entries) * int(unsafe.Sizeof(utf16Offset{}))}
+	sizes := [...]int{
+		cap(b.p.nodes) * int(unsafe.Sizeof(nodeRecord{})),
+		cap(b.p.values) * 4,
+		cap(b.p.lists) * 4,
+		cap(b.p.strings) * int(unsafe.Sizeof("")),
+		cap(b.p.numbers) * 8,
+		cap(b.tokens) * int(unsafe.Sizeof(projectedToken{})),
+		cap(b.comments) * int(unsafe.Sizeof(projectedComment{})),
+		cap(b.p.tokenCovers) * int(unsafe.Sizeof(tokenCover{})),
+		cap(b.p.offsets.entries) * int(unsafe.Sizeof(utf16Offset{})),
+		cap(b.p.links) * int(unsafe.Sizeof(nodeLink{})),
+		cap(b.p.listScratch) * 4,
+	}
 	total := 0
 	for _, size := range sizes {
 		total += size
@@ -129,6 +148,10 @@ func (b *Builder) Reset() {
 			b.p.tokenCovers = nil
 		case 8:
 			b.p.offsets.entries = nil
+		case 9:
+			b.p.links = nil
+		case 10:
+			b.p.listScratch = nil
 		}
 	}
 }
@@ -145,6 +168,20 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	return b.build(ctx, file, options, allocate, nil)
 }
 
+// projectionError marks expected projection rejections (unsupported syntax,
+// malformed/incomplete AST recovery nodes, frame encoding limits) so
+// projectTree only catches these and never swallows unexpected Go runtime bugs.
+type projectionError struct {
+	err error
+}
+
+func (e projectionError) Error() string { return e.err.Error() }
+func (e projectionError) Unwrap() error { return e.err }
+
+func failProjection(err error) {
+	panic(projectionError{err: err})
+}
+
 func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte, mapping *originProjection) (data []byte, err error) {
 	if options.SourceType != "module" && options.SourceType != "script" && options.SourceType != "commonjs" {
 		return nil, fmt.Errorf("invalid ESTree sourceType %q", options.SourceType)
@@ -153,7 +190,9 @@ func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Optio
 		b.p.clearSource()
 		if failure := recover(); failure != nil {
 			data = nil
-			if e, ok := failure.(error); ok {
+			if pe, ok := failure.(projectionError); ok {
+				err = pe.err
+			} else if e, ok := failure.(error); ok {
 				err = e
 			} else {
 				err = fmt.Errorf("ESTree projection: %v", failure)
@@ -165,9 +204,14 @@ func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Optio
 	p.check()
 	p.file = file
 	p.text = file.Text()
+	p.isJS = file.ScriptKind == core.ScriptKindJS || file.ScriptKind == core.ScriptKindJSX
 	p.sourceType = options.SourceType
 	p.mapping = mapping
-	if options.SourceType == "commonjs" {
+	p.treeMode = false
+	p.needTokens = mapping == nil || !mapping.originsOnly
+	p.lastTriviaPos = -1
+	p.lastTriviaStart = 0
+	if options.SourceType == "commonjs" && !p.isJS {
 		p.sourceType = "script"
 	}
 	if len(p.text) > maxWireFrameSize-headerSize-6 {
@@ -187,6 +231,7 @@ func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Optio
 		mapping.Reverse = make(map[uint32]uint32, nodeCapacity)
 	}
 	p.lists = p.lists[:0]
+	p.listScratch = p.listScratch[:0]
 	p.emptyList = 0
 	p.strings = p.strings[:0]
 	p.stringBytes = 0
@@ -212,8 +257,10 @@ func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Optio
 }
 
 func (p *estreeProjector) check() {
-	if err := p.ctx.Err(); err != nil {
-		panic(err)
+	if p.ctx != nil {
+		if err := p.ctx.Err(); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -224,7 +271,10 @@ func (p *estreeProjector) clearSource() {
 	p.text = ""
 	p.sourceType = ""
 	p.ctx = nil
+	p.treeMode = false
+	p.needTokens = false
 	p.offsets.entries = p.offsets.entries[:0]
+	p.offsets.delta = 0
 	indexSize := len(p.stringIDs)
 	clear(p.stringIDs)
 	if indexSize > 4096 {
@@ -233,7 +283,10 @@ func (p *estreeProjector) clearSource() {
 	clear(p.strings)
 	p.strings = p.strings[:0]
 	p.tokenCovers = p.tokenCovers[:0]
+	p.listScratch = p.listScratch[:0]
 	p.triviaStarts = nil
+	p.lastTriviaPos = -1
+	p.lastTriviaStart = 0
 	// Numeric caches and token state may contain source-backed strings.
 	// Reuse the scanner's storage, never state from a previous file.
 	p.scan = scanner.Scanner{}
@@ -241,13 +294,13 @@ func (p *estreeProjector) clearSource() {
 
 func (p *estreeProjector) reserve(bytes uint64) {
 	if bytes > uint64(maxWireFrameSize)-p.frameBytes {
-		panic(errors.New("ESTree frame size does not fit its encoding"))
+		failProjection(errors.New("ESTree frame size does not fit its encoding"))
 	}
 	p.frameBytes += bytes
 }
 func taggedValue(tag, payload uint32) uint32 {
 	if payload > payloadMask {
-		panic("ESTree wire payload exceeds 29 bits")
+		failProjection(errors.New("ESTree wire payload exceeds 29 bits"))
 	}
 	return tag<<tagShift | payload
 }
@@ -255,6 +308,13 @@ func taggedValue(tag, payload uint32) uint32 {
 func nodeValue(id uint32) uint32 {
 	if id == 0 {
 		return taggedValue(tagNull, 0)
+	}
+	return taggedValue(tagNode, id)
+}
+
+func optionalNodeValue(id uint32) uint32 {
+	if id == 0 {
+		return undefinedValue()
 	}
 	return taggedValue(tagNode, id)
 }
@@ -270,6 +330,11 @@ func nullValue() uint32      { return taggedValue(tagNull, 0) }
 func undefinedValue() uint32 { return taggedValue(tagUndefined, 0) }
 
 func (p *estreeProjector) stringValue(value string) uint32 {
+	if p.treeMode {
+		id := uint32(len(p.strings))
+		p.strings = append(p.strings, value)
+		return taggedValue(tagString, id)
+	}
 	if id, ok := p.stringIDs[value]; ok {
 		return taggedValue(tagString, id)
 	}
@@ -342,7 +407,9 @@ func (p *estreeProjector) encodeStrings(out []byte) {
 }
 
 func (p *estreeProjector) numberValue(value float64) uint32 {
-	p.reserve(8)
+	if !p.treeMode {
+		p.reserve(8)
+	}
 	index := uint32(len(p.numbers))
 	p.numbers = append(p.numbers, value)
 	return taggedValue(tagNumber, index)
@@ -352,7 +419,9 @@ func (p *estreeProjector) listValue(ids []uint32) uint32 {
 	if len(ids) == 0 && p.emptyList != 0 {
 		return p.emptyList
 	}
-	p.reserve((uint64(len(ids)) + 1) * 4)
+	if !p.treeMode {
+		p.reserve((uint64(len(ids)) + 1) * 4)
+	}
 	offset := uint32(len(p.lists))
 	p.lists = append(p.lists, uint32(len(ids)))
 	p.lists = append(p.lists, ids...)
@@ -364,51 +433,50 @@ func (p *estreeProjector) listValue(ids []uint32) uint32 {
 }
 
 func (p *estreeProjector) convertList(nodes []*ast.Node, pattern bool) uint32 {
-	ids := make([]uint32, 0, len(nodes))
+	if len(nodes) == 0 {
+		return p.listValue(nil)
+	}
+	base := len(p.listScratch)
 	for _, node := range nodes {
 		if id := p.convert(node, pattern); id != 0 {
-			ids = append(ids, id)
+			p.listScratch = append(p.listScratch, id)
 		}
 	}
-	return p.listValue(ids)
+	res := p.listValue(p.listScratch[base:])
+	p.listScratch = p.listScratch[:base]
+	return res
 }
 
 func (p *estreeProjector) convertListWithNulls(nodes []*ast.Node, pattern bool) uint32 {
-	ids := make([]uint32, len(nodes))
-	for index, node := range nodes {
-		ids[index] = p.convert(node, pattern)
+	if len(nodes) == 0 {
+		return p.listValue(nil)
 	}
-	return p.listValue(ids)
+	base := len(p.listScratch)
+	for _, node := range nodes {
+		id := p.convert(node, pattern)
+		p.listScratch = append(p.listScratch, id)
+	}
+	res := p.listValue(p.listScratch[base:])
+	p.listScratch = p.listScratch[:base]
+	return res
 }
 
-func (p *estreeProjector) add(typeName string, start, end uint32, values ...uint32) uint32 {
-	return p.addWithOrigin(typeName, p.origin, start, end, values...)
+func (p *estreeProjector) add(typeID TypeID, start, end uint32, values ...uint32) uint32 {
+	return p.addWithOrigin(typeID, p.origin, start, end, values...)
 }
 
-func (p *estreeProjector) addWithOrigin(typeName string, origin *ast.Node, start, end uint32, values ...uint32) uint32 {
-	typeID := typeIDs[typeName]
-	for index, field := range schemas[typeID].fields {
-		switch field {
-		case "abstract", "accessibility", "declare", "definite", "exportKind", "importKind", "implements", "override", "readonly", "returnType", "superTypeArguments", "typeAnnotation", "typeArguments", "typeParameters":
-			if p.isJavaScriptFile() {
-				values[index] = undefinedValue()
-			} else if values[index] == undefinedValue() {
-				values[index] = nullValue()
-			}
-		case "optional":
-			if p.isJavaScriptFile() && typeName != "MemberExpression" && typeName != "CallExpression" {
-				values[index] = undefinedValue()
-			}
-		case "decorators":
-			if p.isJavaScriptFile() && (typeName == "Identifier" || typeName == "ArrayPattern" || typeName == "ObjectPattern" || typeName == "RestElement" || typeName == "AssignmentPattern") {
-				values[index] = undefinedValue()
-			}
+func (p *estreeProjector) addWithOrigin(typeID TypeID, origin *ast.Node, start, end uint32, values ...uint32) uint32 {
+	if p.isJS {
+		for mask := jsUndefinedMask[typeID]; mask != 0; mask &= mask - 1 {
+			values[bits.TrailingZeros16(mask)] = undefinedValue()
 		}
 	}
-	p.reserve(14 + uint64(len(values))*4)
+	if !p.treeMode {
+		p.reserve(14 + uint64(len(values))*4)
+	}
 	id := uint32(len(p.nodes) + 1)
 	p.nodes = append(p.nodes, nodeRecord{
-		typeID:     typeID,
+		typeID:     uint16(typeID),
 		start:      start,
 		end:        end,
 		valueStart: uint32(len(p.values)),
@@ -432,10 +500,19 @@ func (p *estreeProjector) tokenStart(node *ast.Node) int {
 		return scanner.GetTokenPosOfNode(node, p.file, false)
 	}
 	pos := node.Pos()
-	if start, ok := p.triviaStarts[pos]; ok {
-		return start
+	if pos == p.lastTriviaPos {
+		return p.lastTriviaStart
+	}
+	if p.triviaStarts != nil {
+		if start, ok := p.triviaStarts[pos]; ok {
+			p.lastTriviaPos = pos
+			p.lastTriviaStart = start
+			return start
+		}
 	}
 	start := scanner.GetTokenPosOfNode(node, p.file, false)
+	p.lastTriviaPos = pos
+	p.lastTriviaStart = start
 	// Only index long runs: ordinary short spacing needs no extra storage.
 	// Every parent in a deep expression can share this same full-start pos.
 	if start-pos >= 64 {
@@ -460,9 +537,9 @@ func (p *estreeProjector) rangeOf(node *ast.Node) (uint32, uint32) {
 	return p.offsets.At(start), p.offsets.At(node.End())
 }
 
-func (p *estreeProjector) addNode(typeName string, node *ast.Node, values ...uint32) uint32 {
+func (p *estreeProjector) addNode(typeID TypeID, node *ast.Node, values ...uint32) uint32 {
 	start, end := p.rangeOf(node)
-	return p.addWithOrigin(typeName, node, start, end, values...)
+	return p.addWithOrigin(typeID, node, start, end, values...)
 }
 
 func (p *estreeProjector) hasModifier(node *ast.Node, flag ast.ModifierFlags) bool {
@@ -470,7 +547,7 @@ func (p *estreeProjector) hasModifier(node *ast.Node, flag ast.ModifierFlags) bo
 }
 
 func (p *estreeProjector) decorators(node *ast.Node) uint32 {
-	if p.isJavaScriptFile() && (node == nil || len(node.Decorators()) == 0) {
+	if p.isJS && (node == nil || len(node.Decorators()) == 0) {
 		return undefinedValue()
 	}
 	if node == nil {
@@ -494,14 +571,17 @@ func (p *estreeProjector) accessibility(node *ast.Node) uint32 {
 }
 
 func (p *estreeProjector) typeAnnotation(node *ast.Node) uint32 {
-	if node == nil || isJSDocCommentSyntax(node) || p.isJavaScriptFile() {
+	if node == nil || isJSDocCommentSyntax(node) || p.isJS {
 		return undefinedValue()
 	}
 	typeID := p.convert(node, false)
-	_, end := p.rangeOf(node)
+	if typeID == 0 {
+		return undefinedValue()
+	}
+	end := p.offsets.At(node.End())
 	if node.Parent != nil && node.Parent.Kind == ast.KindTypePredicate {
 		inner := p.nodes[typeID-1]
-		return nodeValue(p.addWithOrigin("TSTypeAnnotation", nil, inner.start, inner.end, nodeValue(typeID)))
+		return nodeValue(p.addWithOrigin(typeTSTypeAnnotation, nil, inner.start, inner.end, nodeValue(typeID)))
 	}
 	// The parser's full start follows the authored ':' or '=>' token and
 	// includes intervening trivia, so comments cannot confuse a backward scan.
@@ -510,17 +590,17 @@ func (p *estreeProjector) typeAnnotation(node *ast.Node) uint32 {
 		width = 2
 	}
 	start := p.offsets.At(max(0, node.Pos()-width))
-	return nodeValue(p.addWithOrigin("TSTypeAnnotation", nil, start, end, nodeValue(typeID)))
+	return nodeValue(p.addWithOrigin(typeTSTypeAnnotation, nil, start, end, nodeValue(typeID)))
 }
 
 func (p *estreeProjector) typeParameters(list *ast.NodeList, declaration bool) uint32 {
-	if list == nil || p.isJavaScriptFile() || (len(list.Nodes) > 0 && isJSDocCommentSyntax(list.Nodes[0])) {
+	if list == nil || p.isJS || (len(list.Nodes) > 0 && isJSDocCommentSyntax(list.Nodes[0])) {
 		return undefinedValue()
 	}
-	typeName := "TSTypeParameterInstantiation"
+	typeID := typeTSTypeParameterInstantiation
 	origin := p.origin
 	if declaration {
-		typeName = "TSTypeParameterDeclaration"
+		typeID = typeTSTypeParameterDeclaration
 		origin = nil
 	}
 	start := p.offsets.At(max(0, list.Pos()-1))
@@ -530,27 +610,24 @@ func (p *estreeProjector) typeParameters(list *ast.NodeList, declaration bool) u
 	scan.SetSkipTrivia(true)
 	scan.ResetTokenState(endPos)
 	if scan.Scan() != ast.KindGreaterThanToken {
-		panic(errors.New("missing type parameter closing token"))
+		failProjection(errors.New("missing type parameter closing token"))
 	}
 	endPos = scan.TokenEnd()
 	end := p.offsets.At(endPos)
-	return nodeValue(p.addWithOrigin(typeName, origin, start, end, p.convertList(list.Nodes, false)))
+	return nodeValue(p.addWithOrigin(typeID, origin, start, end, p.convertList(list.Nodes, false)))
 }
 
 func (p *estreeProjector) identifierWithAnnotation(name, typeNode *ast.Node) uint32 {
 	id := p.convert(name, true)
-	if typeNode == nil || id == 0 || p.isJavaScriptFile() || isJSDocCommentSyntax(typeNode) {
+	if typeNode == nil || id == 0 || p.isJS || isJSDocCommentSyntax(typeNode) {
 		return id
 	}
 	record := p.nodes[id-1]
-	fields := schemas[record.typeID].fields
-	annotation := p.typeAnnotation(typeNode)
-	for index, field := range fields {
-		if field == "typeAnnotation" {
-			p.values[int(record.valueStart)+index] = annotation
-			p.nodes[id-1].end = p.offsets.At(typeNode.End())
-			break
-		}
+	slot := fieldSlot[record.typeID][fieldTypeAnnotation]
+	if slot >= 0 {
+		annotation := p.typeAnnotation(typeNode)
+		p.values[int(record.valueStart)+int(slot)] = annotation
+		p.nodes[id-1].end = p.offsets.At(typeNode.End())
 	}
 	return id
 }
@@ -561,14 +638,10 @@ func isJSDocCommentSyntax(node *ast.Node) bool {
 	return node != nil && node.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0
 }
 
-func (p *estreeProjector) isJavaScriptFile() bool {
-	return p.file.ScriptKind == core.ScriptKindJS || p.file.ScriptKind == core.ScriptKindJSX
-}
-
 func parseNumberLiteral(text string) float64 {
 	value, ok := ecmascript.StringToNumber(strings.ReplaceAll(text, "_", ""))
 	if !ok {
-		panic(fmt.Errorf("invalid numeric literal %q", text))
+		failProjection(fmt.Errorf("invalid numeric literal %q", text))
 	}
 	return value
 }

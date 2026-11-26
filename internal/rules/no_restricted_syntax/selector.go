@@ -1,14 +1,14 @@
 package no_restricted_syntax
 
 import (
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"strconv"
+
+	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
-// selector models the subset of the ESLint / esquery selector grammar that the
-// rule needs in order to evaluate user-supplied patterns. Each variant is a
-// node in the parsed selector tree. The matcher in selector_matcher.go walks
-// it against tsgo AST nodes.
+// selector models the ESLint / esquery selector grammar evaluated against an
+// estree.Tree.
 type selector interface {
 	isSelector()
 }
@@ -22,22 +22,85 @@ type subjectSelector struct {
 
 func (subjectSelector) isSelector() {}
 
-// identifierSelector matches a node by its (ESTree) type name. Name == "*"
-// is the wildcard. ESTree type names map to one or more tsgo ast.Kind values
-// via estreeKindMap in selector_mapping.go.
+// identifierSelector matches a node by its ESTree TypeID. Wildcard == true is
+// `*`. Unknown type names carry TypeID == estree.UnknownType and Wildcard == false.
 type identifierSelector struct {
-	Name  string
-	Kinds []ast.Kind
+	Name     string
+	TypeID   estree.TypeID
+	Wildcard bool
 }
 
 func (identifierSelector) isSelector() {}
 
+// compoundSelector represents two sequence atoms that must both match the same
+// node (e.g. `[kind="const"]VariableDeclaration` or `.callee#Identifier`).
+type compoundSelector struct {
+	Left  selector
+	Right selector
+}
+
+func (compoundSelector) isSelector() {}
+
+type pathSpecial uint8
+
+const (
+	pathNormal pathSpecial = iota
+	pathType
+	pathParent
+	pathLength
+)
+
+// pathSegment is a pre-compiled segment of an attribute or class path.
+type pathSegment struct {
+	raw     string
+	fieldID estree.FieldID
+	index   int // canonical non-negative array index, or -1
+	special pathSpecial
+}
+
+func compilePathSegment(raw string) pathSegment {
+	seg := pathSegment{
+		raw:   raw,
+		index: canonicalArrayIndex(raw),
+	}
+	switch raw {
+	case "type":
+		seg.special = pathType
+	case "parent":
+		seg.special = pathParent
+	case "length":
+		seg.special = pathLength
+	default:
+		seg.fieldID, _ = estree.FieldIDByName(raw)
+	}
+	return seg
+}
+
+func compilePath(raw []string) []pathSegment {
+	out := make([]pathSegment, len(raw))
+	for i, s := range raw {
+		out[i] = compilePathSegment(s)
+	}
+	return out
+}
+
+func canonicalArrayIndex(s string) int {
+	if s == "" || (len(s) > 1 && s[0] == '0') {
+		return -1
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return -1
+	}
+	return n
+}
+
 // classSelector wraps another selector and additionally requires that the
-// matched node sits at a specific named field on its parent (e.g.
+// matched node sits at a specific named field path on its parent (e.g.
 // `Literal.key` requires the Literal to be the key of a Property).
 type classSelector struct {
 	Inner selector
-	Path  []string
+	Path  []pathSegment
 }
 
 func (classSelector) isSelector() {}
@@ -71,6 +134,7 @@ type attrValue struct {
 	Kind          attrValueKind
 	Str           string
 	Num           float64
+	numStr        string // precomputed ecmascript.NumberToString(Num)
 	Regex         string
 	Flags         string
 	Ident         string
@@ -79,11 +143,11 @@ type attrValue struct {
 }
 
 // attrSelector matches a node whose attribute (a dotted path inside the
-// node's logical fields) satisfies a comparison. With Op == attrPresent the
-// rule only checks that the path resolves to a non-null value.
+// node's ESTree fields) satisfies a comparison. With Op == attrPresent the
+// rule checks that the path resolves to a non-null, non-undefined value.
 type attrSelector struct {
 	Inner selector
-	Path  []string
+	Path  []pathSegment
 	Op    attrOp
 	Value attrValue
 }
@@ -102,11 +166,13 @@ const (
 )
 
 // combinatorSelector pairs Right with a combinator and an ancestor / sibling
-// constraint Left.
+// constraint Left. memoID is non-zero when per-walk memoization is assigned
+// for combDescendant or combSibling (which reserves memoID and memoID+1).
 type combinatorSelector struct {
-	Kind  combinatorKind
-	Left  selector
-	Right selector
+	Kind   combinatorKind
+	Left   selector
+	Right  selector
+	memoID uint32
 }
 
 func (combinatorSelector) isSelector() {}
@@ -123,11 +189,13 @@ func (relativeSelector) isSelector() {}
 
 // pseudoSelector covers the `:is(...)`, `:matches(...)`, `:not(...)`,
 // `:has(...)`, `:nth-child(N)`, `:nth-last-child(N)`, `:first-child`,
-// `:last-child` forms.
+// `:last-child`, and node-class (`:statement`, `:expression`, `:declaration`,
+// `:function`, `:pattern`) forms.
 type pseudoSelector struct {
-	Name string
-	Args []selector
-	N    int // for :nth-child / :nth-last-child
+	Name   string
+	Args   []selector
+	N      int // for :nth-child / :nth-last-child
+	memoID uint32
 }
 
 func (pseudoSelector) isSelector() {}

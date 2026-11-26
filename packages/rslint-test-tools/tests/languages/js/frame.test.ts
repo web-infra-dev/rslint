@@ -538,7 +538,7 @@ test('parenthesized constructor instantiation retains its own type arguments', (
   const node = ast.body[0].expression;
   const callee = node.callee as ESTreeNode;
   expect(callee.type).toBe('TSInstantiationExpression');
-  expect(node.typeArguments).toBeNull();
+  expect(node.typeArguments).toBeUndefined();
   expect((callee.typeArguments as ESTreeNode).type).toBe(
     'TSTypeParameterInstantiation',
   );

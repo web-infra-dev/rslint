@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
@@ -33,9 +34,12 @@ func parseSelector(input string) (selector, error) {
 	return sel, nil
 }
 
+const maxSelectorDepth = 128
+
 type parser struct {
-	src string
-	pos int
+	src   string
+	pos   int
+	depth int
 }
 
 func (p *parser) eof() bool {
@@ -185,7 +189,7 @@ func (p *parser) parseSequence() (selector, error) {
 				}
 				path = append(path, field)
 			}
-			head = classSelector{Inner: head, Path: path}
+			head = classSelector{Inner: head, Path: compilePath(path)}
 		case '[':
 			attr, err := p.parseAttr(head)
 			if err != nil {
@@ -198,7 +202,25 @@ func (p *parser) parseSequence() (selector, error) {
 				return nil, err
 			}
 			head = ps
+		case '*':
+			p.pos++
+			head = compoundSelector{Left: head, Right: newIdentifierSelector("*")}
+		case '#':
+			p.pos++
+			name, err := p.parseIdent()
+			if err != nil {
+				return nil, err
+			}
+			head = compoundSelector{Left: head, Right: newIdentifierSelector(name)}
 		default:
+			if isIdentStart(c) {
+				name, err := p.parseIdent()
+				if err != nil {
+					return nil, err
+				}
+				head = compoundSelector{Left: head, Right: newIdentifierSelector(name)}
+				continue
+			}
 			if subject {
 				return subjectSelector{Inner: head}, nil
 			}
@@ -211,12 +233,25 @@ func (p *parser) parseSequence() (selector, error) {
 	return head, nil
 }
 
+var lowerEstreeTypes = func() map[string]estree.TypeID {
+	count := estree.TypeCount()
+	m := make(map[string]estree.TypeID, count)
+	for i := range count {
+		tid := estree.TypeID(i)
+		m[ecmascript.StringToLowerCase(tid.String())] = tid
+	}
+	return m
+}()
+
 func newIdentifierSelector(name string) identifierSelector {
 	name = strings.TrimPrefix(name, "#")
-	if canonical, ok := canonicalEstreeName(name); ok {
-		name = canonical
+	if name == "*" {
+		return identifierSelector{Name: "*", TypeID: estree.UnknownType, Wildcard: true}
 	}
-	return identifierSelector{Name: name, Kinds: kindsForEstreeName(name)}
+	if tid, ok := lowerEstreeTypes[ecmascript.StringToLowerCase(name)]; ok {
+		return identifierSelector{Name: tid.String(), TypeID: tid}
+	}
+	return identifierSelector{Name: name, TypeID: estree.UnknownType}
 }
 
 func (p *parser) parseIdent() (string, error) {
@@ -245,7 +280,7 @@ func (p *parser) parseAttr(inner selector) (selector, error) {
 	p.skipSpaces()
 	if !p.eof() && p.peek() == ']' {
 		p.pos++
-		return attrSelector{Inner: inner, Path: pathParts, Op: attrPresent}, nil
+		return attrSelector{Inner: inner, Path: compilePath(pathParts), Op: attrPresent}, nil
 	}
 	op, err := p.parseAttrOp()
 	if err != nil {
@@ -261,7 +296,7 @@ func (p *parser) parseAttr(inner selector) (selector, error) {
 		return nil, fmt.Errorf("expected ] at position %d", p.pos)
 	}
 	p.pos++
-	return attrSelector{Inner: inner, Path: pathParts, Op: op, Value: val}, nil
+	return attrSelector{Inner: inner, Path: compilePath(pathParts), Op: op, Value: val}, nil
 }
 
 func (p *parser) parseAttrPath() ([]string, error) {
@@ -354,7 +389,7 @@ func (p *parser) parseAttrValue() (attrValue, error) {
 		if err != nil {
 			return attrValue{}, err
 		}
-		return attrValue{Kind: attrValueNumber, Num: num}, nil
+		return attrValue{Kind: attrValueNumber, Num: num, numStr: ecmascript.NumberToString(num)}, nil
 	case isIdentStart(c):
 		ident, err := p.parseIdent()
 		if err != nil {
@@ -402,6 +437,31 @@ func anchoredLiteralPrefix(pattern, flags string) string {
 	if !strings.HasPrefix(pattern, "^") || strings.ContainsAny(flags, "im") {
 		return ""
 	}
+	// A top-level unescaped '|' makes '^' apply only to the first branch.
+	parenDepth := 0
+	inClass := false
+	for i := 1; i < len(pattern); i++ {
+		switch pattern[i] {
+		case '\\':
+			i++
+		case '[':
+			inClass = true
+		case ']':
+			inClass = false
+		case '(':
+			if !inClass {
+				parenDepth++
+			}
+		case ')':
+			if !inClass && parenDepth > 0 {
+				parenDepth--
+			}
+		case '|':
+			if !inClass && parenDepth == 0 {
+				return ""
+			}
+		}
+	}
 	end := 1
 	for end < len(pattern) {
 		c := pattern[end]
@@ -410,6 +470,13 @@ func anchoredLiteralPrefix(pattern, flags string) string {
 			continue
 		}
 		break
+	}
+	// A quantifier that can match zero times makes pattern[end-1] optional.
+	if end > 1 && end < len(pattern) {
+		switch pattern[end] {
+		case '?', '*', '{':
+			end--
+		}
 	}
 	return pattern[1:end]
 }
@@ -579,6 +646,11 @@ func (p *parser) parseHasSelectorArgs() ([]selector, error) {
 	if p.eof() || p.peek() != '(' {
 		return nil, fmt.Errorf("expected ( at position %d", p.pos)
 	}
+	if p.depth >= maxSelectorDepth {
+		return nil, errors.New("selector nesting depth limit exceeded")
+	}
+	p.depth++
+	defer func() { p.depth-- }()
 	p.pos++
 	p.skipSpaces()
 
@@ -672,6 +744,11 @@ func (p *parser) parsePseudoSelectorArgs() ([]selector, error) {
 	if p.eof() || p.peek() != '(' {
 		return nil, fmt.Errorf("expected ( at position %d", p.pos)
 	}
+	if p.depth >= maxSelectorDepth {
+		return nil, errors.New("selector nesting depth limit exceeded")
+	}
+	p.depth++
+	defer func() { p.depth-- }()
 	p.pos++ // (
 	p.skipSpaces()
 	var args []selector

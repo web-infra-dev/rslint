@@ -8,20 +8,20 @@ import (
 )
 
 func TestHeritageWildcardTraversal(t *testing.T) {
-	// Preserve the rule's existing TypeScript wildcard coverage. Registering
-	// heritage members must not add ordinary qualified type names to traversal.
-	// The shared ESLint corpus separately checks named MemberExpression selectors.
+	// Wildcard and negative selectors visit the full TSESTree (Program,
+	// declarations, type references, qualified names, heritage, and bodies),
+	// matching ESLint + @typescript-eslint/parser.
 	for _, tc := range []struct {
 		code     string
 		selector string
 		ranges   [][2]int
 	}{
-		{`type Good = Foo.Bar;`, "*", [][2]int{{6, 10}, {13, 16}, {17, 20}}},
-		{`type Good = typeof Foo.Bar;`, "*", [][2]int{{6, 10}, {20, 23}, {24, 27}}},
-		{`interface Good extends Box<Foo.Bar> {}`, "*", [][2]int{{11, 15}, {24, 27}, {28, 31}, {32, 35}}},
-		{`interface Good extends Foo.Bar {}`, "*", [][2]int{{11, 15}, {24, 31}, {24, 27}, {28, 31}}},
-		{`type Good = Foo.Bar;`, ":not(Identifier)", [][2]int{{1, 21}}},
-		{`interface Good extends Foo.Bar {}`, ":not(Identifier)", [][2]int{{1, 34}, {24, 31}}},
+		{`type Good = Foo.Bar;`, "*", [][2]int{{1, 21}, {1, 21}, {6, 10}, {13, 20}, {13, 20}, {13, 16}, {17, 20}}},
+		{`type Good = typeof Foo.Bar;`, "*", [][2]int{{1, 28}, {1, 28}, {6, 10}, {13, 27}, {20, 27}, {20, 23}, {24, 27}}},
+		{`interface Good extends Box<Foo.Bar> {}`, "*", [][2]int{{1, 39}, {1, 39}, {11, 15}, {24, 36}, {24, 27}, {27, 36}, {28, 35}, {28, 35}, {28, 31}, {32, 35}, {37, 39}}},
+		{`interface Good extends Foo.Bar {}`, "*", [][2]int{{1, 34}, {1, 34}, {11, 15}, {24, 31}, {24, 31}, {24, 27}, {28, 31}, {32, 34}}},
+		{`type Good = Foo.Bar;`, ":not(Identifier)", [][2]int{{1, 21}, {1, 21}, {13, 20}, {13, 20}}},
+		{`interface Good extends Foo.Bar {}`, ":not(Identifier)", [][2]int{{1, 34}, {1, 34}, {24, 31}, {24, 31}, {32, 34}}},
 	} {
 		t.Run(tc.code+tc.selector, func(t *testing.T) {
 			var errors []rule_tester.InvalidTestCaseError

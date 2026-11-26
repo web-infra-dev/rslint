@@ -361,7 +361,7 @@ ruleTester.run('no-restricted-syntax', {
       ],
     },
 
-    // Real-world: see-through paren / non-null / as on the receiver
+    // Real-world: parentheses are transparent, while TS assertions remain in ESTree
     {
       code: `(console).log('msg');`,
       options: [`MemberExpression[object.name='console']`] as any,
@@ -369,12 +369,12 @@ ruleTester.run('no-restricted-syntax', {
     },
     {
       code: `console!.log('msg');`,
-      options: [`MemberExpression[object.name='console']`] as any,
+      options: [`MemberExpression[object.type='TSNonNullExpression']`] as any,
       errors: [{ messageId: 'restrictedSyntax' }],
     },
     {
       code: `(console as any).log('msg');`,
-      options: [`MemberExpression[object.name='console']`] as any,
+      options: [`MemberExpression[object.type='TSAsExpression']`] as any,
       errors: [{ messageId: 'restrictedSyntax' }],
     },
 
@@ -739,6 +739,20 @@ ruleTester.run('no-restricted-syntax', {
       code: 'class C { static { initialize(); } }',
       options: ['StaticBlock'] as any,
       errors: [{ messageId: 'restrictedSyntax' }],
+    },
+
+    // TypeScript type nodes and typeAnnotation selectors (issue #2626)
+    {
+      code: `export const v: unknown = 1; export const a = v as unknown as string;`,
+      options: [
+        `TSUnknownKeyword`,
+        `TSAsExpression > TSAsExpression[typeAnnotation.type='TSUnknownKeyword']`,
+      ] as any,
+      errors: [
+        { messageId: 'restrictedSyntax' },
+        { messageId: 'restrictedSyntax' },
+        { messageId: 'restrictedSyntax' },
+      ],
     },
 
     // JSXAttribute name covered in Go tests via Tsx:true; the TS

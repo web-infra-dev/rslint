@@ -2,12 +2,14 @@ package no_restricted_syntax
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	tsparser "github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -1031,8 +1033,12 @@ func TestNoRestrictedSyntaxEsqueryParity(t *testing.T) {
 				Options: []interface{}{`Identifier[missing='value']`},
 			},
 			{
-				Code:    `foo;`,
-				Options: []interface{}{`Identifier[optional]`},
+				// On JS files Identifier has no `optional` property (in TS,
+				// @typescript-eslint/parser sets Identifier.optional = false).
+				Code:     `foo;`,
+				FileName: "identifier-optional.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []interface{}{`Identifier[optional]`},
 			},
 			{
 				Code:    `foo;`,
@@ -1244,6 +1250,7 @@ foo;`,
 				Code:    `(foo);`,
 				Options: []interface{}{"*"},
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax"},
 					{MessageId: "restrictedSyntax"},
 					{MessageId: "restrictedSyntax"},
 				},
@@ -1697,25 +1704,55 @@ func TestNoRestrictedSyntaxDispatchPlanning(t *testing.T) {
 		buildEntryFromString(`BinaryExpression[operator='instanceof'][right.name='DragEvent']`),
 	}
 	binaryBucket := buildRuleBucket(binaryEntries)
-	if binaryBucket.dispatch == nil || len(binaryBucket.dispatch.path) != 1 || binaryBucket.dispatch.path[0] != "operator" {
+	if binaryBucket.dispatch == nil || len(binaryBucket.dispatch.path) != 1 || binaryBucket.dispatch.path[0].raw != "operator" {
 		t.Fatalf("binary dispatch path is %v, want operator", binaryBucket.dispatch)
+	}
+	if binaryBucket.dispatch.byValue != nil || binaryBucket.dispatch.singleValue != "instanceof" {
+		t.Fatalf("single-value dispatch = (%q, byValue=%v), want singleValue=instanceof", binaryBucket.dispatch.singleValue, binaryBucket.dispatch.byValue)
 	}
 
 	singleBucket := buildRuleBucket([]ruleEntry{
 		buildEntryFromString(`NewExpression[callee.object.name='Intl']`),
 	})
-	if singleBucket.dispatch == nil || len(singleBucket.dispatch.path) != 3 ||
-		singleBucket.dispatch.path[0] != "callee" ||
-		singleBucket.dispatch.path[1] != "object" ||
-		singleBucket.dispatch.path[2] != "name" {
-		t.Fatalf("single-selector dispatch path is %v, want callee.object.name", singleBucket.dispatch)
+	if singleBucket.dispatch != nil {
+		t.Fatalf("single-selector bucket unexpectedly built dispatch %v", singleBucket.dispatch)
+	}
+
+	multiBucket := buildRuleBucket([]ruleEntry{
+		buildEntryFromString(`NewExpression[callee.object.name='Intl']`),
+		buildEntryFromString(`NewExpression[callee.object.name='Date']`),
+	})
+	if multiBucket.dispatch == nil || len(multiBucket.dispatch.path) != 3 ||
+		multiBucket.dispatch.path[0].raw != "callee" ||
+		multiBucket.dispatch.path[1].raw != "object" ||
+		multiBucket.dispatch.path[2].raw != "name" {
+		t.Fatalf("multi-selector dispatch path is %v, want callee.object.name", multiBucket.dispatch)
+	}
+
+	valueBucket := buildRuleBucket([]ruleEntry{
+		buildEntryFromString(`Literal[value='text']`),
+		buildEntryFromString(`Literal[value='other']`),
+	})
+	if valueBucket.dispatch == nil || len(valueBucket.dispatch.path) != 1 || valueBucket.dispatch.path[0].raw != "value" {
+		t.Fatalf("Literal.value dispatch path is %v, want value", valueBucket.dispatch)
+	}
+
+	chainedBucket := buildRuleBucket([]ruleEntry{
+		buildEntryFromString(`CallExpression[callee.name='eval']`),
+		buildEntryFromString(`CallExpression[callee.name='Function']`),
+		buildEntryFromString(`CallExpression[callee.property.name='log']`),
+		buildEntryFromString(`CallExpression[callee.property.name='warn']`),
+	})
+	if chainedBucket.dispatch == nil || chainedBucket.dispatch.next == nil {
+		t.Fatalf("expected chained dispatch for mixed CallExpression paths, got %+v", chainedBucket.dispatch)
 	}
 
 	unsupportedBucket := buildRuleBucket([]ruleEntry{
-		buildEntryFromString(`Literal[value='text']`),
+		buildEntryFromString(`CallExpression[arguments.length='1']`),
+		buildEntryFromString(`CallExpression[arguments.length='2']`),
 	})
 	if unsupportedBucket.dispatch != nil {
-		t.Fatalf("unsupported single-selector path unexpectedly built dispatch %v", unsupportedBucket.dispatch)
+		t.Fatalf("unsupported path unexpectedly built dispatch %v", unsupportedBucket.dispatch)
 	}
 }
 
@@ -1728,6 +1765,10 @@ func TestNoRestrictedSyntaxDispatchMatchesFullMatcher(t *testing.T) {
 		`Identifier[name='foo'][name='bar']`,
 		`Identifier[name='foo'][type='Identifier']`,
 		`Identifier[missing='undefined']`,
+		`CallExpression[callee.name=undefined]`,
+		`CallExpression[callee.name='eval']`,
+		`FunctionExpression[id.name=null]`,
+		`FunctionExpression[id.name='named']`,
 	})
 	bucket := buildRuleBucket(entries)
 	if bucket.dispatch == nil {
@@ -1737,37 +1778,40 @@ func TestNoRestrictedSyntaxDispatchMatchesFullMatcher(t *testing.T) {
 	sourceFile := tsparser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/dispatch-attack.ts",
 		Path:     "/dispatch-attack.ts",
-	}, `foo; bar; function foo() {} object.foo;`, core.ScriptKindTS)
-	mc := &matchContext{sf: sourceFile}
+	}, `foo; bar; function foo() {} object.foo(); eval('x'); const f = function() {}; const g = function named() {};`, core.ScriptKindTS)
 
-	var attack func(*ast.Node) bool
-	attack = func(node *ast.Node) bool {
-		full := make([]bool, len(entries))
-		optimized := make([]bool, len(entries))
-		for index := range entries {
-			full[index] = matches(entries[index].compiled, node, mc)
-		}
+	var builder estree.Builder
+	if err := builder.WithTree(sourceFile, estree.TreeOptions{SourceType: "module"}, func(tree *estree.Tree) {
+		var attack func(estree.NodeID)
+		attack = func(id estree.NodeID) {
+			full := make([]bool, len(entries))
+			optimized := make([]bool, len(entries))
+			for index := range entries {
+				full[index] = matchesSelector(entries[index].compiled, tree, id, estree.NoNode, nil)
+			}
 
-		fallback, indexed, useAll := bucket.candidates(node, mc)
-		if useAll {
-			copy(optimized, full)
-		} else {
-			for _, index := range fallback {
-				optimized[index] = matches(entries[index].compiled, node, mc)
+			for cur := bucket.dispatch; cur != nil; cur = cur.next {
+				for _, index := range cur.lookup(tree, id) {
+					optimized[index] = matchesSelector(entries[index].compiled, tree, id, estree.NoNode, nil)
+				}
+				for _, index := range cur.fallback {
+					optimized[index] = matchesSelector(entries[index].compiled, tree, id, estree.NoNode, nil)
+				}
 			}
-			for _, index := range indexed {
-				optimized[index] = matches(bucket.dispatch.matched[index], node, mc)
+			for index := range entries {
+				if optimized[index] != full[index] {
+					t.Errorf("node %s selector %q: optimized=%v full=%v", tree.Type(id), entries[index].selector, optimized[index], full[index])
+				}
 			}
+			tree.ForEachChild(id, func(child estree.NodeID) bool {
+				attack(child)
+				return false
+			})
 		}
-		for index := range entries {
-			if optimized[index] != full[index] {
-				t.Errorf("node %s selector %q: optimized=%v full=%v", node.Kind, entries[index].selector, optimized[index], full[index])
-			}
-		}
-		node.ForEachChild(attack)
-		return false
+		attack(tree.Root())
+	}); err != nil {
+		t.Fatal(err)
 	}
-	attack(sourceFile.AsNode())
 }
 
 func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
@@ -1776,6 +1820,16 @@ func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
 		"Identifier[name='other']",
 	}
 	want := cachedRulePlan(options)
+
+	// In-place slice mutation must not return a stale cached plan.
+	mutated := []any{"UnknownNodeType"}
+	if p := cachedRulePlan(mutated); !p.empty {
+		t.Fatal("unknown node type should produce empty plan")
+	}
+	mutated[0] = "WithStatement"
+	if p := cachedRulePlan(mutated); p.empty {
+		t.Fatal("in-place mutated slice hit stale empty plan in cache")
+	}
 
 	var waitGroup sync.WaitGroup
 	for range 32 {
@@ -1787,14 +1841,8 @@ func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
 	}
 	waitGroup.Wait()
 
-	anchors := make([][]any, 0, maxCachedRulePlans+16)
 	for index := range maxCachedRulePlans + 16 {
-		entryOptions := []any{"Identifier[name='entry" + strconv.Itoa(index) + "']"}
-		anchors = append(anchors, entryOptions)
-		cachedRulePlan(entryOptions)
-	}
-	if len(anchors) != maxCachedRulePlans+16 {
-		t.Fatal("cache anchors were not retained")
+		cachedRulePlan([]any{"Identifier[name='entry" + strconv.Itoa(index) + "']"})
 	}
 
 	rulePlanCache.RLock()
@@ -1805,4 +1853,105 @@ func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
 	if len(rulePlanCache.order) != len(rulePlanCache.entries) {
 		t.Fatalf("cache order has %d entries for %d plans", len(rulePlanCache.order), len(rulePlanCache.entries))
 	}
+}
+
+func TestNoRestrictedSyntaxAdversarialRegressions(t *testing.T) {
+	// Parser depth guard rejects deeply nested selectors cleanly without stack overflow.
+	deepNot := strings.Repeat(":not(", 200) + "Identifier" + strings.Repeat(")", 200)
+	if _, err := parseSelector(deepNot); err == nil {
+		t.Fatal("expected depth limit error for 200-deep nested :not()")
+	}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			// `.parent` is not a valid child field path in class selectors.
+			{
+				Code:    `const x = 1;`,
+				Options: []any{`VariableDeclaration.parent.body`},
+			},
+			// Regex negation with top-level alternation must not false-positive on second branch.
+			{
+				Code:    `bar;`,
+				Options: []any{`Identifier[name!=/^foo|bar/]`},
+			},
+			// Deeply nested `:has` completes instantly via memoization.
+			{
+				Code:    `;`,
+				Options: []any{`*` + strings.Repeat(`:has(`, 28) + `WithStatement` + strings.Repeat(`)`, 28)},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			// anchoredLiteralPrefix with optional quantifier and alternation.
+			{
+				Code:    `const u = "http://example.com";`,
+				Options: []any{`Literal[value=/^https?:\/\//]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 31}},
+			},
+			{
+				Code:    `useLayoutEffect(fn);`,
+				Options: []any{`CallExpression[callee.name=/^useEffect|useLayoutEffect/]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 20}},
+			},
+			{
+				Code:    `a;`,
+				Options: []any{`Identifier[name=/^ab?$/]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 2}},
+			},
+			// Compound atoms in arbitrary order.
+			{
+				Code:    `const x = 1;`,
+				Options: []any{`[kind="const"]VariableDeclaration`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 13}},
+			},
+			{
+				Code:    `a.b;`,
+				Options: []any{`:not([computed=true])MemberExpression`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 4}},
+			},
+			{
+				Code:    `foo();`,
+				Options: []any{`.callee#Identifier`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 4}},
+			},
+			// String code-unit indexing (`[name.0="_"]`).
+			{
+				Code:    `const _a = 1;`,
+				Options: []any{`Identifier[name.0="_"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 7, EndLine: 1, EndColumn: 9}},
+			},
+			// RegExp.lastIndex own property.
+			{
+				Code:    `const r = /foo/;`,
+				Options: []any{`Literal[value.lastIndex=0]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 16}},
+			},
+			// Invalid same-alternative duplicate capture group yields null value.
+			{
+				Code:    `const r = /(?<x>a)(?<x>b)/;`,
+				Options: []any{`Literal[value=null]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 27}},
+			},
+			// Multi-segment class selector `.body.declarations` (O(len(path))).
+			{
+				Code:    `const x = 1;`,
+				Options: []any{`VariableDeclarator.body.declarations`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 7, EndLine: 1, EndColumn: 12}},
+			},
+			// stringAttrDispatch with undefined / null coerced keys.
+			{
+				Code:    `obj.bar();`,
+				Options: []any{`CallExpression[callee.name=undefined]`, `CallExpression[callee.name='eval']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 10}},
+			},
+			{
+				Code:    `const f = function() {};`,
+				Options: []any{`FunctionExpression[id.name=null]`, `FunctionExpression[id.name='foo']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 24}},
+			},
+		},
+	)
 }

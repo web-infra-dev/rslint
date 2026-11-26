@@ -118,7 +118,11 @@ func TestNoRestrictedSyntaxExportSelectorBoundaries(t *testing.T) {
 			},
 			{
 				Code: "export default interface I {}", Options: []any{":not(Program, Identifier)"},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 30},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 28, EndLine: 1, EndColumn: 30},
+				},
 			},
 			{
 				Code: "export default 1;", Options: []any{"[type='ExportDefaultDeclaration'][declaration.type='Literal'][exportKind='value']"},
@@ -149,12 +153,17 @@ func TestNoRestrictedSyntaxExportSelectorBoundaries(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 26, EndLine: 1, EndColumn: 27}},
 			},
 			{
-				// Adding export hosts must neither expose unsupported physical
-				// declarations nor add virtual diagnostics to the bare wildcard.
+				// Wildcard matches every TSESTree node (Program, ExportDefaultDeclaration,
+				// TSInterfaceDeclaration, Identifier, TSInterfaceBody) and [type=/^Export/]
+				// additionally matches ExportDefaultDeclaration.
 				Code: "export default interface I {}", Options: []any{"*", "[type=/^Export/]"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 30},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 26, EndLine: 1, EndColumn: 27},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 28, EndLine: 1, EndColumn: 30},
 				},
 			},
 		})

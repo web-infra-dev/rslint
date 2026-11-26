@@ -236,12 +236,12 @@ func TestSelectorSpecificityMatchesESLint(t *testing.T) {
 	}
 }
 
-func TestCandidateKindsUniverseAbsorbsTypedBranches(t *testing.T) {
+func TestCandidateTypesAllAbsorbsTypedBranches(t *testing.T) {
 	parsed, err := parseSelector(`:matches(*, Identifier)`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kinds := candidateKinds(parsed); !kinds.universe {
-		t.Fatalf("candidate kinds = %#v, want universe", kinds)
+	if types := candidateTypes(parsed); !types.all {
+		t.Fatalf("candidate types = %#v, want all", types)
 	}
 }

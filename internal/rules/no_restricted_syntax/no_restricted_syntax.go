@@ -2,30 +2,34 @@ package no_restricted_syntax
 
 import (
 	_ "embed"
-	"reflect"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_restricted_syntax.schema.json
 var schemaJSON []byte
 
+var estreeBuilderPool = sync.Pool{
+	New: func() any {
+		return new(estree.Builder)
+	},
+}
+
 // NoRestrictedSyntaxRule is the rslint port of ESLint's `no-restricted-syntax`.
 //
-// Configuration mirrors ESLint: the rule accepts a list of strings or
-// `{ selector, message? }` objects. Each selector follows the esquery
-// grammar (the subset implemented in parser.go). Parsed selectors are indexed
-// by candidate kind and common string attributes; each match produces one
-// diagnostic with the user-supplied message (or a default).
+// Configuration mirrors ESLint: the rule accepts a list of selector strings or
+// `{ selector, message? }` objects. Selectors are evaluated against a scoped
+// read-only TSESTree projected by internal/languages/js/estree so every JS,
+// JSX, and TypeScript ESTree node, field, and parent-child relation matches
+// upstream ESLint + @typescript-eslint/parser semantics.
 //
 // https://eslint.org/docs/latest/rules/no-restricted-syntax
 var NoRestrictedSyntaxRule = rule.Rule{
@@ -33,185 +37,152 @@ var NoRestrictedSyntaxRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		plan := cachedRulePlan(options)
-		if len(plan.buckets) == 0 {
-			return rule.RuleListeners{}
+		if plan.empty {
+			return nil
 		}
-
-		mc := &matchContext{sf: ctx.SourceFile}
-
-		visit := func(node *ast.Node, bucket *ruleBucket) {
-			if isTransparentEstreeContainer(node) ||
-				(node.Kind == ast.KindQualifiedName && !utils.IsHeritageQualifiedName(node)) {
+		if plan.eager {
+			evaluateFile(ctx, plan)
+			return nil
+		}
+		ran := false
+		trigger := func(*ast.Node) {
+			if ran {
 				return
 			}
-			first, second, useAll := bucket.candidates(node, mc)
-			visitCandidates := func(match func(index int, indexed bool)) {
-				if useAll {
-					for index := range bucket.entries {
-						match(index, false)
-					}
-					return
-				}
-
-				// Both candidate lists retain ESLint specificity order. Merge them so a
-				// dispatch hit cannot reorder diagnostics relative to selectors
-				// that do not participate in the index.
-				left, right := 0, 0
-				for left < len(first) || right < len(second) {
-					var index int
-					indexed := false
-					switch {
-					case right == len(second):
-						index = first[left]
-						left++
-					case left == len(first):
-						index = second[right]
-						right++
-						indexed = true
-					case first[left] < second[right]:
-						index = first[left]
-						left++
-					default:
-						index = second[right]
-						right++
-						indexed = true
-					}
-					match(index, indexed)
-				}
-			}
-
-			// A dispatch key read from the physical node cannot prune its
-			// folded ESTree child: type, parent and fields can all differ.
-			target := virtualTarget(node)
-			visitExportWrapper := func() {
-				if !bucket.hasVirtual {
-					return
-				}
-				wrapper := exportWrapperTarget(node)
-				if wrapper == "" {
-					return
-				}
-				for index := range bucket.entries {
-					bucket.matchVirtual(index, node, wrapper, mc, &ctx)
-				}
-			}
-			visitVirtual := func() {
-				if !bucket.hasVirtual {
-					return
-				}
-				if node.Kind == ast.KindConstructor {
-					keyTarget := constructorKey(node, mc).typeName
-					for index := range bucket.entries {
-						bucket.matchVirtual(index, node, keyTarget, mc, &ctx)
-					}
-				}
-				if target != "" {
-					for index := range bucket.entries {
-						bucket.matchVirtual(index, node, target, mc, &ctx)
-					}
-				}
-			}
-			// ChainExpression surrounds the physical node; the other facades
-			// are its children. Exit events reverse that order.
-			virtualBeforePhysical := bucket.entries[0].exit != (target == "ChainExpression")
-			// Export wrappers also surround the exported declaration,
-			// which may own a child facade such as ClassBody.
-			exit := bucket.entries[0].exit
-			if !exit {
-				visitExportWrapper()
-			}
-			if virtualBeforePhysical {
-				visitVirtual()
-			}
-			visitCandidates(func(index int, indexed bool) {
-				bucket.matchPhysical(index, node, mc, &ctx, indexed)
-			})
-			if !virtualBeforePhysical {
-				visitVirtual()
-			}
-			if exit {
-				visitExportWrapper()
-			}
+			ran = true
+			evaluateFile(ctx, plan)
 		}
-
-		listeners := make(rule.RuleListeners, len(plan.buckets))
-		for k, bucket := range plan.buckets {
-			switch k {
-			case ast.KindSourceFile:
-				// The engine starts at SourceFile's children. Program enter runs
-				// eagerly, and EOF provides the matching Program exit event.
-				visit(ctx.SourceFile.AsNode(), bucket)
-			case rule.ListenerOnExit(ast.KindSourceFile):
-				listeners[rule.ListenerOnExit(ast.KindEndOfFile)] = func(*ast.Node) { visit(ctx.SourceFile.AsNode(), bucket) }
-			case rule.ListenerOnExit(ast.KindImportClause):
-				// Handled on ImportClause.Name()'s exit below so combined
-				// imports (`import Def, * as NS`) exit ImportDefaultSpecifier
-				// before entering sibling named/namespace bindings.
-			default:
-				listeners[k] = func(node *ast.Node) { visit(node, bucket) }
-			}
-		}
-		if exitClauseBucket := plan.buckets[rule.ListenerOnExit(ast.KindImportClause)]; exitClauseBucket != nil {
-			prev := listeners[rule.ListenerOnExit(ast.KindIdentifier)]
-			listeners[rule.ListenerOnExit(ast.KindIdentifier)] = func(node *ast.Node) {
-				if prev != nil {
-					prev(node)
-				}
-				if parent := node.Parent; parent != nil && parent.Kind == ast.KindImportClause && parent.AsImportClause().Name() == node {
-					visit(parent, exitClauseBucket)
-				}
-			}
+		listeners := make(rule.RuleListeners, len(plan.triggerKinds))
+		for _, kind := range plan.triggerKinds {
+			listeners[kind] = trigger
 		}
 		return listeners
 	},
 }
 
+func evaluateFile(ctx rule.RuleContext, plan *rulePlan) {
+	builder, ok := estreeBuilderPool.Get().(*estree.Builder)
+	if !ok {
+		builder = new(estree.Builder)
+	}
+	defer func() {
+		builder.Reset()
+		estreeBuilderPool.Put(builder)
+	}()
+	_ = builder.WithTree(ctx.SourceFile, estree.TreeOptions{
+		SourceType: ctx.LanguageOptions.EffectiveSourceType(),
+	}, func(tree *estree.Tree) {
+		walkTree(tree, plan, &ctx)
+	})
+}
+
+type walkFrame struct {
+	id      estree.NodeID
+	exiting bool
+}
+
+func walkTree(tree *estree.Tree, plan *rulePlan, ctx *rule.RuleContext) {
+	root := tree.Root()
+	if root == estree.NoNode {
+		return
+	}
+	var memo *evalMemo
+	if plan.hasMemo {
+		memo = &evalMemo{}
+	}
+	var stackBuf [64]walkFrame
+	var childBuf [32]estree.NodeID
+	stack := append(stackBuf[:0], walkFrame{id: root})
+	for len(stack) > 0 {
+		frame := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		tid := tree.Type(frame.id)
+		if frame.exiting {
+			plan.exit[tid].evaluate(tree, frame.id, ctx, memo)
+			continue
+		}
+		if bucket := plan.enter[tid]; bucket != nil {
+			bucket.evaluate(tree, frame.id, ctx, memo)
+		}
+		if plan.exit[tid] != nil {
+			stack = append(stack, walkFrame{id: frame.id, exiting: true})
+		}
+		children := tree.AppendChildren(frame.id, childBuf[:0])
+		for i := len(children) - 1; i >= 0; i-- {
+			stack = append(stack, walkFrame{id: children[i]})
+		}
+	}
+}
+
 // ruleEntry is a parsed option entry: the original selector string,
 // the compiled selector tree, and the message (custom or default).
 type ruleEntry struct {
-	selector          string
-	compiled          selector
-	message           string
-	exit              bool
-	hasReverseSubject bool
-	// Some export hosts have no supported physical ESTree identity. Broad
-	// selectors still need their wrappers without exposing extra tsgo nodes.
-	virtualOnly bool
+	selector string
+	compiled selector
+	message  string
+	exit     bool
+}
+
+func (e ruleEntry) formatMessage() string {
+	return e.message
 }
 
 const maxCachedRulePlans = 64
 
 type rulePlan struct {
-	// options keeps the backing array alive while its address identifies this
-	// normalized config in rulePlanCache. Rule options are immutable after
-	// config resolution.
-	options []any
-	buckets map[ast.Kind]*ruleBucket
+	enter        []*ruleBucket
+	exit         []*ruleBucket
+	triggerKinds []ast.Kind
+	eager        bool
+	empty        bool
+	hasMemo      bool
 }
 
-type rulePlanCacheKey struct {
-	options uintptr
-	length  int
-}
-
-var emptyRulePlan = &rulePlan{}
+var emptyRulePlan = &rulePlan{empty: true}
 
 var rulePlanCache = struct {
 	sync.RWMutex
-	entries map[rulePlanCacheKey]*rulePlan
-	order   []rulePlanCacheKey
+	entries map[string]*rulePlan
+	order   []string
 }{
-	entries: make(map[rulePlanCacheKey]*rulePlan),
-	order:   make([]rulePlanCacheKey, 0, maxCachedRulePlans),
+	entries: make(map[string]*rulePlan),
+	order:   make([]string, 0, maxCachedRulePlans),
+}
+
+func optionsCacheKey(options []any) (string, bool) {
+	var sb strings.Builder
+	for _, item := range options {
+		switch x := item.(type) {
+		case string:
+			sb.WriteByte('S')
+			sb.WriteString(strconv.Itoa(len(x)))
+			sb.WriteByte(':')
+			sb.WriteString(x)
+		case map[string]any:
+			sel, _ := x["selector"].(string)
+			msg, _ := x["message"].(string)
+			sb.WriteByte('O')
+			sb.WriteString(strconv.Itoa(len(sel)))
+			sb.WriteByte(':')
+			sb.WriteString(sel)
+			sb.WriteByte(':')
+			sb.WriteString(strconv.Itoa(len(msg)))
+			sb.WriteByte(':')
+			sb.WriteString(msg)
+		default:
+			return "", false
+		}
+	}
+	return sb.String(), true
 }
 
 func cachedRulePlan(options []any) *rulePlan {
 	if len(options) == 0 {
 		return emptyRulePlan
 	}
-	key := rulePlanCacheKey{
-		options: reflect.ValueOf(options).Pointer(),
-		length:  len(options),
+	key, cacheable := optionsCacheKey(options)
+	if !cacheable {
+		return buildRulePlan(options)
 	}
 
 	rulePlanCache.RLock()
@@ -240,89 +211,330 @@ func cachedRulePlan(options []any) *rulePlan {
 	return plan
 }
 
+type typeSet struct {
+	all   bool
+	types map[estree.TypeID]struct{}
+}
+
+func newTypeSet() *typeSet {
+	return &typeSet{types: make(map[estree.TypeID]struct{})}
+}
+
+func (s *typeSet) markAll() {
+	s.all = true
+	s.types = nil
+}
+
+func (s *typeSet) add(id estree.TypeID) {
+	if s.all || id == estree.UnknownType {
+		return
+	}
+	s.types[id] = struct{}{}
+}
+
+func (s *typeSet) unionWith(other *typeSet) {
+	if s.all {
+		return
+	}
+	if other.all {
+		s.markAll()
+		return
+	}
+	for id := range other.types {
+		s.types[id] = struct{}{}
+	}
+}
+
+func (s *typeSet) intersectWith(other *typeSet) {
+	if other.all {
+		return
+	}
+	if s.all {
+		s.all = false
+		s.types = make(map[estree.TypeID]struct{}, len(other.types))
+		for id := range other.types {
+			s.types[id] = struct{}{}
+		}
+		return
+	}
+	for id := range s.types {
+		if _, ok := other.types[id]; !ok {
+			delete(s.types, id)
+		}
+	}
+}
+
+// candidateTypes computes the exact ESLint nodeTypes dispatch set for sel.
+// Selectors whose rightmost host is constrained to specific ESTree type names
+// receive only those TypeIDs; unconstrained selectors (`*`, attributes, `:not`,
+// `:has`, `:nth-child`, node classes) receive all=true.
+func candidateTypes(sel selector) *typeSet {
+	switch v := sel.(type) {
+	case subjectSelector:
+		return candidateTypes(v.Inner)
+	case identifierSelector:
+		s := newTypeSet()
+		if v.Wildcard {
+			s.markAll()
+		} else if v.TypeID != estree.UnknownType {
+			s.add(v.TypeID)
+		}
+		return s
+	case compoundSelector:
+		left := candidateTypes(v.Left)
+		left.intersectWith(candidateTypes(v.Right))
+		return left
+	case classSelector:
+		return candidateTypes(v.Inner)
+	case attrSelector:
+		return candidateTypes(v.Inner)
+	case combinatorSelector:
+		return candidateTypes(v.Right)
+	case relativeSelector:
+		return candidateTypes(v.Inner)
+	case pseudoSelector:
+		switch v.Name {
+		case "is", "matches":
+			s := newTypeSet()
+			for _, arg := range v.Args {
+				s.unionWith(candidateTypes(arg))
+			}
+			return s
+		case "statement":
+			return classTypeSet(isStatementType)
+		case "declaration":
+			return classTypeSet(isDeclarationType)
+		case "function":
+			return classTypeSet(isFunctionType)
+		default:
+			// :not, :has, :nth-child, :nth-last-child, :expression, :pattern
+			s := newTypeSet()
+			s.markAll()
+			return s
+		}
+	case combinedPseudo:
+		left := candidateTypes(v.Inner)
+		right := candidateTypes(v.Pseudo)
+		left.intersectWith(right)
+		return left
+	case unionSelector:
+		s := newTypeSet()
+		for _, child := range v.Selectors {
+			s.unionWith(candidateTypes(child))
+		}
+		return s
+	}
+	return newTypeSet()
+}
+
+func classTypeSet(table []bool) *typeSet {
+	s := newTypeSet()
+	for i, ok := range table {
+		if ok {
+			s.add(estree.TypeID(i))
+		}
+	}
+	return s
+}
+
+func assignMemoIDs(sel selector, next *uint32) selector {
+	switch v := sel.(type) {
+	case subjectSelector:
+		v.Inner = assignMemoIDs(v.Inner, next)
+		return v
+	case compoundSelector:
+		v.Left = assignMemoIDs(v.Left, next)
+		v.Right = assignMemoIDs(v.Right, next)
+		return v
+	case classSelector:
+		v.Inner = assignMemoIDs(v.Inner, next)
+		return v
+	case attrSelector:
+		v.Inner = assignMemoIDs(v.Inner, next)
+		return v
+	case combinatorSelector:
+		v.Left = assignMemoIDs(v.Left, next)
+		v.Right = assignMemoIDs(v.Right, next)
+		switch v.Kind {
+		case combDescendant:
+			*next++
+			v.memoID = *next
+		case combSibling:
+			*next++
+			v.memoID = *next
+			*next++ // reserve memoID+1 for reverse sibling direction
+		}
+		return v
+	case relativeSelector:
+		v.Inner = assignMemoIDs(v.Inner, next)
+		return v
+	case combinedPseudo:
+		v.Inner = assignMemoIDs(v.Inner, next)
+		v.Pseudo = assignPseudoMemoIDs(v.Pseudo, next)
+		return v
+	case pseudoSelector:
+		return assignPseudoMemoIDs(v, next)
+	case unionSelector:
+		selectors := make([]selector, len(v.Selectors))
+		for i, child := range v.Selectors {
+			selectors[i] = assignMemoIDs(child, next)
+		}
+		v.Selectors = selectors
+		return v
+	}
+	return sel
+}
+
+func assignPseudoMemoIDs(v pseudoSelector, next *uint32) pseudoSelector {
+	if len(v.Args) > 0 {
+		args := make([]selector, len(v.Args))
+		for i, arg := range v.Args {
+			args[i] = assignMemoIDs(arg, next)
+		}
+		v.Args = args
+	}
+	if v.Name == "has" {
+		*next++
+		v.memoID = *next
+	}
+	return v
+}
+
 func buildRulePlan(options []any) *rulePlan {
-	plan := &rulePlan{options: options}
 	entries := parseRuleOptions(options)
 	entries = deduplicateRuleEntries(entries)
 	sortRuleEntries(entries)
 	if len(entries) == 0 {
-		return plan
+		return emptyRulePlan
 	}
 
-	// Build per-kind buckets in ESLint's specificity order. This order is
-	// observable when multiple selectors report the same node, including when
-	// a universe selector is interleaved with kind-specific selectors.
-	perKind := make(map[ast.Kind][]ruleEntry)
-	for _, entry := range entries {
-		entry.hasReverseSubject = containsReverseSiblingSubject(entry.compiled)
-		kinds := candidateKinds(entry.compiled)
-		listenerKind := func(kind ast.Kind) ast.Kind {
-			if entry.exit {
-				return rule.ListenerOnExit(kind)
-			}
-			return kind
+	var memoCounter uint32
+	for i := range entries {
+		entries[i].compiled = assignMemoIDs(entries[i].compiled, &memoCounter)
+	}
+
+	typeCount := estree.TypeCount()
+	enterPerType := make([][]ruleEntry, typeCount)
+	exitPerType := make([][]ruleEntry, typeCount)
+	hasAny := false
+	eager := false
+	seenTrigger := make(map[ast.Kind]struct{})
+	var triggerKinds []ast.Kind
+
+	addTrigger := func(tid estree.TypeID) {
+		if eager {
+			return
 		}
-		if kinds.universe {
-			for _, kind := range allInterestingKinds {
-				key := listenerKind(kind)
-				perKind[key] = append(perKind[key], entry)
+		kinds, ok := estree.TriggerKinds(tid)
+		if !ok {
+			eager = true
+			triggerKinds = nil
+			return
+		}
+		for _, k := range kinds {
+			if _, exists := seenTrigger[k]; !exists {
+				seenTrigger[k] = struct{}{}
+				triggerKinds = append(triggerKinds, k)
 			}
-			if !isBareWildcardSelector(entry.compiled) {
-				entry.virtualOnly = true
-				for _, kind := range exportedDeclarationKinds {
-					if !slices.Contains(allInterestingKinds, kind) {
-						key := listenerKind(kind)
-						perKind[key] = append(perKind[key], entry)
-					}
-				}
+		}
+	}
+
+	for _, entry := range entries {
+		targets := candidateTypes(entry.compiled)
+		perType := enterPerType
+		if entry.exit {
+			perType = exitPerType
+		}
+		if targets.all {
+			hasAny = true
+			eager = true
+			triggerKinds = nil
+			for i := range typeCount {
+				perType[i] = append(perType[i], entry)
 			}
 			continue
 		}
-		for kind := range kinds.kinds {
-			key := listenerKind(kind)
-			perKind[key] = append(perKind[key], entry)
+		for tid := range targets.types {
+			hasAny = true
+			perType[tid] = append(perType[tid], entry)
+			addTrigger(tid)
 		}
 	}
-	plan.buckets = make(map[ast.Kind]*ruleBucket, len(perKind))
-	for kind, entries := range perKind {
-		bucket := buildRuleBucket(entries)
-		plan.buckets[kind] = &bucket
+
+	if !hasAny {
+		return emptyRulePlan
+	}
+
+	plan := &rulePlan{
+		enter:        make([]*ruleBucket, typeCount),
+		exit:         make([]*ruleBucket, typeCount),
+		triggerKinds: triggerKinds,
+		eager:        eager,
+		hasMemo:      memoCounter > 0,
+	}
+	for i := range typeCount {
+		if len(enterPerType[i]) > 0 {
+			bucket := buildRuleBucket(enterPerType[i])
+			plan.enter[i] = &bucket
+		}
+		if len(exitPerType[i]) > 0 {
+			bucket := buildRuleBucket(exitPerType[i])
+			plan.exit[i] = &bucket
+		}
 	}
 	return plan
 }
 
 type ruleBucket struct {
-	entries    []ruleEntry
-	dispatch   *stringAttrDispatch
-	hasVirtual bool
+	entries  []ruleEntry
+	dispatch *stringAttrDispatch
 }
 
+const maxDispatchDepth = 4
+
 type stringAttrDispatch struct {
-	path     []string
-	byValue  map[string][]int
-	fallback []int
-	matched  []selector
+	path            []pathSegment
+	singleValue     string
+	singleHits      []int
+	byValue         map[string][]int
+	fallback        []int
+	next            *stringAttrDispatch
+	hasNonStringKey bool
 }
 
 type dispatchAttr struct {
-	path  []string
+	path  []pathSegment
 	key   string
 	value string
 }
 
 type dispatchStat struct {
-	path   []string
+	path   []pathSegment
 	count  int
 	values map[string]struct{}
 }
 
 func buildRuleBucket(entries []ruleEntry) ruleBucket {
 	bucket := ruleBucket{entries: entries}
+	if len(entries) < 2 {
+		return bucket
+	}
+	indices := make([]int, len(entries))
+	for i := range indices {
+		indices[i] = i
+	}
+	bucket.dispatch = buildStringDispatch(entries, indices, 0)
+	return bucket
+}
+
+func buildStringDispatch(entries []ruleEntry, indices []int, depth int) *stringAttrDispatch {
+	if len(indices) < 2 || depth >= maxDispatchDepth {
+		return nil
+	}
 
 	stats := make(map[string]*dispatchStat)
-	for _, entry := range entries {
-		bucket.hasVirtual = bucket.hasVirtual || !isBareWildcardSelector(entry.compiled)
-		attrs := collectDispatchAttrs(entry.compiled, nil)
+	for _, entryIdx := range indices {
+		attrs := collectDispatchAttrs(entries[entryIdx].compiled, nil)
 		for index, attr := range attrs {
 			duplicate := false
 			for previous := range index {
@@ -359,115 +571,119 @@ func buildRuleBucket(entries []ruleEntry) ruleBucket {
 			bestValues = valueCount
 		}
 	}
-	if bestCount == 0 || (bestCount == 1 && !supportsSingleDispatch(stats[bestKey].path)) {
-		return bucket
+	if bestCount < 2 {
+		return nil
 	}
 
 	dispatch := &stringAttrDispatch{
 		path:     stats[bestKey].path,
-		byValue:  make(map[string][]int, bestValues),
-		fallback: make([]int, 0, len(entries)-bestCount),
-		matched:  make([]selector, len(entries)),
+		fallback: make([]int, 0, len(indices)-bestCount),
 	}
-	for index, entry := range entries {
-		value, ok := dispatchValueForPath(entry.compiled, bestKey)
+	for value := range stats[bestKey].values {
+		if couldMatchNonString(value) {
+			dispatch.hasNonStringKey = true
+			break
+		}
+	}
+	if bestValues == 1 {
+		for value := range stats[bestKey].values {
+			dispatch.singleValue = value
+		}
+		dispatch.singleHits = make([]int, 0, bestCount)
+	} else {
+		dispatch.byValue = make(map[string][]int, bestValues)
+	}
+
+	for _, entryIdx := range indices {
+		value, ok := dispatchValueForPath(entries[entryIdx].compiled, bestKey)
 		if !ok {
-			dispatch.fallback = append(dispatch.fallback, index)
+			dispatch.fallback = append(dispatch.fallback, entryIdx)
 			continue
 		}
-		stripped, ok := stripDispatchAttr(entry.compiled, bestKey, value)
-		if !ok {
-			dispatch.fallback = append(dispatch.fallback, index)
-			continue
+		if dispatch.byValue == nil {
+			dispatch.singleHits = append(dispatch.singleHits, entryIdx)
+		} else {
+			dispatch.byValue[value] = append(dispatch.byValue[value], entryIdx)
 		}
-		dispatch.matched[index] = stripped
-		dispatch.byValue[value] = append(dispatch.byValue[value], index)
 	}
-	bucket.dispatch = dispatch
-	return bucket
+	if len(dispatch.fallback) >= 2 {
+		if next := buildStringDispatch(entries, dispatch.fallback, depth+1); next != nil {
+			dispatch.next = next
+			dispatch.fallback = nil
+		}
+	}
+	return dispatch
 }
 
-func supportsSingleDispatch(path []string) bool {
-	if len(path) == 0 {
-		return false
-	}
-	switch path[len(path)-1] {
-	case "name", "operator", "type":
+// couldMatchNonString reports whether expected could match valueAsString on
+// any non-string, non-BigInt ValueKind (undefined, null, bool, number, RegExp,
+// node/object, or list).
+func couldMatchNonString(s string) bool {
+	if s == "" || s == "undefined" || s == "null" || s == "true" || s == "false" || s == "NaN" || s == "Infinity" || s == "-Infinity" {
 		return true
-	default:
-		return false
 	}
+	if s[0] == '/' || s[0] == '[' || s[0] == '-' || (s[0] >= '0' && s[0] <= '9') {
+		return true
+	}
+	return strings.IndexByte(s, ',') >= 0
 }
 
 func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
-	if selectorTargetsClassBody(sel) || selectorTargetsJSXEmptyExpression(sel) ||
-		selectorTargetsEstreeType(sel, "TSEnumBody") || selectorTargetsEstreeType(sel, "FunctionExpression") ||
-		selectorTargetsEstreeType(sel, "JSXElement") || selectorTargetsEstreeType(sel, "JSXOpeningElement") {
-		return attrs
-	}
 	switch value := sel.(type) {
 	case subjectSelector:
-		attrs = collectDispatchAttrs(value.Inner, attrs)
+		return collectDispatchAttrs(value.Inner, attrs)
+	case compoundSelector:
+		attrs = collectDispatchAttrs(value.Left, attrs)
+		return collectDispatchAttrs(value.Right, attrs)
 	case attrSelector:
 		attrs = collectDispatchAttrs(value.Inner, attrs)
-		if value.Op == attrEqual {
-			if expected, ok := exactStringValue(value.Value); ok && expected != "undefined" {
+		if value.Op == attrEqual && canDispatchPath(value.Path) {
+			if expected, ok := exactStringValue(value.Value); ok {
 				attrs = append(attrs, dispatchAttr{
 					path:  value.Path,
-					key:   strings.Join(value.Path, "\x00"),
+					key:   pathKey(value.Path),
 					value: expected,
 				})
 			}
 		}
 	case classSelector:
-		attrs = collectDispatchAttrs(value.Inner, attrs)
+		return collectDispatchAttrs(value.Inner, attrs)
 	case combinatorSelector:
-		// The right-hand attribute cannot filter or be stripped for a reverse
-		// subject match on the left-hand node, because the right-hand selector
-		// is evaluated against a different sibling node.
 		if hasReverseSiblingSubject(value) {
 			return attrs
 		}
-		attrs = collectDispatchAttrs(value.Right, attrs)
+		return collectDispatchAttrs(value.Right, attrs)
 	case combinedPseudo:
-		attrs = collectDispatchAttrs(value.Inner, attrs)
+		return collectDispatchAttrs(value.Inner, attrs)
 	}
 	return attrs
 }
 
-func stripDispatchAttr(sel selector, pathKey, expected string) (selector, bool) {
-	switch value := sel.(type) {
-	case subjectSelector:
-		if inner, ok := stripDispatchAttr(value.Inner, pathKey, expected); ok {
-			value.Inner = inner
-			return value, true
-		}
-	case attrSelector:
-		if inner, ok := stripDispatchAttr(value.Inner, pathKey, expected); ok {
-			value.Inner = inner
-			return value, true
-		}
-		actual, exact := exactStringValue(value.Value)
-		if value.Op == attrEqual && exact && actual == expected && strings.Join(value.Path, "\x00") == pathKey {
-			return value.Inner, true
-		}
-	case classSelector:
-		if inner, ok := stripDispatchAttr(value.Inner, pathKey, expected); ok {
-			value.Inner = inner
-			return value, true
-		}
-	case combinatorSelector:
-		if right, ok := stripDispatchAttr(value.Right, pathKey, expected); ok {
-			value.Right = right
-			return value, true
-		}
-	case combinedPseudo:
-		if inner, ok := stripDispatchAttr(value.Inner, pathKey, expected); ok {
-			value.Inner = inner
-			return value, true
+func canDispatchPath(path []pathSegment) bool {
+	if len(path) == 0 {
+		return false
+	}
+	for _, seg := range path {
+		if seg.special == pathLength || seg.index >= 0 {
+			return false
 		}
 	}
-	return sel, false
+	last := path[len(path)-1]
+	return last.raw == "name" || last.raw == "operator" || last.raw == "kind" || last.raw == "value" || last.special == pathType
+}
+
+func pathKey(path []pathSegment) string {
+	if len(path) == 1 {
+		return path[0].raw
+	}
+	var sb strings.Builder
+	for i, seg := range path {
+		if i > 0 {
+			sb.WriteByte(0)
+		}
+		sb.WriteString(seg.raw)
+	}
+	return sb.String()
 }
 
 func exactStringValue(value attrValue) (string, bool) {
@@ -481,153 +697,104 @@ func exactStringValue(value attrValue) (string, bool) {
 	}
 }
 
-func dispatchValueForPath(sel selector, pathKey string) (string, bool) {
+func dispatchValueForPath(sel selector, targetKey string) (string, bool) {
 	for _, attr := range collectDispatchAttrs(sel, nil) {
-		if attr.key == pathKey {
+		if attr.key == targetKey {
 			return attr.value, true
 		}
 	}
 	return "", false
 }
 
-func (bucket *ruleBucket) candidates(node *ast.Node, mc *matchContext) (first, second []int, useAll bool) {
-	if bucket.dispatch == nil {
-		return nil, nil, true
+func (d *stringAttrDispatch) lookup(tree *estree.Tree, id estree.NodeID) []int {
+	val := lookupAttrPath(tree, id, d.path)
+	var key string
+	switch val.Kind {
+	case estree.ValueString, estree.ValueBigInt:
+		key = val.Str
+	default:
+		if !d.hasNonStringKey {
+			return nil
+		}
+		key = valueAsString(tree, val)
 	}
-	value, ok, handled := lookupStringAttrPath(node, bucket.dispatch.path, mc)
-	if !handled {
-		return nil, nil, true
+	if d.byValue == nil {
+		if key == d.singleValue {
+			return d.singleHits
+		}
+		return nil
 	}
-	if !ok {
-		return bucket.dispatch.fallback, nil, false
-	}
-	return bucket.dispatch.fallback, bucket.dispatch.byValue[value], false
+	return d.byValue[key]
 }
 
-func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext, indexed bool) {
-	entry := &bucket.entries[index]
-	if entry.virtualOnly {
-		return
-	}
-	compiled := entry.compiled
-	if indexed && bucket.dispatch != nil && bucket.dispatch.matched[index] != nil {
-		compiled = bucket.dispatch.matched[index]
-	}
-	if node.Kind == ast.KindSourceFile && isBareWildcardSelector(entry.compiled) {
-		return
-	}
-	if isPlainParameter(node) && !isBareWildcardSelector(entry.compiled) {
-		return
-	}
-	if entry.hasReverseSubject && !matchesTopLevelReverseSubjectHost(entry.compiled, node, "physical") {
-		return
-	}
-	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
-		textRange := utils.GetESTreeBindingIdentifierRange(mc.sf, node)
-		if node.Kind == ast.KindImportClause {
-			if name := node.AsImportClause().Name(); name != nil {
-				// ESTree's ImportDefaultSpecifier spans only the default binding
-				// identifier, excluding `type` and any sibling bindings folded
-				// into tsgo's ImportClause.
-				textRange = utils.TrimNodeTextRange(mc.sf, name)
-			}
-		} else if exportWrapperTarget(node) != "" {
-			// The export wrapper owns the `export` and `default` keywords.
-			textRange = core.NewTextRange(utils.FindFunctionKeywordPos(mc.sf, node), textRange.End())
+func (bucket *ruleBucket) evaluate(tree *estree.Tree, id estree.NodeID, ctx *rule.RuleContext, memo *evalMemo) {
+	d := bucket.dispatch
+	if d == nil {
+		for index := range bucket.entries {
+			bucket.matchEntry(index, tree, id, ctx, memo)
 		}
-		ctx.ReportRange(textRange, rule.RuleMessage{
+		return
+	}
+
+	if d.next == nil {
+		hits := d.lookup(tree, id)
+		if len(d.fallback) == 0 {
+			for _, index := range hits {
+				bucket.matchEntry(index, tree, id, ctx, memo)
+			}
+			return
+		}
+		if len(hits) == 0 {
+			for _, index := range d.fallback {
+				bucket.matchEntry(index, tree, id, ctx, memo)
+			}
+			return
+		}
+		// Merge fallback and hits in ESLint specificity order.
+		left, right := 0, 0
+		for left < len(d.fallback) || right < len(hits) {
+			var index int
+			switch {
+			case right == len(hits):
+				index = d.fallback[left]
+				left++
+			case left == len(d.fallback):
+				index = hits[right]
+				right++
+			case d.fallback[left] < hits[right]:
+				index = d.fallback[left]
+				left++
+			default:
+				index = hits[right]
+				right++
+			}
+			bucket.matchEntry(index, tree, id, ctx, memo)
+		}
+		return
+	}
+
+	var matchedBuf [16]int
+	matched := matchedBuf[:0]
+	for cur := d; cur != nil; cur = cur.next {
+		matched = append(matched, cur.lookup(tree, id)...)
+		matched = append(matched, cur.fallback...)
+	}
+	if len(matched) > 1 {
+		slices.Sort(matched)
+	}
+	for _, index := range matched {
+		bucket.matchEntry(index, tree, id, ctx, memo)
+	}
+}
+
+func (bucket *ruleBucket) matchEntry(index int, tree *estree.Tree, id estree.NodeID, ctx *rule.RuleContext, memo *evalMemo) {
+	entry := &bucket.entries[index]
+	if matchesSelector(entry.compiled, tree, id, estree.NoNode, memo) {
+		ctx.ReportRange(tree.Range(id), rule.RuleMessage{
 			Id:          "restrictedSyntax",
-			Description: entry.formatMessage(),
+			Description: entry.message,
 		})
 	}
-}
-
-func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, target string, mc *matchContext, ctx *rule.RuleContext) {
-	entry := &bucket.entries[index]
-	// Preserve the documented bare-wildcard traversal. Other broad selectors
-	// must see the folded child, including regex and negative selectors.
-	if isBareWildcardSelector(entry.compiled) || entry.hasReverseSubject && !matchesTopLevelReverseSubjectHost(entry.compiled, node, target) || !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
-		return
-	}
-	message := rule.RuleMessage{Id: "restrictedSyntax", Description: entry.formatMessage()}
-	switch target {
-	case "Identifier", "Literal":
-		if token, ok := utils.TokenBeforePosition(mc.sf, node.ParameterList().Pos()-1); ok {
-			ctx.ReportRange(core.NewTextRange(token.Start, token.End), message)
-		}
-	case "ClassBody":
-		ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
-	case "ExportNamedDeclaration", "ExportDefaultDeclaration":
-		ctx.ReportRange(exportWrapperTextRange(mc.sf, node), message)
-	case "TSEnumBody":
-		ctx.ReportRange(enumBodyTextRange(mc.sf, node), message)
-	case "JSXEmptyExpression":
-		nodeRange := utils.TrimNodeTextRange(mc.sf, node)
-		ctx.ReportRange(core.NewTextRange(nodeRange.Pos()+1, max(nodeRange.Pos()+1, nodeRange.End()-1)), message)
-	case "FunctionExpression", "TSEmptyBodyFunctionExpression":
-		ctx.ReportRange(functionValueTextRange(mc.sf, node), message)
-	default:
-		ctx.ReportNode(node, message)
-	}
-}
-
-func (e ruleEntry) formatMessage() string {
-	return e.message
-}
-
-func functionValueTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
-	// tsgo records the position immediately after '(' (or '<' for generic
-	// methods). Reuse that parser boundary, including for bodyless overloads.
-	if parameters := node.TypeParameterList(); parameters != nil && len(parameters.Nodes) > 0 {
-		return core.NewTextRange(parameters.Pos()-1, node.End())
-	}
-	if parameters := node.ParameterList(); parameters != nil {
-		return core.NewTextRange(parameters.Pos()-1, node.End())
-	}
-	return utils.TrimNodeTextRange(sf, node)
-}
-
-// exportWrapperTextRange starts a virtual export wrapper at the authored
-// `export` keyword: decorators written before it belong to the declaration.
-func exportWrapperTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
-	textRange := utils.TrimNodeTextRange(sf, node)
-	if modifiers := node.Modifiers(); modifiers != nil {
-		for _, modifier := range modifiers.Nodes {
-			if modifier.Kind == ast.KindExportKeyword {
-				return core.NewTextRange(scanner.SkipTrivia(sf.Text(), modifier.Pos()), textRange.End())
-			}
-		}
-	}
-	return textRange
-}
-
-func classBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
-	var members *ast.NodeList
-	switch node.Kind {
-	case ast.KindClassDeclaration:
-		members = node.AsClassDeclaration().Members
-	case ast.KindClassExpression:
-		members = node.AsClassExpression().Members
-	}
-	if sf == nil || members == nil {
-		return core.NewTextRange(node.Pos(), node.End())
-	}
-
-	return listBodyTextRange(sf, node, members)
-}
-
-func enumBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
-	if node == nil || node.Kind != ast.KindEnumDeclaration {
-		return core.TextRange{}
-	}
-	return listBodyTextRange(sf, node, node.AsEnumDeclaration().Members)
-}
-
-func listBodyTextRange(sf *ast.SourceFile, node *ast.Node, members *ast.NodeList) core.TextRange {
-	if members != nil {
-		return core.NewTextRange(members.Pos()-1, node.End())
-	}
-	return utils.TrimNodeTextRange(sf, node)
 }
 
 func deduplicateRuleEntries(entries []ruleEntry) []ruleEntry {
@@ -681,9 +848,12 @@ func analyzeSelectorSpecificity(sel selector) selectorSpecificity {
 		case subjectSelector:
 			visit(value.Inner)
 		case identifierSelector:
-			if value.Name != "*" {
+			if !value.Wildcard {
 				result.identifiers++
 			}
+		case compoundSelector:
+			visit(value.Left)
+			visit(value.Right)
 		case attrSelector:
 			visit(value.Inner)
 			result.attributes++
@@ -770,9 +940,6 @@ func buildEntryFromObject(m map[string]interface{}) (ruleEntry, bool) {
 	return ruleEntry{selector: rawSel, compiled: compiled, message: msg, exit: exit}, true
 }
 
-// ESLint handles the event-phase suffix outside esquery. Keep the phase on the
-// entry so the linter can register the selector on the matching enter or exit
-// listener while retaining the original suffix in the diagnostic text.
 func parseRuleSelector(sel string) (selector, bool, error) {
 	exit := strings.HasSuffix(sel, ":exit")
 	compiled, err := parseSelector(strings.TrimSuffix(sel, ":exit"))
