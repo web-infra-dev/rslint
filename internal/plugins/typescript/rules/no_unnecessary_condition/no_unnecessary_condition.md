@@ -159,15 +159,26 @@ Direct reads such as `Object.assign({}, {item}, {item: maybeItem}).item?.id`
 and destructured copies apply these checks even without a binding for the target.
 The same applies to copied array lengths and visible built-in prototype changes.
 Nested copies follow their execution order, so an outer source can restore an
-inner copy's nullable value. Nullable generic constraints are preserved, including
+inner copy's nullable value. Only an own enumerable entry proves restoration:
+an array's intrinsic `length`, inherited methods, and holes do not overwrite
+the target. The final copied value also keeps its full type, so copying a
+`boolean` over `true as const` does not make a subsequent condition constant.
+These corrected data fields still use native control-flow narrowing.
+Nullable generic constraints are preserved, including
 inside object spreads. Setter-only sources copy `undefined`, regardless of the
 setter parameter type, including union and mapped sources. Conditional and logical
-sources preserve their original alternatives before native subtype reduction;
-a nullable write in any possible source still matters. Getters can change later properties during enumeration:
+sources preserve their possible read alternatives before native subtype reduction,
+respecting short-circuit selection and discriminant narrowing at the copy.
+A nullable write in any possible source still matters. Getters can change later properties during enumeration:
 for example, `get 0() { Reflect.deleteProperty(this, "1"); return item; }` can
-remove the following `1: item` before it is copied. Such getters retain the guard;
-only a simple return of a local value or a statically safe expression establishes
-a harmless getter. This also covers implicit coercions that invoke user code.
+remove the following `1: item` before it is copied. Such getters retain the guard,
+including when they mutate a source binding and its exact shape becomes unknown.
+Visible source descriptor changes also retain guards: they can remove fields or
+install getters before the copy.
+Simple local computations and branches preserve data-copy narrowing when they
+have no observable effects. Member reads, calls, disposal, and implicit object
+coercions remain conservative; changing a getter's local primitive counter alone
+does not mutate the source.
 Opaque sources can contain an enumerable `length` absent from their declared
 type, so their indexed reads retain guards. For example, this also retains
 `xs[0] ?? fallback` after copying a class instance whose `length` getter is
@@ -175,6 +186,10 @@ non-enumerable; the rule does not infer the instance's complete own shape.
 An opaque source can also replace `Symbol.iterator` without declaring it.
 Destructuring defaults then retain unknown yielded values, even when the target
 has a declared iterator; unrelated named fields keep their native narrowing.
+When a copied iterator reads receiver fields or calls helpers, changes to copied
+values can also invalidate its inferred yield type. Such uncertain reads retain
+their guards because a destructuring default only replaces `undefined`, not `null`.
+An iterator that yields an independent local value retains its declared contract.
 Ordinary array types also do not prove that an individual source index exists.
 For example, `Object.assign([] as Item[], {length: 0}, [item])[0] ?? fallback`
 retains its fallback, while a tuple source can prove the index was restored.

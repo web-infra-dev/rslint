@@ -16,6 +16,7 @@ type staticCopySource struct {
 	literal, length *ast.Node
 	hasLength       bool
 	hasProperties   bool
+	hasArraySpread  bool
 	hasEffects      bool
 	unknown         bool
 }

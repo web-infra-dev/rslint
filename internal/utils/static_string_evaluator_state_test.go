@@ -96,12 +96,12 @@ func TestStaticPropertyShapeMutations(t *testing.T) {
 			accounted.Set(findVariableInitializer(t, source, "copy"), struct{}{})
 			evaluator := NewStaticStringEvaluatorWithCallEscapes(typeChecker, source, nil)
 			for range 2 {
-				descriptors, values := evaluator.PropertyReadMutations(result, nil, nil, &accounted)
-				assert.Equal(t, descriptors || values, test.changed)
+				descriptors, values, copied := evaluator.PropertyReadMutations(result, nil, nil, &accounted)
+				assert.Equal(t, descriptors || values || copied != nil, test.changed)
 			}
 			ordinary := NewStaticStringEvaluatorWithSourceFile(typeChecker, source)
-			descriptors, values := ordinary.PropertyReadMutations(result, nil, nil, &accounted)
-			assert.Assert(t, descriptors || values)
+			descriptors, values, copied := ordinary.PropertyReadMutations(result, nil, nil, &accounted)
+			assert.Assert(t, descriptors || values || copied != nil)
 		})
 	}
 }
@@ -196,8 +196,8 @@ func TestStaticPropertyReadShapeMutations(t *testing.T) {
 			accounted.Set(copyCall, struct{}{})
 			evaluator := NewStaticStringEvaluatorWithCallEscapes(typeChecker, source, nil)
 			for range 2 {
-				descriptors, values := evaluator.PropertyReadMutations(copyCall.Arguments()[0], origin, access, &accounted)
-				assert.Equal(t, descriptors || values, test.changed)
+				descriptors, values, copied := evaluator.PropertyReadMutations(copyCall.Arguments()[0], origin, access, &accounted)
+				assert.Equal(t, descriptors || values || copied != nil, test.changed)
 			}
 		})
 	}
@@ -221,6 +221,12 @@ func TestStaticPropertyAnonymousCopies(t *testing.T) {
 		{"getter deletes later index", "", "Object.assign([] as number[], {length: 0}, {...{get 0() { Reflect.deleteProperty(this, '1'); return 0; }, 1: 1}})[1]", true, false},
 		{"getter coerces object", "", "Object.assign([] as number[], {length: 0}, {...{get 0() { return +{valueOf: () => {Reflect.deleteProperty(this, '1'); return 0;}}; }, 1: 1}})[1]", true, false},
 		{"pure copied getter", "const value = 1;", "Object.assign({}, {get value() { return value; }}).value", false, false},
+		{"getter mutates its source", "const source = {get label() {Reflect.deleteProperty(source, 'value'); return 0;}, value: 1};", "Object.assign({}, source).value", true, false},
+		{"getter mutates aliased source", "const source = {get label() {Reflect.deleteProperty(source, 'value'); return 0;}, value: 1}; const alias = source;", "Object.assign({}, alias).value", true, false},
+		{"mutated source without getter", "const source = {value: 1}; source.value = 2;", "Object.assign({}, source).value", false, false},
+		{"deleted source field", "const source = {value: 1}; Reflect.deleteProperty(source, 'value');", "Object.assign({}, source).value", true, false},
+		{"observed source field", "const source = {value: 1}; Object.keys(source);", "Object.assign({}, source).value", false, false},
+		{"getter installed on source", "const source = {label: 0, value: 1}; Object.defineProperty(source, 'label', {enumerable: true, get() {Reflect.deleteProperty(source, 'value'); return 0;}});", "Object.assign({}, source).value", true, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := fixtures.GetRootDir()
@@ -240,9 +246,9 @@ func TestStaticPropertyAnonymousCopies(t *testing.T) {
 			var accounted collections.OrderedMap[*ast.Node, struct{}]
 			accounted.Set(copyCall, struct{}{})
 			for range 2 {
-				descriptors, values := evaluator.PropertyReadMutations(origin, origin, access, &accounted)
+				descriptors, values, copied := evaluator.PropertyReadMutations(origin, origin, access, &accounted)
 				assert.Equal(t, descriptors, test.descriptors)
-				assert.Equal(t, values, test.values)
+				assert.Equal(t, values || copied != nil, test.values)
 			}
 		})
 	}
