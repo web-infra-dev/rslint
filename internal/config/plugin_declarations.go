@@ -17,6 +17,7 @@ var bundledPluginDeclarations = []bundledPluginDeclaration{
 	{ruleNamespace: "promise", declarationNames: []string{"eslint-plugin-promise", "promise"}},
 	{ruleNamespace: "react", declarationNames: []string{"react"}},
 	{ruleNamespace: "react-hooks", declarationNames: []string{"eslint-plugin-react-hooks", "react-hooks"}},
+	{ruleNamespace: "rslim", declarationNames: []string{"rslim"}},
 	{ruleNamespace: "rstest", declarationNames: []string{"rstest"}},
 	{ruleNamespace: "unicorn", declarationNames: []string{"eslint-plugin-unicorn", "unicorn"}},
 }
