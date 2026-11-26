@@ -99,11 +99,11 @@ func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candida
 //go:linkname Checker_isConstContext github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isConstContext
 func Checker_isConstContext(recv *checker.Checker, node *ast.Node) bool
 
-//go:linkname Checker_getWriteTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWriteTypeOfSymbol
-func Checker_getWriteTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
-
 //go:linkname Checker_getSymbolOfDeclaration github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getSymbolOfDeclaration
 func Checker_getSymbolOfDeclaration(recv *checker.Checker, node *ast.Node) *ast.Symbol
+
+//go:linkname Checker_getWriteTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWriteTypeOfSymbol
+func Checker_getWriteTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
