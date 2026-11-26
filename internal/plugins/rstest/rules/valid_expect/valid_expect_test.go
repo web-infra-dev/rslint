@@ -91,6 +91,16 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `expect(1)!.toBe(1);`},
 			{Code: `(expect(1) as any).toBe(1);`},
 			{Code: `(expect(1) satisfies unknown).toBe(1);`},
+			// Object properties mutated through a helper call are not static constants.
+			{Code: `import * as r from '@rstest/core'; const config = { name: 'expect' }; function selectSuite(x: any) { x.name = 'test'; } selectSuite(config); const key = config.name; r[key]('registers a test', () => {});`},
+			// Outer TypeScript assertion wrappers preserve the returned/awaited Promise.
+			{Code: `import * as r from '@rstest/core'; const key = 'expect'; r.test('value matches', () => { return r[key](Promise.resolve(1)).resolves.toBe(1) as Promise<void>; });`},
+			{Code: `import * as r from '@rstest/core'; const key = 'expect'; r.test('value matches', async () => { await (r[key](Promise.resolve(1)).resolves.toBe(1) as Promise<void>); });`},
+			{Code: `test('t', () => { return expect(p).resolves.toBe(1) satisfies Promise<void>; });`},
+			{Code: `test('t', () => { return <Promise<void>>expect(p).resolves.toBe(1); });`},
+			{Code: `test('t', async () => { await expect(p).resolves.toBe(1)!; });`},
+			{Code: `test('t', () => expect(p).resolves.toBe(1) as Promise<void>);`},
+			{Code: `test('t', () => { return Promise.all([expect(p).resolves.toBe(1) as Promise<void>]); });`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// --- arg count ---
@@ -273,6 +283,29 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "asyncMustBeAwaited"},
 				},
 				Output: []string{`test("t", async () => { await (expect(p) as any).resolves.toBe(1); });`},
+			},
+			{
+				Code: `test("t", () => { expect(p).resolves.toBe(1) as Promise<void>; });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await (expect(p).resolves.toBe(1) as Promise<void>); });`},
+			},
+			{
+				Code:    `test("t", () => { return expect(p).resolves.toBe(1) as Promise<void>; });`,
+				Options: map[string]any{"alwaysAwait": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await (expect(p).resolves.toBe(1) as Promise<void>); });`},
+			},
+			{
+				Code:    `test("t", () => { return (expect(p).resolves.toBe(1) as Promise<void>); });`,
+				Options: map[string]any{"alwaysAwait": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await (expect(p).resolves.toBe(1) as Promise<void>); });`},
 			},
 		},
 	)

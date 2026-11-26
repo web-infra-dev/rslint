@@ -35,6 +35,8 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: "test(\"valid-expect\", () => { return (condition ? expect(Promise.resolve(2)).resolves.toBeDefined() : expect(2).toBeDefined()); });"},
 			{Code: "test(\"valid-expect\", async () => { await Promise.all([(expect(Promise.resolve(2)).resolves.toBeDefined()), expect(Promise.resolve(3)).resolves.toBeDefined()]); });"},
 			{Code: "test(\"valid-expect\", async () => { await (expect(Promise.resolve(2)).resolves.toBeDefined()).then(() => {}); });"},
+			{Code: "test(\"valid-expect\", () => { return expect(Promise.resolve(2)).resolves.toBeDefined() as Promise<void>; });"},
+			{Code: "test(\"valid-expect\", async () => { await (expect(Promise.resolve(2)).resolves.toBeDefined() as Promise<void>); });"},
 			{Code: "test(\"valid-expect\", () => { return expect(Promise.resolve(2)).rejects.not.toBeDefined(); });"},
 			{Code: "test(\"valid-expect\", function () { return expect(Promise.resolve(2)).resolves.not.toBeDefined(); });"},
 			{Code: "test(\"valid-expect\", function () { return expect(Promise.resolve(2)).rejects.not.toBeDefined(); });"},

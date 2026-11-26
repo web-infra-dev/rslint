@@ -76,6 +76,8 @@ func TestRstestResolvesExtras(t *testing.T) {
 		"expect.extend({toBe(){return {pass:true,message:()=>''}}}); expect(await p).toBe(1);",
 		"import * as r from '@rstest/core'; const expect = 'expect'; r[expect].extend({ toBe() { return { pass: !this.promise, message: () => '' }; } }); r.test('value matches', async () => { const p = Promise.resolve(1); r.expect(await p).toBe(1); });",
 		"import * as r from '@rstest/core'; r[getKey()].extend({ toBe() { return { pass: !this.promise, message: () => '' }; } }); r.test('value matches', async () => { const p = Promise.resolve(1); r.expect(await p).toBe(1); });",
+		"import * as r from '@rstest/core'; const api = 'expect'; const { expect: check } = r; check.extend({ toBe() { return { pass: !this.promise, message: () => '' }; } }); r.test('value matches', async () => { const p = Promise.resolve(1); r[api](await p).toBe(1); });",
+		"import * as r from '@rstest/core'; const api = 'expect'; const register = 'ex' + 'tend'; r[api][register]({ toBe() { return { pass: !this.promise, message: () => '' }; } }); r.test('value matches', async () => { const p = Promise.resolve(1); r[api](await p).toBe(1); });",
 	} {
 		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "expectResolves", Line: 1, Column: strings.Index(code, "await") + 1}}})
 	}
