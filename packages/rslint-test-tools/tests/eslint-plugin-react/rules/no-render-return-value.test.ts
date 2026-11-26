@@ -1,8 +1,37 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
 
-const ruleTester = new RuleTester();
+function expectNoReturnValueError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noReturnValue',
+    message: 'Do not depend on the return value from ReactDOM.render',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('no-render-return-value', {} as never, {
+function expectNoReturnValueError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noReturnValue',
+    message: 'Do not depend on the return value from React.render',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-render-return-value', {
   valid: [
     // ---- Upstream: render with no return-value consumption ----
     { code: `ReactDOM.render(<div />, document.body);` },
@@ -52,12 +81,38 @@ ruleTester.run('no-render-return-value', {} as never, {
     // ---- TS wrappers (AsExpression / NonNullExpression) — upstream skips, we match ----
     { code: `var x = ReactDOM.render(<div />, document.body) as any;` },
     { code: `var x = ReactDOM.render(<div />, document.body)!;` },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 2 (7.37.5)',
+      code: `ReactDOM.render(<div ref={ref => this.node = ref}/>, document.body);`,
+      settings: { react: { version: '0.14.0' } },
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 3 (7.37.5)',
+      code: `React.render(<div ref={ref => this.node = ref}/>, document.body);`,
+      settings: { react: { version: '0.14.0' } },
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 4 (7.37.5)',
+      code: `React.render(<div ref={ref => this.node = ref}/>, document.body);`,
+      settings: { react: { version: '0.13.0' } },
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 5 (7.37.5)',
+      code: `var foo = React.render(<div />, root);`,
+      settings: { react: { version: '0.0.1' } },
+      languageOptions: upstreamModuleOptions,
+    },
   ],
   invalid: [
     // ---- Upstream: VariableDeclarator ----
     {
       code: `var Hello = ReactDOM.render(<div />, document.body);`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 13, 1, 28])],
     },
     // ---- Upstream: Object property value ----
     {
@@ -66,7 +121,7 @@ ruleTester.run('no-render-return-value', {} as never, {
           inst: ReactDOM.render(<div />, document.body)
         };
       `,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([3, 17, 3, 32])],
     },
     // ---- Upstream: ReturnStatement ----
     {
@@ -75,73 +130,73 @@ ruleTester.run('no-render-return-value', {} as never, {
           return ReactDOM.render(<div />, document.body)
         }
       `,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([3, 18, 3, 33])],
     },
     // ---- Upstream: ArrowFunctionExpression body ----
     {
       code: `var render = (a, b) => ReactDOM.render(a, b)`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 24, 1, 39])],
     },
     // ---- Upstream: AssignmentExpression (member-expression LHS) ----
     {
       code: `this.o = ReactDOM.render(<div />, document.body);`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 10, 1, 25])],
     },
     // ---- Upstream: AssignmentExpression (identifier LHS) ----
     {
       code: `var v; v = ReactDOM.render(<div />, document.body);`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 12, 1, 27])],
     },
 
     // ---- Upstream: defaultVersion is used when version is omitted ----
     {
       code: `var instance = React.render(<div />, document.body);`,
       settings: { react: { defaultVersion: '0.13.0' } },
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError2([1, 16, 1, 28])],
     },
 
     // ---- Upstream: a computed property key consumes the render result ----
     {
       code: `var value = { [ReactDOM.render(<div />, document.body)]: true };`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 16, 1, 31])],
     },
 
     // ---- Parens transparent ----
     {
       code: `var x = (ReactDOM.render(<div />, document.body));`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 10, 1, 25])],
     },
     {
       code: `var x = ((ReactDOM.render(<div />, document.body)));`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 11, 1, 26])],
     },
     {
       code: `var f = () => (ReactDOM.render(<div />, document.body))`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 16, 1, 31])],
     },
 
     // ---- Nested arrow — inner body is the call ----
     {
       code: `var f = () => () => ReactDOM.render(<div />, document.body);`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 21, 1, 36])],
     },
 
     // ---- Compound / logical / chained / destructuring assignment ----
     {
       code: `var v = 0; v += ReactDOM.render(<div />, document.body);`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 17, 1, 32])],
     },
     {
       code: `var v; v ??= ReactDOM.render(<div />, document.body);`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 14, 1, 29])],
     },
     {
       code: `var a, b; a = b = ReactDOM.render(<div />, document.body);`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 19, 1, 34])],
     },
     {
       code: `var o; ({ a: o } = ReactDOM.render(<div />, document.body));`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 20, 1, 35])],
     },
 
     // ---- Class-method return + class-field arrow body ----
@@ -153,7 +208,7 @@ ruleTester.run('no-render-return-value', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([4, 20, 4, 35])],
     },
     {
       code: `
@@ -161,7 +216,7 @@ ruleTester.run('no-render-return-value', {} as never, {
           cb = () => ReactDOM.render(<div />, document.body);
         }
       `,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([3, 22, 3, 37])],
     },
 
     // ---- TSX function-component return ----
@@ -171,13 +226,36 @@ ruleTester.run('no-render-return-value', {} as never, {
           return ReactDOM.render(<div />, document.body);
         }
       `,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([3, 18, 3, 33])],
     },
 
     // ---- Bracket access with an Identifier literally named `render` — upstream's `property.name === 'render'` matches ----
     {
       code: `var render; var x = ReactDOM[render](<div />, document.body);`,
-      errors: [{ messageId: 'noReturnValue' }],
+      errors: [expectNoReturnValueError1([1, 21, 1, 37])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 6 (7.37.5)',
+      code: `var inst = React.render(<div />, document.body);`,
+      settings: { react: { version: '0.14.0' } },
+      errors: [expectNoReturnValueError2([1, 12, 1, 24])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 7 (7.37.5)',
+      code: `var inst = ReactDOM.render(<div />, document.body);`,
+      settings: { react: { version: '0.14.0' } },
+      errors: [expectNoReturnValueError1([1, 12, 1, 27])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 8 (7.37.5)',
+      code: `var inst = React.render(<div />, document.body);`,
+      settings: { react: { version: '0.13.0' } },
+      errors: [expectNoReturnValueError2([1, 12, 1, 24])],
+      languageOptions: upstreamModuleOptions,
     },
   ],
 });

@@ -1,8 +1,24 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectNoFindDOMNodeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noFindDOMNode',
+    message:
+      'Do not use findDOMNode. It doesn’t work with function components and is deprecated in StrictMode. See https://reactjs.org/docs/react-dom.html#finddomnode',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('no-find-dom-node', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-find-dom-node', {
   valid: [
     // ---- Upstream valid cases ----
     {
@@ -78,7 +94,7 @@ ruleTester.run('no-find-dom-node', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noFindDOMNode' }],
+      errors: [expectNoFindDOMNodeError([4, 13, 4, 30])],
     },
     {
       code: `
@@ -91,7 +107,7 @@ ruleTester.run('no-find-dom-node', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noFindDOMNode' }],
+      errors: [expectNoFindDOMNodeError([4, 13, 4, 33])],
     },
     {
       code: `
@@ -104,7 +120,7 @@ ruleTester.run('no-find-dom-node', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noFindDOMNode' }],
+      errors: [expectNoFindDOMNodeError([4, 13, 4, 24])],
     },
     {
       code: `
@@ -117,7 +133,7 @@ ruleTester.run('no-find-dom-node', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noFindDOMNode' }],
+      errors: [expectNoFindDOMNodeError([4, 25, 4, 36])],
     },
     // ---- Edge: parenthesized / optional / private / deeply chained ----
     {
@@ -128,7 +144,7 @@ ruleTester.run('no-find-dom-node', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noFindDOMNode' }],
+      errors: [expectNoFindDOMNodeError([4, 14, 4, 31])],
     },
     {
       code: `
@@ -138,7 +154,7 @@ ruleTester.run('no-find-dom-node', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noFindDOMNode' }],
+      errors: [expectNoFindDOMNodeError([4, 13, 4, 31])],
     },
     {
       code: `
@@ -148,7 +164,7 @@ ruleTester.run('no-find-dom-node', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noFindDOMNode' }],
+      errors: [expectNoFindDOMNodeError([4, 13, 4, 30])],
     },
     {
       code: `
@@ -158,7 +174,7 @@ ruleTester.run('no-find-dom-node', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noFindDOMNode' }],
+      errors: [expectNoFindDOMNodeError([4, 13, 4, 34])],
     },
   ],
 });

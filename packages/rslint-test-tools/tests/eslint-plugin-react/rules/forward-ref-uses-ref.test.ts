@@ -1,11 +1,29 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester, type ExpectedSuggestion } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectMissingRefParameterError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingRefParameter',
+    message:
+      'forwardRef is used with this component but no ref parameter is set',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
 
 const message =
   'forwardRef is used with this component but no ref parameter is set';
 
-ruleTester.run('forward-ref-uses-ref', {} as never, {
+ruleTester.run('forward-ref-uses-ref', {
   valid: [
     {
       code: `
@@ -90,7 +108,25 @@ ruleTester.run('forward-ref-uses-ref', {} as never, {
           return null;
         });
       `,
-      errors: [{ message }],
+      errors: [
+        expectMissingRefParameterError(
+          [3, 20, 5, 10],
+          [
+            {
+              messageId: 'addRefParameter',
+              desc: 'Add a ref parameter',
+              output:
+                "\n        import { forwardRef } from 'react'\n        forwardRef((props, ref) => {\n          return null;\n        });\n      ",
+            },
+            {
+              messageId: 'removeForwardRef',
+              desc: 'Remove forwardRef wrapper',
+              output:
+                "\n        import { forwardRef } from 'react'\n        (props) => {\n          return null;\n        };\n      ",
+            },
+          ],
+        ),
+      ],
     },
     {
       code: `
@@ -99,14 +135,50 @@ ruleTester.run('forward-ref-uses-ref', {} as never, {
           return null;
         });
       `,
-      errors: [{ message }],
+      errors: [
+        expectMissingRefParameterError(
+          [3, 20, 5, 10],
+          [
+            {
+              messageId: 'addRefParameter',
+              desc: 'Add a ref parameter',
+              output:
+                "\n        import { forwardRef } from 'react'\n        forwardRef((props, ref) => {\n          return null;\n        });\n      ",
+            },
+            {
+              messageId: 'removeForwardRef',
+              desc: 'Remove forwardRef wrapper',
+              output:
+                "\n        import { forwardRef } from 'react'\n        props => {\n          return null;\n        };\n      ",
+            },
+          ],
+        ),
+      ],
     },
     {
       code: `
         import * as React from 'react'
         React.forwardRef((props) => null);
       `,
-      errors: [{ message }],
+      errors: [
+        expectMissingRefParameterError(
+          [3, 26, 3, 41],
+          [
+            {
+              messageId: 'addRefParameter',
+              desc: 'Add a ref parameter',
+              output:
+                "\n        import * as React from 'react'\n        React.forwardRef((props, ref) => null);\n      ",
+            },
+            {
+              messageId: 'removeForwardRef',
+              desc: 'Remove forwardRef wrapper',
+              output:
+                "\n        import * as React from 'react'\n        (props) => null;\n      ",
+            },
+          ],
+        ),
+      ],
     },
     {
       code: `
@@ -115,7 +187,25 @@ ruleTester.run('forward-ref-uses-ref', {} as never, {
           return null;
         });
       `,
-      errors: [{ message }],
+      errors: [
+        expectMissingRefParameterError(
+          [3, 38, 5, 10],
+          [
+            {
+              messageId: 'addRefParameter',
+              desc: 'Add a ref parameter',
+              output:
+                "\n        import { forwardRef } from 'react'\n        const Component = forwardRef(function (props, ref) {\n          return null;\n        });\n      ",
+            },
+            {
+              messageId: 'removeForwardRef',
+              desc: 'Remove forwardRef wrapper',
+              output:
+                "\n        import { forwardRef } from 'react'\n        const Component = function (props) {\n          return null;\n        };\n      ",
+            },
+          ],
+        ),
+      ],
     },
     {
       code: `
@@ -124,7 +214,25 @@ ruleTester.run('forward-ref-uses-ref', {} as never, {
           return null;
         });
       `,
-      errors: [{ message }],
+      errors: [
+        expectMissingRefParameterError(
+          [3, 26, 5, 10],
+          [
+            {
+              messageId: 'addRefParameter',
+              desc: 'Add a ref parameter',
+              output:
+                "\n        import * as React from 'react'\n        React.forwardRef(function Component(props, ref) {\n          return null;\n        });\n      ",
+            },
+            {
+              messageId: 'removeForwardRef',
+              desc: 'Remove forwardRef wrapper',
+              output:
+                "\n        import * as React from 'react'\n        function Component(props) {\n          return null;\n        };\n      ",
+            },
+          ],
+        ),
+      ],
     },
   ],
 });

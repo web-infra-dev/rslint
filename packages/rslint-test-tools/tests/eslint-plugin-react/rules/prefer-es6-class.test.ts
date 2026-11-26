@@ -1,8 +1,37 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectShouldUseES6ClassError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'shouldUseES6Class',
+    message: 'Component should use es6 class instead of createClass',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('prefer-es6-class', {} as never, {
+function expectShouldUseCreateClassError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'shouldUseCreateClass',
+    message: 'Component should use createClass instead of es6 class',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('prefer-es6-class', {
   valid: [
     // ---- Upstream valid cases ----
     {
@@ -82,7 +111,7 @@ ruleTester.run('prefer-es6-class', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'shouldUseES6Class' }],
+      errors: [expectShouldUseES6ClassError([2, 38, 7, 10])],
     },
     {
       code: `
@@ -93,7 +122,7 @@ ruleTester.run('prefer-es6-class', {} as never, {
         });
       `,
       options: ['always'],
-      errors: [{ messageId: 'shouldUseES6Class' }],
+      errors: [expectShouldUseES6ClassError([2, 38, 6, 10])],
     },
     {
       code: `
@@ -104,7 +133,7 @@ ruleTester.run('prefer-es6-class', {} as never, {
         }
       `,
       options: ['never'],
-      errors: [{ messageId: 'shouldUseCreateClass' }],
+      errors: [expectShouldUseCreateClassError([2, 9, 6, 10])],
     },
 
     // ---- Edge: pragma-qualified React.createReactClass ----
@@ -114,7 +143,7 @@ ruleTester.run('prefer-es6-class', {} as never, {
           render: function() { return <div/>; }
         });
       `,
-      errors: [{ messageId: 'shouldUseES6Class' }],
+      errors: [expectShouldUseES6ClassError([2, 44, 4, 10])],
     },
 
     // ---- Edge: PureComponent variant reported in mode "never" ----
@@ -125,7 +154,7 @@ ruleTester.run('prefer-es6-class', {} as never, {
         }
       `,
       options: ['never'],
-      errors: [{ messageId: 'shouldUseCreateClass' }],
+      errors: [expectShouldUseCreateClassError([2, 9, 4, 10])],
     },
     {
       code: `
@@ -134,7 +163,7 @@ ruleTester.run('prefer-es6-class', {} as never, {
         }
       `,
       options: ['never'],
-      errors: [{ messageId: 'shouldUseCreateClass' }],
+      errors: [expectShouldUseCreateClassError([2, 9, 4, 10])],
     },
 
     // ---- Edge: `new createReactClass({...})` — NewExpression also has
@@ -145,7 +174,7 @@ ruleTester.run('prefer-es6-class', {} as never, {
           render: function() { return <div/>; }
         });
       `,
-      errors: [{ messageId: 'shouldUseES6Class' }],
+      errors: [expectShouldUseES6ClassError([2, 42, 4, 10])],
     },
   ],
 });

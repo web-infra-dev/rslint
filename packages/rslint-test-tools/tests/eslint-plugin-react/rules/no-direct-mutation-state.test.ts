@@ -1,8 +1,23 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectNoDirectMutationError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noDirectMutation',
+    message: 'Do not mutate state directly. Use setState().',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('no-direct-mutation-state', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-direct-mutation-state', {
   valid: [
     // ---- Upstream valid cases ----
     {
@@ -113,7 +128,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     {
       code: `
@@ -124,7 +139,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     {
       code: `
@@ -135,7 +150,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 30])],
     },
     {
       code: `
@@ -146,7 +161,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 35])],
     },
     {
       code: `
@@ -159,8 +174,8 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
         });
       `,
       errors: [
-        { messageId: 'noDirectMutation' },
-        { messageId: 'noDirectMutation' },
+        expectNoDirectMutationError([4, 13, 4, 35]),
+        expectNoDirectMutationError([5, 13, 5, 35]),
       ],
     },
     {
@@ -174,7 +189,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([7, 13, 7, 23])],
     },
     {
       code: `
@@ -187,7 +202,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([6, 15, 6, 19])],
     },
     {
       code: `
@@ -197,7 +212,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     {
       code: `
@@ -207,7 +222,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     {
       code: `
@@ -217,7 +232,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     {
       code: `
@@ -227,7 +242,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     {
       code: `
@@ -237,7 +252,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     {
       code: `
@@ -247,7 +262,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     {
       code: `
@@ -257,7 +272,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     // ---- Edge: compound assignment is still a mutation ----
     {
@@ -268,7 +283,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([4, 13, 4, 23])],
     },
     // ---- Edge: stateless FunctionDeclaration component ----
     {
@@ -278,7 +293,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           return <div/>;
         }
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([3, 11, 3, 21])],
     },
     // ---- Edge: stateless arrow assigned to capital-cased variable ----
     {
@@ -288,7 +303,7 @@ ruleTester.run('no-direct-mutation-state', {} as never, {
           return <div/>;
         };
       `,
-      errors: [{ messageId: 'noDirectMutation' }],
+      errors: [expectNoDirectMutationError([3, 11, 3, 21])],
     },
   ],
 });

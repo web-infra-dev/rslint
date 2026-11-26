@@ -1,8 +1,23 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectNoDuplicatePropsError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noDuplicateProps',
+    message: 'No duplicate props allowed',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('jsx-no-duplicate-props', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-no-duplicate-props', {
   valid: [
     { code: `<App />;` },
     { code: `<App {...this.props} />;` },
@@ -25,47 +40,47 @@ ruleTester.run('jsx-no-duplicate-props', {} as never, {
   invalid: [
     {
       code: `<App a a />;`,
-      errors: [{ message: 'No duplicate props allowed' }],
+      errors: [expectNoDuplicatePropsError([1, 8, 1, 9])],
     },
     {
       code: `<App A b c A />;`,
-      errors: [{ message: 'No duplicate props allowed' }],
+      errors: [expectNoDuplicatePropsError([1, 12, 1, 13])],
     },
     {
       code: `<App a="a" b="b" a="a" />;`,
-      errors: [{ message: 'No duplicate props allowed' }],
+      errors: [expectNoDuplicatePropsError([1, 18, 1, 23])],
     },
     {
       code: `<App A a />;`,
       options: [{ ignoreCase: true }],
-      errors: [{ message: 'No duplicate props allowed' }],
+      errors: [expectNoDuplicatePropsError([1, 8, 1, 9])],
     },
     {
       code: `<App a b c A />;`,
       options: [{ ignoreCase: true }],
-      errors: [{ message: 'No duplicate props allowed' }],
+      errors: [expectNoDuplicatePropsError([1, 12, 1, 13])],
     },
     {
       code: `<App A="a" b="b" B="B" />;`,
       options: [{ ignoreCase: true }],
-      errors: [{ message: 'No duplicate props allowed' }],
+      errors: [expectNoDuplicatePropsError([1, 18, 1, 23])],
     },
     // Non-self-closing element with duplicates.
     {
       code: `<App a a></App>;`,
-      errors: [{ message: 'No duplicate props allowed' }],
+      errors: [expectNoDuplicatePropsError([1, 8, 1, 9])],
     },
     // Spread does not reset duplicate tracking.
     {
       code: `<App a {...x} a />;`,
-      errors: [{ message: 'No duplicate props allowed' }],
+      errors: [expectNoDuplicatePropsError([1, 15, 1, 16])],
     },
     // Three duplicates — each subsequent dup reports.
     {
       code: `<App a a a />;`,
       errors: [
-        { message: 'No duplicate props allowed' },
-        { message: 'No duplicate props allowed' },
+        expectNoDuplicatePropsError([1, 8, 1, 9]),
+        expectNoDuplicatePropsError([1, 10, 1, 11]),
       ],
     },
   ],

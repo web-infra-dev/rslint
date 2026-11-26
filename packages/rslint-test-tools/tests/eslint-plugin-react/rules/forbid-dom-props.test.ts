@@ -1,8 +1,51 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectPropIsForbiddenError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propIsForbidden',
+    message: 'Prop "id" is forbidden on DOM Nodes',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('forbid-dom-props', {} as never, {
+function expectError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: '',
+    message: 'Please use class instead of ClassName',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: '',
+    message: 'Avoid using otherProp',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('forbid-dom-props', {
   valid: [
     // ---- Upstream valid cases ----
     {
@@ -175,7 +218,7 @@ ruleTester.run('forbid-dom-props', {} as never, {
         });
       `,
       options: [{ forbid: ['id'] }],
-      errors: [{ messageId: 'propIsForbidden' }],
+      errors: [expectPropIsForbiddenError([5, 25, 5, 33])],
     },
     {
       code: `
@@ -186,7 +229,7 @@ ruleTester.run('forbid-dom-props', {} as never, {
         }
       `,
       options: [{ forbid: ['id'] }],
-      errors: [{ messageId: 'propIsForbidden' }],
+      errors: [expectPropIsForbiddenError([4, 25, 4, 33])],
     },
     {
       code: `
@@ -195,7 +238,7 @@ ruleTester.run('forbid-dom-props', {} as never, {
         );
       `,
       options: [{ forbid: ['id'] }],
-      errors: [{ messageId: 'propIsForbidden' }],
+      errors: [expectPropIsForbiddenError([3, 16, 3, 24])],
     },
     {
       code: `
@@ -213,7 +256,7 @@ ruleTester.run('forbid-dom-props', {} as never, {
           ],
         },
       ],
-      errors: [{ message: 'Please use class instead of ClassName' }],
+      errors: [expectError2([3, 16, 3, 31])],
     },
     {
       code: `
@@ -226,7 +269,16 @@ ruleTester.run('forbid-dom-props', {} as never, {
           forbid: [{ propName: 'otherProp', disallowedFor: ['span'] }],
         },
       ],
-      errors: [{ messageId: 'propIsForbidden' }],
+      errors: [
+        {
+          messageId: 'propIsForbidden',
+          message: 'Prop "otherProp" is forbidden on DOM Nodes',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: `
@@ -239,7 +291,17 @@ ruleTester.run('forbid-dom-props', {} as never, {
           forbid: [{ propName: 'someProp', disallowedValues: ['someValue'] }],
         },
       ],
-      errors: [{ messageId: 'propIsForbiddenWithValue' }],
+      errors: [
+        {
+          messageId: 'propIsForbiddenWithValue',
+          message:
+            'Prop "someProp" with value "someValue" is forbidden on DOM Nodes',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: `
@@ -260,10 +322,7 @@ ruleTester.run('forbid-dom-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        { message: 'Please use class instead of ClassName' },
-        { message: 'Avoid using otherProp' },
-      ],
+      errors: [expectError2([3, 16, 3, 31]), expectError3([4, 18, 4, 33])],
     },
     {
       code: `
@@ -282,8 +341,15 @@ ruleTester.run('forbid-dom-props', {} as never, {
         },
       ],
       errors: [
-        { messageId: 'propIsForbidden' },
-        { message: 'Avoid using otherProp' },
+        {
+          messageId: 'propIsForbidden',
+          message: 'Prop "className" is forbidden on DOM Nodes',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 31,
+        },
+        expectError3([4, 18, 4, 33]),
       ],
     },
     {
@@ -306,7 +372,16 @@ ruleTester.run('forbid-dom-props', {} as never, {
           ],
         },
       ],
-      errors: [{ message: 'Avoid using the accept attribute on <form>' }],
+      errors: [
+        {
+          messageId: '',
+          message: 'Avoid using the accept attribute on <form>',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: `
@@ -331,9 +406,9 @@ ruleTester.run('forbid-dom-props', {} as never, {
         },
       ],
       errors: [
-        { message: 'Please use class instead of ClassName' },
-        { message: 'Please use class instead of ClassName' },
-        { message: 'Avoid using otherProp' },
+        expectError2([3, 16, 3, 31]),
+        expectError2([5, 19, 5, 37]),
+        expectError3([6, 18, 6, 33]),
       ],
     },
     {
@@ -369,11 +444,25 @@ ruleTester.run('forbid-dom-props', {} as never, {
         },
       ],
       errors: [
-        { message: 'Please use class instead of ClassName' },
-        { message: 'Please use class instead of ClassName' },
-        { message: 'Avoid using otherProp' },
-        { message: 'Do not use thirdProp with values bar and baz on p' },
-        { message: 'Do not use thirdProp with values bar and baz on p' },
+        expectError2([3, 16, 3, 31]),
+        expectError2([5, 19, 5, 37]),
+        expectError3([6, 18, 6, 33]),
+        {
+          messageId: '',
+          message: 'Do not use thirdProp with values bar and baz on p',
+          line: 9,
+          column: 16,
+          endLine: 9,
+          endColumn: 31,
+        },
+        {
+          messageId: '',
+          message: 'Do not use thirdProp with values bar and baz on p',
+          line: 10,
+          column: 16,
+          endLine: 10,
+          endColumn: 31,
+        },
       ],
     },
 
@@ -383,8 +472,15 @@ ruleTester.run('forbid-dom-props', {} as never, {
       code: `<div {...rest} id="x" className="y" />;`,
       options: [{ forbid: ['id', 'className'] }],
       errors: [
-        { messageId: 'propIsForbidden' },
-        { messageId: 'propIsForbidden' },
+        expectPropIsForbiddenError([1, 16, 1, 22]),
+        {
+          messageId: 'propIsForbidden',
+          message: 'Prop "className" is forbidden on DOM Nodes',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 36,
+        },
       ],
     },
     // Real-world: `target="_blank"` security ban via disallowedValues.
@@ -401,7 +497,17 @@ ruleTester.run('forbid-dom-props', {} as never, {
           ],
         },
       ],
-      errors: [{ messageId: 'propIsForbiddenWithValue' }],
+      errors: [
+        {
+          messageId: 'propIsForbiddenWithValue',
+          message:
+            'Prop "target" with value "_blank" is forbidden on DOM Nodes',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     // Same forbid name appearing as both string and object entry —
     // last-write-wins (the second/object entry's message overrides).
@@ -412,15 +518,24 @@ ruleTester.run('forbid-dom-props', {} as never, {
           forbid: ['id', { propName: 'id', message: 'Object wins' }],
         },
       ],
-      errors: [{ message: 'Object wins' }],
+      errors: [
+        {
+          messageId: '',
+          message: 'Object wins',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
     // Same prop attribute appearing twice on the same element — both fire.
     {
       code: `<div id="a" id="b" />;`,
       options: [{ forbid: ['id'] }],
       errors: [
-        { messageId: 'propIsForbidden' },
-        { messageId: 'propIsForbidden' },
+        expectPropIsForbiddenError([1, 6, 1, 12]),
+        expectPropIsForbiddenError([1, 13, 1, 19]),
       ],
     },
   ],

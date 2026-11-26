@@ -1,8 +1,52 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
 
-const ruleTester = new RuleTester();
+function expectBadHandlerNameError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'badHandlerName',
+    message:
+      "Handler function for onChange prop key must be a camelCase name beginning with 'handle' only",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('jsx-handler-names', {} as never, {
+function expectBadPropKeyError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'badPropKey',
+    message: "Prop key for handleChange must begin with 'on'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectBadPropKeyError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'badPropKey',
+    message: "Prop key for handleChange must begin with 'when'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-handler-names', {
   valid: [
     // ---- Standard handle/on patterns ----
     { code: `var x = <TestComponent onChange={this.handleChange} />` },
@@ -250,81 +294,293 @@ ruleTester.run('jsx-handler-names', {} as never, {
         },
       ],
     },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 0 (7.37.5)',
+      code: `<TestComponent onChange={this.handleChange} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 1 (7.37.5)',
+      code: `<TestComponent onChange={this.handle123Change} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 2 (7.37.5)',
+      code: `<TestComponent onChange={this.props.onChange} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 3 (7.37.5)',
+      code: `
+        <TestComponent
+          onChange={
+            this
+              .handleChange
+          } />
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 4 (7.37.5)',
+      code: `
+        <TestComponent
+          onChange={
+            this
+              .props
+              .handleChange
+          } />
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 5 (7.37.5)',
+      code: `<TestComponent onChange={handleChange} />`,
+      options: [{ checkLocalVariables: true }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 6 (7.37.5)',
+      code: `<TestComponent onChange={takeCareOfChange} />`,
+      options: [{ checkLocalVariables: false }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 7 (7.37.5)',
+      code: `<TestComponent onChange={event => window.alert(event.target.value)} />`,
+      options: [{ checkInlineFunction: false }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 8 (7.37.5)',
+      code: `<TestComponent onChange={() => handleChange()} />`,
+      options: [{ checkInlineFunction: true, checkLocalVariables: true }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 9 (7.37.5)',
+      code: `<TestComponent onChange={() => this.handleChange()} />`,
+      options: [{ checkInlineFunction: true }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 10 (7.37.5)',
+      code: `<TestComponent onChange={() => 42} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 11 (7.37.5)',
+      code: `<TestComponent onChange={this.props.onFoo} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 12 (7.37.5)',
+      code: `<TestComponent isSelected={this.props.isSelected} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 13 (7.37.5)',
+      code: `<TestComponent shouldDisplay={this.state.shouldDisplay} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 14 (7.37.5)',
+      code: `<TestComponent shouldDisplay={arr[0].prop} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 15 (7.37.5)',
+      code: `<TestComponent onChange={props.onChange} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 16 (7.37.5)',
+      code: `<TestComponent ref={this.handleRef} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 17 (7.37.5)',
+      code: `<TestComponent ref={this.somethingRef} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 18 (7.37.5)',
+      code: `<TestComponent test={this.props.content} />`,
+      options: [{ eventHandlerPrefix: 'on', eventHandlerPropPrefix: 'on' }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 19 (7.37.5)',
+      skip: "The native TypeScript parser cannot parse this upstream bind operator syntax ('}' expected.).",
+      code: `<TestComponent onChange={props::handleChange} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 20 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream bind operator syntax (Expression expected.).',
+      code: `<TestComponent onChange={::props.onChange} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 21 (7.37.5)',
+      skip: "The native TypeScript parser cannot parse this upstream bind operator syntax ('}' expected.).",
+      code: `<TestComponent onChange={props.foo::handleChange} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 22 (7.37.5)',
+      skip: "The native TypeScript parser cannot parse this upstream bind operator syntax ('}' expected.).",
+      code: `<TestComponent onChange={() => props::handleChange()} />`,
+      options: [{ checkInlineFunction: true }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 23 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream bind operator syntax (Expression expected.).',
+      code: `<TestComponent onChange={() => ::props.onChange()} />`,
+      options: [{ checkInlineFunction: true }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 24 (7.37.5)',
+      skip: "The native TypeScript parser cannot parse this upstream bind operator syntax ('}' expected.).",
+      code: `<TestComponent onChange={() => props.foo::handleChange()} />`,
+      options: [{ checkInlineFunction: true }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 25 (7.37.5)',
+      code: `<TestComponent only={this.only} />`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 26 (7.37.5)',
+      code: `<TestComponent onChange={this.someChange} />`,
+      options: [{ eventHandlerPrefix: false, eventHandlerPropPrefix: 'on' }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 27 (7.37.5)',
+      code: `<TestComponent somePrefixChange={this.someChange} />`,
+      options: [
+        { eventHandlerPrefix: false, eventHandlerPropPrefix: 'somePrefix' },
+      ],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 28 (7.37.5)',
+      code: `<TestComponent someProp={this.handleChange} />`,
+      options: [{ eventHandlerPropPrefix: false }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 29 (7.37.5)',
+      code: `<TestComponent someProp={this.somePrefixChange} />`,
+      options: [
+        { eventHandlerPrefix: 'somePrefix', eventHandlerPropPrefix: false },
+      ],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 30 (7.37.5)',
+      code: `<TestComponent someProp={props.onChange} />`,
+      options: [{ eventHandlerPropPrefix: false }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 31 (7.37.5)',
+      code: `<ComponentFromOtherLibraryBar customPropNameBar={handleSomething} />;`,
+      options: [
+        {
+          checkLocalVariables: true,
+          ignoreComponentNames: ['ComponentFromOtherLibraryBar'],
+        },
+      ],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 32 (7.37.5)',
+      code: `
+        function App() {
+          return (
+            <div>
+              <MyLibInput customPropNameBar={handleSomething} />;
+              <MyLibCheckbox customPropNameBar={handleSomething} />;
+              <MyLibButtom customPropNameBar={handleSomething} />;
+            </div>
+          )
+        }
+      `,
+      options: [
+        { checkLocalVariables: true, ignoreComponentNames: ['MyLib*'] },
+      ],
+      languageOptions: upstreamModuleOptions,
+    },
   ],
   invalid: [
     // ---- Bad handler name (default) ----
     {
       code: `var x = <TestComponent onChange={this.doSomethingOnChange} />`,
-      errors: [
-        {
-          messageId: 'badHandlerName',
-          message:
-            "Handler function for onChange prop key must be a camelCase name beginning with 'handle' only",
-        },
-      ],
+      errors: [expectBadHandlerNameError([1, 24, 1, 59])],
     },
     {
       code: `var x = <TestComponent onChange={this.handlerChange} />`,
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 53])],
     },
     {
       code: `var x = <TestComponent onChange={this.handle} />`,
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 46])],
     },
     {
       code: `var x = <TestComponent onChange={this.handle2} />`,
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 47])],
     },
     {
       code: `var x = <TestComponent onChange={this.handl3Change} />`,
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 52])],
     },
     {
       code: `var x = <TestComponent onChange={this.handle4change} />`,
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 53])],
     },
 
     // ---- checkLocalVariables ----
     {
       code: `var x = <TestComponent onChange={takeCareOfChange} />`,
       options: [{ checkLocalVariables: true }],
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 51])],
     },
 
     // ---- checkInlineFunction ----
     {
       code: `var x = <TestComponent onChange={() => this.takeCareOfChange()} />`,
       options: [{ checkInlineFunction: true }],
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 64])],
     },
 
     // ---- Bad prop key — non-`on` paired with `handle*` ----
     {
       code: `var x = <TestComponent only={this.handleChange} />`,
-      errors: [
-        {
-          messageId: 'badPropKey',
-          message: "Prop key for handleChange must begin with 'on'",
-        },
-      ],
+      errors: [expectBadPropKeyError2([1, 24, 1, 48])],
     },
     {
       code: `var x = <TestComponent2 only={this.handleChange} />`,
-      errors: [{ messageId: 'badPropKey' }],
+      errors: [expectBadPropKeyError2([1, 25, 1, 49])],
     },
     {
       code: `var x = <TestComponent handleChange={this.handleChange} />`,
-      errors: [{ messageId: 'badPropKey' }],
+      errors: [expectBadPropKeyError2([1, 24, 1, 56])],
     },
     {
       code: `var x = <TestComponent whenChange={handleChange} />`,
       options: [{ checkLocalVariables: true }],
-      errors: [{ messageId: 'badPropKey' }],
+      errors: [expectBadPropKeyError2([1, 24, 1, 49])],
     },
     {
       code: `var x = <TestComponent whenChange={() => handleChange()} />`,
       options: [{ checkInlineFunction: true, checkLocalVariables: true }],
-      errors: [{ messageId: 'badPropKey' }],
+      errors: [expectBadPropKeyError2([1, 24, 1, 57])],
     },
 
     // ---- Custom prefixes ----
@@ -337,12 +593,7 @@ ruleTester.run('jsx-handler-names', {} as never, {
           eventHandlerPropPrefix: 'when',
         },
       ],
-      errors: [
-        {
-          messageId: 'badPropKey',
-          message: "Prop key for handleChange must begin with 'when'",
-        },
-      ],
+      errors: [expectBadPropKeyError3([1, 24, 1, 47])],
     },
     {
       code: `var x = <TestComponent onChange={() => handleChange()} />`,
@@ -354,13 +605,13 @@ ruleTester.run('jsx-handler-names', {} as never, {
           eventHandlerPropPrefix: 'when',
         },
       ],
-      errors: [{ messageId: 'badPropKey' }],
+      errors: [expectBadPropKeyError3([1, 24, 1, 55])],
     },
 
     // ---- Handler named like prop fails the handle prefix ----
     {
       code: `var x = <TestComponent onChange={this.onChange} />`,
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 48])],
     },
 
     // ---- ignoreComponentNames non-matching pattern ----
@@ -380,9 +631,30 @@ ruleTester.run('jsx-handler-names', {} as never, {
         { checkLocalVariables: true, ignoreComponentNames: ['MyLibrary*'] },
       ],
       errors: [
-        { messageId: 'badPropKey' },
-        { messageId: 'badPropKey' },
-        { messageId: 'badPropKey' },
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleInput must begin with 'on'",
+          line: 5,
+          column: 27,
+          endLine: 5,
+          endColumn: 58,
+        },
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleCheckbox must begin with 'on'",
+          line: 6,
+          column: 30,
+          endLine: 6,
+          endColumn: 64,
+        },
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleButton must begin with 'on'",
+          line: 7,
+          column: 28,
+          endLine: 7,
+          endColumn: 60,
+        },
       ],
     },
 
@@ -395,28 +667,36 @@ ruleTester.run('jsx-handler-names', {} as never, {
           ignoreComponentNames: ['B.TestComponent', 'TestComponent', 'Test*'],
         },
       ],
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 26, 1, 45])],
     },
 
     // ---- Lock-in: tsgo flat-AST equivalence with parens ----
     {
       code: `var x = <TestComponent onChange={(this.doSomethingOnChange)} />`,
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 61])],
     },
 
     // ---- Lock-in: optional chain still triggers regex under checkLocal ----
     {
       code: `var x = <TestComponent onChange={this?.takeCareOfChange} />`,
       options: [{ checkLocalVariables: true }],
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 24, 1, 57])],
     },
 
     // ---- Lock-in: multiple attributes on one element fire independently ----
     {
       code: `var x = <TestComponent disabled onChange={this.bad1} onClick={this.bad2} />`,
       errors: [
-        { messageId: 'badHandlerName' },
-        { messageId: 'badHandlerName' },
+        expectBadHandlerNameError([1, 33, 1, 53]),
+        {
+          messageId: 'badHandlerName',
+          message:
+            "Handler function for onClick prop key must be a camelCase name beginning with 'handle' only",
+          line: 1,
+          column: 54,
+          endLine: 1,
+          endColumn: 73,
+        },
       ],
     },
 
@@ -426,19 +706,194 @@ ruleTester.run('jsx-handler-names', {} as never, {
       options: [
         { checkLocalVariables: true, ignoreComponentNames: ['Foo{1,2}'] },
       ],
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 15, 1, 41])],
     },
     {
       code: `var x = <TestD onChange={whateverHandler} />`,
       options: [
         { checkLocalVariables: true, ignoreComponentNames: ['Test[ABC]'] },
       ],
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 16, 1, 42])],
     },
     {
       code: `var x = <Foo onChange={whateverHandler} />`,
       options: [{ checkLocalVariables: true, ignoreComponentNames: ['!Foo'] }],
-      errors: [{ messageId: 'badHandlerName' }],
+      errors: [expectBadHandlerNameError([1, 14, 1, 40])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 0 (7.37.5)',
+      code: `<TestComponent onChange={this.doSomethingOnChange} />`,
+      errors: [expectBadHandlerNameError([1, 16, 1, 51])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 1 (7.37.5)',
+      code: `<TestComponent onChange={this.handlerChange} />`,
+      errors: [expectBadHandlerNameError([1, 16, 1, 45])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 2 (7.37.5)',
+      code: `<TestComponent onChange={this.handle} />`,
+      errors: [expectBadHandlerNameError([1, 16, 1, 38])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 3 (7.37.5)',
+      code: `<TestComponent onChange={this.handle2} />`,
+      errors: [expectBadHandlerNameError([1, 16, 1, 39])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 4 (7.37.5)',
+      code: `<TestComponent onChange={this.handl3Change} />`,
+      errors: [expectBadHandlerNameError([1, 16, 1, 44])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 5 (7.37.5)',
+      code: `<TestComponent onChange={this.handle4change} />`,
+      errors: [expectBadHandlerNameError([1, 16, 1, 45])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 6 (7.37.5)',
+      code: `<TestComponent onChange={takeCareOfChange} />`,
+      options: [{ checkLocalVariables: true }],
+      errors: [expectBadHandlerNameError([1, 16, 1, 43])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 7 (7.37.5)',
+      code: `<TestComponent onChange={() => this.takeCareOfChange()} />`,
+      options: [{ checkInlineFunction: true }],
+      errors: [expectBadHandlerNameError([1, 16, 1, 56])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 8 (7.37.5)',
+      code: `<TestComponent only={this.handleChange} />`,
+      errors: [expectBadPropKeyError2([1, 16, 1, 40])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 9 (7.37.5)',
+      code: `<TestComponent2 only={this.handleChange} />`,
+      errors: [expectBadPropKeyError2([1, 17, 1, 41])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 10 (7.37.5)',
+      code: `<TestComponent handleChange={this.handleChange} />`,
+      errors: [expectBadPropKeyError2([1, 16, 1, 48])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 11 (7.37.5)',
+      code: `<TestComponent whenChange={handleChange} />`,
+      options: [{ checkLocalVariables: true }],
+      errors: [expectBadPropKeyError2([1, 16, 1, 41])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 12 (7.37.5)',
+      code: `<TestComponent whenChange={() => handleChange()} />`,
+      options: [{ checkInlineFunction: true, checkLocalVariables: true }],
+      errors: [expectBadPropKeyError2([1, 16, 1, 49])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 13 (7.37.5)',
+      code: `<TestComponent onChange={handleChange} />`,
+      options: [
+        {
+          checkLocalVariables: true,
+          eventHandlerPrefix: 'handle',
+          eventHandlerPropPrefix: 'when',
+        },
+      ],
+      errors: [expectBadPropKeyError3([1, 16, 1, 39])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 14 (7.37.5)',
+      code: `<TestComponent onChange={() => handleChange()} />`,
+      options: [
+        {
+          checkInlineFunction: true,
+          checkLocalVariables: true,
+          eventHandlerPrefix: 'handle',
+          eventHandlerPropPrefix: 'when',
+        },
+      ],
+      errors: [expectBadPropKeyError3([1, 16, 1, 47])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 15 (7.37.5)',
+      code: `<TestComponent onChange={this.onChange} />`,
+      errors: [expectBadHandlerNameError([1, 16, 1, 40])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 16 (7.37.5)',
+      skip: "The native TypeScript parser cannot parse this upstream bind operator syntax ('}' expected.).",
+      code: `<TestComponent onChange={props::onChange} />`,
+      errors: [expectBadHandlerNameError([1, 16, 1, 42])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 17 (7.37.5)',
+      skip: "The native TypeScript parser cannot parse this upstream bind operator syntax ('}' expected.).",
+      code: `<TestComponent onChange={props.foo::onChange} />`,
+      errors: [expectBadHandlerNameError([1, 16, 1, 46])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 18 (7.37.5)',
+      code: `
+        function App() {
+          return (
+            <div>
+              <MyLibInput customPropNameBar={handleInput} />;
+              <MyLibCheckbox customPropNameBar={handleCheckbox} />;
+              <MyLibButtom customPropNameBar={handleButton} />;
+            </div>
+          )
+        }
+      `,
+      options: [
+        { checkLocalVariables: true, ignoreComponentNames: ['MyLibrary*'] },
+      ],
+      errors: [
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleInput must begin with 'on'",
+          line: 5,
+          column: 27,
+          endLine: 5,
+          endColumn: 58,
+        },
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleCheckbox must begin with 'on'",
+          line: 6,
+          column: 30,
+          endLine: 6,
+          endColumn: 64,
+        },
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleButton must begin with 'on'",
+          line: 7,
+          column: 28,
+          endLine: 7,
+          endColumn: 60,
+        },
+      ],
+      languageOptions: upstreamModuleOptions,
     },
   ],
 });

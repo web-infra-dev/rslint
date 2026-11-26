@@ -1,7 +1,36 @@
 // Upstream: https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/prefer-exact-props.js
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectPropTypesError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propTypes',
+    message: "Component propTypes should be exact by using 'exact'.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectFlowError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'flow',
+    message: 'Component flow props should be set with exact objects.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
 
 const settings = {
   propWrapperFunctions: [{ property: 'exact', exact: true }],
@@ -9,7 +38,7 @@ const settings = {
 
 const propTypesError = "Component propTypes should be exact by using 'exact'.";
 
-ruleTester.run('prefer-exact-props', {} as never, {
+ruleTester.run('prefer-exact-props', {
   valid: [
     {
       code: `
@@ -192,6 +221,66 @@ ruleTester.run('prefer-exact-props', {} as never, {
         }
       `,
     },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 5 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream flow syntax (Property or signature expected.).',
+      code: `
+        type Props = {|
+          foo: string
+        |}
+        function Component(props: Props) {
+          return <div />;
+        }
+      `,
+      // Native parsing supports object spread without the historical Babel experimental flag.
+      languageOptions: {
+        ecmaVersion: 8,
+        sourceType: 'module',
+        parserOptions: {
+          ecmaFeatures: { jsx: true },
+        },
+      },
+    },
+    {
+      name: 'Upstream valid 6 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream flow syntax (Property or signature expected.).',
+      code: `
+        type Props = {|
+          foo: string
+        |}
+        function Component(props: Props) {
+          let someVar: { foo: string };
+          return <div />;
+        }
+      `,
+      // Native parsing supports object spread without the historical Babel experimental flag.
+      languageOptions: {
+        ecmaVersion: 8,
+        sourceType: 'module',
+        parserOptions: {
+          ecmaFeatures: { jsx: true },
+        },
+      },
+    },
+    {
+      name: 'Upstream valid 7 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream flow syntax (Property or signature expected.).',
+      code: `
+        function Component(props: {| foo : string |}) {
+          return <div />;
+        }
+      `,
+      // Native parsing supports object spread without the historical Babel experimental flag.
+      languageOptions: {
+        ecmaVersion: 8,
+        sourceType: 'module',
+        parserOptions: {
+          ecmaFeatures: { jsx: true },
+        },
+      },
+    },
   ],
   invalid: [
     {
@@ -206,16 +295,7 @@ ruleTester.run('prefer-exact-props', {} as never, {
         };
       `,
       settings,
-      errors: [
-        {
-          messageId: 'propTypes',
-          message: propTypesError,
-          line: 7,
-          column: 9,
-          endLine: 7,
-          endColumn: 28,
-        },
-      ],
+      errors: [expectPropTypesError([7, 9, 7, 28])],
     },
     {
       code: `
@@ -229,16 +309,7 @@ ruleTester.run('prefer-exact-props', {} as never, {
         }
       `,
       settings,
-      errors: [
-        {
-          messageId: 'propTypes',
-          message: propTypesError,
-          line: 3,
-          column: 11,
-          endLine: 5,
-          endColumn: 12,
-        },
-      ],
+      errors: [expectPropTypesError([3, 11, 5, 12])],
     },
     {
       code: `
@@ -251,7 +322,7 @@ ruleTester.run('prefer-exact-props', {} as never, {
         Component.propTypes = props;
       `,
       settings,
-      errors: [{ messageId: 'propTypes', message: propTypesError }],
+      errors: [expectPropTypesError([8, 9, 8, 28])],
     },
     {
       code: `
@@ -266,7 +337,7 @@ ruleTester.run('prefer-exact-props', {} as never, {
         Component.propTypes = props;
       `,
       settings,
-      errors: [{ messageId: 'propTypes', message: propTypesError }],
+      errors: [expectPropTypesError([10, 9, 10, 28])],
     },
     {
       code: `
@@ -291,6 +362,10 @@ ruleTester.run('prefer-exact-props', {} as never, {
           messageId: 'propTypes',
           message:
             "Component propTypes should be exact by using one of 'exact', 'forbidExtraProps'.",
+          line: 10,
+          column: 9,
+          endLine: 10,
+          endColumn: 28,
         },
       ],
     },
@@ -320,6 +395,10 @@ ruleTester.run('prefer-exact-props', {} as never, {
           messageId: 'propTypes',
           message:
             "Component propTypes should be exact by using one of 'exact', 'forbidExtraProps'.",
+          line: 13,
+          column: 9,
+          endLine: 13,
+          endColumn: 28,
         },
       ],
     },
@@ -335,7 +414,7 @@ ruleTester.run('prefer-exact-props', {} as never, {
         });
       `,
       settings,
-      errors: [{ messageId: 'propTypes', message: propTypesError }],
+      errors: [expectPropTypesError([6, 9, 6, 28])],
     },
     {
       code: `
@@ -354,7 +433,7 @@ ruleTester.run('prefer-exact-props', {} as never, {
         Component.propTypes = somethingElse(props);
       `,
       settings,
-      errors: [{ messageId: 'propTypes', message: propTypesError }],
+      errors: [expectPropTypesError([14, 9, 14, 28])],
     },
     {
       code: `
@@ -373,7 +452,71 @@ ruleTester.run('prefer-exact-props', {} as never, {
         }
       `,
       settings,
-      errors: [{ messageId: 'propTypes', message: propTypesError }],
+      errors: [expectPropTypesError([5, 11, 10, 14])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 2 (7.37.5)',
+      skip: 'Upstream checks Flow prop annotations for prefer-exact-props; the native TypeScript annotation path reports 0 diagnostics instead of 1.',
+      code: `
+        class Component extends React.Component {
+          props: {
+            foo: string
+          }
+          render() {
+            return <div />;
+          }
+        }
+      `,
+      errors: [expectFlowError([3, 11, 5, 12])],
+      // Native parsing supports object spread without the historical Babel experimental flag.
+      languageOptions: {
+        ecmaVersion: 8,
+        sourceType: 'module',
+        parserOptions: {
+          ecmaFeatures: { jsx: true },
+        },
+      },
+    },
+    {
+      name: 'Upstream invalid 3 (7.37.5)',
+      skip: 'Upstream checks Flow prop annotations for prefer-exact-props; the native TypeScript annotation path reports 0 diagnostics instead of 1.',
+      code: `
+        function Component(props: { foo: string }) {
+          return <div />;
+        }
+      `,
+      errors: [expectFlowError([2, 28, 2, 50])],
+      // Native parsing supports object spread without the historical Babel experimental flag.
+      languageOptions: {
+        ecmaVersion: 8,
+        sourceType: 'module',
+        parserOptions: {
+          ecmaFeatures: { jsx: true },
+        },
+      },
+    },
+    {
+      name: 'Upstream invalid 4 (7.37.5)',
+      skip: 'Upstream checks Flow prop annotations for prefer-exact-props; the native TypeScript annotation path reports 0 diagnostics instead of 1.',
+      code: `
+        type Props = {
+          foo: string
+        }
+        function Component(props: Props) {
+          return <div />;
+        }
+      `,
+      errors: [expectFlowError([5, 28, 5, 40])],
+      // Native parsing supports object spread without the historical Babel experimental flag.
+      languageOptions: {
+        ecmaVersion: 8,
+        sourceType: 'module',
+        parserOptions: {
+          ecmaFeatures: { jsx: true },
+        },
+      },
     },
   ],
 });

@@ -1,8 +1,69 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
 
-const ruleTester = new RuleTester();
+function expectNestChildrenError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'nestChildren',
+    message:
+      'Do not pass children as props. Instead, nest children between the opening and closing tags.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('no-children-prop', {} as never, {
+function expectPassChildrenAsArgsError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'passChildrenAsArgs',
+    message:
+      'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectNestFunctionError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'nestFunction',
+    message:
+      'Do not nest a function between the opening and closing tags. Instead, pass it as a prop.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectPassFunctionAsArgsError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'passFunctionAsArgs',
+    message:
+      'Do not pass a function as an additional argument to React.createElement. Instead, pass it as a prop.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-children-prop', {
   valid: [
     // ---- Upstream valid cases ----
     { code: `<div />;` },
@@ -135,317 +196,183 @@ ruleTester.run('no-children-prop', {} as never, {
       code: `React.createElement(MyComponent, {children: (() => {})});`,
       options: [{ allowFunctions: true }],
     },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 35 (7.37.5)',
+      code: `<MyComponent className="class-name" {...props} />;`,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 36 (7.37.5)',
+      code: `React.createElement(MyComponent, {className: "class-name", ...props});`,
+      languageOptions: upstreamModuleOptions,
+    },
   ],
   invalid: [
     // ---- Upstream invalid cases ----
     {
       code: `<div children />;`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 6, 1, 14])],
     },
     {
       code: `<div children="Children" />;`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 6, 1, 25])],
     },
     {
       code: `<div children={<div />} />;`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 6, 1, 24])],
     },
     {
       code: `<div children={[<div />, <div />]} />;`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 6, 1, 35])],
     },
     {
       code: `<div children="Children">Children</div>;`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 6, 1, 25])],
     },
     {
       code: `React.createElement("div", {children: "Children"});`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 51])],
     },
     {
       code: `React.createElement("div", {children: "Children"}, "Children");`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 63])],
     },
     {
       code: `React.createElement("div", {children: React.createElement("div")});`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 67])],
     },
     {
       code: `React.createElement("div", {children: [React.createElement("div"), React.createElement("div")]});`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 97])],
     },
     {
       code: `<MyComponent children="Children" />`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 14, 1, 33])],
     },
     {
       code: `React.createElement(MyComponent, {children: "Children"});`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 57])],
     },
     {
       code: `<MyComponent className="class-name" children="Children" />;`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 37, 1, 56])],
     },
     {
       code: `React.createElement(MyComponent, {children: "Children", className: "class-name"});`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 82])],
     },
     {
       code: `const props: any = {}; const x = <MyComponent {...props} children="Children" />;`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 58, 1, 77])],
     },
     {
       code: `const props: any = {}; React.createElement(MyComponent, {...props, children: "Children"})`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 24, 1, 90])],
     },
     {
       code: `<MyComponent>{() => {}}</MyComponent>;`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not nest a function between the opening and closing tags. Instead, pass it as a prop.',
-        },
-      ],
+      errors: [expectNestFunctionError([1, 1, 1, 38])],
     },
     {
       code: `<MyComponent>{function() {}}</MyComponent>;`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not nest a function between the opening and closing tags. Instead, pass it as a prop.',
-        },
-      ],
+      errors: [expectNestFunctionError([1, 1, 1, 43])],
     },
     {
       code: `<MyComponent>{async function() {}}</MyComponent>;`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not nest a function between the opening and closing tags. Instead, pass it as a prop.',
-        },
-      ],
+      errors: [expectNestFunctionError([1, 1, 1, 49])],
     },
     {
       code: `<MyComponent>{function* () {}}</MyComponent>;`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not nest a function between the opening and closing tags. Instead, pass it as a prop.',
-        },
-      ],
+      errors: [expectNestFunctionError([1, 1, 1, 45])],
     },
     {
       code: `React.createElement(MyComponent, {}, () => {});`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not pass a function as an additional argument to React.createElement. Instead, pass it as a prop.',
-        },
-      ],
+      errors: [expectPassFunctionAsArgsError([1, 1, 1, 47])],
     },
     {
       code: `React.createElement(MyComponent, {}, function() {});`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not pass a function as an additional argument to React.createElement. Instead, pass it as a prop.',
-        },
-      ],
+      errors: [expectPassFunctionAsArgsError([1, 1, 1, 52])],
     },
     {
       code: `React.createElement(MyComponent, {}, async function() {});`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not pass a function as an additional argument to React.createElement. Instead, pass it as a prop.',
-        },
-      ],
+      errors: [expectPassFunctionAsArgsError([1, 1, 1, 58])],
     },
     {
       code: `React.createElement(MyComponent, {}, function* () {});`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not pass a function as an additional argument to React.createElement. Instead, pass it as a prop.',
-        },
-      ],
+      errors: [expectPassFunctionAsArgsError([1, 1, 1, 54])],
     },
 
     // ---- Additional edge cases ----
     // Shorthand `{children}` is still reported.
     {
       code: `const children = "x"; React.createElement("div", {children});`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 23, 1, 61])],
     },
     // Without allowFunctions, a function children prop still reports.
     {
       code: `<MyComponent children={() => {}} />;`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 14, 1, 33])],
     },
     {
       code: `React.createElement(MyComponent, {children: () => {}});`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 55])],
     },
     // With allowFunctions, a non-function value (variable reference) still reports.
     {
       code: `const fn = () => {}; const x = <MyComponent children={fn} />;`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 45, 1, 58])],
     },
     // Parenthesized second arg — still unwrapped and inspected.
     {
       code: `React.createElement("div", ({children: "x"}));`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 46])],
     },
     // Parenthesized createElement callee — IsCreateElementCall unwraps it.
     {
       code: `(React.createElement)("div", {children: "x"});`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 46])],
     },
     // Nested createElement: only the outer call has a `children` prop.
     {
       code: `React.createElement("div", {children: React.createElement("span", {})});`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-        },
-      ],
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 72])],
     },
     // Deeply nested JSX: only the innermost JsxElement with a function child
     // triggers `nestFunction`.
     {
       code: `<Outer><Mid><Inner>{() => {}}</Inner></Mid></Outer>;`,
       options: [{ allowFunctions: true }],
-      errors: [
-        {
-          message:
-            'Do not nest a function between the opening and closing tags. Instead, pass it as a prop.',
-        },
-      ],
+      errors: [expectNestFunctionError([1, 13, 1, 38])],
     },
     // Member-based user component `<Foo.Bar>` — `children` prop still reports.
     {
       code: `const Foo: any = {}; Foo.Bar = () => null; const x = <Foo.Bar children="x" />;`,
-      errors: [
-        {
-          message:
-            'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-        },
-      ],
+      errors: [expectNestChildrenError([1, 63, 1, 75])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 13 (7.37.5)',
+      code: `<MyComponent {...props} children="Children" />;`,
+      errors: [expectNestChildrenError([1, 25, 1, 44])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 14 (7.37.5)',
+      code: `React.createElement(MyComponent, {...props, children: "Children"})`,
+      errors: [expectPassChildrenAsArgsError([1, 1, 1, 67])],
+      languageOptions: upstreamModuleOptions,
     },
   ],
 });

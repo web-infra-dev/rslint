@@ -1,8 +1,69 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamES2015Options } from '../config';
 
-const ruleTester = new RuleTester();
+function expectWrongDepthError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongDepth',
+    message:
+      'Expected the depth of nested jsx elements to be <= 0, but found 1.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('jsx-max-depth', {} as never, {
+function expectWrongDepthError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongDepth',
+    message:
+      'Expected the depth of nested jsx elements to be <= 1, but found 2.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectWrongDepthError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongDepth',
+    message:
+      'Expected the depth of nested jsx elements to be <= 2, but found 3.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectWrongDepthError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongDepth',
+    message:
+      'Expected the depth of nested jsx elements to be <= 0, but found 2.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-max-depth', {
   valid: [
     // ---- Default max=2 ----
     { code: `<App />` },
@@ -640,6 +701,70 @@ ruleTester.run('jsx-max-depth', {} as never, {
       `,
       options: [{ max: 1 }],
     },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 0 (7.37.5)',
+      code: `
+        <App />
+      `,
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream valid 4 (7.37.5)',
+      code: `
+        const x = <div><em>x</em></div>;
+        <div>{x}</div>
+      `,
+      options: [{ max: 2 }],
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream valid 6 (7.37.5)',
+      code: `
+        <></>
+      `,
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream valid 8 (7.37.5)',
+      code: `
+        const x = <><em>x</em></>;
+        <>{x}</>
+      `,
+      options: [{ max: 2 }],
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream valid 12 (7.37.5)',
+      code: `
+        function Component() {
+          let first = "";
+          const second = first;
+          first = second;
+          return <div id={first} />;
+        };
+      `,
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream valid 13 (7.37.5)',
+      code: `
+        function Component() {
+          let first = "";
+          let second = "";
+          let third = "";
+          let fourth = "";
+          const fifth = first;
+          first = second;
+          second = third;
+          third = fourth;
+          fourth = fifth;
+          return <div id={first} />;
+        };
+      `,
+      languageOptions: upstreamES2015Options,
+    },
   ],
 
   invalid: [
@@ -651,7 +776,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </App>
       `,
       options: [{ max: 0 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError1([3, 11, 3, 18])],
     },
     // ---- max=0 with depth 1, JsxExpression child whose inner is non-JSX ----
     {
@@ -661,7 +786,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </App>
       `,
       options: [{ max: 0 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError1([3, 11, 3, 27])],
     },
     // ---- max=1 with depth 2 ----
     {
@@ -673,7 +798,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </App>
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 13, 4, 20])],
     },
     // ---- Identifier resolution puts <span/> at depth 2 ----
     {
@@ -682,7 +807,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <div>{x}</div>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([2, 24, 2, 32])],
     },
     // ---- Chain through `let y = x` ----
     {
@@ -692,7 +817,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <div>{y}</div>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([2, 24, 2, 32])],
     },
     // ---- Two interpolations report independently ----
     {
@@ -702,7 +827,10 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <div>{x}-{y}</div>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }, { messageId: 'wrongDepth' }],
+      errors: [
+        expectWrongDepthError2([2, 24, 2, 32]),
+        expectWrongDepthError2([2, 24, 2, 32]),
+      ],
     },
     // ---- Inline `{<div>...</div>}`; <span/> at depth 3 ----
     {
@@ -711,7 +839,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         {<div><div><span /></div></div>}
         </div>
       `,
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError3([3, 20, 3, 28])],
     },
     // ---- Fragment with depth 1, max=0 ----
     {
@@ -721,7 +849,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </>
       `,
       options: [{ max: 0 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError1([3, 11, 3, 18])],
     },
     // ---- Nested fragments, max=1, depth 2 ----
     {
@@ -733,7 +861,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </>
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 13, 4, 20])],
     },
     // ---- Fragment-wrapped duplicate interpolations ----
     {
@@ -743,7 +871,10 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <>{x}-{y}</>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }, { messageId: 'wrongDepth' }],
+      errors: [
+        expectWrongDepthError2([2, 21, 2, 29]),
+        expectWrongDepthError2([2, 21, 2, 29]),
+      ],
     },
     // ---- Identifier-resolved table — both <td>s exceed max=1 ----
     {
@@ -759,7 +890,10 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </tbody>
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }, { messageId: 'wrongDepth' }],
+      errors: [
+        expectWrongDepthError2([4, 13, 4, 23]),
+        expectWrongDepthError2([5, 13, 5, 23]),
+      ],
     },
     // ---- Deeply nested modal scaffold, max=4 ----
     {
@@ -781,7 +915,17 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </div>
       `,
       options: [{ max: 4 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [
+        {
+          messageId: 'wrongDepth',
+          message:
+            'Expected the depth of nested jsx elements to be <= 4, but found 5.',
+          line: 9,
+          column: 19,
+          endLine: 11,
+          endColumn: 28,
+        },
+      ],
     },
     // ---- Parens around resolved identifier still report ----
     {
@@ -790,7 +934,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <div>{(x)}</div>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([2, 24, 2, 32])],
     },
 
     // ---- Reassignment: latest write wins ----
@@ -801,7 +945,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <div>{x}</div>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([3, 18, 3, 26])],
     },
 
     // ---- Reassignment: declaration without init ----
@@ -812,7 +956,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <div>{x}</div>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([3, 18, 3, 26])],
     },
 
     // ---- Reassignment inside an if branch ----
@@ -827,7 +971,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([5, 22, 5, 30])],
     },
 
     // ---- Closure write from a non-shadowing inner function ----
@@ -842,7 +986,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([5, 22, 5, 30])],
     },
 
     // ---- Reassignment chain y → x ----
@@ -854,7 +998,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <div>{y}</div>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([3, 18, 3, 26])],
     },
 
     // ---- Multi-decl statement ----
@@ -864,7 +1008,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <div>{b}</div>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([2, 29, 2, 37])],
     },
 
     // ---- TS generic component tag ----
@@ -877,7 +1021,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </Foo>
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 13, 4, 20])],
     },
 
     // ---- Member-access tag name ----
@@ -890,7 +1034,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </Module.Foo>
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 13, 4, 20])],
     },
 
     // ---- Mixed element / fragment nesting ----
@@ -905,42 +1049,24 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </App>
       `,
       options: [{ max: 2 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError3([5, 15, 5, 22])],
     },
 
     // ---- Boundary depth with exact message text ----
     {
       code: `<App><foo /></App>`,
       options: [{ max: 0 }],
-      errors: [
-        {
-          messageId: 'wrongDepth',
-          message:
-            'Expected the depth of nested jsx elements to be <= 0, but found 1.',
-        },
-      ],
+      errors: [expectWrongDepthError1([1, 6, 1, 13])],
     },
     {
       code: `<App><foo><bar /></foo></App>`,
       options: [{ max: 0 }],
-      errors: [
-        {
-          messageId: 'wrongDepth',
-          message:
-            'Expected the depth of nested jsx elements to be <= 0, but found 2.',
-        },
-      ],
+      errors: [expectWrongDepthError4([1, 11, 1, 18])],
     },
     {
       code: `<a><b><c><d /></c></b></a>`,
       options: [{ max: 2 }],
-      errors: [
-        {
-          messageId: 'wrongDepth',
-          message:
-            'Expected the depth of nested jsx elements to be <= 2, but found 3.',
-        },
-      ],
+      errors: [expectWrongDepthError3([1, 10, 1, 15])],
     },
     {
       code: `<a><b><c><d><e><f><g /></f></e></d></c></b></a>`,
@@ -950,6 +1076,10 @@ ruleTester.run('jsx-max-depth', {} as never, {
           messageId: 'wrongDepth',
           message:
             'Expected the depth of nested jsx elements to be <= 5, but found 6.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 24,
         },
       ],
     },
@@ -964,7 +1094,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 35, 4, 43])],
     },
     {
       code: `
@@ -975,7 +1105,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 26, 4, 34])],
     },
     {
       code: `
@@ -988,7 +1118,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([5, 35, 5, 43])],
     },
 
     // ---- Closure descent through TWO function levels ----
@@ -1005,7 +1135,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([6, 24, 6, 32])],
     },
 
     // ---- Multiple use sites of the same binding ----
@@ -1016,9 +1146,9 @@ ruleTester.run('jsx-max-depth', {} as never, {
       `,
       options: [{ max: 1 }],
       errors: [
-        { messageId: 'wrongDepth' },
-        { messageId: 'wrongDepth' },
-        { messageId: 'wrongDepth' },
+        expectWrongDepthError2([2, 24, 2, 32]),
+        expectWrongDepthError2([2, 24, 2, 32]),
+        expectWrongDepthError2([2, 24, 2, 32]),
       ],
     },
 
@@ -1030,14 +1160,17 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 0 }],
-      errors: [{ messageId: 'wrongDepth' }, { messageId: 'wrongDepth' }],
+      errors: [
+        expectWrongDepthError1([2, 40, 2, 48]),
+        expectWrongDepthError4([2, 40, 2, 48]),
+      ],
     },
 
     // ---- Same-line multi-element ----
     {
       code: `<a><b><c /></b></a>`,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([1, 7, 1, 12])],
     },
 
     // ---- TS generic with multiple type args ----
@@ -1050,7 +1183,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         </Foo>
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 13, 4, 20])],
     },
 
     // ---- Stress: aliasing chain to deep JSX value ----
@@ -1065,7 +1198,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         <div>{e}</div>;
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([7, 18, 7, 26])],
     },
 
     // ---- For-init binding reassigned to JSX in loop body ----
@@ -1079,7 +1212,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 22, 4, 30])],
     },
     {
       code: `
@@ -1091,7 +1224,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 22, 4, 30])],
     },
 
     // ---- Parameter default JSX exceeds via descend ----
@@ -1102,7 +1235,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([2, 31, 2, 39])],
     },
 
     // ---- Destructured parameter default exceeds (also leaf in default) ----
@@ -1113,7 +1246,10 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 0 }],
-      errors: [{ messageId: 'wrongDepth' }, { messageId: 'wrongDepth' }],
+      errors: [
+        expectWrongDepthError1([2, 40, 2, 48]),
+        expectWrongDepthError4([2, 40, 2, 48]),
+      ],
     },
 
     // ---- Switch case-let cross-clause resolution ----
@@ -1127,7 +1263,7 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([4, 36, 4, 44])],
     },
 
     // ---- Parameter reassigned in body ----
@@ -1139,7 +1275,91 @@ ruleTester.run('jsx-max-depth', {} as never, {
         }
       `,
       options: [{ max: 1 }],
-      errors: [{ messageId: 'wrongDepth' }],
+      errors: [expectWrongDepthError2([3, 20, 3, 28])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 3 (7.37.5)',
+      code: `
+        const x = <div><span /></div>;
+        <div>{x}</div>
+      `,
+      options: [{ max: 1 }],
+      errors: [expectWrongDepthError2([2, 24, 2, 32])],
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream invalid 4 (7.37.5)',
+      code: `
+        const x = <div><span /></div>;
+        let y = x;
+        <div>{y}</div>
+      `,
+      options: [{ max: 1 }],
+      errors: [expectWrongDepthError2([2, 24, 2, 32])],
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream invalid 5 (7.37.5)',
+      code: `
+        const x = <div><span /></div>;
+        let y = x;
+        <div>{x}-{y}</div>
+      `,
+      options: [{ max: 1 }],
+      errors: [
+        expectWrongDepthError2([2, 24, 2, 32]),
+        expectWrongDepthError2([2, 24, 2, 32]),
+      ],
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream invalid 9 (7.37.5)',
+      code: `
+        const x = <><span /></>;
+        let y = x;
+        <>{x}-{y}</>
+      `,
+      options: [{ max: 1 }],
+      errors: [
+        expectWrongDepthError2([2, 21, 2, 29]),
+        expectWrongDepthError2([2, 21, 2, 29]),
+      ],
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream invalid 11 (7.37.5)',
+      code: `
+        <div className="custom_modal">
+          <Modal className={classes.modal} open={isOpen} closeAfterTransition>
+            <Fade in={isOpen}>
+              <DialogContent>
+                <Icon icon="cancel" onClick={onClose} popoverText="Close Modal" />
+                <div className="modal_content">{children}</div>
+                <div className={clxs('modal_buttons', classes.buttons)}>
+                  <Button className="modal_buttons--cancel" onClick={onCancel}>
+                    {cancelMsg ? cancelMsg : 'Cancel'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Fade>
+          </Modal>
+        </div>
+      `,
+      options: [{ max: 4 }],
+      errors: [
+        {
+          messageId: 'wrongDepth',
+          message:
+            'Expected the depth of nested jsx elements to be <= 4, but found 5.',
+          line: 9,
+          column: 19,
+          endLine: 11,
+          endColumn: 28,
+        },
+      ],
+      languageOptions: upstreamES2015Options,
     },
   ],
 });
