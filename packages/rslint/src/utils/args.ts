@@ -30,6 +30,10 @@ const GO_STRING_OPTIONS = {
   cpuprof: { type: 'string' },
 } as const;
 
+function parseBooleanOption(value: unknown): boolean {
+  return value === true || value === 'true';
+}
+
 export function parseArgs(argv: string[]) {
   const { values, tokens } = nodeParseArgs({
     args: argv,
@@ -66,12 +70,23 @@ export function parseArgs(argv: string[]) {
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     if (token.kind === 'option') {
-      if (
-        token.name === 'config' ||
-        token.name === 'init' ||
-        token.name === 'start-time'
-      )
+      if (token.name === 'config') {
+        if (token.value == null) {
+          argumentError ??= `expected a value for ${token.rawName}`;
+        }
         continue;
+      }
+      if (token.name === 'init') {
+        if (
+          token.inlineValue &&
+          token.value !== 'true' &&
+          token.value !== 'false'
+        ) {
+          argumentError ??= `invalid boolean value ${JSON.stringify(token.value)} for ${token.rawName}`;
+        }
+        continue;
+      }
+      if (token.name === 'start-time') continue;
       // Go's --timing requires a value ("all" or a top rule count) but the
       // value is optional on the Node CLI: consume the next argument only
       // when it matches, otherwise fill in the default "all".
@@ -129,16 +144,11 @@ export function parseArgs(argv: string[]) {
     : [...flags, ...positionalsBefore];
 
   return {
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    config: (values.config as string) ?? null,
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    init: (values.init as boolean) ?? false,
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    help: (values.help as boolean) ?? false,
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    singleThreaded: (values.singleThreaded as boolean) ?? false,
-    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    format: (values.format as string) ?? null,
+    config: typeof values.config === 'string' ? values.config : null,
+    init: parseBooleanOption(values.init),
+    help: parseBooleanOption(values.help),
+    singleThreaded: parseBooleanOption(values.singleThreaded),
+    format: typeof values.format === 'string' ? values.format : null,
     rest,
     positionals,
     argumentError,

@@ -277,6 +277,27 @@ describe('parseArgs rest ordering', () => {
       expect(parseArgs(['a.js', flag]).argumentError).toContain(flag);
       expect(parseArgs([flag, '--fix', 'a.js']).argumentError).toContain(flag);
     }
+    const missingConfig = parseArgs(['a.js', '--config']);
+    expect(missingConfig.config).toBeNull();
+    expect(missingConfig.argumentError).toContain('--config');
+
+    const disabledFlags = parseArgs([
+      '--singleThreaded=false',
+      '--help=false',
+      '--init=false',
+      'a.js',
+    ]);
+    expect(disabledFlags.singleThreaded).toBe(false);
+    expect(disabledFlags.help).toBe(false);
+    expect(disabledFlags.init).toBe(false);
+    expect(disabledFlags.rest).toEqual([
+      '--singleThreaded=false',
+      '--help=false',
+      'a.js',
+    ]);
+    expect(parseArgs(['--init=maybe', 'a.js']).argumentError).toContain(
+      '--init',
+    );
   });
 
   test('flags are placed before positionals in rest', () => {
