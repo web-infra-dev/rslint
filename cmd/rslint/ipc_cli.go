@@ -44,16 +44,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/api/plugin"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Application-level IPC message kinds for the CLI ⇆ Node engine protocol.
@@ -283,7 +281,7 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 	if payload.Runtime.SingleThreaded {
 		baseArgs.SingleThreaded = true
 	}
-	baseArgs.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	baseArgs.FS = utils.NewCachedDiskFS()
 
 	// Preserve help/init priority, then reject an invalid payload-authoritative
 	// format before config discovery can execute user JavaScript.

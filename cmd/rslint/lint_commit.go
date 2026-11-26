@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -83,11 +81,5 @@ func (committer cliFinalChangeCommitter) CommitFinalChanges(
 }
 
 func readPhysicalFileText(path string) (string, bool) {
-	fsys := bundled.WrapFS(osvfs.FS())
-	text, ok := fsys.ReadFile(path)
-	if !ok {
-		return "", false
-	}
-	text, err := utils.RestoreSourceBOM(fsys, path, text)
-	return text, err == nil
+	return utils.ReadDiskFileWithBOM(path)
 }

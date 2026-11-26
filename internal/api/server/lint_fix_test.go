@@ -126,6 +126,63 @@ func TestHandleLint_FixOutputPreservesOverlayBOM(t *testing.T) {
 	}
 }
 
+func TestHandleLint_FixDiskBOMAcrossRoundsAndRequests(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "marked.ts")
+	if err := os.WriteFile(target, []byte(utils.BOM+"let a: Array<string> = [];\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "tsconfig.json"), []byte(`{"files":["marked.ts"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	config := json.RawMessage(`[{
+		"files": ["**/*.ts"],
+		"languageOptions": { "parserOptions": { "project": ["./tsconfig.json"] } },
+		"plugins": ["@typescript-eslint"],
+		"rules": {
+			"unicode-bom": ["error", "never"],
+			"@typescript-eslint/array-type": "error"
+		}
+	}]`)
+
+	handler := &Handler{}
+	first, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+		Fix:              true,
+	})
+	if err != nil {
+		t.Fatalf("first HandleLint error: %v", err)
+	}
+	if first.ErrorCount != 0 || len(first.Diagnostics) != 0 {
+		t.Fatalf("first HandleLint left diagnostics: %+v", first.Diagnostics)
+	}
+	const wantFixed = "let a: string[] = [];\n"
+	if got := first.Output["marked.ts"]; got != wantFixed {
+		t.Fatalf("first fixed output = %q, want %q", got, wantFixed)
+	}
+
+	// Write the fixed unmarked source to disk and run a second request on the
+	// same long-lived Handler to verify BOM tracking is strictly request-scoped.
+	if err := os.WriteFile(target, []byte(wantFixed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("second HandleLint error: %v", err)
+	}
+	if second.ErrorCount != 0 || len(second.Diagnostics) != 0 {
+		t.Fatalf("second HandleLint reported stale BOM/diagnostics: %+v", second.Diagnostics)
+	}
+}
+
 func TestHandleLint_FixRunsNativeCascadesWithoutWritingDisk(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "input.ts")
