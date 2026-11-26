@@ -130,7 +130,18 @@ export class TypeServiceClient {
   private readonly syntax: GenerationSyntaxViews;
   private readonly typeFactory: TypeFactory;
   private readonly viewHost: ViewHost;
-  private readonly files = new Set<TypeServiceFile>();
+  private readonly files = new Set<WeakRef<TypeServiceFile>>();
+  private readonly fileRefs = new WeakMap<
+    TypeServiceFile,
+    WeakRef<TypeServiceFile>
+  >();
+  private readonly fileCleanup = new FinalizationRegistry<{
+    readonly ref: WeakRef<TypeServiceFile>;
+    readonly syntax: FileSyntaxViews;
+  }>((held) => {
+    this.files.delete(held.ref);
+    held.syntax.close();
+  });
   private factBytes = 0;
   readonly program: ProgramView;
   readonly checker: CheckerView;
@@ -810,10 +821,14 @@ export class TypeServiceClient {
     this.symbols.clear();
     this.signatures.clear();
     this.indexInfos.clear();
-    for (const file of this.files) file.close();
+    for (const ref of [...this.files]) ref.deref()?.close();
     this.files.clear();
     this.syntax.close();
     this.transport = undefined;
+  }
+
+  [Symbol.dispose](): void {
+    this.close();
   }
 
   private withReplyRecords<T>(run: () => T): T {
@@ -1062,19 +1077,37 @@ export class TypeServiceClient {
     if (binding.generation !== this.descriptor.generation) {
       throw new Error('foreign file binding');
     }
-    const file = new TypeServiceFile(
-      this,
-      binding,
-      new FileSyntaxViews(this.syntax, binding, () => {
-        this.ensure();
-      }),
-    );
-    this.files.add(file);
+    const syntax = new FileSyntaxViews(this.syntax, binding, () => {
+      this.ensure();
+    });
+    const file = new TypeServiceFile(this, binding, syntax);
+    const ref = new WeakRef(file);
+    this.files.add(ref);
+    this.fileRefs.set(file, ref);
+    this.fileCleanup.register(file, { ref, syntax }, file);
     return file;
   }
 
+  /**
+   * Open a file handle for the duration of `run` and close it automatically
+   * in `finally` so callers cannot leak per-file ESTree mappings.
+   */
+  withFile<T>(binding: FileBinding, run: (file: TypeServiceFile) => T): T {
+    const file = this.file(binding);
+    try {
+      return run(file);
+    } finally {
+      file.close();
+    }
+  }
+
   releaseFile(file: TypeServiceFile): void {
-    this.files.delete(file);
+    const ref = this.fileRefs.get(file);
+    if (ref) {
+      this.files.delete(ref);
+      this.fileRefs.delete(file);
+    }
+    this.fileCleanup.unregister(file);
   }
 }
 
@@ -1117,6 +1150,10 @@ export class TypeServiceFile {
     this.closed = true;
     this.syntax.close();
     this.owner.releaseFile(this);
+  }
+
+  [Symbol.dispose](): void {
+    this.close();
   }
 
   /**

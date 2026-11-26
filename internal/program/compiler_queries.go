@@ -7,14 +7,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 )
 
 // CompilerQueries provides read-only program-wide queries. Diagnostics may
 // acquire multiple checker shards and must run outside a file checker lease.
 type CompilerQueries interface {
 	Diagnostics(ctx context.Context, kind DiagnosticKind, source *ast.SourceFile) []*ast.Diagnostic
-	CommandLine() *tsoptions.ParsedCommandLine
+	ConfigSourceFile() *ast.SourceFile
 }
 
 type DiagnosticKind uint8
@@ -28,8 +27,13 @@ const (
 	DeclarationDiagnostics
 )
 
-func (p *Program) CompilerQueries() CompilerQueries                  { return p.types }
-func (b *compilerBackend) CommandLine() *tsoptions.ParsedCommandLine { return b.raw.CommandLine() }
+func (p *Program) CompilerQueries() CompilerQueries { return p.types }
+func (b *compilerBackend) ConfigSourceFile() *ast.SourceFile {
+	if cmd := b.raw.CommandLine(); cmd != nil && cmd.ConfigFile != nil {
+		return cmd.ConfigFile.SourceFile
+	}
+	return nil
+}
 func (b *compilerBackend) Diagnostics(ctx context.Context, kind DiagnosticKind, file *ast.SourceFile) []*ast.Diagnostic {
 	switch kind {
 	case ConfigFileParsingDiagnostics:

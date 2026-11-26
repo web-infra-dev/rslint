@@ -9,8 +9,7 @@
       "@typescript/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.mjs"
-    },
-    "./*": "./*"
+    }
   },
   "repository": {
     "type": "git",

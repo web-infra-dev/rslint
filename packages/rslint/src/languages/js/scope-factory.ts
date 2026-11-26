@@ -30,7 +30,6 @@ import type { ScopeManager as EslintScopeManager } from 'eslint-scope';
 // (reading 'analyze')") while .js (eslint-scope) silently kept working.
 import * as tsScopeManagerPkg from '@typescript-eslint/scope-manager';
 import * as eslintScopePkg from 'eslint-scope';
-import { ScriptTarget } from '@rslint/api/src/script-target.ts';
 
 import { getVisitorKeys, VISITOR_KEYS } from './visitor-keys.js';
 import {
@@ -202,24 +201,33 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
   });
 }
 
+// Matches TypeScript's ScriptTarget numeric enum (ES2015=2 .. ES2025=12, ESNext=99).
+// Kept local so scope-factory never reaches into @rslint/api internals.
+export const TARGET_DEFAULT_LIB: Readonly<Record<number, string>> = {
+  2: 'es6',
+  3: 'es2016.full',
+  4: 'es2017.full',
+  5: 'es2018.full',
+  6: 'es2019.full',
+  7: 'es2020.full',
+  8: 'es2021.full',
+  9: 'es2022.full',
+  10: 'es2023.full',
+  11: 'es2024.full',
+  12: 'es2025.full',
+  99: 'esnext.full',
+};
+
 function scopeLibs(
   files: readonly string[] | undefined,
-  target = ScriptTarget.ES2025,
+  target = 12,
 ): string[] {
   if (files)
     return files.flatMap(
       (file) =>
         /lib\.(.+)\.d\.[cm]?ts$/.exec(file.toLowerCase())?.slice(1) ?? [],
     );
-  if (target === ScriptTarget.ES2015) return ['es6'];
-  if (target === ScriptTarget.ESNext) return ['esnext.full'];
-  return [
-    target >= ScriptTarget.ES2016 &&
-    target < ScriptTarget.ESNext &&
-    ScriptTarget[target]
-      ? `${ScriptTarget[target].toLowerCase()}.full`
-      : 'lib',
-  ];
+  return [TARGET_DEFAULT_LIB[target] ?? 'lib'];
 }
 
 // Minimal shape of an eslint-scope Variable that the

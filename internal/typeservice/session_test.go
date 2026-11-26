@@ -575,3 +575,48 @@ func TestProtocolOperationsMatchTypeScriptTables(t *testing.T) {
 		}
 	}
 }
+
+func TestJSCheckFlagsBitAlignment(t *testing.T) {
+	// Locks jsCheckFlags() against future typescript-go CheckFlags bit shifts.
+	// Expected bit positions match TypeScript 6.0.3's ts.CheckFlags.
+	cases := []struct {
+		name string
+		goF  ast.CheckFlags
+		want uint32
+	}{
+		{"None", ast.CheckFlagsNone, 0},
+		{"Instantiated", ast.CheckFlagsInstantiated, 1 << 0},
+		{"SyntheticProperty", ast.CheckFlagsSyntheticProperty, 1 << 1},
+		{"SyntheticMethod", ast.CheckFlagsSyntheticMethod, 1 << 2},
+		{"Readonly", ast.CheckFlagsReadonly, 1 << 3},
+		{"ReadPartial", ast.CheckFlagsReadPartial, 1 << 4},
+		{"WritePartial", ast.CheckFlagsWritePartial, 1 << 5},
+		{"HasNonUniformType", ast.CheckFlagsHasNonUniformType, 1 << 6},
+		{"HasLiteralType", ast.CheckFlagsHasLiteralType, 1 << 7},
+		{"ContainsPublic", ast.CheckFlagsContainsPublic, 1 << 8},
+		{"ContainsProtected", ast.CheckFlagsContainsProtected, 1 << 9},
+		{"ContainsPrivate", ast.CheckFlagsContainsPrivate, 1 << 10},
+		{"ContainsStatic", ast.CheckFlagsContainsStatic, 1 << 11},
+		{"Late", ast.CheckFlagsLate, 1 << 12},
+		{"ReverseMapped", ast.CheckFlagsReverseMapped, 1 << 13},
+		{"OptionalParameter", ast.CheckFlagsOptionalParameter, 1 << 14},
+		{"RestParameter", ast.CheckFlagsRestParameter, 1 << 15},
+		{"DeferredType", ast.CheckFlagsDeferredType, 1 << 16},
+		{"HasNeverType", ast.CheckFlagsHasNeverType, 1 << 17},
+		{"Mapped", ast.CheckFlagsMapped, 1 << 18},
+		{"StripOptional", ast.CheckFlagsStripOptional, 1 << 19},
+		{"Unresolved", ast.CheckFlagsUnresolved, 1 << 20},
+		// Go-only private bits must be stripped cleanly.
+		{"ContainsWritePublic", ast.CheckFlagsContainsWritePublic, 0},
+		{"ContainsWriteProtected", ast.CheckFlagsContainsWriteProtected, 0},
+		{"ContainsWritePrivate", ast.CheckFlagsContainsWritePrivate, 0},
+		{"IsDiscriminant", ast.CheckFlagsIsDiscriminant, 0},
+		{"IsDiscriminantComputed", ast.CheckFlagsIsDiscriminantComputed, 0},
+		{"IndexSymbol", ast.CheckFlagsIndexSymbol, 0},
+	}
+	for _, tc := range cases {
+		if got := jsCheckFlags(tc.goF); got != tc.want {
+			t.Errorf("jsCheckFlags(%s = %#x) = %#x, want %#x", tc.name, uint32(tc.goF), got, tc.want)
+		}
+	}
+}
