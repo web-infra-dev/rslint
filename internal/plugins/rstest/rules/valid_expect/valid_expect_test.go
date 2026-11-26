@@ -85,6 +85,12 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `const expect = () => {}; expect(1);`},
 			{Code: `import r = require('@rstest/core'); const expect = 'test'; r[expect]('works', () => {});`},
 			{Code: `import * as r from '@rstest/core'; const expect = 'test'; r[expect]('works', () => {});`},
+			// TypeScript assertion wrappers before the matcher are erased at
+			// runtime and must not trigger a false `matcherNotFound` warning.
+			{Code: `import.meta.rstest!.expect(1)!.toBe(1);`},
+			{Code: `expect(1)!.toBe(1);`},
+			{Code: `(expect(1) as any).toBe(1);`},
+			{Code: `(expect(1) satisfies unknown).toBe(1);`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// --- arg count ---
@@ -248,6 +254,25 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "asyncMustBeAwaited", Line: 1, Column: 19, EndColumn: 79},
 				},
 				Output: []string{`test("t", async () => { await import.meta.rstest.expect(p).resolves.toBe(1).then(() => {}); });`},
+			},
+			{
+				Code: `(expect(1) as any);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matcherNotFound"},
+				},
+			},
+			{
+				Code: `(expect(1) as any).toBe;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matcherNotCalled"},
+				},
+			},
+			{
+				Code: `test("t", () => { (expect(p) as any).resolves.toBe(1); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await (expect(p) as any).resolves.toBe(1); });`},
 			},
 		},
 	)

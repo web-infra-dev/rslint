@@ -211,6 +211,12 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 				}},
 			},
 			{
+				Code: `test("case", () => { promise.then(value => (import.meta.rstest as typeof import("@rstest/core")).expect(value).toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+			{
 				Code: `import { expect, test } from "@rstest/playwright"; test("case", async ({ page }) => { page.goto("url").then(() => expect(page).toBeDefined()); });`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "expectInFloatingPromise",

@@ -279,7 +279,7 @@ var ValidExpectRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := analysis.ParseExpectCall(node)
+				parsed := analysis.ParseExpectCallThroughTransparentExpressions(node)
 				if parsed == nil {
 					return
 				}

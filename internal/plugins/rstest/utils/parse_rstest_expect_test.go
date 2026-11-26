@@ -846,9 +846,27 @@ func TestParseRstestExpectCallSources(t *testing.T) {
 					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
 				),
 			},
+			{
+				Code: `(import.meta.rstest as typeof import('@rstest/core')).expect(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `(import.meta.rstest satisfies unknown).expect(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `const r = import.meta.rstest!; r.expect(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
 			// Non-null assertion on `import.meta.rstest!` is unwrapped, while a
-			// non-null assertion after `expect(1)` still stops matcher parsing
-			// (matching `expect(1)!.toBe(1)`).
+			// non-null assertion after `expect(1)` still stops ordinary
+			// `ParseExpectCall` matcher parsing (matching `expect(1)!.toBe(1)`).
 			{
 				Code: `import.meta.rstest!.expect(1)!.toBe(1);`,
 				Errors: parsedExpectError(
@@ -863,6 +881,24 @@ func TestParseRstestExpectCallSources(t *testing.T) {
 			},
 			{
 				Code: `import r = require('@rstest/core'); r['expect'](1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `import * as r from '@rstest/core'; const expect = 'expect'; r[expect](1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `import * as r from '@rstest/core'; const key = 'expect'; r[key](1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `const key = 'expect'; import.meta.rstest[key](1).toBe(1);`,
 				Errors: parsedExpectError(
 					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
 				),
@@ -919,8 +955,10 @@ func TestParseRstestExpectCallIgnoresForeignExpect(t *testing.T) {
 			{Code: `import.meta.rstest[expect](1).toBe(1);`},
 			{Code: `import r = require('@rstest/core'); const expect = 'test'; r[expect]('works', () => {});`},
 			{Code: `import * as r from '@rstest/core'; const expect = 'test'; r[expect](1).toBe(1);`},
+			{Code: `import * as r from '@rstest/core'; let expect = 'expect'; expect = 'test'; r[expect](1).toBe(1);`},
 			{Code: `test('t', (ctx) => { const expect = 'skip'; ctx[expect](); });`},
-			{Code: `(import.meta.rstest as any).expect(1).toBe(1);`},
+			{Code: `(import.meta.rstest as any)().expect(1).toBe(1);`},
+			{Code: `(import.meta.rstest() as any).expect(1).toBe(1);`},
 			{Code: `import.meta.rstest()!.expect(1).toBe(1);`},
 			{Code: `(import.meta.rstest!)().expect(1).toBe(1);`},
 			{Code: "(import.meta.rstest!)`tag`.expect(1).toBe(1);"},
@@ -988,8 +1026,10 @@ func TestIsRstestExpectCallRecognizesChaiPropertyStyleOnce(t *testing.T) {
 			{Code: "import * as rstest from '@rstest/core'; rstest`tag`.expect(1).toBe(1);"},
 			{Code: `import r = require('@rstest/core'); const expect = 'test'; r[expect]('works', () => {});`},
 			{Code: `import * as r from '@rstest/core'; const expect = 'test'; r[expect](1).toBe(1);`},
+			{Code: `import * as r from '@rstest/core'; let expect = 'expect'; expect = 'test'; r[expect](1).toBe(1);`},
 			{Code: `test('t', (ctx) => { const expect = 'skip'; ctx[expect](); });`},
-			{Code: `(import.meta.rstest as any).expect(1).toBe(1);`},
+			{Code: `(import.meta.rstest as any)().expect(1).toBe(1);`},
+			{Code: `(import.meta.rstest() as any).expect(1).toBe(1);`},
 			{Code: `import.meta.rstest()!.expect(1).toBe(1);`},
 			{Code: `(import.meta.rstest!)().expect(1).toBe(1);`},
 			{Code: "(import.meta.rstest!)`tag`.expect(1).toBe(1);"},
@@ -1003,6 +1043,9 @@ func TestIsRstestExpectCallRecognizesChaiPropertyStyleOnce(t *testing.T) {
 			{Code: `expect(spy).to.have.been.calledOnce;`, Errors: expectCall},
 			{Code: `expect(value).to.equal(expected);`, Errors: expectCall},
 			{Code: `import.meta.rstest!.expect(1).toBe(1);`, Errors: expectCall},
+			{Code: `(import.meta.rstest as typeof import('@rstest/core')).expect(1).toBe(1);`, Errors: expectCall},
+			{Code: `import * as r from '@rstest/core'; const expect = 'expect'; r[expect](1).toBe(1);`, Errors: expectCall},
+			{Code: `import * as r from '@rstest/core'; const key = 'expect'; r[key](1).toBe(1);`, Errors: expectCall},
 			{Code: `import.meta.rstest!.expect(1)!.toBe(1);`, Errors: expectCall},
 			{Code: `import.meta.rstest.expect(1)[matcherName](1);`, Errors: expectCall},
 			{Code: `import.meta.rstest.expect(1).toBe(1)[key]();`, Errors: expectCall},
@@ -1084,7 +1127,11 @@ func TestIsRstestAssertCallIgnoresNonIdentifierReceivers(t *testing.T) {
 			{Code: `assert.equal(1, 1);`, Errors: assertCall},
 			{Code: `import.meta.rstest.assert.equal(1, 1);`, Errors: assertCall},
 			{Code: `import.meta.rstest!.assert.equal(1, 1);`, Errors: assertCall},
+			{Code: `(import.meta.rstest as typeof import('@rstest/core')).assert.equal(1, 1);`, Errors: assertCall},
+			{Code: `const r = (import.meta.rstest as typeof import('@rstest/core')); r.assert.equal(1, 1);`, Errors: assertCall},
 			{Code: `import r = require('@rstest/core'); r['assert'](1);`, Errors: assertCall},
+			{Code: `import r = require('@rstest/core'); const key = 'assert'; r[key](1);`, Errors: assertCall},
+			{Code: `const key = 'assert'; import.meta.rstest[key](1);`, Errors: assertCall},
 		},
 	)
 }

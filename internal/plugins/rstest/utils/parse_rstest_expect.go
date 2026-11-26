@@ -173,6 +173,7 @@ func isRstestExpectCall(
 	if entries.count > 0 && entries.first != nil && entries.first.Kind == ast.KindIdentifier {
 		return rstestExpectRootMatch(
 			entries.first,
+			entries.secondNode,
 			entries.secondName,
 			entries.count > 1,
 			entries.secondDynamic,
@@ -181,11 +182,12 @@ func isRstestExpectCall(
 		).ok
 	}
 	metaEntries := importMetaRstestMemberEntries(expression, false)
-	return isImportMetaRstestMemberCall(metaEntries, "expect", false)
+	return isImportMetaRstestMemberCall(metaEntries, "expect", false, analysis)
 }
 
 type rstestExpectEntries struct {
 	first         *ast.Node
+	secondNode    *ast.Node
 	secondName    string
 	count         uint8
 	secondDynamic bool
@@ -200,6 +202,7 @@ func (entries *rstestExpectEntries) append(name string, node *ast.Node, dynamic 
 	case 0:
 		entries.first = node
 	case 1:
+		entries.secondNode = node
 		entries.secondName = name
 		entries.secondDynamic = dynamic
 	}
@@ -326,7 +329,7 @@ func parseRstestExpectCallOptions(
 	var match rstestExpectMatch
 	if len(entries) > 0 {
 		match = rstestExpectMemberMatch(entries, analysis, throughTransparentExpressions)
-	} else if metaEntries := importMetaRstestMemberEntries(expression, throughTransparentExpressions); isImportMetaRstestMemberCall(metaEntries, "expect", throughTransparentExpressions) {
+	} else if metaEntries := importMetaRstestMemberEntries(expression, throughTransparentExpressions); isImportMetaRstestMemberCall(metaEntries, "expect", throughTransparentExpressions, analysis) {
 		entries = metaEntries
 		match = rstestExpectMatch{index: 1, ok: true}
 	}
@@ -475,15 +478,43 @@ func importMetaRstestMemberEntries(
 	)
 }
 
+// resolveReceiverMemberName returns the runtime property name selected by a
+// member access on an Rstest receiver (namespace import, require binding,
+// test context, or `import.meta.rstest`). Static dot/string/template access
+// returns its text directly; a computed identifier key (such as `r[key]`) is
+// folded through the file's static string evaluator so `const key = 'expect'`
+// resolves to `"expect"` while `const expect = 'test'` resolves to `"test"`.
+func resolveReceiverMemberName(
+	memberNode *ast.Node,
+	defaultName string,
+	dynamic bool,
+	analysis *RstestCallAnalysis,
+) (string, bool) {
+	if !dynamic {
+		return defaultName, defaultName != ""
+	}
+	if memberNode == nil || analysis == nil {
+		return "", false
+	}
+	return analysis.staticStringEvaluator().EvalToString(memberNode)
+}
+
 func isImportMetaRstestMemberCall(
 	entries []testFramework.MemberEntry,
 	memberName string,
 	throughTransparentExpressions bool,
+	analysis *RstestCallAnalysis,
 ) bool {
-	return len(entries) > 1 &&
-		!isReceiverEntryInvoked(entries, throughTransparentExpressions) &&
-		entries[1].Name == memberName &&
-		!isComputedDynamicMemberName(entries[1].Node)
+	if len(entries) <= 1 || isReceiverEntryInvoked(entries, throughTransparentExpressions) {
+		return false
+	}
+	resolvedName, ok := resolveReceiverMemberName(
+		entries[1].Node,
+		entries[1].Name,
+		isComputedDynamicMemberName(entries[1].Node),
+		analysis,
+	)
+	return ok && resolvedName == memberName
 }
 
 func isReceiverEntryInvoked(
@@ -518,24 +549,15 @@ func importMetaRstestRootEntryOptions(
 	node *ast.Node,
 	throughTransparentExpressions bool,
 ) (testFramework.MemberEntry, bool) {
+	// `@rstest/core` types `import.meta.rstest` as optional for in-source
+	// testing, so TypeScript assertions on the `import.meta.rstest` receiver
+	// itself (such as `import.meta.rstest!` or `(import.meta.rstest as ...)`)
+	// are erased at runtime and still name the Rstest namespace. Unwrap them
+	// here while keeping later wrapper boundaries in the assertion chain
+	// controlled by `throughTransparentExpressions`.
+	node = internalUtils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return testFramework.MemberEntry{}, false
-	}
-	for {
-		node = ast.SkipParentheses(node)
-		if node == nil {
-			return testFramework.MemberEntry{}, false
-		}
-		// `@rstest/core` types `import.meta.rstest` as optional for in-source
-		// testing, so `import.meta.rstest!.expect(...)` is idiomatic TypeScript
-		// and `!` is erased at runtime. Unwrap non-null assertions on the
-		// `import.meta.rstest` receiver itself while preserving wrapper
-		// boundaries later in the chain (e.g. `expect(x)!.toBe(1)`).
-		if node.Kind == ast.KindNonNullExpression {
-			node = node.AsNonNullExpression().Expression
-			continue
-		}
-		break
 	}
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
@@ -579,14 +601,17 @@ func rstestExpectMemberMatch(
 	if len(entries) == 0 || entries[0].Node == nil || entries[0].Node.Kind != ast.KindIdentifier {
 		return rstestExpectMatch{}
 	}
+	var secondNode *ast.Node
 	secondName := ""
 	secondDynamic := false
 	if len(entries) > 1 {
+		secondNode = entries[1].Node
 		secondName = entries[1].Name
 		secondDynamic = isComputedDynamicMemberName(entries[1].Node)
 	}
 	return rstestExpectRootMatch(
 		entries[0].Node,
+		secondNode,
 		secondName,
 		len(entries) > 1,
 		secondDynamic,
@@ -597,6 +622,7 @@ func rstestExpectMemberMatch(
 
 func rstestExpectRootMatch(
 	root *ast.Node,
+	secondNode *ast.Node,
 	secondName string,
 	hasSecond bool,
 	secondDynamic bool,
@@ -628,9 +654,13 @@ func rstestExpectRootMatch(
 	case rstestExpectRootDirect:
 		return rstestExpectMatch{ok: true, fromTestContext: rootInfo.FromTestContext}
 	case rstestExpectRootReceiver:
+		if firstInvoked || !hasSecond {
+			return rstestExpectMatch{}
+		}
+		memberName, ok := resolveReceiverMemberName(secondNode, secondName, secondDynamic, analysis)
 		return rstestExpectMatch{
 			index:           1,
-			ok:              !firstInvoked && hasSecond && !secondDynamic && secondName == "expect",
+			ok:              ok && memberName == "expect",
 			fromTestContext: rootInfo.FromTestContext,
 		}
 	default:
@@ -1025,7 +1055,7 @@ func isImportMetaRstestObjectAlias(symbol *ast.Symbol) bool {
 		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 			continue
 		}
-		initializer := declaration.AsVariableDeclaration().Initializer
+		initializer := internalUtils.SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
 		if isImportMetaRstest(initializer) {
 			return true
 		}
