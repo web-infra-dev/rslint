@@ -143,8 +143,23 @@ var NoRestrictedSyntaxRule = rule.Rule{
 				visit(ctx.SourceFile.AsNode(), bucket)
 			case rule.ListenerOnExit(ast.KindSourceFile):
 				listeners[rule.ListenerOnExit(ast.KindEndOfFile)] = func(*ast.Node) { visit(ctx.SourceFile.AsNode(), bucket) }
+			case rule.ListenerOnExit(ast.KindImportClause):
+				// Handled on ImportClause.Name()'s exit below so combined
+				// imports (`import Def, * as NS`) exit ImportDefaultSpecifier
+				// before entering sibling named/namespace bindings.
 			default:
 				listeners[k] = func(node *ast.Node) { visit(node, bucket) }
+			}
+		}
+		if exitClauseBucket := plan.buckets[rule.ListenerOnExit(ast.KindImportClause)]; exitClauseBucket != nil {
+			prev := listeners[rule.ListenerOnExit(ast.KindIdentifier)]
+			listeners[rule.ListenerOnExit(ast.KindIdentifier)] = func(node *ast.Node) {
+				if prev != nil {
+					prev(node)
+				}
+				if parent := node.Parent; parent != nil && parent.Kind == ast.KindImportClause && parent.AsImportClause().Name() == node {
+					visit(parent, exitClauseBucket)
+				}
 			}
 		}
 		return listeners
@@ -154,10 +169,11 @@ var NoRestrictedSyntaxRule = rule.Rule{
 // ruleEntry is a parsed option entry: the original selector string,
 // the compiled selector tree, and the message (custom or default).
 type ruleEntry struct {
-	selector string
-	compiled selector
-	message  string
-	exit     bool
+	selector          string
+	compiled          selector
+	message           string
+	exit              bool
+	hasReverseSubject bool
 	// Some export hosts have no supported physical ESTree identity. Broad
 	// selectors still need their wrappers without exposing extra tsgo nodes.
 	virtualOnly bool
@@ -238,6 +254,7 @@ func buildRulePlan(options []any) *rulePlan {
 	// a universe selector is interleaved with kind-specific selectors.
 	perKind := make(map[ast.Kind][]ruleEntry)
 	for _, entry := range entries {
+		entry.hasReverseSubject = containsReverseSiblingSubject(entry.compiled)
 		kinds := candidateKinds(entry.compiled)
 		listenerKind := func(kind ast.Kind) ast.Kind {
 			if entry.exit {
@@ -405,14 +422,11 @@ func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
 	case classSelector:
 		attrs = collectDispatchAttrs(value.Inner, attrs)
 	case combinatorSelector:
-		// The right-hand attribute cannot filter a reverse subject match on
-		// the left-hand node, whose attributes may be completely different.
+		// The right-hand attribute cannot filter or be stripped for a reverse
+		// subject match on the left-hand node, because the right-hand selector
+		// is evaluated against a different sibling node.
 		if hasReverseSiblingSubject(value) {
-			kinds := newKindSet()
-			collectKinds(value.Right, kinds, false)
-			if kinds.universe {
-				return attrs
-			}
+			return attrs
 		}
 		attrs = collectDispatchAttrs(value.Right, attrs)
 	case combinedPseudo:
@@ -505,9 +519,19 @@ func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchCont
 	if isPlainParameter(node) && !isBareWildcardSelector(entry.compiled) {
 		return
 	}
+	if entry.hasReverseSubject && !matchesTopLevelReverseSubjectHost(entry.compiled, node, "physical") {
+		return
+	}
 	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
 		textRange := utils.GetESTreeBindingIdentifierRange(mc.sf, node)
-		if exportWrapperTarget(node) != "" {
+		if node.Kind == ast.KindImportClause {
+			if name := node.AsImportClause().Name(); name != nil {
+				// ESTree's ImportDefaultSpecifier spans only the default binding
+				// identifier, excluding `type` and any sibling bindings folded
+				// into tsgo's ImportClause.
+				textRange = utils.TrimNodeTextRange(mc.sf, name)
+			}
+		} else if exportWrapperTarget(node) != "" {
 			// The export wrapper owns the `export` and `default` keywords.
 			textRange = core.NewTextRange(utils.FindFunctionKeywordPos(mc.sf, node), textRange.End())
 		}
@@ -522,7 +546,7 @@ func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, target string,
 	entry := &bucket.entries[index]
 	// Preserve the documented bare-wildcard traversal. Other broad selectors
 	// must see the folded child, including regex and negative selectors.
-	if isBareWildcardSelector(entry.compiled) || !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
+	if isBareWildcardSelector(entry.compiled) || entry.hasReverseSubject && !matchesTopLevelReverseSubjectHost(entry.compiled, node, target) || !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
 		return
 	}
 	message := rule.RuleMessage{Id: "restrictedSyntax", Description: entry.formatMessage()}
