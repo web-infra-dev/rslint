@@ -2039,21 +2039,30 @@ export class Consumer {
             opts?.fileParserOptions ?? parserOptions,
           );
           if (!opts?.customGetterFactory) return base;
-          // Custom class factory exposing node maps via prototype getters and
-          // a prototype method reading `this.emitDecoratorMetadata`.
+          // Custom class factory exposing node maps via prototype getters
+          // backed by `#private` fields alongside a method reading
+          // `this.emitDecoratorMetadata` and a method reading `#tag`.
           class CustomSyntaxServices {
+            readonly #tag = 'kept';
+            readonly #maps = {
+              esTreeNodeToTSNodeMap: base.esTreeNodeToTSNodeMap,
+              tsNodeToESTreeNodeMap: base.tsNodeToESTreeNodeMap,
+            };
             readonly program = null;
             readonly emitDecoratorMetadata = false;
             readonly experimentalDecorators = false;
             readonly isolatedDeclarations = false;
             get esTreeNodeToTSNodeMap() {
-              return base.esTreeNodeToTSNodeMap;
+              return this.#maps.esTreeNodeToTSNodeMap;
             }
             get tsNodeToESTreeNodeMap() {
-              return base.tsNodeToESTreeNodeMap;
+              return this.#maps.tsNodeToESTreeNodeMap;
             }
             readDecoratorFlag() {
               return this.emitDecoratorMetadata;
+            }
+            readTag() {
+              return this.#tag;
             }
           }
           const instance = new CustomSyntaxServices();
@@ -2118,6 +2127,8 @@ export class Consumer {
   const customSvc = customWithOverride.seenService as any;
   expect(customSvc.emitDecoratorMetadata).toBe(true);
   expect(customSvc.readDecoratorFlag()).toBe(true);
+  expect(customSvc.readTag()).toBe('kept');
+  expect(customSvc.esTreeNodeToTSNodeMap).toBeDefined();
   expect(customWithOverride.originalInstance?.emitDecoratorMetadata).toBe(
     false,
   );
@@ -2242,6 +2253,110 @@ test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json loc
     expect(ts.formatDiagnostic(actualTs5051, formatHost)).toContain(
       'Project.Config.json(',
     );
+
+    // Late-discovered inherited config diagnostics carry the compiler's
+    // canonical path even when the host SyntaxSource omits `path`.
+    const baseConfig = resolve(dir, 'Base.Config.json');
+    const childConfig = resolve(dir, 'Child.Config.json');
+    writeFileSync(
+      baseConfig,
+      JSON.stringify(
+        {
+          compilerOptions: {
+            strict: true,
+            unknownInheritedOption: true,
+          },
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    writeFileSync(
+      childConfig,
+      JSON.stringify(
+        {
+          extends: './Base.Config.json',
+          compilerOptions: {
+            target: 'ES2022',
+            module: 'ESNext',
+            skipLibCheck: true,
+          },
+          include: ['input.ts'],
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    const childConfigLower = resolve(dir, 'Child.Lower.json');
+    writeFileSync(
+      childConfigLower,
+      JSON.stringify(
+        {
+          extends: ts.sys.useCaseSensitiveFileNames
+            ? './Base.Config.json'
+            : './base.config.json',
+          compilerOptions: {
+            target: 'ES2022',
+            module: 'ESNext',
+            skipLibCheck: true,
+          },
+          include: ['input.ts'],
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    const readInheritedDiag = async (cfg: string) => {
+      const inheritedHost = new Host();
+      const inheritedDesc = inheritedHost.request({
+        method: 'init',
+        config: cfg,
+      }) as TypeServiceDescriptor;
+      const legacySource = (
+        scope: { generation: number },
+        reqFile: string,
+        metadataOnly?: boolean,
+      ) => {
+        const reply = inheritedHost.source(scope, reqFile, metadataOnly);
+        return reply
+          ? { fileName: reply.fileName, tree: reply.tree }
+          : undefined;
+      };
+      const inheritedClient = new TypeServiceClient(
+        enums,
+        inheritedDesc,
+        (query) =>
+          Buffer.from(
+            inheritedHost.request({ method: 'query', query }),
+            'base64',
+          ),
+        legacySource,
+        { maxFactsBytes: 1 << 20 },
+      );
+      try {
+        const inheritedActual =
+          inheritedClient.program as unknown as ts.Program;
+        const diag = inheritedActual
+          .getConfigFileParsingDiagnostics()
+          .find((d) => d.code === 5023)!;
+        return {
+          fileName: normalizeSlashes(diag.file?.fileName),
+          path: normalizeSlashes((diag.file as any)?.path),
+        };
+      } finally {
+        inheritedClient.close();
+        await inheritedHost.close();
+      }
+    };
+    const upperInherited = await readInheritedDiag(childConfig);
+    const lowerInherited = await readInheritedDiag(childConfigLower);
+    const normalizedBaseConfig = baseConfig.replaceAll('\\', '/');
+    const expectedBasePath = ts.sys.useCaseSensitiveFileNames
+      ? normalizedBaseConfig
+      : normalizedBaseConfig.toLowerCase();
+    expect(upperInherited.fileName).toBe(normalizedBaseConfig);
+    expect(upperInherited.path).toBe(expectedBasePath);
+    expect(lowerInherited.path).toBe(expectedBasePath);
   } finally {
     owner.close();
     await host.close();
@@ -2259,7 +2374,16 @@ export function pick(a: number, b: boolean): 2;
 export function pick(a: string | number, b?: boolean): 1 | 2 {
   return b ? 2 : 1;
 }
+export function choose<T extends string>(x: T): 1;
+export function choose<T extends string>(x: T, y: T): 2;
+export function choose<T extends string>(x: T, y?: T): 1 | 2 {
+  return y === undefined ? 1 : 2;
+}
 export const coldInvalid = pick(true);
+export const genericOne = choose(true);
+export const genericTwo = choose(true);
+export const genericWithCandidates = choose(true);
+export const genericWarm = choose(true);
 export const incomplete = pick(true as unknown as never);
 export const call1 = pick('ok');
 export const call2 = pick(1, true);
@@ -2324,16 +2448,40 @@ export const call2 = pick(1, true);
       const retOf = (sig: ts.Signature | undefined) =>
         sig ? c.typeToString(c.getReturnTypeOfSignature(sig)) : undefined;
 
-      // Cold invalid overloaded call queried with (undefined, 2): without a
-      // candidates array, TypeScript combines overloads (returning `never`)
-      // rather than selecting the 2-arg overload.
+      // Cold invalid non-generic overloaded call queried with (undefined, 2):
+      // without a candidates array, TypeScript combines overloads (`never`).
       const coldInvalid = callFor('coldInvalid');
       const coldFirst = retOf(
         c.getResolvedSignature(coldInvalid, undefined, 2),
       );
       const coldNext = retOf(c.getResolvedSignature(coldInvalid));
 
-      // Warm call: querying with (undefined, 2) after caching MUST NOT
+      // Cold invalid generic overloaded calls: argumentCount selects the
+      // matching overload even when candidatesOutArray is omitted.
+      const genericOne = callFor('genericOne');
+      const genericOneSeq = [
+        retOf(c.getResolvedSignature(genericOne, undefined, 1)),
+        retOf(c.getResolvedSignature(genericOne)),
+      ];
+      const genericTwo = callFor('genericTwo');
+      const genericTwoSeq = [
+        retOf(c.getResolvedSignature(genericTwo, undefined, 2)),
+        retOf(c.getResolvedSignature(genericTwo)),
+      ];
+      const genericCandCall = callFor('genericWithCandidates');
+      const genericCandidates: ts.Signature[] = [];
+      const genericCandSeq = [
+        retOf(c.getResolvedSignature(genericCandCall, genericCandidates, 2)),
+        retOf(c.getResolvedSignature(genericCandCall)),
+      ];
+      const genericWarm = callFor('genericWarm');
+      const genericWarmSeq = [
+        retOf(c.getResolvedSignature(genericWarm)),
+        retOf(c.getResolvedSignature(genericWarm, undefined, 2)),
+        retOf(c.getResolvedSignature(genericWarm)),
+      ];
+
+      // Warm non-generic call: querying with (undefined, 2) after caching MUST NOT
       // overwrite the cached overload; passing a candidates array DOES resolve
       // with argumentCount = 2 and populates both candidates.
       const incomplete = callFor('incomplete');
@@ -2362,6 +2510,11 @@ export const call2 = pick(1, true);
       return {
         coldFirst,
         coldNext,
+        genericOneSeq,
+        genericTwoSeq,
+        genericCandSeq,
+        genericCandidates: genericCandidates.map(retOf),
+        genericWarmSeq,
         first,
         countWithoutCandidates,
         after,
@@ -2379,6 +2532,9 @@ export const call2 = pick(1, true);
     const expected = exercise(reference);
     expect(actual).toEqual(expected);
     expect([actual.coldFirst, actual.coldNext]).toEqual(['never', 'never']);
+    expect(actual.genericOneSeq).toEqual(['1', '1']);
+    expect(actual.genericTwoSeq).toEqual(['2', '2']);
+    expect(actual.genericWarmSeq).toEqual(['1', '1', '1']);
     expect([actual.first, actual.countWithoutCandidates, actual.after]).toEqual(
       ['1', '1', '1'],
     );
@@ -2596,6 +2752,7 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
 
   let queries = 0;
   let recordQueries = 0;
+  let lastReplyBytes = 0;
   const zeroCacheClient = new TypeServiceClient(
     enums,
     descriptor,
@@ -2608,7 +2765,12 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
       ) {
         recordQueries++;
       }
-      return Buffer.from(host.request({ method: 'query', query }), 'base64');
+      const reply = Buffer.from(
+        host.request({ method: 'query', query }),
+        'base64',
+      );
+      lastReplyBytes = reply.byteLength;
+      return reply;
     },
     host.source,
     { maxFactsBytes: 0 },
@@ -2657,7 +2819,8 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
     expect(recordQueries).toBeLessThanOrEqual(1);
 
     // Listing 1,000 properties and reading every property name under
-    // maxFactsBytes: 0 takes 1 query total (0 symbolRecord round trips).
+    // maxFactsBytes: 0 takes 1 query total (0 symbolRecord round trips) and
+    // skips shipping discarded supplemental symbol records over the wire.
     const hugeDecl = zSrc.statements.find(
       (s): s is ts.VariableStatement =>
         ts.isVariableStatement(s) &&
@@ -2667,6 +2830,7 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
     const hugeType = zc.getTypeAtLocation(hugeDecl)!;
     queries = 0;
     recordQueries = 0;
+    lastReplyBytes = 0;
     const props = zc.getPropertiesOfType(hugeType);
     const propNames = props.map((p) => p.name);
     expect(propNames).toHaveLength(1000);
@@ -2674,6 +2838,7 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
     expect(propNames[999]).toBe('p999');
     expect(queries).toBe(1);
     expect(recordQueries).toBe(0);
+    expect(lastReplyBytes).toBeLessThan(40_000);
   } finally {
     zeroCacheClient.close();
     await host.close();

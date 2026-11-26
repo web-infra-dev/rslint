@@ -313,7 +313,7 @@ export interface ViewHost {
   indexInfo(fact: IndexInfoFact): IndexInfoView;
   nodeRef(ref: NodeRef | undefined): object | undefined;
   sourceView(file: string): object | undefined;
-  diagnosticSourceView(file: string): object | undefined;
+  diagnosticSourceView(file: string, filePath?: string): object | undefined;
   conditionalRootFor(
     node: object,
     create: () => ConditionalRootView,
@@ -956,7 +956,9 @@ export function createDiagnosticView(
   d: DiagnosticFact,
 ): DiagnosticView {
   return {
-    file: d.fileName ? host.diagnosticSourceView(d.fileName) : undefined,
+    file: d.fileName
+      ? host.diagnosticSourceView(d.fileName, d.filePath)
+      : undefined,
     start: d.fileName ? d.start : undefined,
     length: d.fileName ? d.length : undefined,
     code: d.code,

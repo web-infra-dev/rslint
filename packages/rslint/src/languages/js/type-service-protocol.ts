@@ -151,6 +151,7 @@ export interface SymbolFact {
 
 export interface DiagnosticFact {
   readonly fileName?: string;
+  readonly filePath?: string;
   readonly start: number;
   readonly length: number;
   readonly code: number;
@@ -445,7 +446,11 @@ export interface QueryResults {
 
 export type Operation = keyof QueryArguments;
 export type TypeServiceQuery<K extends Operation = Operation> = {
-  [P in K]: Scope & { readonly op: P; readonly args: QueryArguments[P] };
+  [P in K]: Scope & {
+    readonly op: P;
+    readonly args: QueryArguments[P];
+    readonly skipRecords?: boolean;
+  };
 }[K];
 export type QueryTransport = (
   query: TypeServiceQuery,

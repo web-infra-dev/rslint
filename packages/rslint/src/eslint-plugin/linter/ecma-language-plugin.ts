@@ -178,27 +178,144 @@ type ParserOptions = NonNullable<
   LintFileRequest['languageOptions']
 >['parserOptions'];
 
+function isPrivateBrandError(err: unknown): boolean {
+  return (
+    err instanceof TypeError &&
+    /private (?:member|method|field)/i.test(err.message)
+  );
+}
+
 /**
- * Derive a syntax-only parserServices object with per-file boolean overrides
- * without mutating the factory's object or dropping prototype getters/methods.
+ * Wrap a syntax-only parserServices object with per-file boolean overrides
+ * without mutating the factory's object:
+ * - Own/inherited writes land in a per-view local property map so rules can
+ *   memoize without mutating the factory's instance.
+ * - Prototype getters and methods run with `this = proxy` so they observe the
+ *   overridden flags, falling back to `target` only on private-field brand
+ *   errors so classes with `#private` slots keep working.
+ * - Wrapped methods are cached per function so `services.m === services.m`.
  */
 function withSyntaxParserServiceOverrides(
   target: Record<string, unknown>,
   overrides: Readonly<Record<string, boolean>>,
 ): Record<string, unknown> {
-  const descriptors = Object.getOwnPropertyDescriptors(target);
-  for (const [key, value] of Object.entries(overrides)) {
-    descriptors[key] = {
-      configurable: true,
-      enumerable: true,
-      value,
-      writable: true,
-    };
-  }
-  return Object.create(
-    Object.getPrototypeOf(target) as object | null,
-    descriptors,
-  ) as Record<string, unknown>;
+  const extraProps = new Map<string | symbol, PropertyDescriptor>();
+  const deleted = new Set<string | symbol>();
+  const methodCache = new WeakMap<
+    (...args: unknown[]) => unknown,
+    (...args: unknown[]) => unknown
+  >();
+
+  const proxy: Record<string, unknown> = new Proxy<Record<string, unknown>>(
+    {},
+    {
+      get(_shadow, prop, receiver) {
+        if (extraProps.has(prop)) {
+          const desc = extraProps.get(prop)!;
+          if ('get' in desc) {
+            return desc.get?.call(receiver);
+          }
+          return desc.value;
+        }
+        if (deleted.has(prop)) return undefined;
+        if (typeof prop === 'string' && Object.hasOwn(overrides, prop)) {
+          return overrides[prop];
+        }
+        let value: unknown;
+        try {
+          value = Reflect.get(target, prop, receiver);
+        } catch (err) {
+          if (!isPrivateBrandError(err)) throw err;
+          value = Reflect.get(target, prop, target);
+        }
+        if (typeof value !== 'function') return value;
+        const fn = value as (...args: unknown[]) => unknown;
+        let wrapped = methodCache.get(fn);
+        if (!wrapped) {
+          wrapped = function (this: unknown, ...args: unknown[]): unknown {
+            if (this !== proxy) return Reflect.apply(fn, this, args);
+            try {
+              return Reflect.apply(fn, proxy, args);
+            } catch (err) {
+              if (!isPrivateBrandError(err)) throw err;
+              return Reflect.apply(fn, target, args);
+            }
+          };
+          methodCache.set(fn, wrapped);
+        }
+        return wrapped;
+      },
+      set(_shadow, prop, value, receiver) {
+        const existing = extraProps.get(prop);
+        if (existing) {
+          if ('set' in existing) {
+            if (typeof existing.set !== 'function') return false;
+            existing.set.call(receiver, value);
+            return true;
+          }
+          if (existing.writable === false) return false;
+          existing.value = value;
+          return true;
+        }
+        deleted.delete(prop);
+        extraProps.set(prop, {
+          configurable: true,
+          enumerable: true,
+          value,
+          writable: true,
+        });
+        return true;
+      },
+      defineProperty(_shadow, prop, descriptor) {
+        deleted.delete(prop);
+        extraProps.set(prop, { ...descriptor, configurable: true });
+        return true;
+      },
+      deleteProperty(_shadow, prop) {
+        extraProps.delete(prop);
+        deleted.add(prop);
+        return true;
+      },
+      has(_shadow, prop) {
+        if (extraProps.has(prop)) return true;
+        if (deleted.has(prop)) return false;
+        if (typeof prop === 'string' && Object.hasOwn(overrides, prop)) {
+          return true;
+        }
+        return Reflect.has(target, prop);
+      },
+      ownKeys() {
+        const keys = new Set<string | symbol>([
+          ...Reflect.ownKeys(target),
+          ...Object.keys(overrides),
+          ...extraProps.keys(),
+        ]);
+        for (const prop of deleted) keys.delete(prop);
+        return Array.from(keys);
+      },
+      getOwnPropertyDescriptor(_shadow, prop) {
+        if (extraProps.has(prop)) {
+          return { ...extraProps.get(prop)!, configurable: true };
+        }
+        if (deleted.has(prop)) return undefined;
+        if (typeof prop === 'string' && Object.hasOwn(overrides, prop)) {
+          return {
+            configurable: true,
+            enumerable: true,
+            value: overrides[prop],
+            writable: true,
+          };
+        }
+        const desc = Reflect.getOwnPropertyDescriptor(target, prop);
+        if (!desc) return undefined;
+        return desc.configurable ? desc : { ...desc, configurable: true };
+      },
+      getPrototypeOf() {
+        return Reflect.getPrototypeOf(target);
+      },
+    },
+  );
+  return proxy;
 }
 
 /**

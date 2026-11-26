@@ -702,7 +702,8 @@ export class TypeServiceClient {
       indexInfo: (fact) => this.indexInfo(fact),
       nodeRef: (ref) => this.syntax.nodeRef(ref),
       sourceView: (file) => this.syntax.sourceView(file),
-      diagnosticSourceView: (file) => this.syntax.diagnosticSourceView(file),
+      diagnosticSourceView: (file, filePath) =>
+        this.syntax.diagnosticSourceView(file, filePath),
       conditionalRootFor: (node, create) => {
         const existing = this.conditionalRoots.get(node);
         if (existing) return existing;
@@ -845,10 +846,17 @@ export class TypeServiceClient {
     this.checkCancellation();
     const transport = this.transport;
     if (!transport) throw new Error('type service transport unavailable');
-    const query: TypeServiceQuery = {
-      generation: this.descriptor.generation,
-      ...request,
-    };
+    const query: TypeServiceQuery =
+      this.maxFactsBytes === 0 && !this.replyRecords
+        ? {
+            generation: this.descriptor.generation,
+            ...request,
+            skipRecords: true,
+          }
+        : {
+            generation: this.descriptor.generation,
+            ...request,
+          };
     const key = typeQueryKey(query);
     if (
       !isCacheableTypeQuery(query) &&

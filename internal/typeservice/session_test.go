@@ -77,10 +77,10 @@ func TestSessionReleasesCheckerLeaseAndPreservesEligibility(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := syntax.Query(t.Context(), Query{binding.Scope, &NodeRequest{Op: "nodeRecord", Node: NodeRef{File: name, Index: 1}}}); err != nil {
+		if _, err := syntax.Query(t.Context(), Query{Scope: binding.Scope, Request: &NodeRequest{Op: "nodeRecord", Node: NodeRef{File: name, Index: 1}}}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := syntax.Query(t.Context(), Query{binding.Scope, &CheckerRequest{Op: "void"}}); err == nil {
+		if _, err := syntax.Query(t.Context(), Query{Scope: binding.Scope, Request: &CheckerRequest{Op: "void"}}); err == nil {
 			t.Fatal("syntax-only session acquired a checker")
 		}
 		syntax.Close()

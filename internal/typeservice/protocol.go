@@ -203,14 +203,16 @@ func (*ResolveNameRequest) operation() Operation         { return "resolveName" 
 
 type Query struct {
 	Scope
-	Request Request
+	Request     Request
+	SkipRecords bool
 }
 
 func (q *Query) UnmarshalJSON(data []byte) error {
 	var wire struct {
 		Scope
-		Op   Operation       `json:"op"`
-		Args json.RawMessage `json:"args"`
+		Op          Operation       `json:"op"`
+		Args        json.RawMessage `json:"args"`
+		SkipRecords bool            `json:"skipRecords,omitempty"`
 	}
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
@@ -285,7 +287,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(wire.Args, request); err != nil {
 		return err
 	}
-	q.Scope, q.Request = wire.Scope, request
+	q.Scope, q.Request, q.SkipRecords = wire.Scope, request, wire.SkipRecords
 	return nil
 }
 
@@ -343,10 +345,10 @@ type EncodedTypeNode struct {
 type SuggestionDiagnostics []DiagnosticFact
 
 type DiagnosticFact struct {
-	File, Message, Source         string
-	Start, Length, Category, Code uint32
-	Deprecated, Unnecessary       bool
-	Chain, Related                SuggestionDiagnostics
+	File, FilePath, Message, Source string
+	Start, Length, Category, Code   uint32
+	Deprecated, Unnecessary         bool
+	Chain, Related                  SuggestionDiagnostics
 }
 
 type TypeFact struct {

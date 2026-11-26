@@ -777,7 +777,7 @@ export class GenerationSyntaxViews {
       : undefined;
   }
 
-  diagnosticSourceView(file: string): object | undefined {
+  diagnosticSourceView(file: string, filePath?: string): object | undefined {
     this.ensure();
     const programSource = this.sourceView(file);
     if (programSource) return programSource;
@@ -787,7 +787,7 @@ export class GenerationSyntaxViews {
       if (reply) {
         metadata = this.diagnosticMetadata.get(reply.fileName) ?? {
           fileName: reply.fileName,
-          path: reply.path ?? reply.fileName,
+          path: reply.path ?? filePath ?? reply.fileName,
           external: false,
           defaultLibrary: false,
           isDeclarationFile: false,

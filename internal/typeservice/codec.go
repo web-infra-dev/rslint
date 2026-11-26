@@ -342,10 +342,10 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
 		return 0
 	}
 	at := uint32(len(w.data))
-	w.data = append(w.data, make([]byte, 4+40*len(facts))...)
+	w.data = append(w.data, make([]byte, 4+44*len(facts))...)
 	w.put(at, uint32(len(facts)))
 	for i, d := range facts {
-		pos := at + 4 + uint32(i)*40
+		pos := at + 4 + uint32(i)*44
 		if d.File != "" {
 			w.put(pos, w.text(d.File))
 		}
@@ -367,6 +367,9 @@ func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
 		w.put(pos+28, flags)
 		w.put(pos+32, w.diagnostics(d.Chain))
 		w.put(pos+36, w.diagnostics(d.Related))
+		if d.FilePath != "" {
+			w.put(pos+40, w.text(d.FilePath))
+		}
 	}
 	return at
 }

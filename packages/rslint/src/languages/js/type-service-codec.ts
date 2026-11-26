@@ -281,14 +281,16 @@ export class TypePacketReader {
     if (!at) return [];
     const bytes = this.buf();
     const count = this.word(at);
-    if (at + 4 + count * 40 > bytes.length) return invalid();
+    if (at + 4 + count * 44 > bytes.length) return invalid();
     return Array.from({ length: count }, (_, i) => {
-      const pos = at + 4 + i * 40;
+      const pos = at + 4 + i * 44;
       const file = this.word(pos);
       const source = this.word(pos + 24);
       const flags = this.word(pos + 28);
+      const filePath = this.word(pos + 40);
       return {
         fileName: file ? this.text(file) : undefined,
+        filePath: filePath ? this.text(filePath) : undefined,
         start: this.word(pos + 4),
         length: this.word(pos + 8),
         category: this.word(pos + 12),

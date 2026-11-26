@@ -575,9 +575,11 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 		if err != nil {
 			return err
 		}
-		records[i], err = s.directRecords(ctx, c, q.Request.operation(), results[i])
-		if err != nil {
-			return err
+		if !q.SkipRecords {
+			records[i], err = s.directRecords(ctx, c, q.Request.operation(), results[i])
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -949,19 +951,14 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		if !ast.IsCallLikeExpression(native) {
 			return Handles{0}, nil
 		}
-		var sig *checker.Signature
 		var candidates []*checker.Signature
-		switch {
-		case r.WithCandidates && r.ArgumentCount != nil:
-			sig, candidates = checker.Checker_getResolvedSignatureWorker(c, native, checker.CheckModeNormal, *r.ArgumentCount)
-		case r.WithCandidates:
-			sig = checker.Checker_getResolvedSignature(c, native, &candidates, checker.CheckModeNormal)
-		default:
-			// Without candidatesOutArray, keep candidatesOutArray nil so overload
-			// failure combines overloads (matching TypeScript 6) and cached
-			// signatures are reused without overwriting links.resolvedSignature.
-			sig = c.GetResolvedSignature(native)
+		var candidatesOut *[]*checker.Signature
+		if r.WithCandidates {
+			candidatesOut = &candidates
 		}
+		sig := checker.Checker_getResolvedSignatureWithArgumentCount(
+			c, native, candidatesOut, r.ArgumentCount, checker.CheckModeNormal,
+		)
 		ids := make(Handles, 1, 1+len(candidates))
 		ids[0] = s.signatureID(sig)
 		for _, candidate := range candidates {
@@ -1581,6 +1578,7 @@ func diagnosticFacts(diagnostics []*ast.Diagnostic) SuggestionDiagnostics {
 		}
 		if f := diagnostic.File(); f != nil {
 			d.File = f.FileName()
+			d.FilePath = string(f.Path())
 			positions := f.GetPositionMap()
 			start := positions.UTF8ToUTF16(diagnostic.Pos())
 			d.Start = uint32(start)
