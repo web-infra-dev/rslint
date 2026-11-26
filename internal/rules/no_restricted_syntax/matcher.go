@@ -267,6 +267,8 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 		return node.Kind == ast.KindCallExpression &&
 			node.AsCallExpression().Expression != nil &&
 			node.AsCallExpression().Expression.Kind == ast.KindImportKeyword
+	case "ImportDefaultSpecifier":
+		return node.Kind == ast.KindImportClause && node.AsImportClause().Name() != nil
 	case "BinaryExpression":
 		return node.Kind == ast.KindBinaryExpression && isPlainBinaryOperator(node)
 	case "LogicalExpression":
@@ -1260,6 +1262,24 @@ func forEachLogicalChild(node *ast.Node, target string, mc *matchContext, visit 
 		visit(node, "JSXOpeningElement")
 	case isEmptyJSXExpression(node):
 		visit(node, "JSXEmptyExpression")
+	case node.Kind == ast.KindImportDeclaration:
+		for _, specifier := range collectImportSpecifiers(node) {
+			if visit(specifier, "physical") {
+				return
+			}
+		}
+		if source := node.AsImportDeclaration().ModuleSpecifier; source != nil && visit(source, childTarget(source)) {
+			return
+		}
+		for _, attr := range importAttributes(node.AsImportDeclaration().Attributes) {
+			if visit(attr, "physical") {
+				return
+			}
+		}
+	case node.Kind == ast.KindImportClause:
+		if name := node.AsImportClause().Name(); name != nil {
+			visit(name, "physical")
+		}
 	default:
 		visitPhysicalChildren(nil)
 	}
@@ -1724,8 +1744,10 @@ func isTransparentEstreeContainer(node *ast.Node) bool {
 	}
 	switch node.Kind {
 	case ast.KindParenthesizedExpression, ast.KindComputedPropertyName, ast.KindSemicolonClassElement,
-		ast.KindImportAttributes, ast.KindJsxAttributes, ast.KindHeritageClause, ast.KindExpressionWithTypeArguments:
+		ast.KindImportAttributes, ast.KindNamedImports, ast.KindJsxAttributes, ast.KindHeritageClause, ast.KindExpressionWithTypeArguments:
 		return true
+	case ast.KindImportClause:
+		return node.AsImportClause().Name() == nil
 	case ast.KindTypeReference:
 		return node.Parent != nil && node.Parent.Kind == ast.KindHeritageClause
 	case ast.KindBlock:
@@ -1736,9 +1758,21 @@ func isTransparentEstreeContainer(node *ast.Node) bool {
 	return false
 }
 
+// isTransparentImportClauseForChild reports whether an ImportClause should be
+// skipped when climbing from child. When an import combines a default binding
+// with named or namespace bindings (`import Def, * as NS from 'x'`), tsgo
+// nests the named/namespace bindings inside the ImportClause that models
+// ImportDefaultSpecifier; only the default binding identifier belongs under
+// ImportDefaultSpecifier in ESTree.
+func isTransparentImportClauseForChild(parent, child *ast.Node) bool {
+	return parent != nil && parent.Kind == ast.KindImportClause && child != parent.AsImportClause().Name()
+}
+
 func estreeParent(node *ast.Node) *ast.Node {
+	child := node
 	parent := utils.ESTreeParent(node)
-	for parent != nil && (isTransparentEstreeContainer(parent) || isPlainParameter(parent)) {
+	for parent != nil && (isTransparentEstreeContainer(parent) || isPlainParameter(parent) || isTransparentImportClauseForChild(parent, child)) {
+		child = parent
 		parent = utils.ESTreeParent(parent)
 	}
 	return parent
@@ -2007,7 +2041,10 @@ func readLocalAttr(node *ast.Node) (interface{}, bool) {
 	case ast.KindImportSpecifier:
 		return node.AsImportSpecifier().Name(), true
 	case ast.KindImportClause:
-		return node.AsImportClause().Name(), true
+		if name := node.AsImportClause().Name(); name != nil {
+			return name, true
+		}
+		return nil, false
 	case ast.KindNamespaceImport:
 		return node.AsNamespaceImport().Name(), true
 	case ast.KindExportSpecifier:
@@ -2181,6 +2218,14 @@ func estreeNameForKind(node *ast.Node) string {
 		return "TSMethodSignature"
 	case ast.KindImportDeclaration:
 		return "ImportDeclaration"
+	case ast.KindImportSpecifier:
+		return "ImportSpecifier"
+	case ast.KindNamespaceImport:
+		return "ImportNamespaceSpecifier"
+	case ast.KindImportClause:
+		if node.AsImportClause().Name() != nil {
+			return "ImportDefaultSpecifier"
+		}
 	case ast.KindExportAssignment:
 		if !node.AsExportAssignment().IsExportEquals {
 			return "ExportDefaultDeclaration"

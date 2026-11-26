@@ -240,8 +240,6 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 			return statements(parent.AsArrayLiteralExpression().Elements)
 		case ast.KindArrayBindingPattern:
 			return statements(parent.AsBindingPattern().Elements)
-		case ast.KindNamedImports:
-			return statements(parent.AsNamedImports().Elements)
 		case ast.KindNamedExports:
 			return statements(parent.AsNamedExports().Elements)
 		}
@@ -304,8 +302,6 @@ func listChildrenOf(parent *ast.Node) [][]*ast.Node {
 		add(statements(parent.AsClassDeclaration().Members))
 	case ast.KindClassExpression:
 		add(statements(parent.AsClassExpression().Members))
-	case ast.KindNamedImports:
-		add(statements(parent.AsNamedImports().Elements))
 	case ast.KindNamedExports:
 		add(statements(parent.AsNamedExports().Elements))
 	case ast.KindArrayBindingPattern, ast.KindObjectBindingPattern:
@@ -326,6 +322,7 @@ func listChildrenOf(parent *ast.Node) [][]*ast.Node {
 		add(statements(parent.AsJsxSelfClosingElement().Attributes.AsJsxAttributes().Properties))
 
 	case ast.KindImportDeclaration:
+		add(collectImportSpecifiers(parent))
 		if attributes := parent.AsImportDeclaration().Attributes; attributes != nil {
 			add(statements(attributes.AsImportAttributes().Attributes))
 		}

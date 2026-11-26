@@ -1283,3 +1283,351 @@ func TestNoRestrictedSyntaxNonNullChainFields(t *testing.T) {
 			},
 		})
 }
+
+// Import specifiers sit directly in ImportDeclaration.specifiers in ESTree:
+// tsgo's ImportClause (when nameless or when climbing from named/namespace
+// bindings) and NamedImports are transparent containers. When a default
+// binding is present, ImportClause represents only ImportDefaultSpecifier and
+// spans the default binding identifier alone.
+// Expectations checked against ESLint 10.13.0 and @typescript-eslint/parser 8.65.0.
+func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
+	const issue2631 = "import * as Lib from 'some-lib'\nimport { x } from 'other-lib'\nexport const l = [Lib, x]\n"
+	const defaultAndNamespace = "import Def, * as NS from 'lib';\n"
+	const defaultAndNamed = "import Def, { x, y as z } from 'lib';\n"
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			// Nameless ImportClause must not match ImportDefaultSpecifier or act as a parent.
+			{Code: issue2631, Options: []any{"ImportDefaultSpecifier"}},
+			{Code: issue2631, Options: []any{"ImportDefaultSpecifier > ImportNamespaceSpecifier"}},
+			{Code: issue2631, Options: []any{"ImportDefaultSpecifier > ImportSpecifier"}},
+			{Code: "import type * as NS from 't2';\n", Options: []any{"ImportDefaultSpecifier"}},
+			{Code: "import type { T } from 't3';\n", Options: []any{"ImportDefaultSpecifier"}},
+			{Code: "import {} from 'empty';\n", Options: []any{"ImportDefaultSpecifier", "ImportSpecifier", "ImportDeclaration:has(> :not(Literal))"}},
+			{Code: "import 'side-effect';\n", Options: []any{"ImportDefaultSpecifier", "ImportNamespaceSpecifier", "ImportSpecifier"}},
+
+			// Combined default + namespace: namespace specifier is a sibling, not a child of default.
+			{Code: defaultAndNamespace, Options: []any{"ImportDefaultSpecifier > ImportNamespaceSpecifier"}},
+			{Code: defaultAndNamespace, Options: []any{"ImportDefaultSpecifier ImportNamespaceSpecifier"}},
+			{Code: defaultAndNamespace, Options: []any{"ImportDefaultSpecifier:has(ImportNamespaceSpecifier)"}},
+			{Code: defaultAndNamespace, Options: []any{"ImportDefaultSpecifier:has(> ImportNamespaceSpecifier)"}},
+			{Code: defaultAndNamespace, Options: []any{"ImportDefaultSpecifier:has(Identifier[name='NS'])"}},
+			{Code: defaultAndNamespace, Options: []any{"ImportNamespaceSpecifier:first-child"}},
+			{Code: defaultAndNamespace, Options: []any{"ImportDeclaration > Identifier"}},
+
+			// Combined default + named: named specifiers are siblings of default, not children.
+			{Code: defaultAndNamed, Options: []any{"ImportDefaultSpecifier > ImportSpecifier"}},
+			{Code: defaultAndNamed, Options: []any{"ImportDefaultSpecifier ImportSpecifier"}},
+			{Code: defaultAndNamed, Options: []any{"ImportDefaultSpecifier:has(ImportSpecifier)"}},
+			{Code: defaultAndNamed, Options: []any{"ImportDefaultSpecifier:has(Identifier[name='x'])"}},
+			{Code: defaultAndNamed, Options: []any{"ImportSpecifier:first-child"}},
+			{Code: defaultAndNamed, Options: []any{"ImportSpecifier.elements"}},
+
+			// Specifiers and import attributes belong to separate arrays.
+			{Code: "import { x } from 'str' with { type: 'json' };\n", Options: []any{"ImportSpecifier + ImportAttribute"}},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Issue #2631 exact reproduction with multiple selectors in specificity order.
+			{
+				Code: issue2631,
+				Options: []any{
+					map[string]any{"selector": `ImportDeclaration[source.value="some-lib"]`, "message": "A"},
+					map[string]any{"selector": `ImportDeclaration > ImportNamespaceSpecifier`, "message": "B"},
+					map[string]any{"selector": `ImportNamespaceSpecifier[parent.type="ImportDeclaration"]`, "message": "C"},
+					map[string]any{"selector": `ImportDeclaration > ImportSpecifier`, "message": "D"},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "A", Line: 1, Column: 1, EndLine: 1, EndColumn: 32},
+					{MessageId: "restrictedSyntax", Message: "B", Line: 1, Column: 8, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Message: "C", Line: 1, Column: 8, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Message: "D", Line: 2, Column: 10, EndLine: 2, EndColumn: 11},
+				},
+			},
+			{
+				Code:    issue2631,
+				Options: []any{`ImportNamespaceSpecifier[parent.source.value="some-lib"]`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code:    issue2631,
+				Options: []any{`ImportSpecifier[parent.type="ImportDeclaration"][parent.source.value="other-lib"]`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 10, EndLine: 2, EndColumn: 11},
+				},
+			},
+			{
+				Code:    "import * as Lib from 'some-lib';\n",
+				Options: []any{"[type='ImportNamespaceSpecifier']", "ImportDeclaration > ImportNamespaceSpecifier:exit"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				// Bare wildcard skips transparent ImportClause without emitting a phantom node.
+				Code:    "import * as Lib from 'some-lib';\n",
+				Options: []any{"*"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 33},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 22, EndLine: 1, EndColumn: 32},
+				},
+			},
+
+			// Combined default + namespace: parent, range, siblings, fields, and :has().
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDefaultSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDeclaration > ImportDefaultSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDeclaration > ImportNamespaceSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDefaultSpecifier + ImportNamespaceSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportNamespaceSpecifier[parent.type='ImportDeclaration'][parent.source.value='lib']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDefaultSpecifier[parent.type='ImportDeclaration'][parent.source.value='lib']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDefaultSpecifier:first-child"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportNamespaceSpecifier:nth-child(2)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportNamespaceSpecifier:last-child"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDeclaration:has(> ImportDefaultSpecifier)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 32},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDeclaration:has(> ImportNamespaceSpecifier)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 32},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDefaultSpecifier > Identifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDefaultSpecifier Identifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"Identifier[parent.type='ImportDefaultSpecifier']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"Identifier[parent.type='ImportNamespaceSpecifier']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"[parent.type='ImportDeclaration']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 20},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 26, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"ImportDeclaration[specifiers.0.type='ImportDefaultSpecifier'][specifiers.1.type='ImportNamespaceSpecifier']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 32},
+				},
+			},
+			{
+				Code:    defaultAndNamespace,
+				Options: []any{"Identifier.specifiers.local"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 20},
+				},
+			},
+
+			// Combined default + named: parent, siblings, indices, fields, and :has().
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportDeclaration > ImportSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportDefaultSpecifier + ImportSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportDefaultSpecifier ~ ImportSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportSpecifier + ImportSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportSpecifier:nth-child(2)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportSpecifier:last-child"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportDeclaration:has(> ImportSpecifier)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 38},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportSpecifier.specifiers"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportDefaultSpecifier.specifiers"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 11},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"Identifier[parent.type='ImportSpecifier']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 19},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 23, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code:    defaultAndNamed,
+				Options: []any{"ImportDeclaration[specifiers.1.type='ImportSpecifier']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 38},
+				},
+			},
+
+			// Type-only imports, empty named imports, string-literal import name, and attributes.
+			{
+				Code:    "import type Def from 't1';\n",
+				Options: []any{"ImportDeclaration > ImportDefaultSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code:    "import type * as NS from 't2';\n",
+				Options: []any{"ImportDeclaration > ImportNamespaceSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:    "import type { T } from 't3';\n",
+				Options: []any{"ImportDeclaration > ImportSpecifier"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code:    "import {} from 'empty';\n",
+				Options: []any{"[parent.type='ImportDeclaration']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 23},
+				},
+			},
+			{
+				Code:    `import { "a" as b } from 'str' with { type: 'json' };` + "\n",
+				Options: []any{`ImportSpecifier[parent.source.value="str"]`, "ImportDeclaration > ImportAttribute"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 18},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 39, EndLine: 1, EndColumn: 51},
+				},
+			},
+		})
+}

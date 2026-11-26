@@ -507,7 +507,14 @@ func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchCont
 	}
 	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
 		textRange := utils.GetESTreeBindingIdentifierRange(mc.sf, node)
-		if exportWrapperTarget(node) != "" {
+		if node.Kind == ast.KindImportClause {
+			if name := node.AsImportClause().Name(); name != nil {
+				// ESTree's ImportDefaultSpecifier spans only the default binding
+				// identifier, excluding `type` and any sibling bindings folded
+				// into tsgo's ImportClause.
+				textRange = utils.TrimNodeTextRange(mc.sf, name)
+			}
+		} else if exportWrapperTarget(node) != "" {
 			// The export wrapper owns the `export` and `default` keywords.
 			textRange = core.NewTextRange(utils.FindFunctionKeywordPos(mc.sf, node), textRange.End())
 		}
