@@ -42,7 +42,6 @@
       "getNameTypeFromMappedType",
       "getTemplateTypeFromMappedType",
       "getAugmentedPropertiesOfType",
-      "getResolvedSignatureWorker",
       "getStringLiteralType",
       "getNumberLiteralType",
       "getBigIntLiteralType",

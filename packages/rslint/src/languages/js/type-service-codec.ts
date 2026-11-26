@@ -277,8 +277,9 @@ export class TypePacketReader {
     });
   }
 
-  private diagnostics(at: number): readonly DiagnosticFact[] {
+  private diagnostics(at: number, depth = 0): readonly DiagnosticFact[] {
     if (!at) return [];
+    if (depth > 64) return invalid();
     const bytes = this.buf();
     const count = this.word(at);
     if (at + 4 + count * 44 > bytes.length) return invalid();
@@ -299,8 +300,8 @@ export class TypePacketReader {
         source: source ? this.text(source) : undefined,
         reportsDeprecated: flags & 1 ? true : undefined,
         reportsUnnecessary: flags & 2 ? true : undefined,
-        chain: this.diagnostics(this.word(pos + 32)),
-        related: this.diagnostics(this.word(pos + 36)),
+        chain: this.diagnostics(this.word(pos + 32), depth + 1),
+        related: this.diagnostics(this.word(pos + 36), depth + 1),
       };
     });
   }

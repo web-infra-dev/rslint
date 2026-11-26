@@ -52,9 +52,9 @@ func (b *compilerBackend) Diagnostics(ctx context.Context, kind DiagnosticKind, 
 		c, release := pool.GetChecker(core.WithCheckerLifetime(ctx, core.CheckerLifetimeAPI), nil)
 		defer release()
 		if fromAPI := c.GetGlobalDiagnostics(); len(fromAPI) > 0 {
-			return compiler.SortAndDeduplicateDiagnostics(slices.Concat(globals, fromAPI))
+			globals = slices.Concat(globals, fromAPI)
 		}
-		return globals
+		return compiler.SortAndDeduplicateDiagnostics(globals)
 	case SyntacticDiagnostics:
 		return b.raw.GetSyntacticDiagnostics(ctx, file)
 	case SemanticDiagnostics:

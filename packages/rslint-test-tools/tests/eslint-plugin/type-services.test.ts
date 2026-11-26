@@ -2,7 +2,7 @@ import { beforeAll, afterAll, describe, expect, test } from 'rstack/test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve, relative, sep } from 'node:path';
+import { resolve, relative } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
@@ -795,13 +795,7 @@ describe('original npm typed rules over Go type services', () => {
           const result = lintFile(
             request,
             { rules } as any,
-            (decoded, parserOptions) =>
-              handle.parserServices(
-                decoded,
-                projection,
-                projection.binding.sourceFileName,
-                parserOptions,
-              ),
+            handle.parserServicesFactory(projection),
           );
           expect(result.parseError).toBeUndefined();
           expect(result.ruleErrors).toBeUndefined();
@@ -1974,6 +1968,7 @@ export class Consumer {
         emitDecoratorMetadata?: boolean;
       };
       customGetterFactory?: boolean;
+      probeContext?: boolean;
     },
   ) => {
     const host = new Host();
@@ -2006,23 +2001,103 @@ export class Consumer {
       ]);
 
       let seenService: Record<string, unknown> | undefined;
+      let seenLanguageOptions: unknown;
+      let seenSourceCode: any;
       let originalInstance: Record<string, unknown> | undefined;
       const probeRule = {
         meta: { type: 'problem', docs: {}, schema: [], messages: {} },
         create(context: any) {
           seenService = context.sourceCode.parserServices;
+          seenLanguageOptions = context.languageOptions;
+          seenSourceCode = context.sourceCode;
           return {};
         },
       };
-      const allRules = opts?.customGetterFactory
-        ? new Map([...rules, ['probe/check', probeRule as any]])
-        : rules;
+      const allRules =
+        opts?.customGetterFactory || opts?.probeContext
+          ? new Map([...rules, ['probe/check', probeRule as any]])
+          : rules;
       const ruleConfigs: Record<string, { options: unknown[] }> = {
         '@typescript-eslint/consistent-type-imports': { options: [] },
-        ...(opts?.customGetterFactory
+        ...(opts?.customGetterFactory || opts?.probeContext
           ? { 'probe/check': { options: [] } }
           : {}),
       };
+
+      const factory =
+        !opts?.customGetterFactory && !opts?.fileParserOptions
+          ? handle.parserServicesFactory(projection)
+          : (decoded: any, parserOptions: any) => {
+              const base = handle.parserServices(
+                decoded,
+                projection,
+                projection.binding.sourceFileName,
+                opts?.fileParserOptions ?? parserOptions,
+              );
+              if (!opts?.customGetterFactory) return base;
+              // Custom class factory applies the file's parserOptions at
+              // construction time; lintFile passes the original instance directly
+              // to rules so private methods, `#field in this`, setters, read-only
+              // fields, non-configurable defineProperty, and domain errors behave
+              // identically to native class instances without double execution.
+              class CustomSyntaxServices {
+                readonly #tag = 'kept';
+                readonly #maps = {
+                  esTreeNodeToTSNodeMap: base.esTreeNodeToTSNodeMap,
+                  tsNodeToESTreeNodeMap: base.tsNodeToESTreeNodeMap,
+                };
+                #label = 'initial';
+                readonly program = null;
+                readonly emitDecoratorMetadata: boolean;
+                readonly experimentalDecorators: boolean;
+                readonly isolatedDeclarations: boolean;
+                readonly locked = 'source';
+                calls = 0;
+                constructor() {
+                  this.emitDecoratorMetadata =
+                    parserOptions?.emitDecoratorMetadata === true;
+                  this.experimentalDecorators =
+                    parserOptions?.experimentalDecorators === true;
+                  this.isolatedDeclarations =
+                    parserOptions?.isolatedDeclarations === true;
+                  Object.defineProperty(this, 'locked', {
+                    value: 'source',
+                    writable: false,
+                    enumerable: true,
+                    configurable: false,
+                  });
+                }
+                #helper() {
+                  return this.#tag;
+                }
+                get esTreeNodeToTSNodeMap() {
+                  return this.#maps.esTreeNodeToTSNodeMap;
+                }
+                get tsNodeToESTreeNodeMap() {
+                  return this.#maps.tsNodeToESTreeNodeMap;
+                }
+                get label() {
+                  return this.#label;
+                }
+                set label(value: string) {
+                  this.#label = value.trim();
+                }
+                readMixed() {
+                  this.calls += 1;
+                  return [this.#helper(), this.emitDecoratorMetadata] as const;
+                }
+                hasPrivate() {
+                  return #tag in this;
+                }
+                throwDomainError(): never {
+                  this.calls += 1;
+                  throw new TypeError('private field metadata is unavailable');
+                }
+              }
+              const instance = new CustomSyntaxServices();
+              originalInstance = instance as unknown as Record<string, unknown>;
+              return instance;
+            };
 
       const result = lintFile(
         {
@@ -2036,81 +2111,17 @@ export class Consumer {
           suggestionsMode: 'eager',
         },
         { rules: allRules } as any,
-        (decoded, parserOptions) => {
-          const base = handle.parserServices(
-            decoded,
-            projection,
-            projection.binding.sourceFileName,
-            opts?.fileParserOptions ?? parserOptions,
-          );
-          if (!opts?.customGetterFactory) return base;
-          // Custom class factory applies the file's parserOptions at
-          // construction time; lintFile passes the original instance directly
-          // to rules so private methods, `#field in this`, setters, read-only
-          // fields, non-configurable defineProperty, and domain errors behave
-          // identically to native class instances without double execution.
-          class CustomSyntaxServices {
-            readonly #tag = 'kept';
-            readonly #maps = {
-              esTreeNodeToTSNodeMap: base.esTreeNodeToTSNodeMap,
-              tsNodeToESTreeNodeMap: base.tsNodeToESTreeNodeMap,
-            };
-            #label = 'initial';
-            readonly program = null;
-            readonly emitDecoratorMetadata: boolean;
-            readonly experimentalDecorators: boolean;
-            readonly isolatedDeclarations: boolean;
-            readonly locked = 'source';
-            calls = 0;
-            constructor() {
-              this.emitDecoratorMetadata =
-                parserOptions?.emitDecoratorMetadata === true;
-              this.experimentalDecorators =
-                parserOptions?.experimentalDecorators === true;
-              this.isolatedDeclarations =
-                parserOptions?.isolatedDeclarations === true;
-              Object.defineProperty(this, 'locked', {
-                value: 'source',
-                writable: false,
-                enumerable: true,
-                configurable: false,
-              });
-            }
-            #helper() {
-              return this.#tag;
-            }
-            get esTreeNodeToTSNodeMap() {
-              return this.#maps.esTreeNodeToTSNodeMap;
-            }
-            get tsNodeToESTreeNodeMap() {
-              return this.#maps.tsNodeToESTreeNodeMap;
-            }
-            get label() {
-              return this.#label;
-            }
-            set label(value: string) {
-              this.#label = value.trim();
-            }
-            readMixed() {
-              this.calls += 1;
-              return [this.#helper(), this.emitDecoratorMetadata] as const;
-            }
-            hasPrivate() {
-              return #tag in this;
-            }
-            throwDomainError(): never {
-              this.calls += 1;
-              throw new TypeError('private field metadata is unavailable');
-            }
-          }
-          const instance = new CustomSyntaxServices();
-          originalInstance = instance as unknown as Record<string, unknown>;
-          return instance;
-        },
+        factory,
       );
       expect(result.parseError).toBeUndefined();
       expect(result.ruleErrors).toBeUndefined();
-      return { result, seenService, originalInstance };
+      return {
+        result,
+        seenService,
+        seenLanguageOptions,
+        seenSourceCode,
+        originalInstance,
+      };
     } finally {
       client.close();
       await host.close();
@@ -2119,6 +2130,17 @@ export class Consumer {
 
   // Typed project: tsconfig is authoritative; conflicting per-file flags (either
   // passed via handle.parserServices or via lintFile request) MUST NOT override it.
+  // Also verify lintFile passes req.languageOptions through untouched and
+  // snapshots compiler options eagerly so deferred getScope() survives client.close().
+  const typedDefault = await runMode(withDecoratorsConfig, false, {
+    probeContext: true,
+  });
+  expect(typedDefault.result.diagnostics).toEqual([]);
+  expect(typedDefault.seenLanguageOptions).toEqual({ parserOptions: {} });
+  expect(
+    typedDefault.seenSourceCode.getScope(typedDefault.seenSourceCode.ast),
+  ).toBeDefined();
+
   const typedFileOverride = await runMode(withDecoratorsConfig, false, {
     fileParserOptions: {
       experimentalDecorators: false,
@@ -2815,8 +2837,10 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
     config,
   }) as TypeServiceDescriptor;
 
-  let queries = 0;
-  let recordQueries = 0;
+  let transportCalls = 0;
+  let transportRecordCalls = 0;
+  let serverTrips = 0;
+  let recordServerTrips = 0;
   let lastReplyBytes = 0;
   const sharedTransportCache = new Map<string, Uint8Array>();
   const sharedTransport = (
@@ -2824,6 +2848,12 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
     key: string,
     cacheable: boolean,
   ): Uint8Array => {
+    transportCalls++;
+    const isRecordOp =
+      query.op === 'typeRecord' ||
+      query.op === 'symbolRecord' ||
+      query.op === 'signatureRecord';
+    if (isRecordOp) transportRecordCalls++;
     if (cacheable) {
       const cached = sharedTransportCache.get(key);
       if (cached) {
@@ -2831,14 +2861,8 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
         return cached;
       }
     }
-    queries++;
-    if (
-      query.op === 'typeRecord' ||
-      query.op === 'symbolRecord' ||
-      query.op === 'signatureRecord'
-    ) {
-      recordQueries++;
-    }
+    serverTrips++;
+    if (isRecordOp) recordServerTrips++;
     const reply = Buffer.from(
       host.request({ method: 'query', query }),
       'base64',
@@ -2858,7 +2882,9 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
   try {
     const zc = zeroCacheClient.program.getTypeChecker();
 
-    // Compact vs full reply shapes MUST produce distinct transport cache keys.
+    // Compact vs full reply shapes MUST produce distinct transport cache keys
+    // for operations that bundle supplemental records, while operations whose
+    // replies are byte-identical across modes MUST share the same key.
     expect(
       typeQueryKey({
         generation: descriptor.generation,
@@ -2873,27 +2899,55 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
         args: { id: 1 },
       }),
     );
+    expect(
+      typeQueryKey({
+        generation: descriptor.generation,
+        op: 'typeString',
+        args: { id: 1, node: undefined, flags: undefined },
+        skipRecords: true,
+      }),
+    ).toBe(
+      typeQueryKey({
+        generation: descriptor.generation,
+        op: 'typeString',
+        args: { id: 1, node: undefined, flags: undefined },
+      }),
+    );
+    expect(
+      typeQueryKey({
+        generation: descriptor.generation,
+        op: 'isArray',
+        args: { id: 1 },
+        skipRecords: true,
+      }),
+    ).toBe(
+      typeQueryKey({
+        generation: descriptor.generation,
+        op: 'isArray',
+        args: { id: 1 },
+      }),
+    );
 
     // Cold getStringType() consumes the bundled typeRecord during eager view
-    // construction: 1 Go query total, 0 record queries, 0 retained bytes.
-    queries = 0;
-    recordQueries = 0;
+    // construction: 1 transport call total, 0 record calls, 0 retained bytes.
+    transportCalls = 0;
+    transportRecordCalls = 0;
     const zString = zc.getStringType();
     expect(zString.flags).toBe(ts.TypeFlags.String);
     expect(zString.intrinsicName).toBe('string');
-    expect(queries).toBe(1);
-    expect(recordQueries).toBe(0);
+    expect(transportCalls).toBe(1);
+    expect(transportRecordCalls).toBe(0);
 
     // Reading all shallow fields of a lazy SymbolView / SignatureView with a
     // zero-byte cache decodes the record once rather than per field (1 record
-    // query instead of 5-6).
+    // call instead of 5-6).
     const zSrc = zeroCacheClient.program.getSourceFile(file) as ts.SourceFile;
     const zIsNum = zSrc.statements.find(
       (s): s is ts.FunctionDeclaration =>
         ts.isFunctionDeclaration(s) && s.name?.text === 'isNum',
     )!;
-    queries = 0;
-    recordQueries = 0;
+    transportCalls = 0;
+    transportRecordCalls = 0;
     const zSym = zc.getSymbolAtLocation(zIsNum.name!)!;
     void zSym.name;
     void zSym.escapedName;
@@ -2901,21 +2955,21 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
     void zSym.declarations;
     void zSym.valueDeclaration;
     void zSym.links;
-    expect(recordQueries).toBeLessThanOrEqual(1);
+    expect(transportRecordCalls).toBeLessThanOrEqual(1);
 
-    queries = 0;
-    recordQueries = 0;
+    transportCalls = 0;
+    transportRecordCalls = 0;
     const zSig = zc.getSignatureFromDeclaration(zIsNum)!;
     void zSig.parameters;
     void zSig.declaration;
     void zSig.typeParameters;
     void zSig.thisParameter;
     void zSig.minArgumentCount;
-    expect(recordQueries).toBeLessThanOrEqual(1);
+    expect(transportRecordCalls).toBeLessThanOrEqual(1);
 
     // Listing 1,000 properties and reading every property name under
-    // maxFactsBytes: 0 takes 1 query total (0 symbolRecord round trips) and
-    // skips shipping discarded supplemental symbol records over the wire.
+    // maxFactsBytes: 0 takes 1 transport call total (0 symbolRecord round trips)
+    // and skips shipping discarded supplemental symbol records over the wire.
     const hugeDecl = zSrc.statements.find(
       (s): s is ts.VariableStatement =>
         ts.isVariableStatement(s) &&
@@ -2923,22 +2977,30 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
         s.declarationList.declarations[0].name.text === 'huge',
     )!.declarationList.declarations[0];
     const hugeType = zc.getTypeAtLocation(hugeDecl)!;
-    queries = 0;
-    recordQueries = 0;
+    transportCalls = 0;
+    transportRecordCalls = 0;
+    serverTrips = 0;
     lastReplyBytes = 0;
     const props = zc.getPropertiesOfType(hugeType);
     const propNames = props.map((p) => p.name);
     expect(propNames).toHaveLength(1000);
     expect(propNames[0]).toBe('p0');
     expect(propNames[999]).toBe('p999');
-    expect(queries).toBe(1);
-    expect(recordQueries).toBe(0);
+    expect(transportCalls).toBe(1);
+    expect(transportRecordCalls).toBe(0);
+    expect(serverTrips).toBe(1);
     expect(lastReplyBytes).toBeLessThan(40_000);
 
+    // Seed shared transport cache with zero-budget replies for operations that
+    // never bundle supplemental records (`typeToString`, `isArrayType`).
+    const zSampleTypes = [zc.getStringType(), zc.getNumberType(), hugeType];
+    const zFormatted = zSampleTypes.map((t) => zc.typeToString(t));
+    const zArrays = zSampleTypes.map((t) => zc.isArrayType(t));
+
     // A second client with an 8 MiB fact budget sharing the same transport
-    // cache MUST NOT receive the zero-budget client's compact reply; it gets
-    // the full reply with bundled symbol records (1 server query, 0 per-symbol
-    // round trips when reading flags on all 1,000 properties).
+    // cache MUST NOT receive the zero-budget client's compact `properties`
+    // reply (1 bulk server trip, 0 per-symbol trips), AND MUST reuse cached
+    // `typeToString` / `isArrayType` replies with 0 server trips.
     const cachedClient = new TypeServiceClient(
       enums,
       descriptor,
@@ -2956,15 +3018,23 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
           s.declarationList.declarations[0].name.text === 'huge',
       )!.declarationList.declarations[0];
       const cHugeType = cc.getTypeAtLocation(cHugeDecl)!;
-      queries = 0;
-      recordQueries = 0;
+      serverTrips = 0;
+      recordServerTrips = 0;
       const cachedProps = cc.getPropertiesOfType(cHugeType);
       const flags = cachedProps.map((p) => p.flags);
       expect(flags).toHaveLength(1000);
       expect(flags[0]).toBe(ts.SymbolFlags.Property);
       expect(flags[999]).toBe(ts.SymbolFlags.Property);
-      expect(queries).toBe(1);
-      expect(recordQueries).toBe(0);
+      expect(serverTrips).toBe(1);
+      expect(recordServerTrips).toBe(0);
+
+      const cSampleTypes = [cc.getStringType(), cc.getNumberType(), cHugeType];
+      serverTrips = 0;
+      recordServerTrips = 0;
+      expect(cSampleTypes.map((t) => cc.typeToString(t))).toEqual(zFormatted);
+      expect(cSampleTypes.map((t) => cc.isArrayType(t))).toEqual(zArrays);
+      expect(serverTrips).toBe(0);
+      expect(recordServerTrips).toBe(0);
     } finally {
       cachedClient.close();
     }

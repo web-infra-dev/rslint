@@ -494,8 +494,84 @@ function formatNodeKey(node: NodeRef | undefined): string {
     : base;
 }
 
+/**
+ * Operations for which Go's `directRecords` bundles supplemental shallow
+ * records in the wire reply. Only these operations change wire representation
+ * when `skipRecords: true` is set, so only their transport cache keys need to
+ * distinguish compact from full replies.
+ */
+export const DIRECT_RECORD_OPS: ReadonlySet<Operation> = new Set<Operation>([
+  // typeRecord
+  'type',
+  'fromTypeNode',
+  'context',
+  'constraint',
+  'apparent',
+  'baseLiteral',
+  'nonNullable',
+  'errorType',
+  'anyType',
+  'unknownType',
+  'stringType',
+  'numberType',
+  'booleanType',
+  'bigIntType',
+  'eSSymbolType',
+  'nonPrimitiveType',
+  'neverType',
+  'nullType',
+  'undefinedType',
+  'trueType',
+  'falseType',
+  'stringLiteralType',
+  'numberLiteralType',
+  'bigIntLiteralType',
+  'nullableType',
+  'void',
+  'declaredType',
+  'symbolType',
+  'returnType',
+  'numberIndexType',
+  'typeArguments',
+  'stringIndexType',
+  'awaited',
+  'widened',
+  'baseTypes',
+  'defaultType',
+  'typeOfSymbol',
+  'indexInfo',
+  'indexInfos',
+  'declaredIndexInfos',
+  'typePredicate',
+  'parameterType',
+  'propertyType',
+  'mappedFields',
+  'classThisType',
+  'contextualArgument',
+  // symbolRecord
+  'symbol',
+  'declarationSymbol',
+  'aliasedSymbol',
+  'property',
+  'properties',
+  'resolveName',
+  'exportSymbol',
+  'immediateAliasedSymbol',
+  'shorthandValueSymbol',
+  'exportSpecifierLocalTargetSymbol',
+  'propertySymbolOfDestructuringAssignment',
+  'mergedSymbol',
+  'moduleMember',
+  'parameterPropertySymbols',
+  // signatureRecord
+  'signature',
+  'resolvedSignature',
+  'signatures',
+]);
+
 export function typeQueryKey(q: TypeServiceQuery): string {
-  const prefix = `${q.generation}:${operationIDs.get(q.op) ?? 0}${q.skipRecords ? 's' : ''}:`;
+  const compact = q.skipRecords && DIRECT_RECORD_OPS.has(q.op);
+  const prefix = `${q.generation}:${operationIDs.get(q.op) ?? 0}${compact ? 's' : ''}:`;
   switch (q.op) {
     case 'rootFileNames':
     case 'errorType':

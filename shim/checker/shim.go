@@ -225,9 +225,6 @@ func Checker_newTypePredicate(recv *checker.Checker, kind checker.TypePredicateK
 //go:linkname Checker_getAugmentedPropertiesOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAugmentedPropertiesOfType
 func Checker_getAugmentedPropertiesOfType(recv *checker.Checker, t *checker.Type) []*ast.Symbol
 
-//go:linkname Checker_getResolvedSignatureWorker github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSignatureWorker
-func Checker_getResolvedSignatureWorker(recv *checker.Checker, node *ast.Node, checkMode checker.CheckMode, argumentCount int) (*checker.Signature, []*checker.Signature)
-
 //go:linkname Checker_isOptionalParameter github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isOptionalParameter
 func Checker_isOptionalParameter(recv *checker.Checker, node *ast.Node) bool
 

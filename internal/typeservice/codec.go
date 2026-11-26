@@ -12,24 +12,40 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-func prepareGeneratedSyntax(tree []byte, file *ast.SourceFile) {
-	if file == nil {
-		return
-	}
+func prepareGeneratedSyntax(tree []byte, nodes []*ast.Node, parseNodes []*ast.Node, enclosing *ast.SourceFile) {
 	records := tree[binary.LittleEndian.Uint32(tree[encoder.HeaderOffsetNodes:]):]
-	var positions *ast.PositionMap
-	for offset := encoder.NodeSize; offset < len(records); offset += encoder.NodeSize {
+	posMaps := make(map[*ast.SourceFile]*ast.PositionMap)
+	for index := 1; index < len(nodes); index++ {
+		offset := index * encoder.NodeSize
+		if offset+encoder.NodeSize > len(records) {
+			break
+		}
+		var file *ast.SourceFile
+		if index < len(parseNodes) && parseNodes[index] != nil {
+			file = ast.GetSourceFileOfNode(parseNodes[index])
+		}
+		if file == nil && nodes[index] != nil {
+			file = ast.GetSourceFileOfNode(nodes[index])
+		}
+		if file == nil {
+			file = enclosing
+		}
+		if file == nil {
+			continue
+		}
+		positions, ok := posMaps[file]
+		if !ok {
+			positions = file.GetPositionMap()
+			posMaps[file] = positions
+		}
+		if positions.IsAsciiOnly() {
+			continue
+		}
 		for _, field := range [...]int{encoder.NodeOffsetPos, encoder.NodeOffsetEnd} {
 			data := records[offset+field:]
 			pos := int32(binary.LittleEndian.Uint32(data))
 			if pos < 0 {
 				continue
-			}
-			if positions == nil {
-				positions = file.GetPositionMap()
-				if positions.IsAsciiOnly() {
-					return
-				}
 			}
 			binary.LittleEndian.PutUint32(data, uint32(positions.UTF8ToUTF16(int(pos))))
 		}

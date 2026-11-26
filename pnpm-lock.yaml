@@ -240,6 +240,9 @@ catalogs:
     '@types/react-dom':
       specifier: ^19.2.3
       version: 19.2.3
+    '@typescript-eslint/eslint-plugin':
+      specifier: ^8.65.0
+      version: 8.65.0
     '@typescript-eslint/parser':
       specifier: ^8.65.0
       version: 8.65.0
@@ -549,7 +552,7 @@ importers:
         specifier: 'catalog:'
         version: 26.6.6
       '@typescript-eslint/eslint-plugin':
-        specifier: 8.65.0
+        specifier: 'catalog:'
         version: 8.65.0(@typescript-eslint/parser@8.65.0(eslint@10.14.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.14.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       '@typescript-eslint/parser':
         specifier: 'catalog:'

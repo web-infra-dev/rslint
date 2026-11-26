@@ -18,7 +18,7 @@
     "@rslint/rule-tester": "workspace:*",
     "@stylistic/eslint-plugin": "catalog:",
     "@types/node": "catalog:",
-    "@typescript-eslint/eslint-plugin": "8.65.0",
+    "@typescript-eslint/eslint-plugin": "catalog:",
     "@typescript-eslint/parser": "catalog:",
     "@typescript-eslint/rule-tester": "workspace:*",
     "@typescript-eslint/utils": "workspace:*",

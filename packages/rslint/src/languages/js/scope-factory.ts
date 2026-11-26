@@ -41,6 +41,13 @@ import type { GlobalAccess } from './types.js';
 
 type NormalizedGlobalAccess = 'readonly' | 'writable' | 'off';
 
+export interface ScopeCompilerOptions {
+  readonly jsxFactory?: string;
+  readonly jsxFragmentFactory?: string;
+  readonly lib?: readonly string[];
+  readonly target?: number;
+}
+
 /** Subset of options accepted by both analyzers. */
 export interface ScopeFactoryOptions {
   filePath: string;
@@ -75,14 +82,19 @@ export interface ScopeFactoryOptions {
   globalReturn?: boolean;
   jsxPragma?: string;
   jsxFragmentName?: string;
+  /**
+   * Force the TypeScript scope analyzer even for `.js`/`.jsx` files (e.g.
+   * when TypeScript parserServices are attached).
+   */
+  useTsScope?: boolean;
+  /**
+   * Snapshot of compiler options read eagerly from `parserServices.program`
+   * so lazy `getScope()` calls never depend on a live type-service client.
+   */
+  compilerOptions?: ScopeCompilerOptions;
   parserServices?: {
     program?: {
-      getCompilerOptions(): {
-        jsxFactory?: string;
-        jsxFragmentFactory?: string;
-        lib?: readonly string[];
-        target?: number;
-      };
+      getCompilerOptions(): ScopeCompilerOptions;
     } | null;
   };
 }
@@ -125,8 +137,9 @@ export function makeScopeManagerFactory(
 function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
   const ecmaVersion = normalizeEcmaVersion(opts.ecmaVersion);
   const program = opts.parserServices?.program;
-  if (shouldUseTsScopeManager(opts.filePath) || program !== undefined) {
-    const compiler = program?.getCompilerOptions();
+  const hasTsParserServices = opts.useTsScope === true || program !== undefined;
+  if (shouldUseTsScopeManager(opts.filePath) || hasTsParserServices) {
+    const compiler = opts.compilerOptions ?? program?.getCompilerOptions();
     const tsScope = tsScopeManagerPkg as unknown as {
       analyze: (ast: object, options?: object) => unknown;
     };
@@ -155,7 +168,7 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
       // TypeScript files on the ordinary CLI historically use Fragment.
       jsxFragmentName:
         opts.jsxFragmentName ??
-        (program === undefined
+        (!hasTsParserServices
           ? 'Fragment'
           : compiler?.jsxFragmentFactory?.split('.')[0].trim()),
       lib: compiler && scopeLibs(compiler.lib, compiler.target),

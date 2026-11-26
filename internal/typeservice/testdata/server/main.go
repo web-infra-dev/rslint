@@ -130,6 +130,10 @@ func main() {
 				}{origins, frame, tree, f.FileName(), binding}
 				err = projectErr
 			case "source":
+				if session == nil {
+					err = errors.New("session not initialized")
+					return
+				}
 				f, sourceErr := session.Source(req.Generation, tspath.NormalizePath(req.File))
 				if sourceErr != nil {
 					err = sourceErr

@@ -1023,7 +1023,7 @@ export class GenerationSyntaxViews {
     const key =
       value.kind === SyntaxKind.SyntaxList
         ? `list:${this.key(ref.owner)}:${ref.child}`
-        : `token:${this.ordinal(ref.owner) ?? 0}:${value.pos}:${value.end}`;
+        : `token:${this.ordinal(ref.owner) ?? 0}:${value.kind}:${value.pos}:${value.end}`;
     return this.wrapRef(ref, key);
   }
 
@@ -1738,6 +1738,8 @@ export class FileSyntaxViews {
           }
         : {
             type: 'SequenceExpression',
+            start: info.start,
+            end: info.end,
             ...position,
             expressions: (this.sequenceMembers.get(info.sequence) ?? []).slice(
               0,

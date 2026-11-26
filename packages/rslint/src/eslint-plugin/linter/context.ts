@@ -44,7 +44,18 @@ import {
 // Public types
 // ─────────────────────────────────────────────────────────────────────
 
-/** Per-file language options shared by the rule context and the worker request. */
+/**
+ * The forwarded subset of ESLint flat-config `languageOptions` exposed
+ * to plugin rules as `context.languageOptions`.
+ *
+ * The core fields (`ecmaVersion`, `sourceType`, `globals`,
+ * `parserOptions.ecmaFeatures`) match Go's `EslintPluginLintFile.LanguageOptions`
+ * wire contract — any change to those fields must stay in sync with
+ * `ecma-language-plugin.ts:LintFileRequest` and Go's wire type. The optional
+ * TypeScript syntax-only flags (`emitDecoratorMetadata`,
+ * `experimentalDecorators`, `isolatedDeclarations`) are forwarded to
+ * `lintFile`'s `services` factory by direct callers and future bridge wiring.
+ */
 export interface LanguageOptions {
   /**
    * ECMAScript version target — top-level in ESLint v10. Plugin rules

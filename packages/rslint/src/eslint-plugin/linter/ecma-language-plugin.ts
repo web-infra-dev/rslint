@@ -184,8 +184,9 @@ type ParserOptions = NonNullable<
  *
  * When a `services` factory is provided, it receives the file's
  * `languageOptions.parserOptions` so it can apply per-file syntax-only
- * options at construction time; `lintFile` passes the returned object
- * directly to rules and scope analysis without wrapping or mutating it.
+ * options at construction time (`TypeServiceFile.parserServicesFactory`
+ * forwards them automatically); `lintFile` passes the returned object
+ * directly to rules without wrapping or mutating it.
  */
 export function lintFile(
   req: LintFileRequest,
@@ -222,32 +223,28 @@ export function lintFile(
   // ── 3. scope-manager factory (lazy) ──────────────────────────────
   // ESLint v10: sourceType / ecmaVersion / globals are top-level fields
   // of `languageOptions`. No legacy positions are accepted.
-  // Lazy SourceCode resources may outlive lintFile. Keep their language
-  // metadata, rather than capturing the request and its transport frame.
-  const rawParserOptions = req.languageOptions?.parserOptions;
-  const isolatedFromServices =
-    (parserServices as Record<string, unknown> | undefined)
-      ?.isolatedDeclarations === true;
+  // Lazy SourceCode resources may outlive lintFile and a closed type-service
+  // client. Snapshot compiler options eagerly so deferred getScope() calls
+  // never touch the live Program.
+  // ESLint v10 guarantees `languageOptions.parserOptions` is an object when a
+  // parser runs (e.g. `@typescript-eslint/no-deprecated` destructures it
+  // directly). Default missing `parserOptions` to `{}` when parser services
+  // are attached without writing derived parser flags back into it.
   const languageOptions =
-    services && !rawParserOptions
-      ? {
-          ...req.languageOptions,
-          parserOptions: isolatedFromServices
-            ? { isolatedDeclarations: true }
-            : {},
-        }
-      : isolatedFromServices &&
-          rawParserOptions?.isolatedDeclarations === undefined
-        ? {
-            ...req.languageOptions,
-            parserOptions: {
-              ...rawParserOptions,
-              isolatedDeclarations: true,
-            },
-          }
-        : req.languageOptions;
+    services && !req.languageOptions?.parserOptions
+      ? { ...req.languageOptions, parserOptions: {} }
+      : req.languageOptions;
   const globals = languageOptions?.globals;
   const ecmaFeatures = languageOptions?.parserOptions?.ecmaFeatures;
+  const compilerOptions = parserServices?.program?.getCompilerOptions();
+  const scopeCompilerOptions = compilerOptions
+    ? {
+        jsxFactory: compilerOptions.jsxFactory,
+        jsxFragmentFactory: compilerOptions.jsxFragmentFactory,
+        lib: compilerOptions.lib ? [...compilerOptions.lib] : undefined,
+        target: compilerOptions.target,
+      }
+    : undefined;
   const createScopeManager = makeScopeManagerFactory(ast, {
     filePath: req.filePath,
     sourceType: languageOptions?.sourceType ?? 'module',
@@ -260,7 +257,8 @@ export function lintFile(
     // are filled in by `scope-factory` to match ESLint v10.
     impliedStrict: ecmaFeatures?.impliedStrict,
     globalReturn: ecmaFeatures?.globalReturn,
-    parserServices,
+    useTsScope: parserServices?.program !== undefined,
+    compilerOptions: scopeCompilerOptions,
   });
   const scopeManagerFactory = () => {
     const sm = createScopeManager();

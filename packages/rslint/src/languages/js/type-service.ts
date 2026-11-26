@@ -8,6 +8,7 @@ import {
   GenerationSyntaxViews,
 } from './type-service-syntax.js';
 import {
+  DIRECT_RECORD_OPS,
   typeQueryKey,
   isCacheableTypeQuery,
   nameToUnits,
@@ -847,7 +848,9 @@ export class TypeServiceClient {
     const transport = this.transport;
     if (!transport) throw new Error('type service transport unavailable');
     const query: TypeServiceQuery =
-      this.maxFactsBytes === 0 && !this.replyRecords
+      this.maxFactsBytes === 0 &&
+      !this.replyRecords &&
+      DIRECT_RECORD_OPS.has(request.op)
         ? {
             generation: this.descriptor.generation,
             ...request,
@@ -1114,6 +1117,20 @@ export class TypeServiceFile {
     this.closed = true;
     this.syntax.close();
     this.owner.releaseFile(this);
+  }
+
+  /**
+   * Build a `lintFile` parserServices callback bound to this file handle and
+   * projection, automatically forwarding per-file `parserOptions`.
+   */
+  parserServicesFactory(
+    projection: TypeServiceProjection,
+    sourceFileName = this.binding.sourceFileName,
+  ) {
+    return (
+      frame: Readonly<DecodedFrame>,
+      parserOptions?: Readonly<ParserServiceOptions>,
+    ) => this.parserServices(frame, projection, sourceFileName, parserOptions);
   }
 
   parserServices(

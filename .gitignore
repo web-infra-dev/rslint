@@ -47,6 +47,9 @@ web_modules/
 # TypeScript cache
 *.tsbuildinfo
 
+# Temporary workspace fixtures created by type-services tests
+packages/rslint-test-tools/.type-services-*/
+
 # Optional npm cache directory
 .npm
 

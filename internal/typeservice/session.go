@@ -21,13 +21,17 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/nodebuilder"
 	"github.com/microsoft/TypeScript/tsc/shim/printer"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 var nextGeneration atomic.Uint32
-var ErrClosed = errors.New("type service session is closed")
+var (
+	ErrClosed   = errors.New("type service session is closed")
+	ErrPoisoned = errors.New("type service session is unusable after an internal panic")
+)
 
 // Public TypeScript ObjectFlags have different bit positions from Go's flags.
 // Do not expose checker-private cache state through the compatibility surface.
@@ -60,12 +64,25 @@ var publicObjectFlags = [...]struct {
 // One anchored checker supplies all objects, including cross-file declarations.
 // Exclusive checker access is acquired and released per query batch.
 //
+// Checker lease contract:
+//   - On project/LSP pools (core.CheckerLifetimeAPI), tsgo routes leases to a
+//     dedicated persistent checker that does not contend with diagnostic or
+//     query checkers. If that checker is later replaced (e.g. after a canceled
+//     request), QueryBatch returns "type service checker identity changed" and
+//     the caller must close this Session and create a new generation/session.
+//   - On CLI compiler pools (compiler.checkerPool), TypeCheckerForFileExclusive
+//     locks the anchor file's shard mutex directly. Callers MUST NOT invoke
+//     QueryBatch concurrently with (or from within) native lint shards
+//     holding exclusive checker leases on the same Program; JS typed linting
+//     must run in its own phase outside native shards.
+//
 // Locking order: lifeMu (RLock for active operations, Lock for Close) is always
 // acquired before checkMu (serializing exclusive checker access and handle maps).
 type Session struct {
 	lifeMu       sync.RWMutex
 	checkMu      sync.Mutex
 	extraMu      sync.RWMutex
+	poisoned     atomic.Bool
 	program      *program.Program
 	syntaxOnly   bool
 	anchor       *ast.SourceFile
@@ -411,10 +428,14 @@ func (s *Session) Query(ctx context.Context, q Query) ([]byte, error) {
 func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]byte, err error) {
 	defer func() {
 		if value := recover(); value != nil {
+			s.poisoned.Store(true)
 			packets = nil
 			err = fmt.Errorf("type service: %v", value)
 		}
 	}()
+	if s.poisoned.Load() {
+		return nil, ErrPoisoned
+	}
 	if len(queries) > 256 {
 		return nil, errors.New("type service batch exceeds 256 queries")
 	}
@@ -423,6 +444,9 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	}
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
+	if s.poisoned.Load() {
+		return nil, ErrPoisoned
+	}
 	if s.program == nil {
 		return nil, ErrClosed
 	}
@@ -585,8 +609,7 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 	return nil
 }
 
-func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Operation, result Result) ([]Record, error) {
-	var kind Operation
+func directRecordKind(op Operation) Operation {
 	switch op {
 	case "type", "fromTypeNode", "context", "constraint", "apparent", "baseLiteral", "nonNullable",
 		"errorType", "anyType", "unknownType", "stringType", "numberType", "booleanType",
@@ -597,15 +620,22 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 		"stringIndexType", "awaited", "widened", "baseTypes", "defaultType", "typeOfSymbol",
 		"indexInfo", "indexInfos", "declaredIndexInfos", "typePredicate", "parameterType", "propertyType",
 		"mappedFields", "classThisType", "contextualArgument":
-		kind = "typeRecord"
+		return "typeRecord"
 	case "symbol", "declarationSymbol", "aliasedSymbol", "property", "properties", "resolveName",
 		"exportSymbol", "immediateAliasedSymbol", "shorthandValueSymbol",
 		"exportSpecifierLocalTargetSymbol", "propertySymbolOfDestructuringAssignment",
 		"mergedSymbol", "moduleMember", "parameterPropertySymbols":
-		kind = "symbolRecord"
+		return "symbolRecord"
 	case "signature", "resolvedSignature", "signatures":
-		kind = "signatureRecord"
+		return "signatureRecord"
 	default:
+		return ""
+	}
+}
+
+func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Operation, result Result) ([]Record, error) {
+	kind := directRecordKind(op)
+	if kind == "" {
 		return nil, nil
 	}
 	var ids []uint32
@@ -794,28 +824,28 @@ func indexedNodeReference(f *ast.SourceFile, table *encoder.NodeIndexTable, n *a
 	return &NodeRef{File: f.FileName(), Index: index}
 }
 
-func (s *Session) typeByID(id uint32) *checker.Type {
+func (s *Session) typeByID(id uint32) (*checker.Type, error) {
 	t := s.types[id]
 	if t == nil {
-		panic("invalid type handle")
+		return nil, errors.New("invalid type handle")
 	}
-	return t
+	return t, nil
 }
 
-func (s *Session) symbolByID(id uint32) *ast.Symbol {
+func (s *Session) symbolByID(id uint32) (*ast.Symbol, error) {
 	v := s.symbols[id]
 	if v == nil {
-		panic("invalid symbol handle")
+		return nil, errors.New("invalid symbol handle")
 	}
-	return v
+	return v, nil
 }
 
-func (s *Session) signatureByID(id uint32) *checker.Signature {
+func (s *Session) signatureByID(id uint32) (*checker.Signature, error) {
 	v := s.signatures[id]
 	if v == nil {
-		panic("invalid signature handle")
+		return nil, errors.New("invalid signature handle")
 	}
-	return v
+	return v, nil
 }
 
 func (s *Session) typeID(t *checker.Type) uint32 {
@@ -899,8 +929,15 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	case *NodeRequest:
 		switch r.Op {
 		case "exportSpecifierLocalTargetSymbol":
+			if (native.Kind != ast.KindExportSpecifier || native.Parent == nil || native.Parent.Parent == nil) &&
+				native.Kind != ast.KindIdentifier {
+				return nil, errors.New("expected export specifier or identifier")
+			}
 			return Handle(s.symbolID(c.GetExportSpecifierLocalTargetSymbol(native))), nil
 		case "propertySymbolOfDestructuringAssignment":
+			if native.Kind != ast.KindIdentifier || native.Parent == nil || native.Parent.Parent == nil {
+				return Handle(0), nil
+			}
 			return Handle(s.symbolID(c.GetPropertySymbolOfDestructuringAssignment(native))), nil
 		case "jsxIntrinsicTagNamesAt":
 			return s.namedSymbols(c.GetJsxIntrinsicTagNamesAt(native)), nil
@@ -938,6 +975,9 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 					native = bound
 				}
 			}
+			if !ast.IsFunctionLike(native) {
+				return Handle(0), nil
+			}
 			return Handle(s.signatureID(c.GetSignatureFromDeclaration(native))), nil
 		case "shorthandValueSymbol":
 			return Handle(s.symbolID(c.GetShorthandAssignmentValueSymbol(native))), nil
@@ -968,7 +1008,12 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	case *NamedNodeRequest:
 		switch r.Op {
 		case "validPropertyAccess":
-			return Boolean(c.IsValidPropertyAccess(native, string(r.Name))), nil
+			switch native.Kind {
+			case ast.KindPropertyAccessExpression, ast.KindQualifiedName, ast.KindImportType:
+				return Boolean(c.IsValidPropertyAccess(native, string(r.Name))), nil
+			default:
+				return nil, errors.New("expected property access, qualified name, or import type")
+			}
 		case "parameterPropertySymbols":
 			if !ast.IsParameterPropertyDeclaration(native, native.Parent) ||
 				native.Parent == nil || native.Parent.Parent == nil ||
@@ -991,41 +1036,43 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 		return Handle(s.typeID(c.GetContextualTypeForArgumentAtIndex(native, r.Index))), nil
 	case *TypeRequest:
+		t, err := s.typeByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
 		switch r.Op {
 		case "augmentedPropertiesOfType":
-			return s.namedSymbols(checker.Checker_getAugmentedPropertiesOfType(c, s.typeByID(r.ID))), nil
+			return s.namedSymbols(checker.Checker_getAugmentedPropertiesOfType(c, t)), nil
 		case "constraint":
-			return Handle(s.typeID(c.GetBaseConstraintOfType(s.typeByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetBaseConstraintOfType(t))), nil
 		case "apparent":
-			return Handle(s.typeID(c.GetApparentType(s.typeByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetApparentType(t))), nil
 		case "baseLiteral":
-			return Handle(s.typeID(c.GetBaseTypeOfLiteralType(s.typeByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetBaseTypeOfLiteralType(t))), nil
 		case "nonNullable":
-			return Handle(s.typeID(c.GetNonNullableType(s.typeByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetNonNullableType(t))), nil
 		case "awaited":
-			return Handle(s.typeID(checker.Checker_getAwaitedType(c, s.typeByID(r.ID)))), nil
+			return Handle(s.typeID(checker.Checker_getAwaitedType(c, t))), nil
 		case "widened":
-			return Handle(s.typeID(c.GetWidenedType(s.typeByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetWidenedType(t))), nil
 		case "baseTypes":
-			t := s.typeByID(r.ID)
 			if t.ObjectFlags()&checker.ObjectFlagsReference != 0 {
 				t = t.Target()
 			}
 			return s.typeIDs(c.GetBaseTypes(t)), nil
 		case "defaultType":
-			return Handle(s.typeID(c.GetDefaultFromTypeParameter(s.typeByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetDefaultFromTypeParameter(t))), nil
 		case "declaredIndexInfos":
-			return s.declaredIndexInfos(s.typeByID(r.ID)), nil
+			return s.declaredIndexInfos(t), nil
 		case "typeDetails":
-			return s.typeDetails(s.typeByID(r.ID)), nil
+			return s.typeDetails(t), nil
 		case "classThisType":
-			t := s.typeByID(r.ID).AsInterfaceType()
-			if t == nil {
+			iface := t.AsInterfaceType()
+			if iface == nil {
 				return Handle(0), nil
 			}
-			return Handle(s.typeID(checker.InterfaceType_thisType(t))), nil
+			return Handle(s.typeID(checker.InterfaceType_thisType(iface))), nil
 		case "mappedFields":
-			t := s.typeByID(r.ID)
 			if t.ObjectFlags()&checker.ObjectFlagsMapped == 0 {
 				return Handles(nil), nil
 			}
@@ -1037,61 +1084,64 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				s.typeID(checker.MappedType_modifiersType(mapped)),
 			}, nil
 		case "properties":
-			return s.namedSymbols(c.GetPropertiesOfType(s.typeByID(r.ID))), nil
+			return s.namedSymbols(c.GetPropertiesOfType(t)), nil
 		case "typeArguments":
-			return s.typeIDs(c.GetTypeArguments(s.typeByID(r.ID))), nil
+			return s.typeIDs(c.GetTypeArguments(t)), nil
 		case "isArray":
-			return Boolean(c.IsArrayType(s.typeByID(r.ID))), nil
+			return Boolean(c.IsArrayType(t)), nil
 		case "isArrayLike":
-			return Boolean(c.IsArrayLikeType(s.typeByID(r.ID))), nil
+			return Boolean(c.IsArrayLikeType(t)), nil
 		case "isTuple":
-			return Boolean(checker.IsTupleType(s.typeByID(r.ID))), nil
+			return Boolean(checker.IsTupleType(t)), nil
 		case "numberIndexType":
-			return Handle(s.typeID(c.GetNumberIndexType(s.typeByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetNumberIndexType(t))), nil
 		case "stringIndexType":
-			return Handle(s.typeID(c.GetStringIndexType(s.typeByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetStringIndexType(t))), nil
 		case "indexInfos":
-			infos := c.GetIndexInfosOfType(s.typeByID(r.ID))
+			infos := c.GetIndexInfosOfType(t)
 			result := make(IndexInfos, len(infos))
 			for i, info := range infos {
 				result[i] = s.indexInfo(info)
 			}
 			return result, nil
 		case "typeRecord":
-			return s.typeFact(s.typeByID(r.ID))
+			return s.typeFact(t)
 		}
 	case *SymbolRequest:
+		sym, err := s.symbolByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
 		switch r.Op {
 		case "rootSymbols":
-			return s.namedSymbols(c.GetRootSymbols(s.symbolByID(r.ID))), nil
+			return s.namedSymbols(c.GetRootSymbols(sym)), nil
 		case "mergedSymbol":
-			return Handle(s.symbolID(c.GetMergedSymbol(s.symbolByID(r.ID)))), nil
+			return Handle(s.symbolID(c.GetMergedSymbol(sym))), nil
 		case "isArgumentsSymbol":
-			return Boolean(c.GetArgumentsSymbol() == s.symbolByID(r.ID)), nil
+			return Boolean(c.GetArgumentsSymbol() == sym), nil
 		case "isUndefinedSymbol":
-			return Boolean(c.GetUndefinedSymbol() == s.symbolByID(r.ID)), nil
+			return Boolean(c.GetUndefinedSymbol() == sym), nil
 		case "aliasedSymbol":
-			return Handle(s.symbolID(c.GetAliasedSymbol(s.symbolByID(r.ID)))), nil
+			return Handle(s.symbolID(c.GetAliasedSymbol(sym))), nil
 		case "immediateAliasedSymbol":
-			return Handle(s.symbolID(c.GetImmediateAliasedSymbol(s.symbolByID(r.ID)))), nil
+			return Handle(s.symbolID(c.GetImmediateAliasedSymbol(sym))), nil
 		case "isUnknownSymbol":
-			return Boolean(c.IsUnknownSymbol(s.symbolByID(r.ID))), nil
+			return Boolean(c.IsUnknownSymbol(sym)), nil
 		case "exportsOfModule":
-			exports := c.GetExportsOfModule(s.symbolByID(r.ID))
+			exports := c.GetExportsOfModule(sym)
 			slices.SortFunc(exports, c.CompareSymbols)
 			return s.namedSymbols(exports), nil
 		case "fullyQualifiedName":
-			return Text(c.GetFullyQualifiedName(s.symbolByID(r.ID))), nil
+			return Text(c.GetFullyQualifiedName(sym)), nil
 		case "symbolMembers", "symbolExports":
-			return s.symbolTable(c, s.symbolByID(r.ID), r.Op == "symbolExports"), nil
+			return s.symbolTable(c, sym, r.Op == "symbolExports"), nil
 		case "exportSymbol":
-			return Handle(s.symbolID(c.GetExportSymbolOfSymbol(s.symbolByID(r.ID)))), nil
+			return Handle(s.symbolID(c.GetExportSymbolOfSymbol(sym))), nil
 		case "declaredType":
-			return Handle(s.typeID(c.GetDeclaredTypeOfSymbol(s.symbolByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetDeclaredTypeOfSymbol(sym))), nil
 		case "typeOfSymbol":
-			return Handle(s.typeID(c.GetTypeOfSymbol(s.symbolByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetTypeOfSymbol(sym))), nil
 		case "symbolRecord":
-			sym := s.symbolByID(r.ID)
 			declarations, value := symbolDeclarations(sym, true)
 			return &SymbolFact{
 				Name:        symbolName(sym),
@@ -1106,7 +1156,10 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		if !r.WithChecker {
 			c = nil
 		}
-		symbol := s.symbolByID(r.ID)
+		symbol, err := s.symbolByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
 		active := map[*ast.Symbol]bool{symbol: true}
 		declarations, _ := symbolDeclarations(symbol, false)
 		if r.Op == "symbolDocumentation" {
@@ -1114,18 +1167,22 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 		return jsDocTags(c, declarations, active), nil
 	case *SignatureRequest:
+		sig, err := s.signatureByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
 		switch r.Op {
 		case "returnType":
-			return Handle(s.typeID(c.GetReturnTypeOfSignature(s.signatureByID(r.ID)))), nil
+			return Handle(s.typeID(c.GetReturnTypeOfSignature(sig))), nil
 		case "signatureDocumentation", "signatureJSDocTags":
-			declarations := []*ast.Node{s.signatureByID(r.ID).Declaration()}
+			declarations := []*ast.Node{sig.Declaration()}
 			active := make(map[*ast.Symbol]bool)
 			if r.Op == "signatureDocumentation" {
 				return documentation(c, declarations, active), nil
 			}
 			return jsDocTags(c, declarations, active), nil
 		case "typePredicate":
-			predicate := c.GetTypePredicateOfSignature(s.signatureByID(r.ID))
+			predicate := c.GetTypePredicateOfSignature(sig)
 			if predicate == nil {
 				return (*TypePredicateFact)(nil), nil
 			}
@@ -1137,7 +1194,6 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			}
 			return fact, nil
 		case "signatureRecord":
-			sig := s.signatureByID(r.ID)
 			return &SignatureFact{
 				Parameters:       s.symbolIDs(sig.Parameters()),
 				TypeParameters:   s.typeIDs(sig.TypeParameters()),
@@ -1186,27 +1242,55 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	case *PropertyRequest:
 		switch r.Op {
 		case "moduleMember":
-			return Handle(s.symbolID(c.TryGetMemberInModuleExports(string(r.Name), s.symbolByID(r.ID)))), nil
+			sym, err := s.symbolByID(r.ID)
+			if err != nil {
+				return nil, err
+			}
+			return Handle(s.symbolID(c.TryGetMemberInModuleExports(string(r.Name), sym))), nil
 		case "property":
-			return Handle(s.symbolID(c.GetPropertyOfType(s.typeByID(r.ID), string(r.Name)))), nil
+			t, err := s.typeByID(r.ID)
+			if err != nil {
+				return nil, err
+			}
+			return Handle(s.symbolID(c.GetPropertyOfType(t, string(r.Name)))), nil
 		case "propertyType":
-			return Handle(s.typeID(c.GetTypeOfPropertyOfType(s.typeByID(r.ID), string(r.Name)))), nil
+			t, err := s.typeByID(r.ID)
+			if err != nil {
+				return nil, err
+			}
+			return Handle(s.typeID(c.GetTypeOfPropertyOfType(t, string(r.Name)))), nil
 		}
 	case *SymbolTypeRequest:
-		return Handle(s.typeID(c.GetTypeOfSymbolAtLocation(s.symbolByID(r.ID), native))), nil
+		sym, err := s.symbolByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
+		return Handle(s.typeID(c.GetTypeOfSymbolAtLocation(sym, native))), nil
 	case *ResolveNameRequest:
 		return Handle(s.symbolID(resolveName(c, string(r.Name), native, ast.SymbolFlags(r.Kind), r.ExcludeGlobals))), nil
 	case *AssignableRequest:
-		return Boolean(c.IsTypeAssignableTo(s.typeByID(r.Source), s.typeByID(r.Target))), nil
+		source, err := s.typeByID(r.Source)
+		if err != nil {
+			return nil, err
+		}
+		target, err := s.typeByID(r.Target)
+		if err != nil {
+			return nil, err
+		}
+		return Boolean(c.IsTypeAssignableTo(source, target)), nil
 	case *IndexInfoRequest:
 		if r.Kind > 1 {
 			return nil, errors.New("invalid index kind")
+		}
+		t, err := s.typeByID(r.ID)
+		if err != nil {
+			return nil, err
 		}
 		key := c.GetNumberType()
 		if r.Kind == 0 {
 			key = c.GetStringType()
 		}
-		info := c.GetIndexInfoOfType(s.typeByID(r.ID), key)
+		info := c.GetIndexInfoOfType(t, key)
 		if info == nil {
 			return IndexInfos{}, nil
 		}
@@ -1214,7 +1298,11 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	case *ScopeSymbolsRequest:
 		return s.namedSymbols(symbolsInScope(c, native, ast.SymbolFlags(r.Meaning))), nil
 	case *ParameterTypeRequest:
-		return Handle(s.typeID(c.GetTypeParameterAtPosition(s.signatureByID(r.ID), r.Position))), nil
+		sig, err := s.signatureByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
+		return Handle(s.typeID(c.GetTypeParameterAtPosition(sig, r.Position))), nil
 	case *StringLiteralRequest:
 		return Handle(s.typeID(checker.Checker_getStringLiteralType(c, string(r.Value)))), nil
 	case *NumberLiteralRequest:
@@ -1239,7 +1327,11 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		negative := r.Negative && text != "0"
 		return Handle(s.typeID(checker.Checker_getBigIntLiteralType(c, jsnum.PseudoBigInt{Negative: negative, Base10Value: text}))), nil
 	case *NullableTypeRequest:
-		return Handle(s.typeID(checker.Checker_getNullableType(c, s.typeByID(r.ID), checker.TypeFlags(r.Flags)))), nil
+		t, err := s.typeByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
+		return Handle(s.typeID(checker.Checker_getNullableType(c, t, checker.TypeFlags(r.Flags)))), nil
 	case *TypePredicateStringRequest:
 		if r.Kind > uint32(checker.TypePredicateKindAssertsIdentifier) {
 			return nil, errors.New("invalid type predicate kind")
@@ -1250,7 +1342,11 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 		var predType *checker.Type
 		if r.Type != 0 {
-			predType = s.typeByID(r.Type)
+			var err error
+			predType, err = s.typeByID(r.Type)
+			if err != nil {
+				return nil, err
+			}
 		}
 		pred := checker.Checker_newTypePredicate(c, checker.TypePredicateKind(r.Kind), name, r.ParameterIndex, predType)
 		flags := checker.TypeFormatFlagsUseAliasDefinedOutsideCurrentScope
@@ -1264,8 +1360,12 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		if r.Kind > 1 {
 			return nil, errors.New("invalid signature kind")
 		}
+		t, err := s.typeByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
 		ids := Handles{}
-		for _, v := range c.GetSignaturesOfType(s.typeByID(r.ID), checker.SignatureKind(r.Kind)) {
+		for _, v := range c.GetSignaturesOfType(t, checker.SignatureKind(r.Kind)) {
 			ids = append(ids, s.signatureID(v))
 		}
 		return ids, nil
@@ -1380,34 +1480,49 @@ func (s *Session) typeFact(t *checker.Type) (*TypeFact, error) {
 func (s *Session) executePrint(c *checker.Checker, r *PrintRequest, native *ast.Node) (Result, error) {
 	switch r.Op {
 	case "symbolString":
+		sym, err := s.symbolByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
 		flags := checker.SymbolFormatFlagsAllowAnyNodeKind
 		if r.Flags != nil {
 			flags = checker.SymbolFormatFlags(*r.Flags)
 		}
-		return Text(c.SymbolToStringEx(s.symbolByID(r.ID), native, ast.SymbolFlags(r.Kind), flags)), nil
+		return Text(c.SymbolToStringEx(sym, native, ast.SymbolFlags(r.Kind), flags)), nil
 	case "typeNode":
+		t, err := s.typeByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
 		var builderFlags nodebuilder.Flags
 		if r.Flags != nil {
 			builderFlags = nodebuilder.Flags(*r.Flags)
 		}
 		builder := checker.NewNodeBuilder(c, printer.NewEmitContext())
-		node := builder.TypeToTypeNode(s.typeByID(r.ID), native, builderFlags, nodebuilder.InternalFlagsNone, nil)
+		node := builder.TypeToTypeNode(t, native, builderFlags, nodebuilder.InternalFlagsNone, nil)
 		return encodeGeneratedNode(node, builder, native)
 	case "typeString":
+		t, err := s.typeByID(r.ID)
+		if err != nil {
+			return nil, err
+		}
 		flags := checker.TypeFormatFlagsAllowUniqueESSymbolType | checker.TypeFormatFlagsUseAliasDefinedOutsideCurrentScope
 		if r.Flags != nil {
 			flags = checker.TypeFormatFlags(*r.Flags)
 		}
-		return Text(sanitizeTruncatedUTF8(c.TypeToStringEx(s.typeByID(r.ID), native, flags, nil))), nil
+		return Text(sanitizeTruncatedUTF8(c.TypeToStringEx(t, native, flags, nil))), nil
 	case "signatureString":
 		if r.Kind > uint32(checker.SignatureKindConstruct) {
 			return nil, errors.New("invalid signature kind")
+		}
+		sig, err := s.signatureByID(r.ID)
+		if err != nil {
+			return nil, err
 		}
 		flags := checker.TypeFormatFlagsNone
 		if r.Flags != nil {
 			flags = checker.TypeFormatFlags(*r.Flags)
 		}
-		sig := s.signatureByID(r.ID)
 		if r.Kind == uint32(checker.SignatureKindCall) {
 			flags |= checker.TypeFormatFlagsWriteCallStyleSignature
 			return Text(c.SignatureToStringEx(sig, native, flags, nil)), nil
@@ -1485,7 +1600,99 @@ func resolveNode(f *ast.SourceFile, node NodeRef) (*ast.Node, error) {
 	if !ast.IsTokenKind(token.Kind) {
 		return nil, errors.New("invalid compiler token kind")
 	}
-	return f.GetOrCreateToken(token.Kind, pos, end, parent, ast.TokenFlagsNone), nil
+	tokenStart, flags, ok := scanValidatedToken(f, token.Kind, pos, end)
+	if !ok {
+		return nil, errors.New("compiler token does not match source")
+	}
+	return createEphemeralToken(f, token.Kind, pos, tokenStart, end, parent, flags), nil
+}
+
+// scanValidatedToken verifies that a client-supplied token kind and range match
+// the actual source text without writing into the shared SourceFile tokenCache.
+func scanValidatedToken(f *ast.SourceFile, kind ast.Kind, pos, end int) (int, ast.TokenFlags, bool) {
+	s := scanner.GetScannerForSourceFile(f, pos)
+	scanned := s.Token()
+	if (scanned == kind || (kind == ast.KindIdentifier && ast.IsKeywordKind(scanned))) && s.TokenEnd() == end {
+		return s.TokenStart(), s.TokenFlags(), true
+	}
+	switch kind {
+	case ast.KindGreaterThanToken, ast.KindGreaterThanGreaterThanToken, ast.KindGreaterThanEqualsToken,
+		ast.KindGreaterThanGreaterThanEqualsToken, ast.KindGreaterThanGreaterThanGreaterThanToken,
+		ast.KindGreaterThanGreaterThanGreaterThanEqualsToken:
+		if s.ReScanGreaterThanToken() == kind && s.TokenEnd() == end {
+			return s.TokenStart(), s.TokenFlags(), true
+		}
+	case ast.KindLessThanToken:
+		if s.ReScanLessThanToken() == kind && s.TokenEnd() == end {
+			return s.TokenStart(), s.TokenFlags(), true
+		}
+	case ast.KindQuestionToken:
+		if s.ReScanQuestionToken() == kind && s.TokenEnd() == end {
+			return s.TokenStart(), s.TokenFlags(), true
+		}
+	case ast.KindRegularExpressionLiteral:
+		if s.ReScanSlashToken() == kind && s.TokenEnd() == end {
+			return s.TokenStart(), s.TokenFlags(), true
+		}
+	case ast.KindTemplateMiddle, ast.KindTemplateTail:
+		if s.ReScanTemplateToken(false) == kind && s.TokenEnd() == end {
+			return s.TokenStart(), s.TokenFlags(), true
+		}
+	case ast.KindJsxText, ast.KindJsxTextAllWhiteSpaces, ast.KindLessThanSlashToken:
+		if s.ReScanJsxToken(true) == kind && s.TokenEnd() == end {
+			return s.TokenStart(), s.TokenFlags(), true
+		}
+	case ast.KindHashToken:
+		if s.ReScanHashToken() == kind && s.TokenEnd() == end {
+			return s.TokenStart(), s.TokenFlags(), true
+		}
+	case ast.KindAsteriskEqualsToken:
+		if s.ReScanAsteriskEqualsToken() == kind && s.TokenEnd() == end {
+			return s.TokenStart(), s.TokenFlags(), true
+		}
+	case ast.KindStringLiteral:
+		if s.ReScanJsxAttributeValue() == kind && s.TokenEnd() == end {
+			return s.TokenStart(), s.TokenFlags(), true
+		}
+	}
+	return 0, ast.TokenFlagsNone, false
+}
+
+// createEphemeralToken builds a request-local token node without mutating
+// SourceFile.tokenCache.
+func createEphemeralToken(f *ast.SourceFile, kind ast.Kind, pos, tokenStart, end int, parent *ast.Node, flags ast.TokenFlags) *ast.Node {
+	factory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
+	text := f.Text()[tokenStart:end]
+	var tok *ast.Node
+	switch kind {
+	case ast.KindNumericLiteral:
+		tok = factory.NewNumericLiteral(text, flags)
+	case ast.KindBigIntLiteral:
+		tok = factory.NewBigIntLiteral(text, flags)
+	case ast.KindStringLiteral:
+		tok = factory.NewStringLiteral(text, flags)
+	case ast.KindJsxText, ast.KindJsxTextAllWhiteSpaces:
+		tok = factory.NewJsxText(text, kind == ast.KindJsxTextAllWhiteSpaces)
+	case ast.KindRegularExpressionLiteral:
+		tok = factory.NewRegularExpressionLiteral(text, flags)
+	case ast.KindNoSubstitutionTemplateLiteral:
+		tok = factory.NewNoSubstitutionTemplateLiteral(text, flags)
+	case ast.KindTemplateHead:
+		tok = factory.NewTemplateHead(text, "", flags)
+	case ast.KindTemplateMiddle:
+		tok = factory.NewTemplateMiddle(text, "", flags)
+	case ast.KindTemplateTail:
+		tok = factory.NewTemplateTail(text, "", flags)
+	case ast.KindIdentifier:
+		tok = factory.NewIdentifier(text)
+	case ast.KindPrivateIdentifier:
+		tok = factory.NewPrivateIdentifier(text)
+	default:
+		tok = factory.NewToken(kind)
+	}
+	tok.Loc = core.NewTextRange(pos, end)
+	tok.Parent = parent
+	return tok
 }
 
 func encodeGeneratedNode(node *ast.Node, builder *checker.NodeBuilder, enclosing *ast.Node) (Result, error) {
@@ -1521,7 +1728,7 @@ func encodeGeneratedNode(node *ast.Node, builder *checker.NodeBuilder, enclosing
 			result.parseNodes[index] = origin
 		}
 	}
-	prepareGeneratedSyntax(tree, ast.GetSourceFileOfNode(enclosing))
+	prepareGeneratedSyntax(tree, table.Nodes, result.parseNodes, ast.GetSourceFileOfNode(enclosing))
 	return result, nil
 }
 

@@ -4,11 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
 
+	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
@@ -367,5 +372,206 @@ func TestConfigDiagnosticSourcePreservesCaseSensitivePath(t *testing.T) {
 	lowerPath := openDiagPath(lowerCfg, lowerFile)
 	if upperPath != upperCfg || lowerPath != lowerCfg || upperPath == lowerPath {
 		t.Fatalf("expected distinct case-sensitive config paths %q and %q, got %q and %q", upperCfg, lowerCfg, upperPath, lowerPath)
+	}
+}
+
+func TestResolveNodeTokenValidationDoesNotPolluteSourceFileCache(t *testing.T) {
+	p, _, root := buildTestProgram(t, map[string]string{
+		"input.ts": "export type Nested = Array<Array<number>>;\n",
+	}, []string{"input.ts"})
+	fileName := tspath.ResolvePath(root, "input.ts")
+	f := p.GetSourceFile(fileName)
+	table := encoder.GetNodeIndexTable(f)
+	if len(table.Nodes) < 2 {
+		t.Fatal("expected populated node index table")
+	}
+
+	// Find the outer TypeReference node (`Array<Array<number>>`) and its two `>` tokens.
+	var outerTypeRef uint32
+	for idx, n := range table.Nodes {
+		if n != nil && n.Kind == ast.KindTypeReference && strings.Contains(f.Text()[n.Pos():n.End()], "Array<Array<number>>") {
+			outerTypeRef = uint32(idx)
+			break
+		}
+	}
+	if outerTypeRef == 0 {
+		t.Fatal("failed to locate outer TypeReference")
+	}
+
+	// Mismatched client-supplied token kind MUST be rejected and MUST NOT
+	// write into SourceFile.tokenCache.
+	if _, err := resolveNode(f, NodeRef{
+		File:  fileName,
+		Index: 1,
+		Token: &SyntaxToken{Kind: ast.KindPlusToken, Pos: 0, End: 6},
+	}); err == nil {
+		t.Fatal("expected mismatched token kind to be rejected")
+	}
+	// Calling SourceFile.GetOrCreateToken with the real kind afterwards must not panic.
+	if tok := f.GetOrCreateToken(ast.KindExportKeyword, 0, 6, table.Nodes[1], ast.TokenFlagsNone); tok == nil || tok.Kind != ast.KindExportKeyword {
+		t.Fatalf("expected clean SourceFile token cache after rejected token, got %v", tok)
+	}
+
+	// Valid re-scanned token (`>` inside `>>`) must succeed as an ephemeral token.
+	gtPos := strings.Index(f.Text(), ">>")
+	if gtPos < 0 {
+		t.Fatal("expected >> in fixture")
+	}
+	resolved, err := resolveNode(f, NodeRef{
+		File:  fileName,
+		Index: outerTypeRef,
+		Token: &SyntaxToken{Kind: ast.KindGreaterThanToken, Pos: gtPos, End: gtPos + 1},
+	})
+	if err != nil || resolved.Kind != ast.KindGreaterThanToken {
+		t.Fatalf("expected re-scanned > token, got %v err=%v", resolved, err)
+	}
+}
+
+func TestInvalidHandlesAndNodeKindsReturnErrorsWithoutPoisoningSession(t *testing.T) {
+	p, _, root := buildTestProgram(t, map[string]string{
+		"input.ts": "export const value = 1;\n",
+	}, []string{"input.ts"})
+	fileName := tspath.ResolvePath(root, "input.ts")
+	f := p.GetSourceFile(fileName)
+	session, err := New(t.Context(), p, []*ast.SourceFile{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	desc, err := session.Descriptor()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Invalid handles must return regular errors without poisoning the session.
+	for _, req := range []Request{
+		&TypeRequest{Op: "typeRecord", ID: 999999},
+		&SymbolRequest{Op: "symbolRecord", ID: 999999},
+		&SignatureRequest{Op: "signatureRecord", ID: 999999},
+	} {
+		if _, err := session.Query(t.Context(), Query{
+			Scope:   Scope{Generation: desc.Generation},
+			Request: req,
+		}); err == nil || errors.Is(err, ErrPoisoned) {
+			t.Fatalf("expected non-poisoning handle error for %q, got %v", req.operation(), err)
+		}
+	}
+
+	// Wrong node kinds for checker ops that otherwise panic must be handled safely.
+	srcRef := NodeRef{File: fileName, Index: 1}
+	for _, req := range []Request{
+		&NodeRequest{Op: "signature", Node: srcRef},
+		&NodeRequest{Op: "propertySymbolOfDestructuringAssignment", Node: srcRef},
+	} {
+		if _, err := session.Query(t.Context(), Query{
+			Scope:   Scope{Generation: desc.Generation},
+			Request: req,
+		}); err != nil {
+			t.Fatalf("expected nil-handle response for %q on SourceFile, got err=%v", req.operation(), err)
+		}
+	}
+	for _, req := range []Request{
+		&NodeRequest{Op: "exportSpecifierLocalTargetSymbol", Node: srcRef},
+		&NamedNodeRequest{Op: "validPropertyAccess", Node: srcRef, Name: "x"},
+	} {
+		if _, err := session.Query(t.Context(), Query{
+			Scope:   Scope{Generation: desc.Generation},
+			Request: req,
+		}); err == nil || errors.Is(err, ErrPoisoned) {
+			t.Fatalf("expected non-poisoning validation error for %q on SourceFile, got %v", req.operation(), err)
+		}
+	}
+
+	// Session must still serve valid queries after all rejected inputs.
+	if _, err := session.Query(t.Context(), Query{
+		Scope:   Scope{Generation: desc.Generation},
+		Request: &CheckerRequest{Op: "stringType"},
+	}); err != nil {
+		t.Fatalf("session unexpectedly unusable after validation errors: %v", err)
+	}
+
+	// A recovered internal panic must poison the session against further use.
+	session.poisoned.Store(true)
+	if _, err := session.Query(t.Context(), Query{
+		Scope:   Scope{Generation: desc.Generation},
+		Request: &CheckerRequest{Op: "stringType"},
+	}); !errors.Is(err, ErrPoisoned) {
+		t.Fatalf("expected ErrPoisoned after panic, got %v", err)
+	}
+}
+
+func TestProtocolOperationsMatchTypeScriptTables(t *testing.T) {
+	protocolPath := filepath.Join("..", "..", "packages", "rslint", "src", "languages", "js", "type-service-protocol.ts")
+	raw, err := os.ReadFile(protocolPath)
+	if err != nil {
+		t.Fatalf("read TS protocol file: %v", err)
+	}
+	src := string(raw)
+
+	// Extract SCALAR_KINDS keys (+ the 4 record ops) and verify every TS op
+	// decodes in Go Query.UnmarshalJSON.
+	scalarStart := strings.Index(src, "export const SCALAR_KINDS")
+	if scalarStart < 0 {
+		t.Fatal("SCALAR_KINDS not found")
+	}
+	scalarEnd := strings.Index(src[scalarStart:], "};")
+	if scalarEnd < 0 {
+		t.Fatal("SCALAR_KINDS closing brace not found")
+	}
+	scalarBlock := src[scalarStart : scalarStart+scalarEnd]
+	keyRe := regexp.MustCompile(`(?m)^\s+([a-zA-Z0-9_]+):\s+\d+,`)
+	tsOps := map[Operation]bool{
+		"typeRecord":      true,
+		"symbolRecord":    true,
+		"signatureRecord": true,
+		"nodeRecord":      true,
+	}
+	for _, m := range keyRe.FindAllStringSubmatch(scalarBlock, -1) {
+		tsOps[Operation(m[1])] = true
+	}
+	if len(tsOps) < 50 {
+		t.Fatalf("unexpectedly few TS operations parsed: %d", len(tsOps))
+	}
+	for op := range tsOps {
+		var q Query
+		payload, err := json.Marshal(struct {
+			Generation uint32         `json:"generation"`
+			Op         Operation      `json:"op"`
+			Args       map[string]int `json:"args"`
+		}{Generation: 1, Op: op, Args: map[string]int{}})
+		if err != nil {
+			t.Fatalf("marshal %q: %v", op, err)
+		}
+		if err := json.Unmarshal(payload, &q); err != nil {
+			t.Errorf("TS operation %q failed to decode in Go Query.UnmarshalJSON: %v", op, err)
+		}
+	}
+
+	// Extract DIRECT_RECORD_OPS from TS and assert exact 1:1 match with Go directRecordKind.
+	directStart := strings.Index(src, "export const DIRECT_RECORD_OPS")
+	if directStart < 0 {
+		t.Fatal("DIRECT_RECORD_OPS not found")
+	}
+	directEnd := strings.Index(src[directStart:], "]);")
+	if directEnd < 0 {
+		t.Fatal("DIRECT_RECORD_OPS closing bracket not found")
+	}
+	directBlock := src[directStart : directStart+directEnd]
+	strRe := regexp.MustCompile(`'([a-zA-Z0-9_]+)'`)
+	tsDirect := make(map[Operation]bool)
+	for _, m := range strRe.FindAllStringSubmatch(directBlock, -1) {
+		tsDirect[Operation(m[1])] = true
+	}
+	for op := range tsOps {
+		inGo := directRecordKind(op) != ""
+		inTS := tsDirect[op]
+		if inGo != inTS {
+			t.Errorf("direct-record mismatch for %q: Go=%v TS=%v", op, inGo, inTS)
+		}
+	}
+	for op := range tsDirect {
+		if !tsOps[op] {
+			t.Errorf("DIRECT_RECORD_OPS contains unknown op %q", op)
+		}
 	}
 }
