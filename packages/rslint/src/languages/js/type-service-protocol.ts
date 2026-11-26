@@ -495,7 +495,7 @@ function formatNodeKey(node: NodeRef | undefined): string {
 }
 
 export function typeQueryKey(q: TypeServiceQuery): string {
-  const prefix = `${q.generation}:${operationIDs.get(q.op) ?? 0}:`;
+  const prefix = `${q.generation}:${operationIDs.get(q.op) ?? 0}${q.skipRecords ? 's' : ''}:`;
   switch (q.op) {
     case 'rootFileNames':
     case 'errorType':

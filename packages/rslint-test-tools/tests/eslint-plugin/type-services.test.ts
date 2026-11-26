@@ -13,6 +13,7 @@ import ts from 'typescript';
 import { typeServiceCompilerData } from '../../../rslint/src/languages/js/type-service-compiler-data.js';
 import {
   TypeServiceClient,
+  typeQueryKey,
   type TypeServiceDescriptor,
 } from '../../../rslint/src/languages/js/type-service.js';
 import { lintFile } from '../../../rslint/src/eslint-plugin/linter/ecma-language-plugin.js';
@@ -791,12 +792,16 @@ describe('original npm typed rules over Go type services', () => {
         );
         try {
           const handle = client.file(projection.binding);
-          const result = lintFile(request, { rules } as any, (decoded) =>
-            handle.parserServices(
-              decoded,
-              projection,
-              projection.binding.sourceFileName,
-            ),
+          const result = lintFile(
+            request,
+            { rules } as any,
+            (decoded, parserOptions) =>
+              handle.parserServices(
+                decoded,
+                projection,
+                projection.binding.sourceFileName,
+                parserOptions,
+              ),
           );
           expect(result.parseError).toBeUndefined();
           expect(result.ruleErrors).toBeUndefined();
@@ -2039,30 +2044,63 @@ export class Consumer {
             opts?.fileParserOptions ?? parserOptions,
           );
           if (!opts?.customGetterFactory) return base;
-          // Custom class factory exposing node maps via prototype getters
-          // backed by `#private` fields alongside a method reading
-          // `this.emitDecoratorMetadata` and a method reading `#tag`.
+          // Custom class factory applies the file's parserOptions at
+          // construction time; lintFile passes the original instance directly
+          // to rules so private methods, `#field in this`, setters, read-only
+          // fields, non-configurable defineProperty, and domain errors behave
+          // identically to native class instances without double execution.
           class CustomSyntaxServices {
             readonly #tag = 'kept';
             readonly #maps = {
               esTreeNodeToTSNodeMap: base.esTreeNodeToTSNodeMap,
               tsNodeToESTreeNodeMap: base.tsNodeToESTreeNodeMap,
             };
+            #label = 'initial';
             readonly program = null;
-            readonly emitDecoratorMetadata = false;
-            readonly experimentalDecorators = false;
-            readonly isolatedDeclarations = false;
+            readonly emitDecoratorMetadata: boolean;
+            readonly experimentalDecorators: boolean;
+            readonly isolatedDeclarations: boolean;
+            readonly locked = 'source';
+            calls = 0;
+            constructor() {
+              this.emitDecoratorMetadata =
+                parserOptions?.emitDecoratorMetadata === true;
+              this.experimentalDecorators =
+                parserOptions?.experimentalDecorators === true;
+              this.isolatedDeclarations =
+                parserOptions?.isolatedDeclarations === true;
+              Object.defineProperty(this, 'locked', {
+                value: 'source',
+                writable: false,
+                enumerable: true,
+                configurable: false,
+              });
+            }
+            #helper() {
+              return this.#tag;
+            }
             get esTreeNodeToTSNodeMap() {
               return this.#maps.esTreeNodeToTSNodeMap;
             }
             get tsNodeToESTreeNodeMap() {
               return this.#maps.tsNodeToESTreeNodeMap;
             }
-            readDecoratorFlag() {
-              return this.emitDecoratorMetadata;
+            get label() {
+              return this.#label;
             }
-            readTag() {
-              return this.#tag;
+            set label(value: string) {
+              this.#label = value.trim();
+            }
+            readMixed() {
+              this.calls += 1;
+              return [this.#helper(), this.emitDecoratorMetadata] as const;
+            }
+            hasPrivate() {
+              return #tag in this;
+            }
+            throwDomainError(): never {
+              this.calls += 1;
+              throw new TypeError('private field metadata is unavailable');
             }
           }
           const instance = new CustomSyntaxServices();
@@ -2113,9 +2151,8 @@ export class Consumer {
   const syntaxDisabledByDefault = await runMode(plainConfig, true);
   expect(syntaxDisabledByDefault.result.diagnostics).toHaveLength(1);
 
-  // Syntax-only custom class factory with prototype getters + prototype method:
-  // per-file override must preserve getters, method identity, consistent `this`,
-  // and expando writes without mutating the original factory object.
+  // Syntax-only custom class factory receives parserOptions at construction
+  // time and rules receive the original class instance directly (no wrapper).
   const customWithOverride = await runMode(plainConfig, true, {
     requestParserOptions: {
       experimentalDecorators: true,
@@ -2125,22 +2162,39 @@ export class Consumer {
   });
   expect(customWithOverride.result.diagnostics).toEqual([]);
   const customSvc = customWithOverride.seenService as any;
+  expect(customSvc).toBe(customWithOverride.originalInstance);
   expect(customSvc.emitDecoratorMetadata).toBe(true);
-  expect(customSvc.readDecoratorFlag()).toBe(true);
-  expect(customSvc.readTag()).toBe('kept');
   expect(customSvc.esTreeNodeToTSNodeMap).toBeDefined();
-  expect(customWithOverride.originalInstance?.emitDecoratorMetadata).toBe(
-    false,
+  expect(customSvc.readMixed()).toEqual(['kept', true]);
+  expect(customSvc.calls).toBe(1);
+  expect(customSvc.hasPrivate()).toBe(true);
+  expect(() => customSvc.throwDomainError()).toThrow(
+    'private field metadata is unavailable',
   );
-  expect(customSvc.readDecoratorFlag).toBe(customSvc.readDecoratorFlag);
-  customSvc._memo = new Map<string, number>();
-  customSvc._memo.set('hit', 1);
-  expect(customSvc._memo.get('hit')).toBe(1);
-  expect((customWithOverride.originalInstance as any)._memo).toBeUndefined();
+  expect(customSvc.calls).toBe(2);
+  customSvc.label = '  active  ';
+  expect(customSvc.label).toBe('active');
+  expect(Reflect.set(customSvc, 'locked', 'overwritten')).toBe(false);
+  expect(customSvc.locked).toBe('source');
+  Object.defineProperty(customSvc, 'memoSlot', {
+    value: 7,
+    writable: false,
+    enumerable: false,
+    configurable: false,
+  });
+  expect(Object.getOwnPropertyDescriptor(customSvc, 'memoSlot')).toEqual({
+    value: 7,
+    writable: false,
+    enumerable: false,
+    configurable: false,
+  });
+  expect(customSvc.readMixed).toBe(customSvc.readMixed);
 });
 
 test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json location', async () => {
-  const dir = mkdtempSync(resolve(temp, 'pre-emit-config-'));
+  // Include U+0130 (İ) in the fixture path so canonical-path comparisons
+  // cannot rely on JavaScript String.prototype.toLowerCase().
+  const dir = mkdtempSync(resolve(temp, 'pre-emit-config-\u0130-'));
   const file = resolve(dir, 'input.ts');
   const config = resolve(dir, 'Project.Config.json');
   writeFileSync(file, `export const bad: number = 'oops';\n`);
@@ -2257,9 +2311,8 @@ test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json loc
     // Late-discovered inherited config diagnostics carry the compiler's
     // canonical path even when the host SyntaxSource omits `path`.
     const baseConfig = resolve(dir, 'Base.Config.json');
-    const childConfig = resolve(dir, 'Child.Config.json');
-    writeFileSync(
-      baseConfig,
+    const lowerBaseConfig = resolve(dir, 'base.config.json');
+    const baseConfigContent =
       JSON.stringify(
         {
           compilerOptions: {
@@ -2269,8 +2322,14 @@ test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json loc
         },
         null,
         2,
-      ) + '\n',
-    );
+      ) + '\n';
+    writeFileSync(baseConfig, baseConfigContent);
+    if (ts.sys.useCaseSensitiveFileNames) {
+      // On case-sensitive hosts, create two distinct files so both spellings
+      // produce distinct canonical paths.
+      writeFileSync(lowerBaseConfig, baseConfigContent);
+    }
+    const childConfig = resolve(dir, 'Child.Config.json');
     writeFileSync(
       childConfig,
       JSON.stringify(
@@ -2292,9 +2351,7 @@ test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json loc
       childConfigLower,
       JSON.stringify(
         {
-          extends: ts.sys.useCaseSensitiveFileNames
-            ? './Base.Config.json'
-            : './base.config.json',
+          extends: './base.config.json',
           compilerOptions: {
             target: 'ES2022',
             module: 'ESNext',
@@ -2350,13 +2407,21 @@ test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json loc
     };
     const upperInherited = await readInheritedDiag(childConfig);
     const lowerInherited = await readInheritedDiag(childConfigLower);
+    const canonicalDir = normalizeSlashes(
+      (refTs5051.file as any)?.path,
+    )!.replace(/\/project\.config\.json$/i, '');
     const normalizedBaseConfig = baseConfig.replaceAll('\\', '/');
-    const expectedBasePath = ts.sys.useCaseSensitiveFileNames
-      ? normalizedBaseConfig
-      : normalizedBaseConfig.toLowerCase();
+    const normalizedLowerBaseConfig = lowerBaseConfig.replaceAll('\\', '/');
     expect(upperInherited.fileName).toBe(normalizedBaseConfig);
-    expect(upperInherited.path).toBe(expectedBasePath);
-    expect(lowerInherited.path).toBe(expectedBasePath);
+    expect(lowerInherited.fileName).toBe(normalizedLowerBaseConfig);
+    if (ts.sys.useCaseSensitiveFileNames) {
+      expect(upperInherited.path).toBe(`${canonicalDir}/Base.Config.json`);
+      expect(lowerInherited.path).toBe(`${canonicalDir}/base.config.json`);
+      expect(lowerInherited.path).not.toBe(upperInherited.path);
+    } else {
+      expect(upperInherited.path).toBe(`${canonicalDir}/base.config.json`);
+      expect(lowerInherited.path).toBe(upperInherited.path);
+    }
   } finally {
     owner.close();
     await host.close();
@@ -2753,31 +2818,61 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
   let queries = 0;
   let recordQueries = 0;
   let lastReplyBytes = 0;
+  const sharedTransportCache = new Map<string, Uint8Array>();
+  const sharedTransport = (
+    query: Parameters<typeof typeQueryKey>[0],
+    key: string,
+    cacheable: boolean,
+  ): Uint8Array => {
+    if (cacheable) {
+      const cached = sharedTransportCache.get(key);
+      if (cached) {
+        lastReplyBytes = cached.byteLength;
+        return cached;
+      }
+    }
+    queries++;
+    if (
+      query.op === 'typeRecord' ||
+      query.op === 'symbolRecord' ||
+      query.op === 'signatureRecord'
+    ) {
+      recordQueries++;
+    }
+    const reply = Buffer.from(
+      host.request({ method: 'query', query }),
+      'base64',
+    );
+    if (cacheable) sharedTransportCache.set(key, reply);
+    lastReplyBytes = reply.byteLength;
+    return reply;
+  };
   const zeroCacheClient = new TypeServiceClient(
     enums,
     descriptor,
-    (query) => {
-      queries++;
-      if (
-        query.op === 'typeRecord' ||
-        query.op === 'symbolRecord' ||
-        query.op === 'signatureRecord'
-      ) {
-        recordQueries++;
-      }
-      const reply = Buffer.from(
-        host.request({ method: 'query', query }),
-        'base64',
-      );
-      lastReplyBytes = reply.byteLength;
-      return reply;
-    },
+    sharedTransport,
     host.source,
     { maxFactsBytes: 0 },
   );
 
   try {
     const zc = zeroCacheClient.program.getTypeChecker();
+
+    // Compact vs full reply shapes MUST produce distinct transport cache keys.
+    expect(
+      typeQueryKey({
+        generation: descriptor.generation,
+        op: 'properties',
+        args: { id: 1 },
+        skipRecords: true,
+      }),
+    ).not.toBe(
+      typeQueryKey({
+        generation: descriptor.generation,
+        op: 'properties',
+        args: { id: 1 },
+      }),
+    );
 
     // Cold getStringType() consumes the bundled typeRecord during eager view
     // construction: 1 Go query total, 0 record queries, 0 retained bytes.
@@ -2839,6 +2934,40 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
     expect(queries).toBe(1);
     expect(recordQueries).toBe(0);
     expect(lastReplyBytes).toBeLessThan(40_000);
+
+    // A second client with an 8 MiB fact budget sharing the same transport
+    // cache MUST NOT receive the zero-budget client's compact reply; it gets
+    // the full reply with bundled symbol records (1 server query, 0 per-symbol
+    // round trips when reading flags on all 1,000 properties).
+    const cachedClient = new TypeServiceClient(
+      enums,
+      descriptor,
+      sharedTransport,
+      host.source,
+      { maxFactsBytes: 8 << 20 },
+    );
+    try {
+      const cc = cachedClient.program.getTypeChecker();
+      const cSrc = cachedClient.program.getSourceFile(file) as ts.SourceFile;
+      const cHugeDecl = cSrc.statements.find(
+        (s): s is ts.VariableStatement =>
+          ts.isVariableStatement(s) &&
+          ts.isIdentifier(s.declarationList.declarations[0].name) &&
+          s.declarationList.declarations[0].name.text === 'huge',
+      )!.declarationList.declarations[0];
+      const cHugeType = cc.getTypeAtLocation(cHugeDecl)!;
+      queries = 0;
+      recordQueries = 0;
+      const cachedProps = cc.getPropertiesOfType(cHugeType);
+      const flags = cachedProps.map((p) => p.flags);
+      expect(flags).toHaveLength(1000);
+      expect(flags[0]).toBe(ts.SymbolFlags.Property);
+      expect(flags[999]).toBe(ts.SymbolFlags.Property);
+      expect(queries).toBe(1);
+      expect(recordQueries).toBe(0);
+    } finally {
+      cachedClient.close();
+    }
   } finally {
     zeroCacheClient.close();
     await host.close();
