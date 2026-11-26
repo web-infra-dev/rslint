@@ -39,7 +39,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.10.4
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/fatih/color v1.19.0
-	github.com/fxamacker/cbor/v2 v2.9.0
+	github.com/fxamacker/cbor/v2 v2.10.0
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
 	github.com/google/go-cmp v0.7.0
 	github.com/jinzhu/inflection v1.0.0
