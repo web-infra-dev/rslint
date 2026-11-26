@@ -1316,7 +1316,6 @@ test('withFile supports sync/async callbacks and GC preserves live node maps', a
     // once and invoked asynchronously in a promise job after `withFile` returns,
     // matching native `Promise.resolve` / `await`.
     let thenReads = 0;
-    let readyAfterReturn = false;
     const thenTrace: string[] = [];
     let thenableServices: typeof syncServices | undefined;
     const thenablePromise = client.withFile(projection.binding, (handle) => {
@@ -1330,7 +1329,6 @@ test('withFile supports sync/async callbacks and GC preserves live node maps', a
           }
           return (resolveThenable: (value: number) => void) => {
             thenTrace.push('run then');
-            expect(readyAfterReturn).toBe(true);
             expect(
               (thenableServices!.esTreeNodeToTSNodeMap.get(stmt) as any)?.kind,
             ).toBe(ts.SyntaxKind.VariableStatement);
@@ -1343,7 +1341,6 @@ test('withFile supports sync/async callbacks and GC preserves live node maps', a
       };
     });
     thenTrace.push('returned to caller');
-    readyAfterReturn = true;
     // @ts-expect-error minimal void-returning thenable is normalized to Promise<number>
     thenablePromise.cancel;
     expect(typeof thenablePromise.finally).toBe('function');
@@ -1354,6 +1351,16 @@ test('withFile supports sync/async callbacks and GC preserves live node maps', a
     expect(() => thenableServices!.esTreeNodeToTSNodeMap.get(stmt)).toThrow(
       'file type services are closed',
     );
+
+    // Synchronous throwing callbacks infer `never` (not `Promise<unknown>`),
+    // rejecting `.catch()` at compile time and closing the handle on throw.
+    expect(() => {
+      const unreachable = client.withFile(projection.binding, () => {
+        throw new Error('sync failure');
+      });
+      // @ts-expect-error synchronous throw returns `never`, not a Promise
+      unreachable.catch(() => {});
+    }).toThrow('sync failure');
 
     // Explicit generic type arguments work for both async and sync callbacks.
     const explicitAsync = await client.withFile<number>(

@@ -1123,12 +1123,12 @@ export class TypeServiceClient {
    */
   withFile<T>(
     binding: FileBinding,
-    run: (file: TypeServiceFile) => PromiseLike<T>,
-  ): Promise<Awaited<T>>;
-  withFile<T>(
-    binding: FileBinding,
     run: (file: TypeServiceFile) => T,
   ): WithFileResult<T>;
+  withFile<T>(
+    binding: FileBinding,
+    run: (file: TypeServiceFile) => PromiseLike<T>,
+  ): Promise<Awaited<T>>;
   withFile(
     binding: FileBinding,
     run: (file: TypeServiceFile) => unknown,
