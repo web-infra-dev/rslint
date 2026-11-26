@@ -2,7 +2,7 @@
 
 ## Rule Details
 
-Disallows invalid regular expression strings in `RegExp` constructors. This rule validates patterns and flags passed to `new RegExp(pattern, flags)` and `RegExp(pattern, flags)` when the arguments are string literals.
+Disallows invalid regular expression strings in `RegExp` constructors. This rule validates patterns and flags passed to `new RegExp(pattern, flags)` and `RegExp(pattern, flags)` when the arguments are string literals. Only references to the global `RegExp` constructor are checked; shadowed bindings and disabled globals are ignored.
 
 Valid flags are: `d`, `g`, `i`, `m`, `s`, `u`, `v`, `y`.
 
@@ -10,7 +10,7 @@ Examples of **incorrect** code for this rule:
 
 ```javascript
 RegExp('.', 'z'); // invalid flag 'z'
-new RegExp('.', 'aa'); // duplicate flag 'a'
+new RegExp('.', 'gg'); // duplicate flag 'g'
 RegExp('.', 'uv'); // 'u' and 'v' flags are mutually exclusive
 RegExp('['); // unterminated character class
 RegExp('('); // unterminated group
@@ -23,33 +23,29 @@ Examples of **correct** code for this rule:
 RegExp('.');
 new RegExp('.', 'im');
 new RegExp('.', 'gmi');
-new RegExp(pattern, 'g'); // non-literal pattern, skipped
-new RegExp('.', flags); // non-literal flags, skipped
+new RegExp(pattern, 'g'); // valid flags; pattern is unknown
+new RegExp('.', flags); // pattern is valid for every possible flag mode
 ```
 
 ## Options
 
 ### `allowConstructorFlags`
 
-An array or string of additional flags to allow in RegExp constructors. For example, to allow the `a` and `z` flags:
+An array of additional flags to allow in RegExp constructors. For example, to allow the `a` and `z` flags:
 
 ```json
-{ "allowConstructorFlags": "az" }
+{ "allowConstructorFlags": ["a", "z"] }
 ```
 
-## Known Limitations
+## Pattern Validation
 
-The following ECMAScript regex features are not yet fully supported in pattern validation:
+Patterns are checked using ECMAScript syntax independently of the matching engine. This includes Unicode property escapes, `v`-flag set notation and string properties, Unicode capture group names, duplicate named groups in separate alternatives, and inline modifiers.
 
-- Unicode property long names (`\p{Letter}`) and `Script=` syntax (`\p{Script=Latin}`)
-- `v`-flag set notation (`[A--B]`, `[A&&B]`, `[A--[0-9]]`)
-- Surrogate pair named capture groups (`(?<\ud835\udc9c>.)`)
-- `v`-flag specific parsing (`[[]` with `v` flag)
-- Duplicate named capture groups outside alternatives (`(?<k>a)(?<k>b)`)
+When flags are unknown, a pattern is reported only if it is invalid in all three modes: non-Unicode, `u`, and `v`. Unknown patterns still receive flag validation when flags are string literals.
 
-Flag validation (invalid flags, duplicate flags, `u`/`v` conflict) and `allowConstructorFlags` are fully aligned with ESLint.
+This rule provides no autofixes or suggestions.
 
 ## Original Documentation
 
 - [ESLint: no-invalid-regexp](https://eslint.org/docs/latest/rules/no-invalid-regexp)
-- [Source code](https://github.com/eslint/eslint/blob/v10.2.0/lib/rules/no-invalid-regexp.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.14.0/lib/rules/no-invalid-regexp.js)

@@ -712,6 +712,12 @@ Counts, path bases, stderr notices, and protocol empty-array rules stay
 integration-owned; lint/fix observation order and fix-round state belong to the
 core pipeline.
 
+At the `--api` response boundary, diagnostic and suggestion messages containing
+compiler WTF-8 lone surrogates are JSON-escaped without changing their UTF-16
+values. Ordinary UTF-8 responses retain their existing typed serialization.
+This adaptation belongs to the API service; generic IPC framing remains
+independent of diagnostic payloads.
+
 Observations that do not plan source changes project diagnostic AST references
 to immutable text frames before aggregation. Observations that plan fixes keep
 the original frames until source identity checks and fix text freezing finish.

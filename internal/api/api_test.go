@@ -1,11 +1,15 @@
+// cspell:ignore udfff
 package api
 
 import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -13,6 +17,7 @@ import (
 	"time"
 
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 type serviceTestHandler struct {
@@ -538,5 +543,116 @@ func TestService_TruncatedFrameIsNotCleanShutdown(t *testing.T) {
 	err := NewService(reader, io.Discard, &serviceTestHandler{}).Start()
 	if !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("expected truncated frame error, got %v", err)
+	}
+}
+
+type surrogateMessageHandler struct {
+	serviceTestHandler
+	response *LintResponse
+}
+
+func (handler *surrogateMessageHandler) HandleLint(LintRequest) (*LintResponse, error) {
+	return handler.response, nil
+}
+
+type surrogateBidirectionalHandler struct{ *surrogateMessageHandler }
+
+func (handler *surrogateBidirectionalHandler) HandleLintWithContext(context.Context, LintRequest, Requester) (*LintResponse, error) {
+	return handler.response, nil
+}
+
+func TestService_PreservesSurrogateDiagnosticMessages(t *testing.T) {
+	high := ecmascript.StringFromCodeUnits([]uint16{0xd800})
+	low := ecmascript.StringFromCodeUnits([]uint16{0xdfff})
+	message := "before <tag> & " + high + " / " + low + " � 😀\n\"\\"
+	for _, bidirectional := range []bool{false, true} {
+		t.Run(fmt.Sprintf("bidirectional=%v", bidirectional), func(t *testing.T) {
+			response := &LintResponse{Diagnostics: []Diagnostic{{
+				RuleName: "test/rule", Message: message, FilePath: "input.js", Range: Range{Start: Position{Line: 1, Column: 3}, End: Position{Line: 2, Column: 4}}, MessageId: "testMessage", Severity: "error",
+				Fixes:       []Fix{{Text: "next", StartPos: 2, EndPos: 3}},
+				Suggestions: []Suggestion{{MessageId: "testSuggestion", Message: low + " suggestion", Data: map[string]string{"name": "<tag>"}, Fixes: []Fix{{Text: "other", StartPos: 2, EndPos: 3}}}},
+			}}, ErrorCount: 1}
+			base := &surrogateMessageHandler{response: response}
+			var handler Handler = base
+			if bidirectional {
+				handler = &surrogateBidirectionalHandler{base}
+			}
+			pair := newServiceChannelPair(t, handler, nil)
+			ctx := requestContext(t)
+			if _, err := pair.peer.SendRequest(ctx, ipc.KindHandshake, HandshakeRequest{Version: Version}); err != nil {
+				t.Fatal(err)
+			}
+			result, err := pair.peer.SendRequest(ctx, KindLint, LintRequest{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var wire struct {
+				Diagnostics []struct {
+					Message     json.RawMessage `json:"message"`
+					Range       Range           `json:"range"`
+					Fixes       []Fix           `json:"fixes"`
+					Suggestions []struct {
+						Message json.RawMessage   `json:"message"`
+						Data    map[string]string `json:"data"`
+						Fixes   []Fix             `json:"fixes"`
+					} `json:"suggestions"`
+				} `json:"diagnostics"`
+				ErrorCount int `json:"errorCount"`
+			}
+			if err := json.Unmarshal(result.Data, &wire); err != nil {
+				t.Fatal(err)
+			}
+			if len(wire.Diagnostics) != 1 {
+				t.Fatalf("response=%s", result.Data)
+			}
+			diagnostic := wire.Diagnostics[0]
+			if string(diagnostic.Message) != `"before <tag> & \ud800 / \udfff � 😀\n\"\\"` {
+				t.Fatalf("message JSON=%s", diagnostic.Message)
+			}
+			if len(diagnostic.Suggestions) != 1 || string(diagnostic.Suggestions[0].Message) != `"\udfff suggestion"` {
+				t.Fatalf("suggestions=%+v", diagnostic.Suggestions)
+			}
+			if diagnostic.Range != response.Diagnostics[0].Range || !reflect.DeepEqual(diagnostic.Fixes, response.Diagnostics[0].Fixes) || !reflect.DeepEqual(diagnostic.Suggestions[0].Fixes, response.Diagnostics[0].Suggestions[0].Fixes) || diagnostic.Suggestions[0].Data["name"] != "<tag>" || wire.ErrorCount != 1 {
+				t.Fatalf("other fields changed: %s", result.Data)
+			}
+			if response.Diagnostics[0].Message != message || response.Diagnostics[0].Suggestions[0].Message != low+" suggestion" {
+				t.Fatal("response mutated")
+			}
+		})
+	}
+}
+
+func TestLintResponseForWireKeepsOrdinaryResponses(t *testing.T) {
+	for _, response := range []*LintResponse{nil, {}, {Diagnostics: []Diagnostic{}}, {Diagnostics: []Diagnostic{{Message: "� 😀 <tag>", Suggestions: []Suggestion{{Message: "ordinary"}}}}}} {
+		if got := lintResponseForWire(response); got != response {
+			t.Fatalf("ordinary response was wrapped: %#v", response)
+		}
+	}
+	// A lone surrogate in a suggestion alone must also trigger adaptation.
+	response := &LintResponse{Diagnostics: []Diagnostic{{Message: "ordinary", Suggestions: []Suggestion{{Message: ecmascript.StringFromCodeUnits([]uint16{0xd800})}}}}}
+	if got := lintResponseForWire(response); got == response {
+		t.Fatal("suggestion-only surrogate was not adapted")
+	}
+}
+
+func TestJSONMessageMatchesOrdinaryJSONEncoding(t *testing.T) {
+	var controls strings.Builder
+	for ch := rune(0); ch < 128; ch++ {
+		controls.WriteRune(ch)
+	}
+	for _, text := range []string{"", controls.String(), "� 😀 <>& \u2028\u2029", string([]byte{0xff, 0xfe})} {
+		var want bytes.Buffer
+		encoder := json.NewEncoder(&want)
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(text); err != nil {
+			t.Fatal(err)
+		}
+		got, err := jsonMessage(text).MarshalJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, bytes.TrimSuffix(want.Bytes(), []byte{'\n'})) {
+			t.Fatalf("got=%s want=%s", got, want.Bytes())
+		}
 	}
 }

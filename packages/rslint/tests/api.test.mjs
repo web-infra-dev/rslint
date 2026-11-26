@@ -70,6 +70,81 @@ describe('lint api', async (t) => {
       new Set(['src/index.ts']),
     );
   });
+  test('preserves UTF-16 regexp messages across the API boundary', async () => {
+    const filename = path.resolve(cwd, 'src/surrogate.js');
+    const cases = [
+      { pattern: '[\ud800-\udfff]', flags: 'u', reason: '' },
+      { pattern: '[a-\ufffd]', flags: 'u', reason: '' },
+      {
+        pattern: '.',
+        flags: '\ud800',
+        message: "Invalid flags supplied to RegExp constructor '\ud800'.",
+      },
+      {
+        pattern: '[\udfff-a]',
+        flags: 'u',
+        reason: 'Range out of order in character class',
+      },
+      {
+        pattern: '[\udfff-a]',
+        flags: 'v',
+        reason: 'Range out of order in character class',
+      },
+      {
+        pattern: '[\ufffd-a]',
+        flags: 'u',
+        reason: 'Range out of order in character class',
+      },
+      {
+        pattern: '(?<\ud800>a)',
+        flags: 'u',
+        reason: 'Invalid capture group name',
+      },
+    ];
+    for (const { pattern, flags, reason, message } of cases) {
+      const code = `new RegExp(${JSON.stringify(pattern)}, ${JSON.stringify(flags)});`;
+      for (const fix of [false, true]) {
+        const result = await lint({
+          configDirectory: cwd,
+          workingDirectory: cwd,
+          config: [
+            {
+              languageOptions: { parserOptions: { projectService: false } },
+              rules: { 'no-invalid-regexp': 'error' },
+            },
+          ],
+          fileContents: { [filename]: code },
+          fix,
+        });
+        expect(result.fileCount).toBe(1);
+        expect(result.ruleCount).toBe(1);
+        expect(result.errorCount).toBe(reason || message ? 1 : 0);
+        expect(result.warningCount).toBe(0);
+        expect(result.fixableErrorCount).toBe(0);
+        expect(result.fixableWarningCount).toBe(0);
+        expect(result.diagnostics).toEqual(
+          reason || message
+            ? [
+                {
+                  ruleName: 'no-invalid-regexp',
+                  messageId: 'regexMessage',
+                  message:
+                    message ??
+                    `Invalid regular expression: /${pattern}/${flags}: ${reason}.`,
+                  filePath: 'src/surrogate.js',
+                  severity: 'error',
+                  range: {
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: code.length },
+                  },
+                },
+              ]
+            : [],
+        );
+        expect(result.output ?? {}).toEqual({});
+      }
+    }
+  });
 });
 
 describe('lint fix:true', async (t) => {
