@@ -692,8 +692,23 @@ func isEnumDeclarationNode(node *ast.Node) bool {
 func isChainRoot(node *ast.Node) bool {
 	// Only the receiver continues a chain. An optional chain in an argument
 	// or a computed key belongs to its own ChainExpression.
-	return node != nil && ast.IsOptionalChain(node) &&
-		(node.Parent == nil || !ast.IsOptionalChain(node.Parent) || node.Parent.Expression() != node)
+	return isChainMember(node) &&
+		(node.Parent == nil || !isChainMember(node.Parent) || node.Parent.Expression() != node)
+}
+
+// isChainMember reports whether node belongs to an ESTree ChainExpression.
+// tsgo only flags a non-null assertion as part of an optional chain when the
+// chain continues after it (`o?.x!.y`). A trailing assertion (`o?.x!`) is
+// still inside the ChainExpression in ESTree; a parenthesized receiver
+// (`(o?.x)!`) ends the chain first.
+func isChainMember(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if ast.IsOptionalChain(node) {
+		return true
+	}
+	return node.Kind == ast.KindNonNullExpression && isChainMember(node.Expression())
 }
 
 func childTarget(node *ast.Node) string {
@@ -1663,8 +1678,18 @@ func indexInNodeList(node *ast.Node, list []*ast.Node) (int, int) {
 // shapes that esquery still walks. Without this, a real-world selector
 // like `MemberExpression[object.name='console']` would silently miss
 // `(console).log`, `(console as any).log`, `console!.log`.
+//
+// A trailing non-null assertion on an optional chain (`o?.x!`) is kept: it is
+// the root of the ESTree ChainExpression, so stripping it would expose the
+// inner member instead of the chain.
 func unwrapExpression(node *ast.Node) *ast.Node {
-	return utils.SkipAssertionsAndParens(node)
+	for node != nil && ast.IsOuterExpression(node, ast.OEKParentheses|ast.OEKAssertions) {
+		if isChainRoot(node) {
+			return node
+		}
+		node = node.Expression()
+	}
+	return node
 }
 
 func unwrapEstreeNode(node *ast.Node) *ast.Node {

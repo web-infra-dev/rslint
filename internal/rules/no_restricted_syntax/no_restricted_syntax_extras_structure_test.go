@@ -1107,3 +1107,179 @@ func TestNoRestrictedSyntaxStructureRegressions(t *testing.T) {
 			},
 		})
 }
+
+// TypeScript assertion expressions are their own ESTree node types:
+// TSAsExpression, TSSatisfiesExpression, TSNonNullExpression and
+// TSTypeAssertion. ESTree drops parentheses, so a parenthesized inner
+// assertion is still a direct child of the outer one. A trailing non-null
+// assertion on an optional chain (`o?.x!`) is inside the ChainExpression.
+func TestNoRestrictedSyntaxTSAssertionExpressions(t *testing.T) {
+	const assertions = "declare const v: unknown;\nconst a = v as string;\nconst b = v!;\nconst c = v satisfies unknown;\nconst d = <string>v;\n"
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			{
+				// A single cast has no assertion child.
+				Code:    "declare const v: unknown;\nconst a = v as string;\n",
+				Options: []any{"TSAsExpression > TSAsExpression"},
+			},
+			{
+				// A trailing non-null assertion stays inside the optional chain.
+				Code:    "declare const o: { x?: { y: number } } | undefined;\no?.x!;\n",
+				Options: []any{"TSNonNullExpression > ChainExpression"},
+			},
+			{
+				// Parentheses end the chain before the assertion.
+				Code:    "declare const o: { x?: { y: number } } | undefined;\n(o?.x)!;\n",
+				Options: []any{"ChainExpression > TSNonNullExpression"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    assertions,
+				Options: []any{"TSAsExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "Using 'TSAsExpression' is not allowed.", Line: 2, Column: 11, EndLine: 2, EndColumn: 22},
+				},
+			},
+			{
+				Code:    assertions,
+				Options: []any{"TSNonNullExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 3, Column: 11, EndLine: 3, EndColumn: 13},
+				},
+			},
+			{
+				Code:    assertions,
+				Options: []any{"TSSatisfiesExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 4, Column: 11, EndLine: 4, EndColumn: 30},
+				},
+			},
+			{
+				Code:    assertions,
+				Options: []any{"TSTypeAssertion"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 5, Column: 11, EndLine: 5, EndColumn: 20},
+				},
+			},
+			{
+				Code:    "const t = [1, 2] as const;\n",
+				Options: []any{"TSAsExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				// Double cast: the inner assertion is the child.
+				Code: "declare const v: unknown;\nconst e = v as unknown as string;\n",
+				Options: []any{map[string]any{
+					"selector": "TSAsExpression > TSAsExpression",
+					"message":  "Do not double cast.",
+				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "Do not double cast.", Line: 2, Column: 11, EndLine: 2, EndColumn: 23},
+				},
+			},
+			{
+				Code:    "declare const v: unknown;\nconst e = (v as unknown) as string;\n",
+				Options: []any{"TSAsExpression > TSAsExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 12, EndLine: 2, EndColumn: 24},
+				},
+			},
+			{
+				// Double cast seen from the outer assertion.
+				Code:    "declare const v: unknown;\nconst e = v as unknown as string;\n",
+				Options: []any{"TSAsExpression[expression.type='TSAsExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 11, EndLine: 2, EndColumn: 33},
+				},
+			},
+			{
+				Code:    "declare const o: { x?: { y: number } };\no.x!.y;\n",
+				Options: []any{"MemberExpression > TSNonNullExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 5},
+				},
+			},
+			{
+				Code:    "declare const o: { x?: { y: number } } | undefined;\no?.x!;\n",
+				Options: []any{"ChainExpression > TSNonNullExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 6},
+				},
+			},
+			{
+				Code:    "declare const o: { x?: { y: number } } | undefined;\no?.x!;\n",
+				Options: []any{"ExpressionStatement > ChainExpression > TSNonNullExpression > MemberExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 5},
+				},
+			},
+			{
+				Code:    "declare const o: { x?: { y: number } } | undefined;\n(o?.x)!;\n",
+				Options: []any{"TSNonNullExpression > ChainExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 2, EndLine: 2, EndColumn: 6},
+				},
+			},
+			{
+				Code:    "declare const o: { x?: { y: number } } | undefined;\no?.x!.y;\n",
+				Options: []any{"ChainExpression > MemberExpression > TSNonNullExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 6},
+				},
+			},
+			{
+				Code:    "declare const o: { x?: { y: number } } | undefined;\no?.x!!;\n",
+				Options: []any{"ChainExpression > TSNonNullExpression > TSNonNullExpression"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 6},
+				},
+			},
+		})
+}
+
+// Attribute paths look through assertions, but a trailing non-null assertion
+// on an optional chain (`o?.x!`) is the ChainExpression itself in ESTree, so
+// the field must resolve to ChainExpression rather than the inner member.
+func TestNoRestrictedSyntaxNonNullChainFields(t *testing.T) {
+	const decl = "declare const o: { x?: { y: number }; f?: () => number } | undefined;\n"
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			{Code: decl + "const a = o?.x!;\n", Options: []any{"VariableDeclarator[init.type='MemberExpression']"}},
+			{Code: decl + "function f() { return o?.x!; }\n", Options: []any{"ReturnStatement[argument.type='MemberExpression']"}},
+			{Code: decl + "(o?.f!)();\n", Options: []any{"CallExpression[callee.type='MemberExpression']"}},
+			{Code: decl + "(o?.x!).y;\n", Options: []any{"MemberExpression[object.type='MemberExpression']"}},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    decl + "const a = o?.x!;\n",
+				Options: []any{"VariableDeclarator[init.type='ChainExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 7, EndLine: 2, EndColumn: 16},
+				},
+			},
+			{
+				Code:    decl + "function f() { return o?.x!; }\n",
+				Options: []any{"ReturnStatement[argument.type='ChainExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 16, EndLine: 2, EndColumn: 29},
+				},
+			},
+			{
+				Code:    decl + "(o?.f!)();\n",
+				Options: []any{"CallExpression[callee.type='ChainExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 10},
+				},
+			},
+			{
+				Code:    decl + "(o?.x!).y;\n",
+				Options: []any{"MemberExpression[object.type='ChainExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 10},
+				},
+			},
+		})
+}
