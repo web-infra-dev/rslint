@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -246,7 +247,15 @@ func (f *File) missing(path string) error {
 }
 
 func readEntries(path string) (entries, error) {
-	content, err := os.ReadFile(path)
+	content, err := readBaselineFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return decodeEntries(content, path)
+}
+
+func readEntriesFromFile(file *os.File, path string) (entries, error) {
+	content, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +321,7 @@ func normalizeDriveKeys(data entries) error {
 }
 
 // update checks whether the baseline needs modification, then serializes
-// writes per destination directory, re-reads the latest contents, applies
+// writes on the baseline file itself, re-reads the latest contents, applies
 // change, and replaces the baseline atomically via a temporary file.
 func (f *File) update(ctx context.Context, change func(entries) bool) error {
 	if err := ctx.Err(); err != nil {
@@ -327,8 +336,8 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 		return fmt.Errorf("cannot resolve suppressions destination %q", f.path)
 	}
 
-	// Avoid acquiring a write lock when an existing baseline already matches
-	// the desired counts, so no-op runs succeed even inside a read-only directory.
+	// Avoid taking a write lock when an existing baseline already matches the
+	// desired counts, so no-op runs succeed even inside a read-only directory.
 	if info, err := os.Stat(path); err == nil {
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("suppressions file %q must be a regular file", path)
@@ -357,61 +366,58 @@ func (f *File) update(ctx context.Context, change func(entries) bool) error {
 		path = filepath.Join(realDir, filepath.Base(path))
 	}
 
-	unlock, err := lockBaselineUpdate(ctx, path)
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	var data entries
-	var mode fs.FileMode
-	hasExisting := false
-	info, err := os.Stat(path)
-	switch {
-	case err == nil:
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("suppressions file %q must be a regular file", path)
-		}
-		hasExisting = true
-		mode = info.Mode().Perm()
-		data, err = readEntries(path)
-		if err != nil {
+	for {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
-	case errors.Is(err, fs.ErrNotExist):
-		if err := f.missing(path); err != nil {
+		locked, err := lockExistingBaseline(ctx, path)
+		switch {
+		case err == nil:
+			data, readErr := readEntriesFromFile(locked.file, path)
+			if readErr != nil {
+				locked.unlock()
+				return readErr
+			}
+			if change(data) {
+				if writeErr := writeAndPublishBaseline(ctx, path, data, locked); writeErr != nil {
+					locked.unlock()
+					return writeErr
+				}
+			}
+			locked.unlock()
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			f.entries = data
+			return nil
+		case errors.Is(err, fs.ErrNotExist):
+			if err := f.missing(path); err != nil {
+				return err
+			}
+			data := make(entries)
+			change(data)
+			err = writeAndPublishBaseline(ctx, path, data, nil)
+			if errors.Is(err, fs.ErrExist) {
+				// Another writer created the baseline first; lock and merge into it.
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			f.entries = data
+			return nil
+		default:
 			return err
 		}
-		data = make(entries)
-	default:
-		return err
 	}
-
-	if changed := change(data); changed || !hasExisting {
-		if err := writeBaseline(ctx, path, data, hasExisting, mode); err != nil {
-			return err
-		}
-	} else if err := ctx.Err(); err != nil {
-		return err
-	}
-	f.entries = data
-	return nil
 }
 
-func writeBaseline(ctx context.Context, path string, data entries, preserveMode bool, mode fs.FileMode) error {
-	if preserveMode {
-		// Require write permission on an existing baseline before replacing it
-		// via rename, which checks directory permissions on Unix.
-		probe, err := os.OpenFile(path, os.O_WRONLY, 0)
-		if err != nil {
+func writeAndPublishBaseline(ctx context.Context, path string, data entries, locked *lockedBaseline) error {
+	preserveMode := locked != nil
+	if !preserveMode {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
-		_ = probe.Close()
-	} else if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
 	}
 	tempName := filepath.Join(filepath.Dir(path), ".rslint-suppressions-"+rand.Text()+".tmp")
 	perm := fs.FileMode(0o666)
@@ -430,7 +436,7 @@ func writeBaseline(ctx context.Context, path string, data entries, preserveMode 
 		}
 	}()
 	if preserveMode {
-		if err := stage.Chmod(mode); err != nil {
+		if err := stage.Chmod(locked.mode); err != nil {
 			return err
 		}
 	}
@@ -446,8 +452,14 @@ func writeBaseline(ctx context.Context, path string, data entries, preserveMode 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := replaceBaselineFile(ctx, tempName, path); err != nil {
-		return err
+	if preserveMode {
+		if err := replaceLockedBaseline(ctx, tempName, path, locked); err != nil {
+			return err
+		}
+	} else {
+		if err := publishNewBaseline(ctx, tempName, path); err != nil {
+			return err
+		}
 	}
 	published = true
 	return nil

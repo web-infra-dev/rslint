@@ -1507,9 +1507,9 @@ counts error-level lint findings by rule and by the selected target path
 (relative to the caller working directory for files inside it, and to the
 physical working directory for external paths). It owns comparison and scoped
 updates, skipping locking when an existing baseline needs no change, otherwise
-serializing writes per destination directory via OS locking (directory-fd
-`flock` on Unix, directory-identity kernel mutex on Windows, creating no lock
-files on disk), validating writable parent
+serializing writes directly on the baseline file itself (`flock` on Unix,
+beyond-EOF `LockFileEx` + POSIX-semantics rename on Windows, atomic hard-link
+creation on first write, creating no lock files on disk), validating writable parent
 paths before autofix, creating missing parent directories on first record, and
 writing the complete JSON to a temporary file in the same directory before
 replacing the baseline. The CLI renders the remaining

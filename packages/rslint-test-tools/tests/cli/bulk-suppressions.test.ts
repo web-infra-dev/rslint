@@ -626,6 +626,37 @@ describe('CLI bulk suppressions', () => {
         await fs.chmod(roBaseDir, 0o755);
       }
       await fs.writeFile(path.join(cwd, 'a.js'), 'var a = 1; debugger;');
+
+      // A writable, searchable directory that disallows listing (0333) still
+      // supports recording both fresh and existing baselines with --fix.
+      const writeOnlyDir = path.join(cwd, 'write-only');
+      await fs.mkdir(writeOnlyDir, { mode: 0o333 });
+      try {
+        const recorded = await runRslint(
+          [
+            '--fix',
+            '--suppress-all',
+            '--suppressions-location',
+            'write-only/base.json',
+            'a.js',
+          ],
+          cwd,
+        );
+        expect(recorded.exitCode, recorded.stderr).toBe(0);
+        expect(await fs.readFile(path.join(cwd, 'a.js'), 'utf8')).toBe(
+          'let a = 1; debugger;',
+        );
+        expect(
+          JSON.parse(
+            await fs.readFile(path.join(writeOnlyDir, 'base.json'), 'utf8'),
+          ),
+        ).toEqual({
+          'a.js': { 'no-debugger': { count: 1 } },
+        });
+      } finally {
+        await fs.chmod(writeOnlyDir, 0o755);
+      }
+      await fs.writeFile(path.join(cwd, 'a.js'), 'var a = 1; debugger;');
     }
 
     const created = await runRslint(

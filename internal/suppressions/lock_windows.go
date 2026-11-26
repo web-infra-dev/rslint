@@ -4,111 +4,165 @@ package suppressions
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/sys/windows"
 )
 
-// inProcessUpdateMu serializes goroutines in the same process so two
-// goroutines never re-enter the same thread-owned Win32 mutex.
-var inProcessUpdateMu sync.Mutex
+// Lock a single byte far beyond EOF so mandatory Windows byte-range locks
+// serialize writers across all login sessions without blocking readers.
+const (
+	baselineLockOffsetLow  = 0xffffffff
+	baselineLockOffsetHigh = 0x7fffffff
+)
 
-func lockBaselineUpdate(ctx context.Context, targetPath string) (func(), error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	name, err := directoryMutexName(filepath.Dir(targetPath))
-	if err != nil {
-		return nil, err
-	}
-	namePtr, err := windows.UTF16PtrFromString(name)
-	if err != nil {
-		return nil, err
-	}
+type lockedBaseline struct {
+	file   *os.File
+	mode   fs.FileMode
+	root   *os.Root
+	unlock func()
+}
 
-	inProcessUpdateMu.Lock()
-	runtime.LockOSThread()
-	handle, err := windows.CreateMutex(nil, false, namePtr)
+func readBaselineFile(path string) ([]byte, error) {
+	ptr, err := windows.UTF16PtrFromString(path)
 	if err != nil {
-		runtime.UnlockOSThread()
-		inProcessUpdateMu.Unlock()
+		return nil, err
+	}
+	// Grant FILE_SHARE_DELETE so read-only checks never block POSIX rename.
+	handle, err := windows.CreateFile(
+		ptr,
+		windows.GENERIC_READ,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_ATTRIBUTE_NORMAL,
+		0,
+	)
+	if err != nil {
+		return nil, &os.PathError{Op: "open", Path: path, Err: err}
+	}
+	f := os.NewFile(uintptr(handle), path)
+	defer func() { _ = f.Close() }()
+	return io.ReadAll(f)
+}
+
+func lockExistingBaseline(ctx context.Context, path string) (*lockedBaseline, error) {
+	dir, base := filepath.Dir(path), filepath.Base(path)
+	root, err := os.OpenRoot(dir)
+	if err != nil {
 		return nil, err
 	}
 	for {
-		status, waitErr := windows.WaitForSingleObject(handle, 50)
-		switch status {
-		case windows.WAIT_OBJECT_0, windows.WAIT_ABANDONED:
-			return func() {
-				_ = windows.ReleaseMutex(handle)
-				_ = windows.CloseHandle(handle)
-				runtime.UnlockOSThread()
-				inProcessUpdateMu.Unlock()
+		if err := ctx.Err(); err != nil {
+			_ = root.Close()
+			return nil, err
+		}
+		// os.Root opens files with FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+		// so holding this lock does not prevent POSIX-semantics replacement.
+		f, err := root.OpenFile(base, os.O_RDWR, 0)
+		if err != nil {
+			_ = root.Close()
+			return nil, err
+		}
+		ov := windows.Overlapped{
+			Offset:     baselineLockOffsetLow,
+			OffsetHigh: baselineLockOffsetHigh,
+		}
+		if err := windows.LockFileEx(windows.Handle(f.Fd()), windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &ov); err != nil {
+			_ = f.Close()
+			_ = root.Close()
+			return nil, err
+		}
+		same, mode, checkErr := verifyLockedHandle(root, base, f)
+		if checkErr == nil && same {
+			if !mode.IsRegular() {
+				unlockWindowsHandle(f)
+				_ = root.Close()
+				return nil, fmt.Errorf("suppressions file %q must be a regular file", path)
+			}
+			return &lockedBaseline{
+				file: f,
+				mode: mode.Perm(),
+				root: root,
+				unlock: func() {
+					unlockWindowsHandle(f)
+					_ = root.Close()
+				},
 			}, nil
-		case uint32(windows.WAIT_TIMEOUT):
-			if err := ctx.Err(); err != nil {
-				_ = windows.CloseHandle(handle)
-				runtime.UnlockOSThread()
-				inProcessUpdateMu.Unlock()
-				return nil, err
-			}
-		default:
-			_ = windows.CloseHandle(handle)
-			runtime.UnlockOSThread()
-			inProcessUpdateMu.Unlock()
-			if waitErr != nil {
-				return nil, waitErr
-			}
-			return nil, fmt.Errorf("wait for suppressions lock failed: status %#x", status)
+		}
+		unlockWindowsHandle(f)
+		if checkErr != nil {
+			_ = root.Close()
+			return nil, checkErr
 		}
 	}
 }
 
-// directoryMutexName derives a kernel mutex name from the destination
-// directory's volume and file index so no lock file is created on disk and
-// case/short-name/junction aliases of the same directory share one mutex.
-func directoryMutexName(dir string) (string, error) {
-	if ptr, err := windows.UTF16PtrFromString(dir); err == nil {
-		h, openErr := windows.CreateFile(
-			ptr,
-			0,
-			windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
-			nil,
-			windows.OPEN_EXISTING,
-			windows.FILE_FLAG_BACKUP_SEMANTICS,
-			0,
-		)
-		if openErr == nil {
-			var info windows.ByHandleFileInformation
-			infoErr := windows.GetFileInformationByHandle(h, &info)
-			_ = windows.CloseHandle(h)
-			if infoErr == nil && (info.VolumeSerialNumber != 0 || info.FileIndexHigh != 0 || info.FileIndexLow != 0) {
-				return fmt.Sprintf("Local\\rslint-suppressions-%08x-%08x%08x", info.VolumeSerialNumber, info.FileIndexHigh, info.FileIndexLow), nil
-			}
-		}
+func unlockWindowsHandle(f *os.File) {
+	ov := windows.Overlapped{
+		Offset:     baselineLockOffsetLow,
+		OffsetHigh: baselineLockOffsetHigh,
 	}
-	abs, err := filepath.Abs(dir)
+	_ = windows.UnlockFileEx(windows.Handle(f.Fd()), 0, 1, 0, &ov)
+	_ = f.Close()
+}
+
+func verifyLockedHandle(root *os.Root, base string, locked *os.File) (bool, fs.FileMode, error) {
+	fdInfo, err := locked.Stat()
 	if err != nil {
-		abs = dir
+		return false, 0, err
 	}
-	sum := sha256.Sum256([]byte(strings.ToLower(abs)))
-	return fmt.Sprintf("Local\\rslint-suppressions-%x", sum[:16]), nil
+	var lockedID windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(windows.Handle(locked.Fd()), &lockedID); err != nil {
+		return false, 0, err
+	}
+	current, err := root.Open(base)
+	if err != nil {
+		return false, 0, err
+	}
+	var currentID windows.ByHandleFileInformation
+	infoErr := windows.GetFileInformationByHandle(windows.Handle(current.Fd()), &currentID)
+	_ = current.Close()
+	if infoErr != nil {
+		return false, 0, infoErr
+	}
+	same := lockedID.VolumeSerialNumber == currentID.VolumeSerialNumber &&
+		lockedID.FileIndexHigh == currentID.FileIndexHigh &&
+		lockedID.FileIndexLow == currentID.FileIndexLow
+	return same, fdInfo.Mode(), nil
 }
 
-func replaceBaselineFile(ctx context.Context, tempName, path string) error {
-	// A concurrent read-only check opens path without FILE_SHARE_DELETE on
-	// Windows, which can briefly block MoveFileExW. Retry transiently once
-	// write permission on path has already been verified.
+func publishNewBaseline(_ context.Context, tempName, path string) error {
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	tempBase, base := filepath.Base(tempName), filepath.Base(path)
+	err = root.Link(tempBase, base)
+	if err == nil {
+		_ = os.Remove(tempName)
+		return nil
+	}
+	if errors.Is(err, windows.ERROR_INVALID_FUNCTION) || errors.Is(err, windows.ERROR_NOT_SUPPORTED) {
+		return root.Rename(tempBase, base)
+	}
+	return err
+}
+
+func replaceLockedBaseline(ctx context.Context, tempName, path string, locked *lockedBaseline) error {
+	tempBase, base := filepath.Base(tempName), filepath.Base(path)
+	// os.Root.Rename uses FILE_RENAME_REPLACE_IF_EXISTS|FILE_RENAME_POSIX_SEMANTICS
+	// on Windows. Retry briefly in case an external scanner holds path without FILE_SHARE_DELETE.
 	var err error
 	for attempt := range 25 {
-		err = os.Rename(tempName, path)
+		err = locked.root.Rename(tempBase, base)
 		if err == nil {
 			return nil
 		}
