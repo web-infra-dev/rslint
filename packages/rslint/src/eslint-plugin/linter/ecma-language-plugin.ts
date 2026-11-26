@@ -179,54 +179,26 @@ type ParserOptions = NonNullable<
 >['parserOptions'];
 
 /**
- * Wrap a syntax-only parserServices object with per-file boolean overrides
- * without mutating it or dropping prototype getters, methods, or private fields.
+ * Derive a syntax-only parserServices object with per-file boolean overrides
+ * without mutating the factory's object or dropping prototype getters/methods.
  */
 function withSyntaxParserServiceOverrides(
   target: Record<string, unknown>,
   overrides: Readonly<Record<string, boolean>>,
 ): Record<string, unknown> {
-  return new Proxy<Record<string, unknown>>(
-    {},
-    {
-      get(_shadow, prop) {
-        if (typeof prop === 'string' && Object.hasOwn(overrides, prop)) {
-          return overrides[prop];
-        }
-        const value: unknown = Reflect.get(target, prop, target);
-        return typeof value === 'function' ? value.bind(target) : value;
-      },
-      has(_shadow, prop) {
-        if (typeof prop === 'string' && Object.hasOwn(overrides, prop)) {
-          return true;
-        }
-        return Reflect.has(target, prop);
-      },
-      ownKeys() {
-        return Array.from(
-          new Set([...Reflect.ownKeys(target), ...Object.keys(overrides)]),
-        );
-      },
-      getOwnPropertyDescriptor(_shadow, prop) {
-        if (typeof prop === 'string' && Object.hasOwn(overrides, prop)) {
-          return {
-            configurable: true,
-            enumerable: true,
-            value: overrides[prop],
-            writable: false,
-          };
-        }
-        const desc = Reflect.getOwnPropertyDescriptor(target, prop);
-        if (!desc) return undefined;
-        // Return a configurable descriptor so non-configurable own properties
-        // on a frozen target never violate Proxy invariants on the shadow object.
-        return desc.configurable ? desc : { ...desc, configurable: true };
-      },
-      getPrototypeOf() {
-        return Reflect.getPrototypeOf(target);
-      },
-    },
-  );
+  const descriptors = Object.getOwnPropertyDescriptors(target);
+  for (const [key, value] of Object.entries(overrides)) {
+    descriptors[key] = {
+      configurable: true,
+      enumerable: true,
+      value,
+      writable: true,
+    };
+  }
+  return Object.create(
+    Object.getPrototypeOf(target) as object | null,
+    descriptors,
+  ) as Record<string, unknown>;
 }
 
 /**

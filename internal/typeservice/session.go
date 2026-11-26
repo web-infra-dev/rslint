@@ -80,11 +80,12 @@ type Session struct {
 }
 
 type Descriptor struct {
-	SyntaxOnly       bool            `json:"syntaxOnly,omitempty"`
-	Generation       uint32          `json:"generation"`
-	CurrentDirectory string          `json:"currentDirectory"`
-	CompilerOptions  json.RawMessage `json:"compilerOptions"`
-	Sources          []Source        `json:"sources"`
+	SyntaxOnly        bool            `json:"syntaxOnly,omitempty"`
+	Generation        uint32          `json:"generation"`
+	CurrentDirectory  string          `json:"currentDirectory"`
+	CompilerOptions   json.RawMessage `json:"compilerOptions"`
+	Sources           []Source        `json:"sources"`
+	DiagnosticSources []Source        `json:"diagnosticSources,omitempty"`
 }
 
 type Source struct {
@@ -183,6 +184,40 @@ func (s *Session) extraSource(name string) *ast.SourceFile {
 	return s.extraSources[tspath.NormalizePath(name)]
 }
 
+func (s *Session) sourceFile(name string) *ast.SourceFile {
+	if f := s.program.GetSourceFile(name); f != nil {
+		return f
+	}
+	if !s.syntaxOnly {
+		return s.extraSource(name)
+	}
+	return nil
+}
+
+func (s *Session) diagnosticSources() []Source {
+	s.extraMu.RLock()
+	defer s.extraMu.RUnlock()
+	if len(s.extraSources) == 0 {
+		return nil
+	}
+	seen := make(map[*ast.SourceFile]bool, len(s.extraSources))
+	files := make([]*ast.SourceFile, 0, len(s.extraSources))
+	for _, f := range s.extraSources {
+		if f != nil && !seen[f] {
+			seen[f] = true
+			files = append(files, f)
+		}
+	}
+	slices.SortFunc(files, func(a, b *ast.SourceFile) int {
+		return strings.Compare(a.FileName(), b.FileName())
+	})
+	sources := make([]Source, len(files))
+	for i, f := range files {
+		sources[i] = syntaxSource(f)
+	}
+	return sources
+}
+
 // Close waits for any in-flight operations to finish before releasing references.
 func (s *Session) Close() {
 	s.lifeMu.Lock()
@@ -222,10 +257,7 @@ func (s *Session) Source(generation uint32, name string) (*ast.SourceFile, error
 	if generation != s.generation {
 		return nil, errors.New("stale type service generation")
 	}
-	file := s.program.GetSourceFile(name)
-	if file == nil && !s.syntaxOnly {
-		file = s.extraSource(name)
-	}
+	file := s.sourceFile(name)
 	if s.syntaxOnly && !s.eligible[file] {
 		return nil, errors.New("foreign syntax service source")
 	}
@@ -307,10 +339,11 @@ func (s *Session) Descriptor() (Descriptor, error) {
 		return Descriptor{}, err
 	}
 	d := Descriptor{
-		Generation:       s.generation,
-		CurrentDirectory: s.program.CurrentDirectory(),
-		CompilerOptions:  options,
-		Sources:          make([]Source, 0, len(s.program.SourceFiles())),
+		Generation:        s.generation,
+		CurrentDirectory:  s.program.CurrentDirectory(),
+		CompilerOptions:   options,
+		Sources:           make([]Source, 0, len(s.program.SourceFiles())),
+		DiagnosticSources: s.diagnosticSources(),
 	}
 	for _, f := range s.program.SourceFiles() {
 		d.Sources = append(d.Sources, s.source(f))
@@ -409,7 +442,7 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	natives := make([]*ast.Node, len(queries))
 	for i, q := range queries {
 		if ref := requestNode(q.Request); ref != nil {
-			f := p.GetSourceFile(ref.File)
+			f := s.sourceFile(ref.File)
 			if s.syntaxOnly && !eligible[f] {
 				return nil, errors.New("foreign syntax service source")
 			}
@@ -434,7 +467,7 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 		}
 		if queries[start].Request.operation() == "nodeRecord" {
 			ref := requestNode(queries[start].Request)
-			results[start] = nodeFacts(p.GetSourceFile(ref.File), natives[start])
+			results[start] = nodeFacts(s.sourceFile(ref.File), natives[start])
 			start++
 			continue
 		}
@@ -579,6 +612,11 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 		ids = []uint32{uint32(value)}
 	case Handles:
 		ids = value
+	case NamedSymbols:
+		ids = make([]uint32, 0, len(value))
+		for _, item := range value {
+			ids = append(ids, item.ID)
+		}
 	case IndexInfos:
 		ids = make([]uint32, 0, 2*len(value))
 		for _, info := range value {
@@ -916,23 +954,12 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		switch {
 		case r.WithCandidates && r.ArgumentCount != nil:
 			sig, candidates = checker.Checker_getResolvedSignatureWorker(c, native, checker.CheckModeNormal, *r.ArgumentCount)
-		case r.ArgumentCount != nil:
-			// Match TypeScript's getResolvedSignature(node, undefined, argCount):
-			// when candidatesOutArray is omitted and a resolved signature is already
-			// cached on the call node, return it without re-resolving or overwriting
-			// the cached signature.
-			links := checker.Checker_signatureLinks(c)
-			if entry := links.TryGet(native); entry != nil {
-				if cached := checker.SignatureLinks_resolvedSignature(entry); cached != nil && cached != checker.Checker_resolvingSignature(c) {
-					sig = cached
-				}
-			}
-			if sig == nil {
-				sig, _ = checker.Checker_getResolvedSignatureWorker(c, native, checker.CheckModeNormal, *r.ArgumentCount)
-			}
 		case r.WithCandidates:
 			sig = checker.Checker_getResolvedSignature(c, native, &candidates, checker.CheckModeNormal)
 		default:
+			// Without candidatesOutArray, keep candidatesOutArray nil so overload
+			// failure combines overloads (matching TypeScript 6) and cached
+			// signatures are reused without overwriting links.resolvedSignature.
 			sig = c.GetResolvedSignature(native)
 		}
 		ids := make(Handles, 1, 1+len(candidates))
@@ -1013,7 +1040,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				s.typeID(checker.MappedType_modifiersType(mapped)),
 			}, nil
 		case "properties":
-			return s.symbolIDs(c.GetPropertiesOfType(s.typeByID(r.ID))), nil
+			return s.namedSymbols(c.GetPropertiesOfType(s.typeByID(r.ID))), nil
 		case "typeArguments":
 			return s.typeIDs(c.GetTypeArguments(s.typeByID(r.ID))), nil
 		case "isArray":

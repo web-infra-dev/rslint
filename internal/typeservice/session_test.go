@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -306,5 +307,65 @@ func TestConfigDiagnosticSourceAvailableWithoutLeakingIntoProgramSources(t *test
 	}
 	if cfgSrc == nil || cfgSrc.FileName() != configName {
 		t.Fatalf("expected tsconfig SourceFile %q, got %v", configName, cfgSrc)
+	}
+	if len(desc.DiagnosticSources) != 1 || desc.DiagnosticSources[0].FileName != configName || desc.DiagnosticSources[0].Path != string(cfgSrc.Path()) {
+		t.Fatalf("expected DiagnosticSources to contain tsconfig with compiler path %q, got %+v", cfgSrc.Path(), desc.DiagnosticSources)
+	}
+
+	// Cold nodeRecord queries against a config diagnostic source must succeed.
+	packet, err := session.Query(t.Context(), Query{
+		Scope:   Scope{Generation: desc.Generation},
+		Request: &NodeRequest{Op: "nodeRecord", Node: NodeRef{File: configName, Index: 1}},
+	})
+	if err != nil || len(packet) == 0 {
+		t.Fatalf("cold nodeRecord query on tsconfig failed: len=%d err=%v", len(packet), err)
+	}
+}
+
+type caseSensitiveFS struct {
+	vfs.FS
+}
+
+func (caseSensitiveFS) UseCaseSensitiveFileNames() bool { return true }
+
+func TestConfigDiagnosticSourcePreservesCaseSensitivePath(t *testing.T) {
+	const root = "/type-service-case-sensitive"
+	upperCfg := tspath.ResolvePath(root, "PKG/tsconfig.json")
+	upperFile := tspath.ResolvePath(root, "PKG/input.ts")
+	lowerCfg := tspath.ResolvePath(root, "pkg/tsconfig.json")
+	lowerFile := tspath.ResolvePath(root, "pkg/input.ts")
+	cfgBody := "{\n  \"compilerOptions\": {\n    \"noLib\": true,\n    \"inlineSources\": true\n  },\n  \"include\": [\"input.ts\"]\n}\n"
+	fs := caseSensitiveFS{utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		upperCfg:  cfgBody,
+		upperFile: "export const upper = 1;\n",
+		lowerCfg:  cfgBody,
+		lowerFile: "export const lower = 2;\n",
+	})}
+
+	openDiagPath := func(cfg, file string) string {
+		raw, err := utils.CreateProgram(false, fs, root, cfg, utils.CreateCompilerHost(root, fs))
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := program.NewFromCompiler(raw)
+		session, err := New(t.Context(), p, []*ast.SourceFile{p.GetSourceFile(file)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer session.Close()
+		desc, err := session.Descriptor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(desc.DiagnosticSources) != 1 {
+			t.Fatalf("expected 1 diagnostic source for %q, got %+v", cfg, desc.DiagnosticSources)
+		}
+		return desc.DiagnosticSources[0].Path
+	}
+
+	upperPath := openDiagPath(upperCfg, upperFile)
+	lowerPath := openDiagPath(lowerCfg, lowerFile)
+	if upperPath != upperCfg || lowerPath != lowerCfg || upperPath == lowerPath {
+		t.Fatalf("expected distinct case-sensitive config paths %q and %q, got %q and %q", upperCfg, lowerCfg, upperPath, lowerPath)
 	}
 }

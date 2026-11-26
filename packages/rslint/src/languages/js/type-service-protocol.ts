@@ -47,6 +47,7 @@ export interface TypeServiceDescriptor extends Scope {
   readonly currentDirectory: string;
   readonly compilerOptions: Readonly<Record<string, unknown>>;
   readonly sources: readonly SourceDescriptor[];
+  readonly diagnosticSources?: readonly SourceDescriptor[];
 }
 
 export interface SequenceAlias {
@@ -83,7 +84,13 @@ export type SyntaxSource = (
   scope: Scope,
   file: string,
   metadataOnly?: boolean,
-) => { readonly fileName: string; readonly tree?: Uint8Array } | undefined;
+) =>
+  | {
+      readonly fileName: string;
+      readonly path?: string;
+      readonly tree?: Uint8Array;
+    }
+  | undefined;
 
 export interface NodeFact {
   readonly node: NodeRef;
@@ -391,7 +398,7 @@ export interface QueryResults {
   baseTypes: readonly number[];
   defaultType: number;
   isTypeAssignableTo: boolean;
-  properties: readonly number[];
+  properties: readonly NamedSymbolFact[];
   augmentedPropertiesOfType: readonly NamedSymbolFact[];
   property: number;
   propertyType: number;
@@ -681,7 +688,7 @@ export const SCALAR_KINDS: Readonly<Record<ScalarOperation, number>> = {
   baseTypes: 4,
   defaultType: 1,
   isTypeAssignableTo: 2,
-  properties: 4,
+  properties: 11,
   augmentedPropertiesOfType: 11,
   property: 1,
   propertyType: 1,

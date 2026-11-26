@@ -139,15 +139,17 @@ func main() {
 					if req.MetadataOnly {
 						value = struct {
 							FileName string `json:"fileName"`
-						}{f.FileName()}
+							Path     string `json:"path"`
+						}{f.FileName(), string(f.Path())}
 						return
 					}
 					tree, _, encodeErr := encoder.EncodeSourceFile(f)
 					err = encodeErr
 					value = struct {
 						FileName string `json:"fileName"`
+						Path     string `json:"path"`
 						Tree     []byte `json:"tree"`
-					}{f.FileName(), tree}
+					}{f.FileName(), string(f.Path()), tree}
 				}
 			case "query":
 				if session == nil {

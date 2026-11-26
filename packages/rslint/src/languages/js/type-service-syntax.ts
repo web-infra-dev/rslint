@@ -615,6 +615,17 @@ export class GenerationSyntaxViews {
       this.metadataByName.set(source.fileName, source);
       this.metadataByName.set(source.path, source);
     }
+    for (const source of descriptor.diagnosticSources ?? []) {
+      this.registerDiagnosticSource(source);
+    }
+  }
+
+  private registerDiagnosticSource(source: SourceDescriptor): void {
+    if (!this.sourceOrdinals.has(source.fileName)) {
+      this.sourceOrdinals.set(source.fileName, this.sourceOrdinals.size + 1);
+    }
+    this.diagnosticMetadata.set(source.fileName, source);
+    if (source.path) this.diagnosticMetadata.set(source.path, source);
   }
 
   private ordinal(ref: NodeRef): number | undefined {
@@ -776,18 +787,12 @@ export class GenerationSyntaxViews {
       if (reply) {
         metadata = this.diagnosticMetadata.get(reply.fileName) ?? {
           fileName: reply.fileName,
-          path: reply.fileName.toLowerCase(),
+          path: reply.path ?? reply.fileName,
           external: false,
           defaultLibrary: false,
           isDeclarationFile: false,
         };
-        if (!this.sourceOrdinals.has(metadata.fileName)) {
-          this.sourceOrdinals.set(
-            metadata.fileName,
-            this.sourceOrdinals.size + 1,
-          );
-        }
-        this.diagnosticMetadata.set(metadata.fileName, metadata);
+        this.registerDiagnosticSource(metadata);
         this.diagnosticMetadata.set(file, metadata);
       }
     }
@@ -1168,6 +1173,7 @@ export class GenerationSyntaxViews {
     if (
       real &&
       !this.cachedSource(file) &&
+      !(real.index === 1 && key === 'text') &&
       (key === 'kind' ||
         key === 'flags' ||
         key === 'parent' ||

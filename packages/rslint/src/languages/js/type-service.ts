@@ -581,7 +581,7 @@ export class TypeServiceClient {
           ),
         ),
       getPropertiesOfType: (t) =>
-        this.symbolsFor(
+        this.namedSymbolsFor(
           this.query({ op: 'properties', args: { id: this.id(t, 'type') } }),
         ),
       getPropertyOfType: (t, name) =>
