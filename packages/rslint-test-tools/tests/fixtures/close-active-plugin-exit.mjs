@@ -91,7 +91,14 @@ try {
     'EMFILE',
     'ENFILE',
   ]);
-  const delays = [50, 100, 200, 500, ...Array.from({ length: 20 }, () => 1000)];
+  const delays = [
+    50,
+    100,
+    200,
+    500,
+    ...Array.from({ length: 10 }, () => 1000),
+    ...Array.from({ length: 40 }, () => 5000),
+  ];
   for (let attempt = 0; ; attempt++) {
     try {
       await rm(tmp, { recursive: true, force: true });

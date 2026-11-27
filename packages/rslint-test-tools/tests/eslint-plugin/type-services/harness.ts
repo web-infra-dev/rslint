@@ -16,8 +16,9 @@ export class Host {
   control = new Int32Array(this.mailbox, 0, 2);
   worker: Worker;
   private workerExited = false;
-  private workerError: unknown = null;
-  private requestFailed = false;
+  private workerExitCode: number | null = null;
+  private workerError: unknown = undefined;
+  private reportedFatalFailure = false;
   private closePromise: Promise<void> | null = null;
 
   constructor(binary: string) {
@@ -28,35 +29,61 @@ export class Host {
       ),
       { workerData: { binary, cwd: root, mailbox: this.mailbox } },
     );
-    this.worker.once('exit', () => {
+    this.worker.once('exit', (code) => {
       this.workerExited = true;
+      this.workerExitCode = code;
     });
     this.worker.on('error', (error) => {
-      this.workerError ??= error;
+      this.workerError ??=
+        error ?? new Error('type service broker worker error');
     });
   }
 
   request(request: object): any {
-    try {
-      if (this.workerError !== null) {
-        throw this.workerError;
-      }
-      if (this.workerExited) {
-        throw new Error('type service broker worker already exited');
-      }
-      Atomics.store(this.control, 0, 0);
-      this.worker.postMessage(request);
-      if (Atomics.wait(this.control, 0, 0, 60_000) === 'timed-out')
-        throw new Error('type service host timed out');
-      const response = JSON.parse(
-        Buffer.from(this.mailbox, 8, Atomics.load(this.control, 1)).toString(),
+    if (this.workerError !== undefined) {
+      this.reportedFatalFailure = true;
+      throw this.workerError;
+    }
+    if (this.workerExited) {
+      this.reportedFatalFailure = true;
+      throw new Error(
+        `type service broker worker already exited with code ${String(this.workerExitCode)}`,
       );
-      if (response.error) throw new Error(response.error);
-      return response.result;
+    }
+    Atomics.store(this.control, 0, 1);
+    try {
+      this.worker.postMessage(request);
     } catch (error) {
-      this.requestFailed = true;
+      Atomics.store(this.control, 0, 0);
+      this.reportedFatalFailure = true;
       throw error;
     }
+    if (Atomics.wait(this.control, 0, 1, 60_000) === 'timed-out') {
+      this.reportedFatalFailure = true;
+      throw new Error('type service host timed out');
+    }
+    const response = JSON.parse(
+      Buffer.from(this.mailbox, 8, Atomics.load(this.control, 1)).toString(),
+    ) as {
+      result?: unknown;
+      error?: string;
+      fatal?: boolean;
+      workerFatal?: boolean;
+    };
+    if (response.error) {
+      if (response.workerFatal) {
+        this.workerExited = true;
+        this.workerExitCode ??= 1;
+      }
+      if (response.fatal || response.workerFatal) {
+        this.reportedFatalFailure = true;
+      }
+      if (response.workerFatal && this.workerError !== undefined) {
+        throw this.workerError;
+      }
+      throw new Error(response.error);
+    }
+    return response.result;
   }
 
   source = (
@@ -84,54 +111,104 @@ export class Host {
       return this.closePromise;
     }
     this.closePromise = (async () => {
-      const hadPriorFailure =
-        this.requestFailed || this.workerExited || this.workerError !== null;
-      let closeError: unknown;
-      if (!this.workerExited && this.workerError === null) {
+      // Only a fatal transport/worker/child failure already thrown out of
+      // `request()` has been surfaced to the caller; normal Go RPC errors or
+      // crashes/exits after the last request must still reject `close()`.
+      const hadReportedFailure = this.reportedFatalFailure;
+      // Flush any queued libuv worker `error`/`exit` events that occurred while
+      // the main thread was blocked in synchronous work before `close()`.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const unexpectedExitError = (code: number | null, phase = '') =>
+        new Error(
+          `type service broker worker exited unexpectedly with code ${String(code)}${phase}`,
+        );
+      let closeError: unknown =
+        this.workerError ??
+        (this.workerExited
+          ? unexpectedExitError(this.workerExitCode)
+          : undefined);
+      if (
+        !hadReportedFailure &&
+        !this.workerExited &&
+        this.workerError === undefined
+      ) {
         try {
           this.request({ method: 'close' });
         } catch (error) {
-          closeError = error;
+          closeError ??= error;
         }
+        closeError ??=
+          this.workerError ??
+          (this.workerExited
+            ? unexpectedExitError(this.workerExitCode)
+            : undefined);
       }
       try {
-        if (!this.workerExited) {
+        if (!this.workerExited && this.workerError === undefined) {
           await new Promise<void>((done) => {
+            let stopTimer: ReturnType<typeof setTimeout> | undefined;
             const cleanup = () => {
+              clearTimeout(stopTimer);
               this.worker.off('message', onMessage);
               this.worker.off('error', onError);
               this.worker.off('exit', onFinish);
             };
-            const onMessage = (message: { stopped?: boolean }) => {
+            const onMessage = (message: {
+              stopped?: boolean;
+              error?: string;
+            }) => {
               if (message?.stopped) {
+                if (message.error) {
+                  closeError ??= new Error(message.error);
+                }
+                closeError ??= this.workerError;
                 cleanup();
                 done();
               }
             };
             const onError = (error: unknown) => {
-              closeError ??= error;
+              closeError ??=
+                error ?? new Error('type service broker worker error');
               cleanup();
               done();
             };
-            const onFinish = () => {
+            const onFinish = (code: number) => {
+              closeError ??=
+                this.workerError ??
+                unexpectedExitError(code, ' before stopping child');
               cleanup();
               done();
             };
             this.worker.on('message', onMessage);
             this.worker.once('error', onError);
             this.worker.once('exit', onFinish);
-            if (this.workerExited) {
+            if (this.workerExited || this.workerError !== undefined) {
+              closeError ??=
+                this.workerError ??
+                unexpectedExitError(
+                  this.workerExitCode,
+                  ' before stopping child',
+                );
               cleanup();
               done();
               return;
             }
+            stopTimer = setTimeout(() => {
+              closeError ??= new Error(
+                'timed out waiting for type service broker worker to stop',
+              );
+              cleanup();
+              done();
+            }, 10_000);
+            stopTimer.unref();
             this.worker.postMessage({ method: 'stop' });
           });
         }
       } finally {
         await this.worker.terminate();
       }
-      if (!hadPriorFailure && closeError !== undefined) {
+      closeError ??= this.workerError;
+      if (!hadReportedFailure && closeError !== undefined) {
         throw closeError;
       }
     })();

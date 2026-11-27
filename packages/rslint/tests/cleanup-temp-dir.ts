@@ -12,14 +12,15 @@ const RETRYABLE_CLEANUP_CODES = new Set([
 ]);
 
 // Short initial probes clear millisecond-scale Windows child-exit and scanner
-// races without stalling for a full second; sustained 1s steps preserve >20s
-// of slack when a busy CI runner delays kernel handle teardown.
+// races without stalling for a full second; 1s and 5s steps preserve main's
+// >=210s total retry window (210.85s) when a busy CI runner delays handle teardown.
 const DEFAULT_RETRY_DELAYS_MS: readonly number[] = [
   50,
   100,
   200,
   500,
-  ...Array.from({ length: 20 }, () => 1_000),
+  ...Array.from({ length: 10 }, () => 1_000),
+  ...Array.from({ length: 40 }, () => 5_000),
 ];
 
 export interface CleanupTempDirOptions {
@@ -51,7 +52,7 @@ function isRetryableCleanupError(error: unknown): boolean {
  * Test execution and assertions are never retried, and persistent lock errors
  * are rethrown once retries are exhausted. When called from Rstest hooks in
  * packages without a global `hookTimeout` override (such as `packages/rslint`),
- * pass an explicit hook timeout `>= 30_000` (e.g. `35 * 60_000`).
+ * pass an explicit hook timeout `>= 240_000` (e.g. `35 * 60_000`).
  */
 export async function cleanupTempDir(
   targetPath: string,

@@ -25,12 +25,21 @@ async function writeFixture(root, files) {
   }
 }
 
-async function runCLI(cwd, args) {
+async function runCLI(cwd, args, options = {}) {
+  const {
+    scriptPath = cliScript,
+    timeoutMs = cliTimeoutMs,
+    graceMs = cliTerminationGraceMs,
+    platform = process.platform,
+    spawnImpl = spawn,
+    setTimeoutImpl = setTimeout,
+    onSpawn,
+  } = options;
   return new Promise((resolve, reject) => {
-    const child = spawn(
+    const child = spawnImpl(
       process.execPath,
       [
-        cliScript,
+        scriptPath,
         '--no-color',
         '--singleThreaded',
         '--format',
@@ -39,18 +48,19 @@ async function runCLI(cwd, args) {
       ],
       {
         cwd,
-        detached: process.platform !== 'win32',
+        detached: platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
       },
     );
+    onSpawn?.(child);
     const stdoutChunks = [];
     const stderrChunks = [];
     let outputBytes = 0;
     let settled = false;
     let failure;
     let timeoutTimer;
-    let hardKillTimer;
+    let pipeDrainTimer;
 
     let killDone = Promise.resolve();
     const destroyPipes = () => {
@@ -59,14 +69,39 @@ async function runCLI(cwd, args) {
     };
     const terminateProcessTree = () => {
       if (child.pid === undefined) return;
-      if (child.exitCode !== null || child.signalCode !== null) {
-        destroyPipes();
-        return;
-      }
-      if (process.platform === 'win32') {
+      if (platform === 'win32') {
+        if (child.exitCode !== null || child.signalCode !== null) {
+          destroyPipes();
+          return;
+        }
         killDone = new Promise((done) => {
+          let finished = false;
+          let windowsTreeKill;
+          const finish = () => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(killTimer);
+            done();
+          };
+          const killTimer = setTimeout(() => {
+            try {
+              windowsTreeKill?.kill('SIGKILL');
+            } catch {
+              // Ignore teardown races if the tree-kill helper already exited.
+            }
+            if (child.exitCode === null && child.signalCode === null) {
+              try {
+                child.kill('SIGKILL');
+              } catch {
+                // Ignore if child already exited.
+              }
+            }
+            destroyPipes();
+            finish();
+          }, graceMs);
+          killTimer.unref();
           try {
-            const windowsTreeKill = spawn(
+            windowsTreeKill = spawnImpl(
               // cspell:disable-next-line
               'taskkill',
               ['/pid', String(child.pid), '/t', '/f'],
@@ -76,7 +111,8 @@ async function runCLI(cwd, args) {
               if (child.exitCode === null && child.signalCode === null) {
                 child.kill('SIGKILL');
               }
-              done();
+              destroyPipes();
+              finish();
             });
             windowsTreeKill.once('close', (code) => {
               if (
@@ -86,34 +122,108 @@ async function runCLI(cwd, args) {
               ) {
                 child.kill('SIGKILL');
               }
-              done();
+              if (code !== 0) {
+                destroyPipes();
+              }
+              finish();
             });
           } catch {
             if (child.exitCode === null && child.signalCode === null) {
               child.kill('SIGKILL');
             }
-            done();
+            destroyPipes();
+            finish();
           }
         });
-        hardKillTimer = setTimeout(() => {
+        pipeDrainTimer = setTimeout(() => {
           destroyPipes();
-        }, cliTerminationGraceMs);
-        hardKillTimer.unref();
+        }, graceMs);
+        pipeDrainTimer.unref();
         return;
       }
-      try {
-        process.kill(-child.pid, 'SIGTERM');
-      } catch {
-        child.kill('SIGTERM');
-      }
-      hardKillTimer = setTimeout(() => {
+
+      // POSIX: `detached: true` places the CLI and its descendants in process
+      // group `-child.pid`. Signal the group even when the group leader has
+      // already exited while a descendant still holds stdout/stderr open.
+      const processGroupId = -child.pid;
+      const isGroupAlive = () => {
         try {
-          process.kill(-child.pid, 'SIGKILL');
-        } catch {
-          child.kill('SIGKILL');
+          process.kill(processGroupId, 0);
+          return true;
+        } catch (err) {
+          return err?.code === 'EPERM';
         }
-      }, cliTerminationGraceMs);
-      hardKillTimer.unref();
+      };
+      let groupSignaled = false;
+      try {
+        process.kill(processGroupId, 'SIGTERM');
+        groupSignaled = true;
+      } catch (err) {
+        if (err?.code === 'EPERM') {
+          groupSignaled = true;
+        } else if (child.exitCode === null && child.signalCode === null) {
+          child.kill('SIGTERM');
+        }
+      }
+      if (
+        !groupSignaled &&
+        (child.exitCode !== null || child.signalCode !== null)
+      ) {
+        destroyPipes();
+        return;
+      }
+      killDone = new Promise((done) => {
+        let finished = false;
+        let pollTimer;
+        let hardTimer;
+        let reapDeadlineTimer;
+        const finish = () => {
+          if (finished) return;
+          finished = true;
+          clearInterval(pollTimer);
+          clearTimeout(hardTimer);
+          clearTimeout(reapDeadlineTimer);
+          done();
+        };
+        const checkDone = () => {
+          const leaderAlive =
+            child.exitCode === null && child.signalCode === null;
+          if (!leaderAlive && (!groupSignaled || !isGroupAlive())) {
+            finish();
+          }
+        };
+        pollTimer = setInterval(checkDone, 20);
+        pollTimer.unref();
+        hardTimer = setTimeout(() => {
+          if (groupSignaled && isGroupAlive()) {
+            try {
+              process.kill(processGroupId, 'SIGKILL');
+            } catch {
+              // Group exited between probe and SIGKILL.
+            }
+          }
+          if (child.exitCode === null && child.signalCode === null) {
+            try {
+              child.kill('SIGKILL');
+            } catch {
+              // Leader already exited.
+            }
+          }
+          destroyPipes();
+          if (!groupSignaled || !isGroupAlive()) {
+            finish();
+            return;
+          }
+          reapDeadlineTimer = setTimeout(finish, 2_000);
+          reapDeadlineTimer.unref();
+        }, graceMs);
+        hardTimer.unref();
+        checkDone();
+      });
+      pipeDrainTimer = setTimeout(() => {
+        destroyPipes();
+      }, graceMs);
+      pipeDrainTimer.unref();
     };
     const requestFailure = (error) => {
       if (failure !== undefined || settled) return;
@@ -144,7 +254,7 @@ async function runCLI(cwd, args) {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutTimer);
-      clearTimeout(hardKillTimer);
+      clearTimeout(pipeDrainTimer);
       const settle = () => {
         const stdout = Buffer.concat(stdoutChunks).toString('utf8');
         const stderr = Buffer.concat(stderrChunks).toString('utf8');
@@ -169,9 +279,9 @@ async function runCLI(cwd, args) {
       void killDone.then(settle, settle);
     });
 
-    timeoutTimer = setTimeout(() => {
-      requestFailure(new Error(`rslint CLI timed out after ${cliTimeoutMs}ms`));
-    }, cliTimeoutMs);
+    timeoutTimer = setTimeoutImpl(() => {
+      requestFailure(new Error(`rslint CLI timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
     timeoutTimer.unref();
   });
 }
@@ -1263,6 +1373,155 @@ describe('CLI lint target contracts', () => {
       expect(result.stderr).not.toContain('outside-files.js');
       expect(result.stderr).not.toContain('linted.ts');
     } finally {
+      await cleanupTempDir(root);
+    }
+  });
+});
+
+describe('runCLI process-tree teardown', () => {
+  test.skipIf(process.platform === 'win32')(
+    'terminates a detached POSIX descendant holding stdout open after its leader exits',
+    async () => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-cli-group-kill-'),
+      );
+      let descendantPid;
+      let postExitTimer;
+      try {
+        const fakeCli = path.join(root, 'fake-cli.mjs');
+        await writeFile(
+          fakeCli,
+          `import { spawn } from 'node:child_process';
+const pidFile = process.argv.at(-1);
+const ignoreSigterm = process.argv.includes('--ignore-sigterm');
+const child = spawn(
+  process.execPath,
+  [
+    '-e',
+    \`import('node:fs').then(({ writeFileSync, writeSync }) => {
+      if (\${String(ignoreSigterm)}) process.on('SIGTERM', () => {});
+      writeFileSync(\${JSON.stringify(pidFile)}, String(process.pid));
+      writeSync(3, 'ready');
+      setInterval(() => {}, 60_000);
+    });\`,
+  ],
+  { stdio: ['ignore', 'inherit', 'inherit', 'pipe'] },
+);
+child.stdio[3].once('data', () => {
+  process.exit(0);
+});
+`,
+        );
+
+        for (const [label, extraArgs] of [
+          ['sigterm', []],
+          ['sigkill', ['--ignore-sigterm']],
+        ]) {
+          const pidFile = path.join(root, `descendant-${label}.pid`);
+          let leader;
+          let leaderExitCode = null;
+          await expect(
+            runCLI(root, [...extraArgs, pidFile], {
+              scriptPath: fakeCli,
+              timeoutMs: 80,
+              graceMs: 120,
+              onSpawn: (child) => {
+                leader = child;
+              },
+              setTimeoutImpl: (fn) => {
+                const fallback = setTimeout(fn, 30_000);
+                leader.once('exit', (code) => {
+                  leaderExitCode = code;
+                  clearTimeout(fallback);
+                  postExitTimer = setTimeout(fn, 10);
+                  postExitTimer.unref();
+                });
+                return fallback;
+              },
+            }),
+          ).rejects.toThrow('rslint CLI timed out after 80ms');
+
+          expect(leaderExitCode).toBe(0);
+          descendantPid = Number(await readFile(pidFile, 'utf8'));
+          expect(Number.isInteger(descendantPid)).toBe(true);
+          let alive = true;
+          for (let i = 0; i < 100; i++) {
+            try {
+              process.kill(descendantPid, 0);
+            } catch (err) {
+              if (err?.code === 'ESRCH') {
+                alive = false;
+                break;
+              }
+            }
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          expect(alive).toBe(false);
+          descendantPid = undefined;
+        }
+      } finally {
+        clearTimeout(postExitTimer);
+        if (descendantPid !== undefined) {
+          try {
+            process.kill(descendantPid, 'SIGKILL');
+          } catch {
+            // Already reaped.
+          }
+        }
+        await cleanupTempDir(root);
+      }
+    },
+  );
+
+  test('bounds a stalled Windows tree-kill helper so runCLI reports its timeout promptly', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-win-stall-'));
+    let cliChild;
+    let stalledTreeKiller;
+    try {
+      const fakeCli = path.join(root, 'fake-win-cli.mjs');
+      await writeFile(fakeCli, 'setInterval(() => {}, 120_000);\n');
+      const customSpawn = (command, args, opts) => {
+        // cspell:disable-next-line
+        if (command === 'taskkill') {
+          stalledTreeKiller = spawn(
+            process.execPath,
+            ['-e', 'setInterval(() => {}, 120_000);'],
+            { stdio: 'ignore', windowsHide: true },
+          );
+          // Simulate the target CLI exiting and emitting `close` while tree-kill hangs.
+          cliChild?.kill('SIGKILL');
+          return stalledTreeKiller;
+        }
+        cliChild = spawn(command, args, opts);
+        return cliChild;
+      };
+
+      const startedAt = Date.now();
+      await expect(
+        runCLI(root, [], {
+          scriptPath: fakeCli,
+          timeoutMs: 60,
+          graceMs: 100,
+          platform: 'win32',
+          spawnImpl: customSpawn,
+        }),
+      ).rejects.toThrow('rslint CLI timed out after 60ms');
+
+      expect(Date.now() - startedAt).toBeLessThan(30_000);
+      expect(stalledTreeKiller).toBeDefined();
+      expect(
+        stalledTreeKiller.killed ||
+          stalledTreeKiller.exitCode !== null ||
+          stalledTreeKiller.signalCode !== null,
+      ).toBe(true);
+    } finally {
+      for (const proc of [cliChild, stalledTreeKiller]) {
+        if (proc && proc.exitCode === null && proc.signalCode === null) {
+          const closed = new Promise((resolve) => proc.once('close', resolve));
+          proc.kill('SIGKILL');
+          await closed;
+        }
+      }
       await cleanupTempDir(root);
     }
   });

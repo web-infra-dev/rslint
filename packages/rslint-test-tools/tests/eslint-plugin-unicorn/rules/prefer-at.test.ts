@@ -3131,9 +3131,12 @@ beforeAll(async () => {
   );
 });
 afterAll(async () => {
-  await service?.close();
-  if (root) {
-    await cleanupTempDir(root);
+  try {
+    await service?.close();
+  } finally {
+    if (root) {
+      await cleanupTempDir(root);
+    }
   }
 });
 

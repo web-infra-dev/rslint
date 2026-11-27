@@ -633,7 +633,7 @@ describe('original npm typed rules over Go type services', () => {
   beforeAll(() => {
     host = harness.createHost();
   });
-  afterAll(() => host.close());
+  afterAll(() => host?.close());
 
   for (const c of cases)
     test(c.name, async () => {

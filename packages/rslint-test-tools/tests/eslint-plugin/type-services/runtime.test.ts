@@ -1652,3 +1652,70 @@ test('decodes deep diagnostic message chains above 64 levels and rejects cyclic 
   );
   diamondReader.close();
 });
+
+test('Host.close surfaces post-request broker crashes and unexpected exits without masking reported request errors', async () => {
+  const dir = mkdtempSync(resolve(harness.temp, 'host-close-crash-'));
+  const file = resolve(dir, 'index.ts');
+  const config = resolve(dir, 'tsconfig.json');
+  writeFileSync(file, 'export const ok = 1;\n');
+  writeFileSync(config, JSON.stringify({ include: ['index.ts'] }));
+
+  const hosts: ReturnType<typeof harness.createHost>[] = [];
+  const spawnHost = () => {
+    const instance = harness.createHost();
+    hosts.push(instance);
+    return instance;
+  };
+
+  try {
+    // 1. Worker throws and exits with code 1 after the last request succeeded,
+    // even if an earlier application-level Go RPC error was caught by the test.
+    const crashedAfterRequest = spawnHost();
+    expect(() => crashedAfterRequest.request({ method: 'unknown' })).toThrow(
+      'unsupported harness request',
+    );
+    const descriptor = crashedAfterRequest.request({
+      method: 'init',
+      config,
+      syntaxOnly: true,
+    }) as TypeServiceDescriptor;
+    expect(descriptor.generation).toBeGreaterThan(0);
+    const crashedExit = new Promise<number>((resolveExit) => {
+      crashedAfterRequest.worker.once('exit', resolveExit);
+    });
+    crashedAfterRequest.worker.postMessage(null);
+    expect(await crashedExit).toBe(1);
+    await expect(crashedAfterRequest.close()).rejects.toThrow(TypeError);
+
+    // 2. Worker exits before `close()` without emitting an `error` event.
+    const exitedWithoutError = spawnHost();
+    expect(
+      (
+        exitedWithoutError.request({
+          method: 'init',
+          config,
+          syntaxOnly: true,
+        }) as TypeServiceDescriptor
+      ).generation,
+    ).toBeGreaterThan(0);
+    await exitedWithoutError.worker.terminate();
+    await expect(exitedWithoutError.close()).rejects.toThrow(
+      /exited unexpectedly/,
+    );
+
+    // 3. Worker crash while `request()` is waiting in `Atomics.wait` wakes the
+    // caller immediately instead of stalling 60s, and `close()` in `finally`
+    // neither stalls in a second `Atomics.wait` nor re-throws over the caller.
+    const crashedInFlight = spawnHost();
+    const startedAt = Date.now();
+    expect(() => crashedInFlight.request(null as unknown as object)).toThrow(
+      /exited unexpectedly/,
+    );
+    await expect(crashedInFlight.close()).resolves.toBeUndefined();
+    expect(Date.now() - startedAt).toBeLessThan(10_000);
+  } finally {
+    await Promise.allSettled(
+      hosts.map((instance) => instance.worker.terminate()),
+    );
+  }
+});

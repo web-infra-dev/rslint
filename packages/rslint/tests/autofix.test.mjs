@@ -116,8 +116,11 @@ function f(value) {
         ),
       );
     } finally {
-      await Promise.all([rslint.close(), nativeFixer.close()]);
-      await cleanupTempDir(tmp);
+      try {
+        await Promise.all([rslint.close(), nativeFixer.close()]);
+      } finally {
+        await cleanupTempDir(tmp);
+      }
     }
   });
 
@@ -158,8 +161,11 @@ function f(value) {
       expect(result.output).toBe('');
       expect(result.messages).toEqual([]);
     } finally {
-      await rslint.close();
-      await cleanupTempDir(tmp);
+      try {
+        await rslint.close();
+      } finally {
+        await cleanupTempDir(tmp);
+      }
     }
   });
 
@@ -283,8 +289,11 @@ function f(value) {
       expect(result.fixableWarningCount).toBe(0);
       expect(result.output).toBeUndefined();
     } finally {
-      await rslint.close();
-      await cleanupTempDir(tmp);
+      try {
+        await rslint.close();
+      } finally {
+        await cleanupTempDir(tmp);
+      }
     }
   });
 
@@ -343,8 +352,11 @@ function f(value) {
       expect(result.fixableErrorCount).toBe(0);
       expect(result.output).toBeUndefined();
     } finally {
-      await rslint.close();
-      await cleanupTempDir(tmp);
+      try {
+        await rslint.close();
+      } finally {
+        await cleanupTempDir(tmp);
+      }
     }
   });
 
@@ -446,12 +458,15 @@ function f(value) {
       expect(suggestionApplied).not.toContain('disk gap');
       expect(suggestionApplied).not.toContain('diskMarker');
     } finally {
-      await Promise.all([
-        fixInspector.close(),
-        suggestionInspector.close(),
-        fixer.close(),
-      ]);
-      await cleanupTempDir(tmp);
+      try {
+        await Promise.all([
+          fixInspector.close(),
+          suggestionInspector.close(),
+          fixer.close(),
+        ]);
+      } finally {
+        await cleanupTempDir(tmp);
+      }
     }
   });
 });

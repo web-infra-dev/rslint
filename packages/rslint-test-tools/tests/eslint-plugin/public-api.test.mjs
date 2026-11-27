@@ -118,8 +118,11 @@ describe('Rslint community plugin API', () => {
       expect(result.fixableErrorCount).toBe(0);
       expect(result.output).toBe('const found = [1].some(Boolean);\n');
     } finally {
-      await rslint?.close();
-      await cleanupTempDir(tmp);
+      try {
+        await rslint?.close();
+      } finally {
+        await cleanupTempDir(tmp);
+      }
     }
   });
 

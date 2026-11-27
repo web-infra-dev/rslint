@@ -38,7 +38,7 @@ describe('runCLI', () => {
     } finally {
       await cleanupTempDir(cwd);
     }
-  }, 120_000);
+  }, 300_000);
 
   test.each<NodeJS.Signals>(
     process.platform === 'win32' ? ['SIGINT'] : ['SIGHUP', 'SIGINT', 'SIGTERM'],
@@ -98,6 +98,6 @@ describe('runCLI', () => {
         await cleanupTempDir(cwd);
       }
     },
-    120_000,
+    300_000,
   );
 });
