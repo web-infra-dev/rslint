@@ -288,6 +288,12 @@ func TestIsValidRegexPatternECMAVersion(t *testing.T) {
 		{name: "sequential duplicate remains invalid", pattern: `(?<a>x)(?<a>y)`, ecmaVersion: 2025},
 		{name: "inline modifiers before introduction", pattern: `(?i:a)`, ecmaVersion: 2024},
 		{name: "inline modifiers after introduction", pattern: `(?i:a)`, ecmaVersion: 2025, want: true},
+		// cspell:ignore Beria
+		{name: "unicode 16 script rejected before ES2023", pattern: `\p{Script=Garay}`, ecmaVersion: 2022},
+		{name: "unicode 16 script accepted from ES2023", pattern: `\p{Script=Garay}`, ecmaVersion: 2023, want: true},
+		{name: "unicode 17 script rejected before ES2023", pattern: `\p{Script=Beria_Erfe}`, ecmaVersion: 2022},
+		{name: "unicode 17 script accepted from ES2023", pattern: `\p{Script=Beria_Erfe}`, ecmaVersion: 2023, want: true},
+		{name: "zero ecmaVersion selects latest", pattern: `(?i:\p{Script=Garay})`, ecmaVersion: 0, want: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if got := IsValidRegexPatternForECMAVersion(test.pattern, u, test.ecmaVersion); got != test.want {

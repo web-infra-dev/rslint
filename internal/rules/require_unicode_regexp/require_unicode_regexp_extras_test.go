@@ -640,6 +640,21 @@ RegExp("a", flags[0]);`},
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/\p{Script=Greek}/u`}},
 				}},
 			},
+			// Unicode 16/17 scripts are accepted starting in ES2023 (matching regexpp/ESLint 10),
+			// so ES2022 must report without offering an unparsable `/u` suggestion.
+			{
+				Code:            `/\p{Script=Garay}/`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+			},
+			{
+				Code:            `/\p{Script=Garay}/`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2023},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/\p{Script=Garay}/u`}},
+				}},
+			},
 			{
 				Code:            `/[a^^b]/`,
 				Options:         []any{map[string]any{"requireFlag": "v"}},

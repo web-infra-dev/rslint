@@ -64,7 +64,9 @@ func scanRegexLiteral(literal string, ignoreDeferredEventErrors bool, ecmaVersio
 				return
 			}
 		}
-		if message == diagnostics.Unknown_Unicode_property_value && isKnownNewerUnicodeScript(literal, flags, start, length) {
+		if message == diagnostics.Unknown_Unicode_property_value &&
+			(ecmaVersion == 0 || ecmaVersion >= 2023) &&
+			isKnownNewerUnicodeScript(literal, flags, start, length) {
 			ignoredUnicodePropertyStart = start
 			return
 		}

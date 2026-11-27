@@ -284,6 +284,31 @@ func TestPreferRegexLiteralsExtras(t *testing.T) {
 				}},
 			},
 
+			// Unicode 16/17 scripts are accepted starting in ES2023 (matching regexpp/ESLint 10),
+			// so ES2022 must report without offering an unparsable regex literal suggestion.
+			{
+				Code:            `const re = new RegExp("\\p{Script=Garay}", "u");`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpectedRegExp",
+					Line:      1,
+					Column:    12,
+				}},
+			},
+			{
+				Code:            `const re = new RegExp("\\p{Script=Garay}", "u");`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2023},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpectedRegExp",
+					Line:      1,
+					Column:    12,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "replaceWithLiteral",
+						Output:    `const re = /\p{Script=Garay}/u;`,
+					}},
+				}},
+			},
+
 			// Config declares RegExp/globalThis as writable globals — still the builtins.
 			{
 				Code:    "new RegExp('a');",

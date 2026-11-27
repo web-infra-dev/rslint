@@ -105,6 +105,12 @@ func TestIsValidRegexLiteralForVersion(t *testing.T) {
 		{literal: `/(?i:foo)bar/`, version: 2025, want: true},
 		{literal: `/[(?i:)]/`, version: 2024, want: true},
 		{literal: `/\(\?i:/`, version: 2024, want: true},
+		{literal: `/\p{Script=Garay}/u`, version: 2022, want: false},
+		{literal: `/\p{Script=Garay}/u`, version: 2023, want: true},
+		{literal: `/\p{Script=Beria_Erfe}/u`, version: 2022, want: false},
+		{literal: `/\p{Script=Beria_Erfe}/u`, version: 2023, want: true},
+		{literal: `/\p{Script=Garay}/v`, version: 2023, want: false},
+		{literal: `/\p{Script=Garay}/v`, version: 2024, want: true},
 		{literal: ``, version: 2024, want: false},
 	}
 

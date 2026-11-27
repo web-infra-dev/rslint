@@ -74,6 +74,7 @@ Leave this rule disabled if your project has no syntax restrictions.
 - Malformed selectors are ignored instead of rejecting the rule configuration. For example, `["error", "[", "WithStatement"]` still restricts `WithStatement` in rslint; ESLint rejects the malformed `[` selector.
 - Unsupported constructs (such as Closure/JSDoc nullable type syntax like `?number` authored in TypeScript code) and malformed error-recovery nodes degrade locally during tree projection so the rest of the file is still linted, rather than aborting the file with a parse error.
 - Node location metadata (`range` and `loc`) is not exposed in attribute selector paths (for example, `[loc.start.line=1]` evaluates to `undefined`).
+- Regular expression literal validation for `Literal.value` uses Unicode 17.0 script data (matching Go 1.27 and Node 24.16+), so scripts added in Unicode 17.0 (for example, `/\p{Script=Beria_Erfe}/v`) expose a `RegExp` value even when compared against older Node runtimes (such as Node 22 / Unicode 16.0) where `new RegExp` throws and ESLint's parser sets `Literal.value` to `null`.
 
 ## Original Documentation
 

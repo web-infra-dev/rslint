@@ -23,7 +23,7 @@ import (
 // accept every RegExpIdentifierName escape spelling. Known scanner gaps fail
 // closed so callers never turn an invalid pattern into a suggested fix.
 func IsValidRegexPattern(pattern string, flags RegexFlags) bool {
-	return isValidRegexPattern(pattern, flags, 2025)
+	return isValidRegexPattern(pattern, flags, 0)
 }
 
 // IsValidRegexPatternForECMAVersion additionally rejects pattern features
@@ -42,14 +42,14 @@ type regexPatternValidation struct {
 }
 
 func isValidRegexPattern(pattern string, flags RegexFlags, ecmaVersion int) bool {
-	validation := validateRegexPattern(pattern, flags)
+	validation := validateRegexPattern(pattern, flags, ecmaVersion)
 	if !validation.valid || validation.hasNonExclusiveDuplicateCaptureName {
 		return false
 	}
-	return ecmaVersion >= 2025 || !validation.hasDuplicateCaptureName
+	return ecmaVersion == 0 || ecmaVersion >= 2025 || !validation.hasDuplicateCaptureName
 }
 
-func validateRegexPattern(pattern string, flags RegexFlags) regexPatternValidation {
+func validateRegexPattern(pattern string, flags RegexFlags, ecmaVersion int) regexPatternValidation {
 	if flags.Unicode && flags.UnicodeSets {
 		return regexPatternValidation{}
 	}
@@ -75,7 +75,7 @@ func validateRegexPattern(pattern string, flags RegexFlags) regexPatternValidati
 		valid = err == nil
 	} else {
 		literal, literalOK := regexPatternLiteral(normalized, flags)
-		valid = literalOK && ecmascript.IsValidRegexLiteral(literal)
+		valid = literalOK && ecmascript.IsValidRegexLiteralForVersion(literal, ecmaVersion)
 	}
 	return regexPatternValidation{
 		valid:                               valid,
@@ -85,6 +85,9 @@ func validateRegexPattern(pattern string, flags RegexFlags) regexPatternValidati
 }
 
 func regexFeaturesAvailable(pattern string, flags RegexFlags, ecmaVersion int) bool {
+	if ecmaVersion == 0 {
+		return true
+	}
 	if flags.Unicode && ecmaVersion < 2015 {
 		return false
 	}
