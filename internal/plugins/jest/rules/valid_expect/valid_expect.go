@@ -205,6 +205,7 @@ func tooManyArgsRange(sourceFile *ast.SourceFile, args []*ast.Node, maxArgs int)
 // belongs to — jest matchers are always called, so it is the call wrapping the
 // matcher's member access — and hands it to the shared resolver.
 func resolveAsyncAssertionReportNode(
+	resolver *sharedValidExpect.AsyncAssertionResolver,
 	matcherEntry *utils.ParsedJestFnMemberEntry,
 	alwaysAwait bool,
 ) (reportNode *ast.Node, promiseWrapped bool, insideAssertionArray bool, shouldReport bool) {
@@ -219,10 +220,11 @@ func resolveAsyncAssertionReportNode(
 		return nil, false, false, false
 	}
 
-	return sharedValidExpect.ResolveAsyncAssertionReportNode(assertionExpr, alwaysAwait)
+	return resolver.ResolveAsyncAssertionReportNode(assertionExpr, alwaysAwait)
 }
 
 type asyncFixTracker struct {
+	resolver      *sharedValidExpect.AsyncAssertionResolver
 	asyncInserted map[*ast.Node]bool
 	deferredFn    map[*ast.Node]bool
 	fnFixable     map[*ast.Node]bool
@@ -248,7 +250,7 @@ func reportAsyncDescriptor(
 
 	ctx.ReportNodeWithDeferredFixes(descriptor.node, msg, func() []rule.RuleFix {
 		fn, ok := sharedValidExpect.FindFixableContainingFunctionCached(descriptor.node, tracker.fnFixable)
-		if !ok || !sharedValidExpect.CanSafelyAwaitFix(descriptor.node) {
+		if !ok || !tracker.resolver.CanSafelyAwaitFix(descriptor.node) {
 			return nil
 		}
 		if tracker.deferredFn[fn] {
@@ -267,7 +269,7 @@ func reportAsyncDescriptor(
 			fixes = append(fixes, asyncFix)
 			tracker.asyncInserted[fn] = true
 		}
-		awaitFix := sharedValidExpect.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait)
+		awaitFix := tracker.resolver.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait)
 		fixes = append(fixes, awaitFix)
 		tracker.emittedRanges = append(tracker.emittedRanges, core.NewTextRange(fixes[0].Range.Pos(), fixes[len(fixes)-1].Range.End()))
 		return fixes
@@ -288,8 +290,10 @@ var ValidExpectRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		analysis := utils.GetJestCallAnalysis(ctx)
+		asyncResolver := sharedValidExpect.NewAsyncAssertionResolver(ctx)
 		arrayExceptions := map[string]bool{}
 		tracker := &asyncFixTracker{
+			resolver:      asyncResolver,
 			asyncInserted: map[*ast.Node]bool{},
 			deferredFn:    map[*ast.Node]bool{},
 			fnFixable:     map[*ast.Node]bool{},
@@ -359,6 +363,7 @@ var ValidExpectRule = rule.Rule{
 				}
 
 				reportNode, promiseWrapped, insideAssertionArray, shouldReport := resolveAsyncAssertionReportNode(
+					asyncResolver,
 					parsed.MatcherEntry,
 					opts.AlwaysAwait,
 				)

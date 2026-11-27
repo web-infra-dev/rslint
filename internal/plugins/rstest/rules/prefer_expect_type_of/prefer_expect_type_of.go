@@ -106,8 +106,19 @@ func matchTypeofAssertion(parsed *rstestUtils.ParsedRstestExpectCall) (typeofAss
 		return typeofAssertion{}, false
 	}
 
-	matcherArg := matcherArgument(parsed.MatcherEntry.Call)
+	matcherCall := rstestUtils.MatcherCall(parsed.MatcherEntry)
+	matcherArg := matcherArgument(matcherCall)
 	if matcherArg == nil {
+		return typeofAssertion{}, false
+	}
+
+	// Skip chains that call or read a property/index off the assertion's own
+	// result (e.g. `expect(typeof value).toBe("string")[0]`,
+	// `(expect(typeof value).toBe("string"))[0]`, `.message`, or
+	// `expect(typeof value).toBe("string")("extra")`), while keeping promise
+	// chains (`.then`/`.catch`/`.finally`) on async `.resolves`/`.rejects`
+	// assertions.
+	if !isAllowedTrailingAssertionShape(parsed, matcherCall) {
 		return typeofAssertion{}, false
 	}
 
@@ -117,6 +128,85 @@ func matchTypeofAssertion(parsed *rstestUtils.ParsedRstestExpectCall) (typeofAss
 		matcherNode:     matcherNode,
 		matcherArgument: matcherArg,
 	}, true
+}
+
+func hasAsyncExpectModifier(parsed *rstestUtils.ParsedRstestExpectCall) bool {
+	for _, mod := range parsed.Modifiers {
+		if mod == "resolves" || mod == "rejects" {
+			return true
+		}
+	}
+	return false
+}
+
+func outermostTransparentExpr(node *ast.Node) *ast.Node {
+	current := node
+	for current != nil && current.Parent != nil {
+		parent := current.Parent
+		if parent.Kind == ast.KindParenthesizedExpression {
+			current = parent
+			continue
+		}
+		if expr, ok := utils.TransparentExpression(parent); ok && expr == current {
+			current = parent
+			continue
+		}
+		break
+	}
+	return current
+}
+
+func isAllowedTrailingAssertionShape(parsed *rstestUtils.ParsedRstestExpectCall, matcherCall *ast.Node) bool {
+	if matcherCall == nil || parsed == nil || parsed.Expression == nil {
+		return false
+	}
+	cur := matcherCall
+	if cur != parsed.Expression {
+		if !hasAsyncExpectModifier(parsed) {
+			return false
+		}
+		for cur != parsed.Expression {
+			outer := utils.OutermostParenthesizedExpression(cur)
+			if outer == nil || outer.Parent == nil ||
+				!ast.IsAccessExpression(outer.Parent) ||
+				outer.Parent.Expression() != outer {
+				return false
+			}
+			method, ok := utils.AccessExpressionStaticName(outer.Parent)
+			if !ok || (method != "then" && method != "catch" && method != "finally") {
+				return false
+			}
+			memberOuter := utils.OutermostParenthesizedExpression(outer.Parent)
+			if memberOuter == nil || memberOuter.Parent == nil ||
+				memberOuter.Parent.Kind != ast.KindCallExpression ||
+				memberOuter.Parent.AsCallExpression().Expression != memberOuter {
+				return false
+			}
+			cur = memberOuter.Parent
+		}
+	}
+	outer := outermostTransparentExpr(parsed.Expression)
+	if outer != nil && outer.Parent != nil {
+		switch outer.Parent.Kind {
+		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+			if outer.Parent.Expression() == outer {
+				return false
+			}
+		case ast.KindCallExpression:
+			if outer.Parent.AsCallExpression().Expression == outer {
+				return false
+			}
+		case ast.KindNewExpression:
+			if outer.Parent.AsNewExpression().Expression == outer {
+				return false
+			}
+		case ast.KindTaggedTemplateExpression:
+			if outer.Parent.AsTaggedTemplateExpression().Tag == outer {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // matcherArgument returns the matcher's single argument, or nil when the

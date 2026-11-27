@@ -170,6 +170,7 @@ func readIntOption(options map[string]interface{}, key string, defaultValue int)
 // parenthesized-assertion false positive exist twice.
 
 type asyncFixTracker struct {
+	resolver      *sharedValidExpect.AsyncAssertionResolver
 	asyncInserted map[*ast.Node]bool
 	deferredFn    map[*ast.Node]bool
 	fnFixable     map[*ast.Node]bool
@@ -195,7 +196,7 @@ func reportAsyncDescriptor(
 
 	ctx.ReportNodeWithDeferredFixes(descriptor.node, msg, func() []rule.RuleFix {
 		fn, ok := sharedValidExpect.FindFixableContainingFunctionCached(descriptor.node, tracker.fnFixable)
-		if !ok || !sharedValidExpect.CanSafelyAwaitFix(descriptor.node) {
+		if !ok || !tracker.resolver.CanSafelyAwaitFix(descriptor.node) {
 			return nil
 		}
 		if tracker.deferredFn[fn] {
@@ -211,7 +212,7 @@ func reportAsyncDescriptor(
 			fixes = append(fixes, asyncFix)
 			tracker.asyncInserted[fn] = true
 		}
-		awaitFix := sharedValidExpect.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait)
+		awaitFix := tracker.resolver.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait)
 		fixes = append(fixes, awaitFix)
 		tracker.emittedRanges = append(tracker.emittedRanges, core.NewTextRange(fixes[0].Range.Pos(), fixes[len(fixes)-1].Range.End()))
 		return fixes
@@ -343,6 +344,56 @@ func outermostTransparentExpr(node *ast.Node) *ast.Node {
 	return current
 }
 
+func trailingUncalledMemberAccess(expr *ast.Node) *ast.Node {
+	var topMember *ast.Node
+	cur := expr
+	for cur != nil {
+		outer := outermostTransparentExpr(cur)
+		if outer == nil || outer.Parent == nil ||
+			!ast.IsAccessExpression(outer.Parent) ||
+			outer.Parent.Expression() != outer {
+			break
+		}
+		topMember = outer.Parent
+		cur = topMember
+	}
+	if topMember == nil {
+		return nil
+	}
+	topOuter := outermostTransparentExpr(topMember)
+	if topOuter != nil && topOuter.Parent != nil &&
+		topOuter.Parent.Kind == ast.KindCallExpression &&
+		topOuter.Parent.AsCallExpression().Expression == topOuter {
+		return nil
+	}
+	return topMember
+}
+
+func reportTrailingUncalledMemberAccess(ctx rule.RuleContext, topMember *ast.Node) {
+	var propNode *ast.Node
+	var propName string
+	if topMember != nil && topMember.Kind == ast.KindElementAccessExpression {
+		arg := internalUtils.SkipAssertionsAndParens(topMember.AsElementAccessExpression().ArgumentExpression)
+		if arg != nil {
+			propNode = arg
+			if staticName, ok := internalUtils.GetStaticStringLiteralValue(arg); ok {
+				propName = staticName
+			}
+		}
+	} else {
+		propNode, propName = testFramework.AccessorPropertyAndName(topMember)
+	}
+	if propNode == nil {
+		ctx.ReportNode(topMember, buildErrorMatcherNotCalledMessage())
+		return
+	}
+	if propName != "" && !testFramework.IsComputedIdentifierAccessor(propNode) && rstestUtils.RSTEST_EXPECT_MODIFIER_NAMES[propName] {
+		ctx.ReportNode(propNode, buildErrorMatcherNotFoundMessage())
+		return
+	}
+	ctx.ReportNode(propNode, buildErrorMatcherNotCalledMessage())
+}
+
 // reportBrokenChain reports a chain that the parser resolved without a matcher.
 // The reason comes directly from the shared analysis, so unlike jest this rule
 // does not re-derive it. matcher-not-called points at the trailing member; the
@@ -350,25 +401,19 @@ func outermostTransparentExpr(node *ast.Node) *ast.Node {
 func reportBrokenChain(ctx rule.RuleContext, parsed *rstestUtils.ParsedRstestExpectCall) {
 	switch parsed.Reason {
 	case rstestUtils.RstestExpectParseReasonMatcherNotFound:
-		// If the parser stopped before an uncalled unsupported trailing element
-		// access such as `expect(1)[0]` or `(expect(1) as any)[0]`, report
-		// `matcherNotCalled` on the key.
-		if outer := outermostTransparentExpr(parsed.Expression); outer != nil &&
-			outer.Parent != nil && outer.Parent.Kind == ast.KindElementAccessExpression &&
-			outer.Parent.AsElementAccessExpression().Expression == outer {
-			elemOuter := outermostTransparentExpr(outer.Parent)
-			isCalled := elemOuter != nil && elemOuter.Parent != nil &&
-				elemOuter.Parent.Kind == ast.KindCallExpression &&
-				elemOuter.Parent.AsCallExpression().Expression == elemOuter
-			if !isCalled {
-				if arg := outer.Parent.AsElementAccessExpression().ArgumentExpression; arg != nil {
-					ctx.ReportNode(ast.SkipParentheses(arg), buildErrorMatcherNotCalledMessage())
-					return
-				}
-			}
+		// If the parser stopped before an uncalled unsupported trailing member
+		// access chain such as `expect(1)[0]`, `(expect(1) as any)[0]`,
+		// `expect(1)[0].foo`, or `expect(1)[0].not`, report on the topmost key.
+		if topMember := trailingUncalledMemberAccess(parsed.Expression); topMember != nil {
+			reportTrailingUncalledMemberAccess(ctx, topMember)
+			return
 		}
 		ctx.ReportNode(parsed.Expression, buildErrorMatcherNotFoundMessage())
 	case rstestUtils.RstestExpectParseReasonMatcherNotCalled:
+		if topMember := trailingUncalledMemberAccess(parsed.Expression); topMember != nil {
+			reportTrailingUncalledMemberAccess(ctx, topMember)
+			return
+		}
 		if len(parsed.MemberEntries) == 0 {
 			ctx.ReportNode(parsed.Expression, buildErrorMatcherNotCalledMessage())
 			return
@@ -392,8 +437,10 @@ var ValidExpectRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+		asyncResolver := sharedValidExpect.NewAsyncAssertionResolver(ctx)
 		arrayExceptions := map[string]bool{}
 		tracker := &asyncFixTracker{
+			resolver:      asyncResolver,
 			asyncInserted: map[*ast.Node]bool{},
 			deferredFn:    map[*ast.Node]bool{},
 			fnFixable:     map[*ast.Node]bool{},
@@ -440,7 +487,7 @@ var ValidExpectRule = rule.Rule{
 					return
 				}
 
-				reportNode, promiseWrapped, insideAssertionArray, shouldReport := sharedValidExpect.ResolveAsyncAssertionReportNode(
+				reportNode, promiseWrapped, insideAssertionArray, shouldReport := asyncResolver.ResolveAsyncAssertionReportNode(
 					asyncAssertionExpression(parsed),
 					opts.AlwaysAwait,
 				)

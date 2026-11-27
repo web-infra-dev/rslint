@@ -39,6 +39,19 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: "test(\"valid-expect\", async () => { await (expect(Promise.resolve(2)).resolves.toBeDefined() as Promise<void>); });"},
 			{Code: "test(\"valid-expect\", async () => { const resolve = 'all'; await Promise[resolve]([expect(Promise.resolve(true)).resolves.toBe(true), startWork()]); });"},
 			{Code: "test(\"valid-expect\", async () => { await Promise.try((check: any) => check.then(() => {}), expect(Promise.resolve(1)).resolves.toBe(1)); });"},
+			{Code: "const Promise = globalThis.Promise; test('starts both elements', async () => { let started = false; const p = Promise.resolve().then(() => started); await Promise.all([expect(p).resolves.toBe(true), (started = true)]); });"},
+			{Code: "test(\"valid-expect\", async () => { const [check] = await Promise.resolve([expect(Promise.resolve(1)).resolves.toBe(1)] as const); await check.then(() => {}); });"},
+			{Code: "test(\"valid-expect\", async () => { const [check] = [expect(Promise.resolve(1)).resolves.toBe(1)]; await check.then(() => {}); });"},
+			{Code: "test(\"valid-expect\", async () => { const check = expect(Promise.resolve(1)).resolves.toBe(1); await check; });"},
+			{Code: "interface Promise<T> {} const Promise = globalThis.Promise; test('t', async () => { await Promise.all([expect(p).resolves.toBe(1)]); });"},
+			{Code: "type P = number; const P = globalThis.Promise; test('t', async () => { await P.all([expect(p).resolves.toBe(1)]); });"},
+			{Code: "import type { Promise } from './types'; test('t', async () => { await Promise.all([expect(p).resolves.toBe(1)]); });"},
+			{Code: "test('t', async () => { await Promise.try(async (check: any) => { const o = { [await check]() {} }; }, expect(p).resolves.toBe(1)); });"},
+			{Code: "test('t', async () => { await Promise.try((...args: any[]) => Promise.all(args), ...xs, expect(p).resolves.toBe(1)); });"},
+			{Code: "test('t', async () => { await Promise.try(function (this: unknown, check: any) { return check; }, expect(p).resolves.toBe(1)); });"},
+			{Code: "test('t', async () => { await Promise.try(async (check: any) => { for await (const _ of [check]) {} }, expect(p).resolves.toBe(1)); });"},
+			{Code: "test('t', async () => { const check = expect(p).resolves.toBe(1); switch (x) { case 1: break; } await check; });"},
+			{Code: "test('t', async () => { const check = expect(p).resolves.toBe(1); for (const v of xs) { if (v) break; } await check; });"},
 			{Code: "test(\"valid-expect\", () => { return expect(Promise.resolve(2)).rejects.not.toBeDefined(); });"},
 			{Code: "test(\"valid-expect\", function () { return expect(Promise.resolve(2)).resolves.not.toBeDefined(); });"},
 			{Code: "test(\"valid-expect\", function () { return expect(Promise.resolve(2)).rejects.not.toBeDefined(); });"},
@@ -319,10 +332,24 @@ func TestValidExpectRule(t *testing.T) {
 				Output: []string{"test(\"valid-expect\", async () => { await Promise.resolve([await expect(Promise.resolve(1)).resolves.toBe(1)] as const); });"},
 			},
 			{
-				Code: "test(\"valid-expect\", async () => { const [check] = await Promise.resolve([expect(Promise.resolve(1)).resolves.toBe(1)] as const); await check.then(() => {}); });",
+				Code: "test(\"valid-expect\", async () => { const [check] = await Promise.resolve([expect(Promise.resolve(1)).resolves.toBe(1)] as const); });",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "asyncMustBeAwaited"},
 				},
+			},
+			{
+				Code: "test(\"valid-expect\", async () => { await Promise.try(() => {}, expect(Promise.resolve(1)).resolves.toBe(1)); });",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{"test(\"valid-expect\", async () => { await Promise.try(() => {}, await expect(Promise.resolve(1)).resolves.toBe(1)); });"},
+			},
+			{
+				Code: "test(\"valid-expect\", async () => { const resolve = 'resolve'; await Promise[resolve]([expect(Promise.resolve(1)).resolves.toBe(1)]); });",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{"test(\"valid-expect\", async () => { const resolve = 'resolve'; await Promise[resolve]([await expect(Promise.resolve(1)).resolves.toBe(1)]); });"},
 			},
 			{
 				Code: "test(\"valid-expect\", () => { return (expect(Promise.resolve(1)).resolves.toBe(1) as unknown) ? Promise.resolve() : Promise.reject(); });",
@@ -977,6 +1004,141 @@ func TestValidExpectRule(t *testing.T) {
 				Output: []string{
 					`test("t", async () => { ({ [await expect(p).resolves.toBe(1)]() { expect(q).resolves.toBe(2); expect(r).resolves.toBe(3); } }); });`,
 					`test("t", async () => { ({ async [await expect(p).resolves.toBe(1)]() { await expect(q).resolves.toBe(2); await expect(r).resolves.toBe(3); } }); });`,
+				},
+			},
+			// Resolved Promise alias preserves `return await` under `alwaysAwait: true`.
+			{
+				Code:    `const key = "Promise"; const P = globalThis[key]; test("t", () => { return P.all([expect(p).resolves.toBe(1), fetchData()]); });`,
+				Options: map[string]interface{}{"alwaysAwait": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "promisesWithAsyncAssertionsMustBeAwaited"},
+				},
+				Output: []string{`const key = "Promise"; const P = globalThis[key]; test("t", async () => { return await P.all([expect(p).resolves.toBe(1), fetchData()]); });`},
+			},
+			// Downstream reads of assigned assertion promises withhold autofix.
+			{
+				Code: `test("t", () => { const check = expect(p).resolves.toBe(1); check.then(() => {}); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { const check = expect(p).resolves.toBe(1); if (cond) await check.then(() => {}); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", () => { let check: any; check = expect(p).resolves.toBe(1); check.then(() => {}); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", () => { const arr = [expect(p).resolves.toBe(1)]; arr[0].then(() => {}); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			// Conditional awaits in destructuring assignment defaults and early exits (yield, outer break) still report.
+			{
+				Code: `test("t", async () => { const check = expect(p).resolves.toBe(1); let x: any; [x = await check] = [1]; });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { const check = expect(p).resolves.toBe(1); let x: any; ({ x = await check } = { x: 1 }); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `async function* gen() { const check = expect(p).resolves.toBe(1); yield 1; await check; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { outer: for (const v of xs) { const check = expect(p).resolves.toBe(1); for (const w of ys) { if (w) break outer; } await check; } });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			// Promise.try edge cases: preceding spread, generator callback, TS `this` parameter, array first arg, property-key `arguments`.
+			{
+				Code: `test("t", async () => { await Promise.try((a: any, b: any) => b, ...[1, 2], expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((a: any) => { a.then(() => {}); }, ...[], expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try(function* (check: any) { return check; }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try(function (this: unknown) { return 1; }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await Promise.try(function (this: unknown) { return 1; }, await expect(p).resolves.toBe(1)); });`},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try([expect(p).resolves.toBe(1)] as any); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await Promise.try([await expect(p).resolves.toBe(1)] as any); });`},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try(function () { const o = { arguments: 1 }; return o; }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+				Output: []string{`test("t", async () => { await Promise.try(function () { const o = { arguments: 1 }; return o; }, await expect(p).resolves.toBe(1)); });`},
+			},
+			{
+				Code: `export let check: Promise<void>; test("t", () => { check = expect(p).resolves.toBe(1); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", () => { globalCheck = expect(p).resolves.toBe(1); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", () => { [expect(p).resolves.toBe(1)][0].then(() => {}); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `async function* gen() { const check = expect(p).resolves.toBe(1), _ = yield 1; await check; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `async function* gen() { const check = Promise.all([expect(p).resolves.toBe(1), yield 1]); await check; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "promisesWithAsyncAssertionsMustBeAwaited"},
+				},
+			},
+			{
+				Code: `async function* gen() { const check = expect(p).resolves.toBe(1); await Promise.all([check, yield 1]); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
 				},
 			},
 		},

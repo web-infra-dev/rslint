@@ -108,6 +108,20 @@ function run() { const core = helper(); core.expect(typeof value).toBe("string")
 			// are all silent rather than guessed at.
 			{Code: `broken.expect?.(typeof value).toBe("string");`},
 			{Code: `expect(typeof value).toBe("string")[0];`},
+			{Code: `(expect(typeof value).toBe("string"))[0];`},
+			{Code: `(expect(typeof value).toBe("string"))?.[0];`},
+			{Code: `expect(typeof value).toBe("string")("extra");`},
+			{Code: `expect(typeof value).toBe("string")?.toString();`},
+			{Code: `(expect(typeof value).toBe("string") as any)[0];`},
+			{Code: `(expect(typeof value).toBe("string") as any).message;`},
+			{Code: `(expect(typeof value).toBe("string") as any)("extra");`},
+			{Code: `expect(typeof value).toBe("string")![0];`},
+			{Code: `expect(typeof value).toBe("string")!.toString();`},
+			{Code: `(<any>expect(typeof value).toBe("string"))("extra");`},
+			{Code: `(expect(typeof value).toBe("string") satisfies unknown)[0];`},
+			{Code: `(expect(typeof value).resolves.toBe("string").then(() => {}) as any)[0];`},
+			{Code: "expect(typeof value).toBe(\"string\")`extra`;"},
+			{Code: `new (expect(typeof value).toBe("string"))();`},
 			{Code: `expect(typeof value).unknownMember.toBe("string");`},
 
 			// N/A: declaration and container variants, function kinds, class
@@ -213,6 +227,16 @@ expect(value).toBeTypeOf("string");`},
 			{
 				Code:   `await expect(typeof value).resolves.toBe("string");`,
 				Output: []string{`await expect(value).resolves.toBeTypeOf("string");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferExpectTypeOf", Line: 1, Column: 7}},
+			},
+			{
+				Code:   `await expect(typeof value).resolves.toBe("string").then(() => {});`,
+				Output: []string{`await expect(value).resolves.toBeTypeOf("string").then(() => {});`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferExpectTypeOf", Line: 1, Column: 7}},
+			},
+			{
+				Code:   `await expect(typeof value).resolves.toBe("string").catch(() => {}).finally(() => {});`,
+				Output: []string{`await expect(value).resolves.toBeTypeOf("string").catch(() => {}).finally(() => {});`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferExpectTypeOf", Line: 1, Column: 7}},
 			},
 			{
