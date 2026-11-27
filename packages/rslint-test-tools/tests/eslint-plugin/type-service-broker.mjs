@@ -17,14 +17,6 @@ let pending = false,
   stopError = null,
   stderr = '';
 const MAX_STDERR_CHARS = 64 * 1024;
-child.stdin.on('error', () => {});
-child.stdout.on('error', () => {});
-child.stderr.on('error', () => {});
-child.stderr.on('data', (chunk) => {
-  if (stderr.length < MAX_STDERR_CHARS) {
-    stderr += String(chunk).slice(0, MAX_STDERR_CHARS - stderr.length);
-  }
-});
 function reply(value) {
   const bytes = Buffer.from(JSON.stringify(value));
   if (bytes.length > body.length) {
@@ -44,19 +36,6 @@ function reply(value) {
   Atomics.notify(control, 0);
   pending = false;
 }
-createInterface({ input: child.stdout }).on('line', (line) => {
-  let message;
-  try {
-    message = JSON.parse(line);
-  } catch (error) {
-    exitReason ??= `invalid type service stdout ${JSON.stringify(line)}: ${error.message}`;
-    stopError ??= exitReason;
-    if (pending) reply({ error: exitReason, childFatal: true });
-    child.kill();
-    return;
-  }
-  reply(message);
-});
 child.on('error', (error) => {
   exitReason ??= `type service host failed: ${error.message}`;
   stopError ??= exitReason;
@@ -74,14 +53,37 @@ child.on('close', (code, signal) => {
     parentPort.postMessage({ stopped: true, error: stopError ?? undefined });
   }
 });
+child.stdin?.on('error', () => {});
+child.stdout?.on('error', () => {});
+child.stderr?.on('error', () => {});
+child.stderr?.on('data', (chunk) => {
+  if (stderr.length < MAX_STDERR_CHARS) {
+    stderr += String(chunk).slice(0, MAX_STDERR_CHARS - stderr.length);
+  }
+});
+if (child.stdout) {
+  createInterface({ input: child.stdout }).on('line', (line) => {
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch (error) {
+      exitReason ??= `invalid type service stdout ${JSON.stringify(line)}: ${error.message}`;
+      stopError ??= exitReason;
+      if (pending) reply({ error: exitReason, childFatal: true });
+      child.kill();
+      return;
+    }
+    reply(message);
+  });
+}
 parentPort.on('message', (request) => {
   if (request.method === 'stop') {
     stopping = true;
-    if (childClosed) {
+    if (childClosed || child.pid === undefined) {
       parentPort.postMessage({ stopped: true, error: stopError ?? undefined });
       return;
     }
-    child.stdin.end();
+    child.stdin?.end();
     const forceKill = setTimeout(() => {
       if (!childClosed) {
         stopError ??= `type service host did not exit within 5000ms after stdin EOF: ${stderr}`;
@@ -110,7 +112,7 @@ parentPort.on('message', (request) => {
   child.stdin.write(`${serialized}\n`);
 });
 process.on('exit', (code) => {
-  if (!childClosed) child.kill();
+  if (!childClosed && child.pid !== undefined) child.kill();
   if (Atomics.load(control, 0) === 1) {
     reply({
       error: `type service broker worker exited unexpectedly with code ${code}`,

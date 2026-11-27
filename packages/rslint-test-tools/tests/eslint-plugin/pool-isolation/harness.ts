@@ -252,14 +252,22 @@ export async function runPoolScenario(
       return;
     }
 
+    let timedOut = false;
+    let spawnError: string | undefined;
+    child.on('error', (err) => {
+      // Node guarantees `close` after `error`; let that single terminal path
+      // collect the complete journal and stream state.
+      spawnError = `failed to run isolated child: ${err.message}`;
+    });
+
     // Never let an unconsumed pipe backpressure the child. Scenario output is
     // intentionally irrelevant; durable state lives in the journal.
-    child.stdout.resume();
+    child.stdout?.resume();
 
     const stderrChunks: Buffer[] = [];
     let stderrBytes = 0;
     let stderrTruncated = false;
-    child.stderr.on('data', (value: Buffer | string) => {
+    child.stderr?.on('data', (value: Buffer | string) => {
       const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
       const remaining = STDERR_LIMIT_BYTES - stderrBytes;
       if (remaining > 0) {
@@ -270,20 +278,12 @@ export async function runPoolScenario(
       if (chunk.length > remaining) stderrTruncated = true;
     });
 
-    let timedOut = false;
-    let spawnError: string | undefined;
     const timer = setTimeout(() => {
       // Do not resolve here: the journal and stdio are not final until
       // ChildProcess emits `close`. A late `done` cannot override timedOut.
       timedOut = true;
       child.kill('SIGKILL');
     }, timeoutMs);
-
-    child.on('error', (err) => {
-      // Node guarantees `close` after `error`; let that single terminal path
-      // collect the complete journal and stream state.
-      spawnError = `failed to run isolated child: ${err.message}`;
-    });
 
     child.on('close', (exitCode, signal) => {
       void (async () => {
