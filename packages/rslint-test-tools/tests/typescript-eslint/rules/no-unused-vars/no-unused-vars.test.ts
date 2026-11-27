@@ -1,1247 +1,33 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
-import { getFixturesRootDir } from '../../RuleTester';
+// Every upstream case from typescript-eslint v8.72.1, preserving inputs, options,
+// outputs and comments. Errors carry the full messages, ranges and
+// suggestions produced by that release.
+// Parser-level `ecmaVersion`/`sourceType` move to language options. Upstream
+// runs these cases without type information; here each uses a fixture project
+// with the upstream compiler options (without ambient `types`).
+// `jsxPragma: 'h'` and `jsxFragmentName: 'Fragment'` map to the equivalent
+// `jsxFactory`/`jsxFragmentFactory` projects; the type-aware cases use
+// `tsconfig-withmeta.json`. `dependencyConstraints` on TypeScript versions are
+// satisfied by the bundled compiler and are omitted.
+// https://github.com/typescript-eslint/typescript-eslint/blob/v8.72.1/packages/eslint-plugin/tests/rules/no-unused-vars/no-unused-vars.test.ts
+import { RuleTester } from '@rslint/rule-tester';
+
+const noFormat = (strings: TemplateStringsArray, ...values: unknown[]) =>
+  String.raw({ raw: strings }, ...values);
 
 const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.lenient.json',
-      tsconfigRootDir: getFixturesRootDir(),
-    },
+  plugin: '@typescript-eslint',
+  filename: 'file.ts',
+  fixtureFiles: {
+    'tsconfig.json': "{\"compilerOptions\":{\"jsx\":\"preserve\",\"target\":\"es2015\",\"module\":\"commonjs\",\"strict\":true,\"types\":[],\"lib\":[\"es2015\",\"es2017\",\"esnext\"],\"experimentalDecorators\":true,\"esModuleInterop\":true},\"include\":[\"file.ts\",\"react.tsx\",\"foo.d.ts\"]}",
+    "tsconfig-withmeta.json": "{\"extends\":\"./tsconfig.json\",\"compilerOptions\":{\"emitDecoratorMetadata\":true}}",
+    "tsconfig.jsx-h.json": "{\"extends\":\"./tsconfig.json\",\"compilerOptions\":{\"jsxFactory\":\"h\"}}",
+    "tsconfig.jsx-fragment.json": "{\"extends\":\"./tsconfig.json\",\"compilerOptions\":{\"jsxFragmentFactory\":\"Fragment\"}}",
   },
+  languageOptions: { ecmaVersion: 6, sourceType: 'module', parserOptions: { project: './tsconfig.json' } },
 });
 
 ruleTester.run('no-unused-vars', {
-  invalid: [
-    {
-      code: `
-import { ClassDecoratorFactory } from 'decorators';
-export class Foo {}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Foo, Bar } from 'foo';
-function baz<Foo>(): Foo {}
-baz<Bar>();
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-const a: string = 'hello';
-console.log(a);
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-import { SomeOther } from 'other';
-const a: Nullable<string> = 'hello';
-console.log(a);
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-
-    {
-      code: `
-import { Nullable } from 'nullable';
-import { Another } from 'some';
-class A {
-  do = (a: Nullable) => {
-    console.log(a);
-  };
-}
-new A();
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-import { Another } from 'some';
-class A {
-  do(a: Nullable) {
-    console.log(a);
-  }
-}
-new A();
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-import { Another } from 'some';
-class A {
-  do(): Nullable {
-    return null;
-  }
-}
-new A();
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-import { Another } from 'some';
-export interface A {
-  do(a: Nullable);
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-import { Another } from 'some';
-export interface A {
-  other: Nullable;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-function foo(a: string) {
-  console.log(a);
-}
-foo();
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-function foo(): string | null {
-  return null;
-}
-foo();
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-import { SomeOther } from 'some';
-import { Another } from 'some';
-class A extends Nullable {
-  other: Nullable<Another>;
-}
-new A();
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import { Nullable } from 'nullable';
-import { SomeOther } from 'some';
-import { Another } from 'some';
-abstract class A extends Nullable {
-  other: Nullable<Another>;
-}
-new A();
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-enum FormFieldIds {
-  PHONE = 'phone',
-  EMAIL = 'email',
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import test from 'test';
-import baz from 'baz';
-export interface Bar extends baz.test {}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import test from 'test';
-import baz from 'baz';
-export class Bar implements baz.test {}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-import test from 'test';
-import baz from 'baz';
-export class Bar implements baz().test {}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-namespace Foo {}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-namespace Foo {
-  export const Foo = 1;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-namespace Foo {
-  const Foo = 1;
-  console.log(Foo);
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-namespace Foo {
-  export const Bar = 1;
-  console.log(Foo.Bar);
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-namespace Foo {
-  namespace Foo {
-    export const Bar = 1;
-    console.log(Foo.Bar);
-  }
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    // self-referencing types
-    {
-      code: `
-interface Foo {
-  bar: string;
-  baz: Foo['bar'];
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-type Foo = Array<Foo>;
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/2455
-    {
-      code: `
-import React from 'react';
-import { Fragment } from 'react';
-
-export const ComponentFoo = () => {
-  return <div>Foo Foo</div>;
-};
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-        },
-      },
-    },
-    // jsxFactory: "h" configured in tsconfig.jsx-h.json
-    {
-      code: `
-import React from 'react';
-import { h } from 'some-other-jsx-lib';
-
-export const ComponentFoo = () => {
-  return <div>Foo Foo</div>;
-};
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-          project: './tsconfig.jsx-h.json',
-        },
-      },
-    },
-    // jsx: "react-jsx" with a React import but NO JSX in the file — React is
-    // genuinely unused and must still be reported.
-    {
-      code: `
-import React from 'react';
-
-export const x = 1;
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-          project: './tsconfig.jsx-reactjsx.json',
-        },
-      },
-    },
-    // Documented gap: a custom pragma declared via an `@jsx X` comment is not
-    // recognized (that requires eslint-plugin-react's jsx-uses-react, which is a
-    // no-op in rslint), so `X` is still reported even though it is the active
-    // JSX factory for this file.
-    {
-      code: `
-/** @jsx X.createElement */
-import X from './x';
-
-export const ComponentFoo = () => {
-  return <div>Foo Foo</div>;
-};
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-          project: './tsconfig.jsx-reactjsx.json',
-        },
-      },
-    },
-    {
-      code: `
-declare module 'foo' {
-  type Test = any;
-  const x = 1;
-  export = x;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-// not declared
-export namespace Foo {
-  namespace Bar {
-    namespace Baz {
-      namespace Bam {
-        const x = 1;
-      }
-    }
-  }
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-        {
-          messageId: 'unusedVar',
-        },
-        {
-          messageId: 'unusedVar',
-        },
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-interface Foo {
-  a: string;
-}
-interface Foo {
-  b: Foo;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-let x = null;
-x = foo(x);
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-interface Foo {
-  bar: string;
-}
-const Foo = 'bar';
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-let foo = 1;
-foo += 1;
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-interface Foo {
-  bar: string;
-}
-type Bar = 1;
-export = Bar;
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-interface Foo {
-  bar: string;
-}
-type Bar = 1;
-export = Foo;
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-namespace Foo {
-  export const foo = 1;
-}
-export namespace Bar {
-  import TheFoo = Foo;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-const foo: number = 1;
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-enum Foo {
-  A = 1,
-  B = Foo.A,
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-
-    // reportUsedIgnorePattern
-    {
-      code: `
-type _Foo = 1;
-export const x: _Foo = 1;
-      `,
-      errors: [
-        {
-          messageId: 'usedIgnoredVar',
-        },
-      ],
-      options: [{ reportUsedIgnorePattern: true, varsIgnorePattern: '^_' }],
-    },
-    {
-      code: `
-interface _Foo {}
-export const x: _Foo = 1;
-      `,
-      errors: [
-        {
-          messageId: 'usedIgnoredVar',
-        },
-      ],
-      options: [{ reportUsedIgnorePattern: true, varsIgnorePattern: '^_' }],
-    },
-    {
-      code: `
-enum _Foo {
-  A = 1,
-}
-export const x = _Foo.A;
-      `,
-      errors: [
-        {
-          messageId: 'usedIgnoredVar',
-        },
-      ],
-      options: [{ reportUsedIgnorePattern: true, varsIgnorePattern: '^_' }],
-    },
-    {
-      code: `
-namespace _Foo {}
-export const x = _Foo;
-      `,
-      errors: [
-        {
-          messageId: 'usedIgnoredVar',
-        },
-      ],
-      options: [{ reportUsedIgnorePattern: true, varsIgnorePattern: '^_' }],
-    },
-    {
-      code: `
-        const foo: number = 1;
-
-        export type Foo = typeof foo;
-      `,
-      errors: [
-        {
-          messageId: 'usedOnlyAsType',
-        },
-      ],
-    },
-    {
-      code: `
-        declare const foo: number;
-
-        export type Foo = typeof foo;
-      `,
-      errors: [
-        {
-          messageId: 'usedOnlyAsType',
-        },
-      ],
-    },
-    {
-      code: `
-        const foo: number = 1;
-
-        export type Foo = typeof foo | string;
-      `,
-      errors: [
-        {
-          messageId: 'usedOnlyAsType',
-        },
-      ],
-    },
-    {
-      code: `
-        const foo: number = 1;
-
-        export type Foo = (typeof foo | string) & { __brand: 'foo' };
-      `,
-      errors: [
-        {
-          messageId: 'usedOnlyAsType',
-        },
-      ],
-    },
-    {
-      code: `
-        const foo = {
-          bar: {
-            baz: 123,
-          },
-        };
-
-        export type Bar = typeof foo.bar;
-      `,
-      errors: [
-        {
-          messageId: 'usedOnlyAsType',
-        },
-      ],
-    },
-    {
-      code: `
-        const foo = {
-          bar: {
-            baz: 123,
-          },
-        };
-
-        export type Bar = (typeof foo)['bar'];
-      `,
-      errors: [
-        {
-          messageId: 'usedOnlyAsType',
-        },
-      ],
-    },
-    {
-      code: `
-const command = (): ParameterDecorator => {
-  return () => {};
-};
-
-export class Foo {
-  bar(@command() command: string) {}
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-declare const deco: () => ParameterDecorator;
-
-export class Foo {
-  bar(@deco() deco, @deco() param) {}
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-export namespace Foo {
-  const foo: 1234;
-  export {};
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-const foo: 1234;
-export {};
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-declare module 'foo' {
-  const foo: 1234;
-  export {};
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-export namespace Foo {
-  const foo: 1234;
-  const bar: 4567;
-
-  export { bar };
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-const foo: 1234;
-const bar: 4567;
-
-export { bar };
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-declare module 'foo' {
-  const foo: 1234;
-  const bar: 4567;
-
-  export { bar };
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-export namespace Foo {
-  const foo: 1234;
-  const bar: 4567;
-  export const bazz: 4567;
-
-  export { bar };
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-const foo: 1234;
-const bar: 4567;
-export const bazz: 4567;
-
-export { bar };
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-declare module 'foo' {
-  const foo: 1234;
-  const bar: 4567;
-  export const bazz: 4567;
-
-  export { bar };
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-export namespace Foo {
-  const foo: string;
-  const bar: number;
-
-  export default bar;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-const foo: string;
-const bar: number;
-
-export default bar;
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-declare module 'foo' {
-  const foo: string;
-  const bar: number;
-
-  export default bar;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-export namespace Foo {
-  const foo: string;
-  const bar: number;
-  export const bazz: number;
-
-  export default bar;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-const foo: string;
-const bar: number;
-export const bazz: number;
-
-export default bar;
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-declare module 'foo' {
-  const foo: string;
-  const bar: number;
-  export const bazz: number;
-
-  export default bar;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-export namespace Foo {
-  const foo: string;
-  export const bar: number;
-
-  export * from '...';
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-const foo: string;
-export const bar: number;
-
-export * from '...';
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-declare module 'foo' {
-  const foo: string;
-  export const bar: number;
-
-  export * from '...';
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-namespace Foo {
-  type Foo = 1;
-  type Bar = 1;
-
-  export = Bar;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-type Foo = 1;
-type Bar = 1;
-
-export = Bar;
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-declare module 'foo' {
-  type Foo = 1;
-  type Bar = 1;
-
-  export = Bar;
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-declare module 'foo' {
-  type Test = 1;
-  export {};
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-export declare namespace Foo {
-  namespace Bar {
-    namespace Baz {
-      namespace Bam {
-        const x = 1;
-      }
-
-      export {};
-    }
-  }
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-declare module 'foo' {
-  namespace Bar {
-    namespace Baz {
-      namespace Bam {
-        const x = 1;
-      }
-
-      export {};
-    }
-  }
-}
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-declare enum Foo {}
-export {};
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-    },
-    {
-      code: `
-class Foo {}
-declare class Bar {}
-
-export {};
-      `,
-      errors: [
-        {
-          messageId: 'unusedVar',
-        },
-        {
-          messageId: 'unusedVar',
-        },
-      ],
-      filename: 'foo.d.ts',
-    },
-    {
-      code: `
-export interface RpcResponse<T = unknown> {
-  code?: number;
-}
-      `,
-      errors: [{ messageId: 'unusedVar' }],
-    },
-    {
-      code: `
-export type Alias<T = unknown> = string;
-      `,
-      errors: [{ messageId: 'unusedVar' }],
-    },
-    {
-      code: `
-export function fn<T>(): void {}
-      `,
-      errors: [{ messageId: 'unusedVar' }],
-    },
-    {
-      code: `
-export class Cls<T = unknown> {}
-      `,
-      errors: [{ messageId: 'unusedVar' }],
-    },
-    {
-      code: `
-export interface CrossRef<T, U extends T> {}
-      `,
-      errors: [{ messageId: 'unusedVar' }],
-    },
-  ],
-
   valid: [
-    // jsx: "react-jsx" — React is referenced only by JSX. Matching
-    // @typescript-eslint/parser's jsxPragma default ("React"), the factory is
-    // treated as used whenever JSX is present, so React is NOT reported.
-    // (Reporting it would require opting into parserOptions.jsxPragma=null per
-    // typescript-eslint #3303, which rslint does not expose.)
-    {
-      code: `
-import React from 'react';
-
-export const ComponentFoo = () => {
-  return <div>Foo Foo</div>;
-};
-      `,
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-          project: './tsconfig.jsx-reactjsx.json',
-        },
-      },
-    },
-    // jsx: "react-jsx" — fragment-only usage also marks the React factory used.
-    {
-      code: `
-import React from 'react';
-
-export const ComponentFoo = () => {
-  return <>Foo</>;
-};
-      `,
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-          project: './tsconfig.jsx-reactjsx.json',
-        },
-      },
-    },
     `
 import { ClassDecoratorFactory } from 'decorators';
 @ClassDecoratorFactory()
@@ -1709,9 +495,7 @@ export class App {
 }
     `,
     // https://github.com/bradzacher/eslint-plugin-typescript/issues/126
-    // https://github.com/bradzacher/eslint-plugin-typescript/issues/126
-    {
-      code: `
+    `
 import { Component, Vue } from 'vue-property-decorator';
 import HelloWorld from './components/HelloWorld.vue';
 
@@ -1721,8 +505,7 @@ import HelloWorld from './components/HelloWorld.vue';
   },
 })
 export default class App extends Vue {}
-      `,
-    },
+    `,
     // https://github.com/bradzacher/eslint-plugin-typescript/issues/189
     `
 import firebase, { User } from 'firebase/app';
@@ -1810,22 +593,15 @@ export interface Bar extends foo.i18n<bar> {}
     `,
     {
       // https://github.com/typescript-eslint/typescript-eslint/issues/141
-      code: `
+      filename: 'react.tsx', code: `
 import { TypeA } from './interface';
 export const a = <GenericComponent<TypeA> />;
       `,
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-        },
-      },
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
     },
     {
       // https://github.com/typescript-eslint/typescript-eslint/issues/160
-      code: `
+      filename: 'react.tsx', code: `
 const text = 'text';
 export function Foo() {
   return (
@@ -1835,14 +611,7 @@ export function Foo() {
   );
 }
       `,
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-        },
-      },
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
     },
     // https://github.com/eslint/typescript-eslint-parser/issues/535
     `
@@ -1892,25 +661,6 @@ export function foo<T>(a: number | string): T {
   return a;
 }
     `,
-    // https://github.com/web-infra-dev/rslint/issues/555
-    // declare function overloads: parameters should not be reported
-    `
-type NormalizedConfig = { key: string };
-declare function getNormalizedConfig(): NormalizedConfig;
-declare function getNormalizedConfig(options: { environment: string }): NormalizedConfig;
-export { getNormalizedConfig };
-    `,
-    // declare function with parameters should not report params as unused
-    `
-declare function doSomething(options: { a: string }): void;
-export { doSomething };
-    `,
-    // declare function overloads called in value position
-    `
-declare function getNormalizedConfig(): string;
-declare function getNormalizedConfig(options: { env: string }): string;
-getNormalizedConfig();
-    `,
     `
 export type T = {
   new (): T;
@@ -1930,13 +680,6 @@ enum Foo {
 export type T = {
   [Foo.a]: 1;
 };
-    `,
-    `
-declare const registeredServiceBrand: unique symbol;
-
-export interface RegisteredService {
-  [registeredServiceBrand]: string;
-}
     `,
     `
 type Foo = string;
@@ -2114,74 +857,36 @@ export type Test<U> = U extends (arg: {
   ? I
   : never;
     `,
-    // namespace import used as JSX factory (jsx: preserve)
-    {
-      code: `
-        import * as React from 'react';
-        export const C = () => <div />;
-      `,
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-        },
-      },
-    },
     // https://github.com/typescript-eslint/typescript-eslint/issues/2455
     {
-      code: `
-        import React from 'react';
+      filename: 'react.tsx', code: `
+import React from 'react';
 
-        export const ComponentFoo: React.FC = () => {
-          return <div>Foo Foo</div>;
-        };
+export const ComponentFoo: React.FC = () => {
+  return <div>Foo Foo</div>;
+};
       `,
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-        },
-      },
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
     },
     {
-      code: `
-        import { h } from 'some-other-jsx-lib';
+      filename: 'react.tsx', code: `
+import { h } from 'some-other-jsx-lib';
 
-        export const ComponentFoo: h.FC = () => {
-          return <div>Foo Foo</div>;
-        };
+export const ComponentFoo: h.FC = () => {
+  return <div>Foo Foo</div>;
+};
       `,
-      filename: 'react.tsx',
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-          jsxPragma: 'h',
-        },
-      },
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true }, project: './tsconfig.jsx-h.json' } },
     },
-    // jsxFragmentFactory: "Fragment" configured in tsconfig.jsx-fragment.json
     {
-      code: `
-        import { Fragment } from 'react';
+      filename: 'react.tsx', code: `
+import { Fragment } from 'react';
 
-        export const ComponentFoo: Fragment = () => {
-          return <>Foo Foo</>;
-        };
+export const ComponentFoo: Fragment = () => {
+  return <>Foo Foo</>;
+};
       `,
-      languageOptions: {
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-          project: './tsconfig.jsx-fragment.json',
-        },
-      },
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true }, project: './tsconfig.jsx-fragment.json' } },
     },
     `
 declare module 'foo' {
@@ -2253,8 +958,7 @@ export type SeussFish = \`\${Quantity | Color} fish\`;
       `,
     },
     {
-      // noFormat converted to regular template
-      code: `
+      code: noFormat`
 type VerticalAlignment = "top" | "middle" | "bottom";
 type HorizontalAlignment = "left" | "center" | "right";
 
@@ -2262,8 +966,7 @@ export declare function setAlignment(value: \`\${VerticalAlignment}-\${Horizonta
       `,
     },
     {
-      // noFormat converted to regular template
-      code: `
+      code: noFormat`
 type EnthusiasticGreeting<T extends string> = \`\${Uppercase<T>} - \${Lowercase<T>} - \${Capitalize<T>} - \${Uncapitalize<T>}\`;
 export type HELLO = EnthusiasticGreeting<"heLLo">;
       `,
@@ -2302,10 +1005,7 @@ interface _Foo {
       options: [{ varsIgnorePattern: '^_' }],
     },
     // https://github.com/typescript-eslint/typescript-eslint/issues/2844
-    // skip: custom rule not supported
-    {
-      skip: true,
-      code: `
+    `
 /* eslint @rule-tester/collect-unused-vars: "error" */
 declare module 'next-auth' {
   interface User {
@@ -2315,7 +1015,6 @@ declare module 'next-auth' {
   }
 }
     `,
-    },
     // https://github.com/typescript-eslint/typescript-eslint/issues/2972
     {
       code: `
@@ -2327,7 +1026,7 @@ export class TestClass {
   public test(): TestGeneric<Test> {}
 }
       `,
-      languageOptions: { parserOptions: { project: './tsconfig-withmeta.json', projectService: false, tsconfigRootDir: getFixturesRootDir() } },
+      languageOptions: { parserOptions: { project: './tsconfig-withmeta.json' } },
     },
     // https://github.com/typescript-eslint/typescript-eslint/issues/5577
     `
@@ -2428,6 +1127,10 @@ export const foo: number = 1;
 export type Foo = typeof foo;
     `,
     `
+export const Both = 0;
+export type Both = typeof Both;
+    `,
+    `
 import { foo } from 'foo';
 
 export type Foo = typeof foo;
@@ -2443,6 +1146,18 @@ export const value = 1234 as typeof SomeType;
 import { foo } from 'foo';
 
 export type Bar = typeof foo;
+    `,
+    `
+const Value = 123;
+console.log(Value);
+export type Value = typeof Value;
+    `,
+    `
+export const Foo = 1;
+
+namespace Foo {
+  export type T = string;
+}
     `,
     {
       code: `
@@ -2597,42 +1312,1073 @@ declare class Bar {}
       `,
       filename: 'foo.d.ts',
     },
-    // Type parameters: used in the body counts as used
-    `
-export function used<T>(x: T): T {
-  return x;
-}
-    `,
-    `
-export interface UsedIface<T> {
-  value: T;
-}
-    `,
-    `
-export class UsedCls<T> {
-  x!: T;
-}
-    `,
-    // `infer T` is not a declaration — never reported
-    `
-export type ElementOf<T> = T extends (infer U)[] ? U : never;
-    `,
-    // Mapped type `[P in K]` is not a declaration — never reported
-    `
-export type MyRecord<K extends string> = { [P in K]: number };
-    `,
-    // Type parameter used only by another type parameter's default/constraint counts as used
-    `
-export interface DefaultUses<T, U = T> {
-  x?: U;
-}
-    `,
-    // varsIgnorePattern applies to type parameters
     {
       code: `
-export interface IgnoredByPattern<_T> {}
+using resource = getResource();
+resource;
       `,
-      options: [{ varsIgnorePattern: '^_' }],
+      languageOptions: { ecmaVersion: 2026 },
+    },
+    {
+      code: `
+using resource = getResource();
+      `,
+      languageOptions: { ecmaVersion: 2026 },
+      options: [{ ignoreUsingDeclarations: true }],
+    },
+    {
+      code: `
+await using resource = getResource();
+      `,
+      languageOptions: { ecmaVersion: 2026 },
+      options: [{ ignoreUsingDeclarations: true }],
+    },
+    {
+      code: `
+export function g(a: string, b: unknown) {
+  const c: typeof b = b;
+  return c;
+}
+      `,
+      options: [{ args: 'after-used' }],
+    },
+  ],
+  invalid: [
+    {
+      code: `
+import { ClassDecoratorFactory } from 'decorators';
+export class Foo {}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'ClassDecoratorFactory' is defined but never used.", line: 2, column: 10, endLine: 2, endColumn: 31, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+export class Foo {}
+      ` }] }],
+    },
+    {
+      code: `
+import { Foo, Bar } from 'foo';
+function baz<Foo>(): Foo {}
+baz<Bar>();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 10, endLine: 2, endColumn: 13, suggestions: [{ messageId: "removeUnusedVar", desc: "Remove unused variable \"Foo\".", output: `
+import {  Bar } from 'foo';
+function baz<Foo>(): Foo {}
+baz<Bar>();
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+const a: string = 'hello';
+console.log(a);
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Nullable' is defined but never used.", line: 2, column: 10, endLine: 2, endColumn: 18, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+const a: string = 'hello';
+console.log(a);
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+import { SomeOther } from 'other';
+const a: Nullable<string> = 'hello';
+console.log(a);
+      `,
+      errors: [{ messageId: "unusedVar", message: "'SomeOther' is defined but never used.", line: 3, column: 10, endLine: 3, endColumn: 19, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import { Nullable } from 'nullable';
+const a: Nullable<string> = 'hello';
+console.log(a);
+      ` }] }],
+    },
+
+    {
+      code: `
+import { Nullable } from 'nullable';
+import { Another } from 'some';
+class A {
+  do = (a: Nullable) => {
+    console.log(a);
+  };
+}
+new A();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Another' is defined but never used.", line: 3, column: 10, endLine: 3, endColumn: 17, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import { Nullable } from 'nullable';
+class A {
+  do = (a: Nullable) => {
+    console.log(a);
+  };
+}
+new A();
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+import { Another } from 'some';
+class A {
+  do(a: Nullable) {
+    console.log(a);
+  }
+}
+new A();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Another' is defined but never used.", line: 3, column: 10, endLine: 3, endColumn: 17, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import { Nullable } from 'nullable';
+class A {
+  do(a: Nullable) {
+    console.log(a);
+  }
+}
+new A();
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+import { Another } from 'some';
+class A {
+  do(): Nullable {
+    return null;
+  }
+}
+new A();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Another' is defined but never used.", line: 3, column: 10, endLine: 3, endColumn: 17, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import { Nullable } from 'nullable';
+class A {
+  do(): Nullable {
+    return null;
+  }
+}
+new A();
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+import { Another } from 'some';
+export interface A {
+  do(a: Nullable);
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Another' is defined but never used.", line: 3, column: 10, endLine: 3, endColumn: 17, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import { Nullable } from 'nullable';
+export interface A {
+  do(a: Nullable);
+}
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+import { Another } from 'some';
+export interface A {
+  other: Nullable;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Another' is defined but never used.", line: 3, column: 10, endLine: 3, endColumn: 17, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import { Nullable } from 'nullable';
+export interface A {
+  other: Nullable;
+}
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+function foo(a: string) {
+  console.log(a);
+}
+foo();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Nullable' is defined but never used.", line: 2, column: 10, endLine: 2, endColumn: 18, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+function foo(a: string) {
+  console.log(a);
+}
+foo();
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+function foo(): string | null {
+  return null;
+}
+foo();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Nullable' is defined but never used.", line: 2, column: 10, endLine: 2, endColumn: 18, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+function foo(): string | null {
+  return null;
+}
+foo();
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+import { SomeOther } from 'some';
+import { Another } from 'some';
+class A extends Nullable {
+  other: Nullable<Another>;
+}
+new A();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'SomeOther' is defined but never used.", line: 3, column: 10, endLine: 3, endColumn: 19, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import { Nullable } from 'nullable';
+import { Another } from 'some';
+class A extends Nullable {
+  other: Nullable<Another>;
+}
+new A();
+      ` }] }],
+    },
+    {
+      code: `
+import { Nullable } from 'nullable';
+import { SomeOther } from 'some';
+import { Another } from 'some';
+abstract class A extends Nullable {
+  other: Nullable<Another>;
+}
+new A();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'SomeOther' is defined but never used.", line: 3, column: 10, endLine: 3, endColumn: 19, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import { Nullable } from 'nullable';
+import { Another } from 'some';
+abstract class A extends Nullable {
+  other: Nullable<Another>;
+}
+new A();
+      ` }] }],
+    },
+    {
+      code: `
+enum FormFieldIds {
+  PHONE = 'phone',
+  EMAIL = 'email',
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'FormFieldIds' is defined but never used.", line: 2, column: 6, endLine: 2, endColumn: 18 }],
+    },
+    {
+      code: `
+import test from 'test';
+import baz from 'baz';
+export interface Bar extends baz.test {}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'test' is defined but never used.", line: 2, column: 8, endLine: 2, endColumn: 12, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import baz from 'baz';
+export interface Bar extends baz.test {}
+      ` }] }],
+    },
+    {
+      code: `
+import test from 'test';
+import baz from 'baz';
+export class Bar implements baz.test {}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'test' is defined but never used.", line: 2, column: 8, endLine: 2, endColumn: 12, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import baz from 'baz';
+export class Bar implements baz.test {}
+      ` }] }],
+    },
+    {
+      code: `
+namespace Foo {}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 11, endLine: 2, endColumn: 14 }],
+    },
+    {
+      code: `
+namespace Foo {
+  export const Foo = 1;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 11, endLine: 2, endColumn: 14 }],
+    },
+    {
+      code: `
+namespace Foo {
+  const Foo = 1;
+  console.log(Foo);
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 11, endLine: 2, endColumn: 14 }],
+    },
+    {
+      code: `
+namespace Foo {
+  export const Bar = 1;
+  console.log(Foo.Bar);
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 11, endLine: 2, endColumn: 14 }],
+    },
+    {
+      code: `
+namespace Foo {
+  export namespace Foo {
+    export const Bar = 1;
+    console.log(Foo.Bar);
+  }
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 11, endLine: 2, endColumn: 14 }],
+    },
+    {
+      code: `
+export namespace Foo {
+  namespace Foo {
+    export const Bar = 1;
+    console.log(Foo.Bar);
+  }
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 3, column: 13, endLine: 3, endColumn: 16 }],
+    },
+    // self-referencing types
+    {
+      code: `
+interface Foo {
+  bar: string;
+  baz: Foo['bar'];
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 11, endLine: 2, endColumn: 14 }],
+    },
+    {
+      code: `
+type Foo = Array<Foo>;
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 6, endLine: 2, endColumn: 9 }],
+    },
+    // https://github.com/typescript-eslint/typescript-eslint/issues/2455
+    {
+      filename: 'react.tsx', code: `
+import React from 'react';
+import { Fragment } from 'react';
+
+export const ComponentFoo = () => {
+  return <div>Foo Foo</div>;
+};
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Fragment' is defined but never used.", line: 3, column: 10, endLine: 3, endColumn: 18, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import React from 'react';
+
+export const ComponentFoo = () => {
+  return <div>Foo Foo</div>;
+};
+      ` }] }],
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+    },
+    {
+      filename: 'react.tsx', code: `
+import React from 'react';
+import { h } from 'some-other-jsx-lib';
+
+export const ComponentFoo = () => {
+  return <div>Foo Foo</div>;
+};
+      `,
+      errors: [{ messageId: "unusedVar", message: "'React' is defined but never used.", line: 2, column: 8, endLine: 2, endColumn: 13, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+import { h } from 'some-other-jsx-lib';
+
+export const ComponentFoo = () => {
+  return <div>Foo Foo</div>;
+};
+      ` }] }],
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true }, project: './tsconfig.jsx-h.json' } },
+    },
+    // https://github.com/typescript-eslint/typescript-eslint/issues/3303
+    {
+      filename: 'react.tsx', skip: "Requires parserOptions.jsxPragma: null, which rslint does not support; project JSX settings cannot remove JSX's implicit reference to the pragma.", code: `
+import React from 'react';
+
+export const ComponentFoo = () => {
+  return <div>Foo Foo</div>;
+};
+      `,
+      errors: [{ messageId: "unusedVar", message: "'React' is defined but never used.", line: 2, column: 8, endLine: 2, endColumn: 13, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+
+export const ComponentFoo = () => {
+  return <div>Foo Foo</div>;
+};
+      ` }] }],
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+    },
+    {
+      code: `
+declare module 'foo' {
+  type Test = any;
+  const x = 1;
+  export = x;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Test' is defined but never used.", line: 3, column: 8, endLine: 3, endColumn: 12 }],
+    },
+    {
+      code: `
+// not declared
+export namespace Foo {
+  namespace Bar {
+    export namespace Baz {
+      export namespace Bam {
+        export const x = 1;
+      }
+    }
+  }
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Bar' is defined but never used.", line: 4, column: 13, endLine: 4, endColumn: 16 }],
+    },
+    {
+      code: `
+// not declared
+export namespace Foo {
+  export namespace Bar {
+    namespace Baz {
+      export namespace Bam {
+        export const x = 1;
+      }
+    }
+  }
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Baz' is defined but never used.", line: 5, column: 15, endLine: 5, endColumn: 18 }],
+    },
+    {
+      code: `
+// not declared
+export namespace Foo {
+  export namespace Bar {
+    export namespace Baz {
+      namespace Bam {
+        export const x = 1;
+      }
+    }
+  }
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Bam' is defined but never used.", line: 6, column: 17, endLine: 6, endColumn: 20 }],
+    },
+    {
+      code: `
+// not declared
+export namespace Foo {
+  export namespace Bar {
+    export namespace Baz {
+      export namespace Bam {
+        const x = 1;
+      }
+    }
+  }
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'x' is assigned a value but never used.", line: 7, column: 15, endLine: 7, endColumn: 16 }],
+    },
+    {
+      code: `
+interface Foo {
+  a: string;
+}
+interface Foo {
+  b: Foo;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 11, endLine: 2, endColumn: 14 }],
+    },
+    {
+      code: `
+let x = null;
+x = foo(x);
+      `,
+      errors: [{ messageId: "unusedVar", message: "'x' is assigned a value but never used.", line: 3, column: 1, endLine: 3, endColumn: 2 }],
+    },
+    {
+      code: `
+interface Foo {
+  bar: string;
+}
+const Foo = 'bar';
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is assigned a value but never used.", line: 5, column: 7, endLine: 5, endColumn: 10 }],
+    },
+    {
+      code: `
+let foo = 1;
+foo += 1;
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is assigned a value but never used.", line: 3, column: 1, endLine: 3, endColumn: 4 }],
+    },
+    {
+      code: `
+interface Foo {
+  bar: string;
+}
+type Bar = 1;
+export = Bar;
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 11, endLine: 2, endColumn: 14 }],
+    },
+    {
+      code: `
+interface Foo {
+  bar: string;
+}
+type Bar = 1;
+export = Foo;
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Bar' is defined but never used.", line: 5, column: 6, endLine: 5, endColumn: 9 }],
+    },
+    {
+      code: `
+namespace Foo {
+  export const foo = 1;
+}
+export namespace Bar {
+  import TheFoo = Foo;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'TheFoo' is defined but never used.", line: 6, column: 10, endLine: 6, endColumn: 16, suggestions: [{ messageId: "removeUnusedImportDeclaration", desc: "Remove unused import declaration.", output: `
+namespace Foo {
+  export const foo = 1;
+}
+export namespace Bar {
+}
+      ` }] }],
+    },
+    {
+      code: `
+const foo: number = 1;
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is assigned a value but never used.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+    },
+    {
+      code: `
+enum Foo {
+  A = 1,
+  B = Foo.A,
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 6, endLine: 2, endColumn: 9 }],
+    },
+
+    // reportUsedIgnorePattern
+    {
+      code: `
+type _Foo = 1;
+export const x: _Foo = 1;
+      `,
+      errors: [{ messageId: "usedIgnoredVar", message: "'_Foo' is marked as ignored but is used. Used vars must not match /^_/u.", line: 2, column: 6, endLine: 2, endColumn: 10 }],
+      options: [{ reportUsedIgnorePattern: true, varsIgnorePattern: '^_' }],
+    },
+    {
+      code: `
+interface _Foo {}
+export const x: _Foo = 1;
+      `,
+      errors: [{ messageId: "usedIgnoredVar", message: "'_Foo' is marked as ignored but is used. Used vars must not match /^_/u.", line: 2, column: 11, endLine: 2, endColumn: 15 }],
+      options: [{ reportUsedIgnorePattern: true, varsIgnorePattern: '^_' }],
+    },
+    {
+      code: `
+enum _Foo {
+  A = 1,
+}
+export const x = _Foo.A;
+      `,
+      errors: [{ messageId: "usedIgnoredVar", message: "'_Foo' is marked as ignored but is used. Used vars must not match /^_/u.", line: 2, column: 6, endLine: 2, endColumn: 10 }],
+      options: [{ reportUsedIgnorePattern: true, varsIgnorePattern: '^_' }],
+    },
+    {
+      code: `
+namespace _Foo {}
+export const x = _Foo;
+      `,
+      errors: [{ messageId: "usedIgnoredVar", message: "'_Foo' is marked as ignored but is used. Used vars must not match /^_/u.", line: 2, column: 11, endLine: 2, endColumn: 15 }],
+      options: [{ reportUsedIgnorePattern: true, varsIgnorePattern: '^_' }],
+    },
+    {
+      code: `
+const foo: number = 1;
+
+export type Foo = typeof foo;
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'foo' is assigned a value but only used as a type.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+    },
+    {
+      code: `
+const A = 0;
+export type A = typeof A;
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'A' is assigned a value but only used as a type.", line: 2, column: 7, endLine: 2, endColumn: 8 }],
+    },
+    {
+      code: `
+const A = {};
+
+type B = typeof A;
+
+export interface A extends B {}
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'A' is assigned a value but only used as a type.", line: 2, column: 7, endLine: 2, endColumn: 8 }],
+    },
+    {
+      code: `
+interface LocalName {}
+const LocalName = 0;
+export type UsesLocalName = LocalName;
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'LocalName' is assigned a value but only used as a type.", line: 3, column: 7, endLine: 3, endColumn: 16 }],
+    },
+    {
+      code: `
+const Foo = 1;
+interface Foo {}
+export type UsesFoo = Foo;
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'Foo' is assigned a value but only used as a type.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+    },
+    {
+      code: `
+declare const foo: number;
+
+export type Foo = typeof foo;
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'foo' is defined but only used as a type.", line: 2, column: 15, endLine: 2, endColumn: 18 }],
+    },
+    {
+      code: `
+const foo: number = 1;
+
+export type Foo = typeof foo | string;
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'foo' is assigned a value but only used as a type.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+    },
+    {
+      code: `
+const foo: number = 1;
+
+export type Foo = (typeof foo | string) & { __brand: 'foo' };
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'foo' is assigned a value but only used as a type.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+    },
+    {
+      code: `
+const foo = {
+  bar: {
+    baz: 123,
+  },
+};
+
+export type Bar = typeof foo.bar;
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'foo' is assigned a value but only used as a type.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+    },
+    {
+      code: `
+const foo = {
+  bar: {
+    baz: 123,
+  },
+};
+
+export type Bar = (typeof foo)['bar'];
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'foo' is assigned a value but only used as a type.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+    },
+    {
+      code: `
+const command = (): ParameterDecorator => {
+  return () => {};
+};
+
+export class Foo {
+  bar(@command() command: string) {}
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'command' is defined but never used.", line: 7, column: 18, endLine: 7, endColumn: 25 }],
+    },
+    {
+      code: `
+declare const deco: () => ParameterDecorator;
+
+export class Foo {
+  bar(@deco() deco, @deco() param) {}
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'deco' is defined but never used.", line: 5, column: 15, endLine: 5, endColumn: 19 }, { messageId: "unusedVar", message: "'param' is defined but never used.", line: 5, column: 29, endLine: 5, endColumn: 34 }],
+    },
+    {
+      code: `
+export namespace Foo {
+  const foo: 1234;
+  export {};
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+const foo: 1234;
+export {};
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+declare module 'foo' {
+  const foo: 1234;
+  export {};
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+export namespace Foo {
+  const foo: 1234;
+  const bar: 4567;
+
+  export { bar };
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+const foo: 1234;
+const bar: 4567;
+
+export { bar };
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+declare module 'foo' {
+  const foo: 1234;
+  const bar: 4567;
+
+  export { bar };
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+export namespace Foo {
+  const foo: 1234;
+  const bar: 4567;
+  export const bazz: 4567;
+
+  export { bar };
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+const foo: 1234;
+const bar: 4567;
+export const bazz: 4567;
+
+export { bar };
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+declare module 'foo' {
+  const foo: 1234;
+  const bar: 4567;
+  export const bazz: 4567;
+
+  export { bar };
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+export namespace Foo {
+  const foo: string;
+  const bar: number;
+
+  export default bar;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+const foo: string;
+const bar: number;
+
+export default bar;
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+declare module 'foo' {
+  const foo: string;
+  const bar: number;
+
+  export default bar;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+export namespace Foo {
+  const foo: string;
+  const bar: number;
+  export const bazz: number;
+
+  export default bar;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+const foo: string;
+const bar: number;
+export const bazz: number;
+
+export default bar;
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+declare module 'foo' {
+  const foo: string;
+  const bar: number;
+  export const bazz: number;
+
+  export default bar;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+export namespace Foo {
+  const foo: string;
+  export const bar: number;
+
+  export * from '...';
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+const foo: string;
+export const bar: number;
+
+export * from '...';
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+declare module 'foo' {
+  const foo: string;
+  export const bar: number;
+
+  export * from '...';
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'foo' is defined but never used.", line: 3, column: 9, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+namespace Foo {
+  type Foo = 1;
+  type Bar = 1;
+
+  export = Bar;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 3, column: 8, endLine: 3, endColumn: 11 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+type Foo = 1;
+type Bar = 1;
+
+export = Bar;
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 6, endLine: 2, endColumn: 9 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+declare module 'foo' {
+  type Foo = 1;
+  type Bar = 1;
+
+  export = Bar;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 3, column: 8, endLine: 3, endColumn: 11 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+declare module 'foo' {
+  type Test = 1;
+  export {};
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Test' is defined but never used.", line: 3, column: 8, endLine: 3, endColumn: 12 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+export declare namespace Foo {
+  namespace Bar {
+    namespace Baz {
+      namespace Bam {
+        const x = 1;
+      }
+
+      export {};
+    }
+  }
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Bam' is defined but never used.", line: 5, column: 17, endLine: 5, endColumn: 20 }],
+    },
+    {
+      code: `
+declare module 'foo' {
+  namespace Bar {
+    namespace Baz {
+      namespace Bam {
+        const x = 1;
+      }
+
+      export {};
+    }
+  }
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Bam' is defined but never used.", line: 5, column: 17, endLine: 5, endColumn: 20 }],
+    },
+    {
+      code: `
+declare enum Foo {}
+export {};
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 14, endLine: 2, endColumn: 17 }],
+    },
+    {
+      code: `
+declare class Bar {}
+
+export {};
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Bar' is defined but never used.", line: 2, column: 15, endLine: 2, endColumn: 18 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+class Foo {}
+
+export {};
+      `,
+      errors: [{ messageId: "unusedVar", message: "'Foo' is defined but never used.", line: 2, column: 7, endLine: 2, endColumn: 10 }],
+      filename: 'foo.d.ts',
+    },
+    {
+      code: `
+using resource = getResource();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'resource' is assigned a value but never used.", line: 2, column: 7, endLine: 2, endColumn: 15 }],
+      languageOptions: { ecmaVersion: 2026 },
+    },
+    {
+      code: `
+await using resource = getResource();
+      `,
+      errors: [{ messageId: "unusedVar", message: "'resource' is assigned a value but never used.", line: 2, column: 13, endLine: 2, endColumn: 21 }],
+      languageOptions: { ecmaVersion: 2026 },
+    },
+    {
+      code: `
+export const myTypeGuard2 = (data2: unknown): typeof data2 => {
+  return true;
+};
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'data2' is defined but only used as a type.", line: 2, column: 30, endLine: 2, endColumn: 35 }],
+    },
+    {
+      code: `
+export const myTypeGuard = (data: unknown): data is string => {
+  return true;
+};
+      `,
+      errors: [{ messageId: "usedOnlyAsType", message: "'data' is defined but only used as a type.", line: 2, column: 29, endLine: 2, endColumn: 33 }],
+    },
+    {
+      code: `
+export function g(a: string, b: unknown, c: string): b is true {
+  return true;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'a' is defined but never used.", line: 2, column: 19, endLine: 2, endColumn: 20 }, { messageId: "usedOnlyAsType", message: "'b' is defined but only used as a type.", line: 2, column: 30, endLine: 2, endColumn: 31 }, { messageId: "unusedVar", message: "'c' is defined but never used.", line: 2, column: 42, endLine: 2, endColumn: 43 }],
+      options: [{ args: 'after-used' }],
+    },
+    {
+      code: `
+export function g(a: string, b: any, c: string): typeof b {
+  return undefined as any;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'a' is defined but never used.", line: 2, column: 19, endLine: 2, endColumn: 20 }, { messageId: "usedOnlyAsType", message: "'b' is defined but only used as a type.", line: 2, column: 30, endLine: 2, endColumn: 31 }, { messageId: "unusedVar", message: "'c' is defined but never used.", line: 2, column: 38, endLine: 2, endColumn: 39 }],
+      options: [{ args: 'after-used' }],
+    },
+    {
+      code: `
+export function g(a: string, b: unknown, c: string): asserts b {}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'a' is defined but never used.", line: 2, column: 19, endLine: 2, endColumn: 20 }, { messageId: "usedOnlyAsType", message: "'b' is defined but only used as a type.", line: 2, column: 30, endLine: 2, endColumn: 31 }, { messageId: "unusedVar", message: "'c' is defined but never used.", line: 2, column: 42, endLine: 2, endColumn: 43 }],
+      options: [{ args: 'after-used' }],
+    },
+    {
+      code: `
+export function g(a: string, b: unknown, c: string) {
+  var b;
+  type b = string;
+  return '' as b;
+}
+      `,
+      errors: [{ messageId: "unusedVar", message: "'a' is defined but never used.", line: 2, column: 19, endLine: 2, endColumn: 20 }, { messageId: "usedOnlyAsType", message: "'b' is defined but only used as a type.", line: 2, column: 30, endLine: 2, endColumn: 31 }, { messageId: "unusedVar", message: "'c' is defined but never used.", line: 2, column: 42, endLine: 2, endColumn: 43 }],
+      options: [{ args: 'after-used' }],
     },
   ],
 });

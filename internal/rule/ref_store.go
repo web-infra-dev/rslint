@@ -577,7 +577,7 @@ func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meanin
 	if location.Parent != nil && location.Parent.Kind == ast.KindExportSpecifier && !isLocalExportTarget(location) {
 		return false
 	}
-	if !s.HasNonGlobalProgramScope() && s.hasAuthoredProgramDefinition(name) {
+	if s.HasGlobalDeclaration(name) {
 		return false
 	}
 	// When a JSDoc import and an authored import bind the same local name,
@@ -609,6 +609,14 @@ func isLocalExportTarget(location *ast.Node) bool {
 		return propertyName == location
 	}
 	return location.Parent.Name() == location
+}
+
+// HasGlobalDeclaration reports whether an authored declaration joins name's
+// outer global binding. Module and CommonJS wrapper locals are separate
+// bindings. Synthetic JSDoc and qualified namespace names are not declarations
+// in the scope model used by lint rules.
+func (s *RefStore) HasGlobalDeclaration(name string) bool {
+	return s != nil && !s.HasNonGlobalProgramScope() && s.hasAuthoredProgramDefinition(name)
 }
 
 // hasAuthoredProgramDefinition reports whether the file spells a definition
