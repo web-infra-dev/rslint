@@ -512,7 +512,8 @@ func stepAttrPath(tree *estree.Tree, current estree.Value, seg pathSegment) estr
 }
 
 // stringCodeUnitAt returns the UTF-16 code unit at index as a single-unit
-// string (matching JS `str[index]`).
+// JavaScript string (preserving unpaired surrogates in WTF-8 rather than
+// replacing them with U+FFFD).
 func stringCodeUnitAt(s string, index int) (string, bool) {
 	if index < 0 {
 		return "", false
@@ -527,7 +528,7 @@ func stringCodeUnitAt(s string, index int) (string, bool) {
 			i++
 			continue
 		}
-		r, size := utf8.DecodeRuneInString(s[i:])
+		r, size := ecmascript.DecodeStringRune(s[i:])
 		if r <= 0xFFFF {
 			if unitIdx == index {
 				return s[i : i+size], true
@@ -536,10 +537,10 @@ func stringCodeUnitAt(s string, index int) (string, bool) {
 		} else {
 			r1, r2 := utf16.EncodeRune(r)
 			if unitIdx == index {
-				return string(r1), true
+				return ecmascript.StringFromCodeUnits([]uint16{uint16(r1)}), true
 			}
 			if unitIdx+1 == index {
-				return string(r2), true
+				return ecmascript.StringFromCodeUnits([]uint16{uint16(r2)}), true
 			}
 			unitIdx += 2
 		}
@@ -724,8 +725,6 @@ func attrEquals(tree *estree.Tree, left estree.Value, right attrValue) bool {
 		return valueEqualsString(tree, left, right.Ident)
 	case attrValueType:
 		return valueTypeOf(left) == right.Ident
-	case attrValueRegex:
-		return attrStringMatchesRegex(valueAsString(tree, left), right)
 	}
 	return false
 }
@@ -755,7 +754,25 @@ func attrStringMatchesRegex(left string, right attrValue) bool {
 			return false
 		}
 	}
+	if !utf8.ValidString(left) {
+		return re.TestRunes(decodeWTF8Runes(left))
+	}
 	return re.Test(left)
+}
+
+func decodeWTF8Runes(s string) []rune {
+	runes := make([]rune, 0, len(s))
+	for i := 0; i < len(s); {
+		if s[i] < utf8.RuneSelf {
+			runes = append(runes, rune(s[i]))
+			i++
+			continue
+		}
+		r, size := ecmascript.DecodeStringRune(s[i:])
+		runes = append(runes, r)
+		i += size
+	}
+	return runes
 }
 
 func valueAsString(tree *estree.Tree, v estree.Value) string {

@@ -1,6 +1,7 @@
 package estree
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -104,13 +105,205 @@ func TestWithTreePanicAndErrorCleanup(t *testing.T) {
 		t.Fatal("expected error for invalid sourceType")
 	}
 
-	// Unsupported syntax returns error and clears staged strings.
-	if err := builder.WithTree(source("/bad.ts", "type T = ?number;"), TreeOptions{SourceType: "module"}, func(*Tree) {
-		t.Fatal("callback must not run on projection error")
-	}); err == nil {
-		t.Fatal("expected error for unsupported JSDoc type syntax")
+	// Resilient treeMode: unsupported or invalid-type constructs (JSDoc types,
+	// import(Name), malformed literals/headers) must degrade locally rather than
+	// aborting the file and silencing diagnostics on later statements.
+	sourceField, _ := FieldIDByName("source")
+	for _, tc := range []struct {
+		name      string
+		code      string
+		wantTypes []TypeID
+	}{
+		{"/import_name.ts", "type Name = 'pkg';\ntype T = import(Name);\ndebugger;", []TypeID{typeTSImportType, typeDebuggerStatement}},
+		{"/import_null.ts", "type D = import(null);\ndebugger;", []TypeID{typeTSImportType, typeDebuggerStatement}},
+		{"/import_template.ts", "type T = import(`a${string}b`);\ndebugger;", []TypeID{typeTSImportType, typeDebuggerStatement}},
+		{"/jsdoc_nullable.ts", "type T = ?number;\ndebugger;", []TypeID{typeTSTypeAliasDeclaration, typeDebuggerStatement}},
+		{"/bad_bigint.ts", "const x = 0xn;\ndebugger;", []TypeID{typeDebuggerStatement}},
+		{"/leading_zero_bigint.ts", "const x = 0_10n;\ndebugger;", []TypeID{typeLiteral, typeDebuggerStatement}},
+		{"/bad_num.ts", "const x = 0x;\ndebugger;", []TypeID{typeDebuggerStatement}},
+		{"/missing_brace.ts", "class C\ndebugger;", []TypeID{typeDebuggerStatement}},
+	} {
+		if err := builder.WithTree(source(tc.name, tc.code), TreeOptions{SourceType: "module"}, func(tree *Tree) {
+			seen := make(map[TypeID]bool)
+			var walk func(NodeID)
+			walk = func(id NodeID) {
+				tid := tree.Type(id)
+				seen[tid] = true
+				if (tc.name == "/import_name.ts" || tc.name == "/import_null.ts" || tc.name == "/import_template.ts") && tid == typeTSImportType {
+					if got := tree.Field(id, sourceField); got.Kind != ValueUndefined {
+						t.Fatalf("%s TSImportType.source = %+v, want ValueUndefined", tc.name, got)
+					}
+				}
+				if tc.name == "/leading_zero_bigint.ts" && tid == typeLiteral {
+					valueField, _ := FieldIDByName("value")
+					if got := tree.Field(id, valueField); got.Kind != ValueNull {
+						t.Fatalf("leading-zero BigInt 0_10n must degrade to ValueNull, got %+v", got)
+					}
+				}
+				tree.ForEachChild(id, func(child NodeID) bool {
+					walk(child)
+					return false
+				})
+			}
+			walk(tree.Root())
+			for _, want := range tc.wantTypes {
+				if !seen[want] {
+					t.Fatalf("%s: expected projected %s, saw %v", tc.name, want, seen)
+				}
+			}
+		}); err != nil {
+			t.Fatalf("%s: unexpected error %v", tc.name, err)
+		}
+		assertClearedProjectionStrings(t, &builder)
 	}
-	assertClearedProjectionStrings(t, &builder)
+
+	// Malformed import-type options in treeMode must not leave orphan nodes in Tree.
+	if err := builder.WithTree(source("/bad_import_opts.ts", `type T = import("a", { with: { type: "json" }`), TreeOptions{SourceType: "module"}, func(tree *Tree) {
+		visited := 0
+		var walk func(NodeID)
+		walk = func(id NodeID) {
+			visited++
+			tree.ForEachChild(id, func(child NodeID) bool {
+				walk(child)
+				return false
+			})
+		}
+		walk(tree.Root())
+		if visited != tree.NodeCount() {
+			t.Fatalf("malformed import options left orphan nodes: visited=%d NodeCount=%d", visited, tree.NodeCount())
+		}
+	}); err != nil {
+		t.Fatalf("WithTree(bad_import_opts.ts) failed: %v", err)
+	}
+
+	// Wire-mode Build() remains strict on unsupported/malformed syntax and non-LiteralType import().
+	for _, tc := range []struct {
+		name string
+		code string
+	}{
+		{"/wire_jsdoc_nullable.ts", "type T = ?number;"},
+		{"/wire_leading_zero_bigint.ts", "const x = 0_10n;"},
+		{"/wire_bad_bigint.ts", "const x = 0xn;"},
+		{"/wire_import_name.ts", "type Name = 'pkg'; type T = import(Name);"},
+		{"/wire_import_template.ts", "type T = import(`a${string}b`); const after = 1; // comment"},
+	} {
+		if _, err := builder.Build(context.Background(), source(tc.name, tc.code), Options{SourceType: "module"}); err == nil {
+			t.Fatalf("Build(%s) succeeded, want error in strict wire mode", tc.name)
+		}
+		assertClearedProjectionStrings(t, &builder)
+	}
+
+	// JS JSDoc modifiers/heritage/prologue-declarations must be skipped in both Build and WithTree.
+	nameField, _ := FieldIDByName("name")
+	keyField, _ := FieldIDByName("key")
+	implField, _ := FieldIDByName("implements")
+	directiveField, _ := FieldIDByName("directive")
+	jsCtor := "class C { /** @private */ constructor() {} }"
+	if _, err := builder.Build(context.Background(), source("/jsdoc_ctor.js", jsCtor), Options{SourceType: "module"}); err != nil {
+		t.Fatalf("Build(jsdoc_ctor.js) failed: %v", err)
+	}
+	if err := builder.WithTree(source("/jsdoc_ctor.js", jsCtor), TreeOptions{SourceType: "module"}, func(tree *Tree) {
+		foundCtor := false
+		var walk func(NodeID)
+		walk = func(id NodeID) {
+			if tree.Type(id) == typeMethodDefinition {
+				k := tree.Field(id, keyField)
+				if k.Kind == ValueNode && tree.Field(k.Node, nameField).Str == "constructor" {
+					foundCtor = true
+				}
+			}
+			tree.ForEachChild(id, func(child NodeID) bool {
+				walk(child)
+				return false
+			})
+		}
+		walk(tree.Root())
+		if !foundCtor {
+			t.Fatal("expected constructor MethodDefinition with Identifier key in JS file with JSDoc @private")
+		}
+	}); err != nil {
+		t.Fatalf("WithTree(jsdoc_ctor.js) failed: %v", err)
+	}
+	jsImpl := "/** @implements {Foo} */ class C {}"
+	if _, err := builder.Build(context.Background(), source("/jsdoc_impl.js", jsImpl), Options{SourceType: "module"}); err != nil {
+		t.Fatalf("Build(jsdoc_impl.js) failed: %v", err)
+	}
+	if err := builder.WithTree(source("/jsdoc_impl.js", jsImpl), TreeOptions{SourceType: "module"}, func(tree *Tree) {
+		foundClass := false
+		var walk func(NodeID)
+		walk = func(id NodeID) {
+			if tree.Type(id) == typeClassDeclaration {
+				if got := tree.Field(id, implField); got.Kind != ValueUndefined {
+					t.Fatalf("JS @implements ClassDeclaration.implements = %+v, want ValueUndefined", got)
+				}
+				foundClass = true
+			}
+			if tree.Type(id) == typeTSClassImplements {
+				t.Fatal("JS @implements must not emit TSClassImplements")
+			}
+			tree.ForEachChild(id, func(child NodeID) bool {
+				walk(child)
+				return false
+			})
+		}
+		walk(tree.Root())
+		if !foundClass {
+			t.Fatal("expected ClassDeclaration")
+		}
+	}); err != nil {
+		t.Fatalf("WithTree(jsdoc_impl.js) failed: %v", err)
+	}
+	jsDirective := "/** @typedef {number} T */\n\"use strict\";"
+	if _, err := builder.Build(context.Background(), source("/jsdoc_directive.js", jsDirective), Options{SourceType: "script"}); err != nil {
+		t.Fatalf("Build(jsdoc_directive.js) failed: %v", err)
+	}
+	if err := builder.WithTree(source("/jsdoc_directive.js", jsDirective), TreeOptions{SourceType: "script"}, func(tree *Tree) {
+		foundDirective := false
+		var walk func(NodeID)
+		walk = func(id NodeID) {
+			if tree.Type(id) == typeExpressionStatement {
+				if got := tree.Field(id, directiveField); got.Kind == ValueString && got.Str == "use strict" {
+					foundDirective = true
+				}
+			}
+			tree.ForEachChild(id, func(child NodeID) bool {
+				walk(child)
+				return false
+			})
+		}
+		walk(tree.Root())
+		if !foundDirective {
+			t.Fatal("expected leading @typedef followed by \"use strict\" to preserve ExpressionStatement.directive")
+		}
+	}); err != nil {
+		t.Fatalf("WithTree(jsdoc_directive.js) failed: %v", err)
+	}
+
+	// Degraded type annotation must not stretch Identifier.end past the identifier token.
+	varAnnCode := "let x: ?number;"
+	if err := builder.WithTree(source("/degraded_ann.ts", varAnnCode), TreeOptions{SourceType: "module"}, func(tree *Tree) {
+		found := false
+		var walk func(NodeID)
+		walk = func(id NodeID) {
+			if tree.Type(id) == typeIdentifier && tree.Field(id, nameField).Str == "x" {
+				r := tree.Range(id)
+				if got := varAnnCode[r.Pos():r.End()]; got != "x" {
+					t.Fatalf("degraded annotation stretched Identifier range to %q, want %q", got, "x")
+				}
+				found = true
+			}
+			tree.ForEachChild(id, func(child NodeID) bool {
+				walk(child)
+				return false
+			})
+		}
+		walk(tree.Root())
+		if !found {
+			t.Fatal("expected Identifier x")
+		}
+	}); err != nil {
+		t.Fatalf("WithTree(degraded_ann.ts) failed: %v", err)
+	}
 
 	// Panic inside fn must NOT be swallowed by WithTree, and must still clear strings.
 	sentinel := errors.New("callback panic")
@@ -344,28 +537,90 @@ func TestWithTreeLiteralsTemplatesSparseAndUndefined(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 4. Invalid same-alternative duplicate capture group yields ValueNull (matching V8/parser).
-	if err := builder.WithTree(source("/bad_regex.ts", `const r = /(?<x>a)(?<x>b)/;`), TreeOptions{SourceType: "module"}, func(tree *Tree) {
-		found := false
-		var walk func(NodeID)
-		walk = func(id NodeID) {
-			if tree.Type(id) == typeLiteral {
-				if val := tree.Field(id, valueField); val.Kind != ValueNull {
-					t.Fatalf("invalid duplicate capture group Literal.value = %+v, want ValueNull", val)
+	// 4. ES2025 + Annex B RegExp validation: distinct-alternative duplicate capture
+	// names, valid `/v` patterns, and legacy Annex B escapes yield ValueRegExp,
+	// while same-alternative duplicates, unknown named backrefs, and invalid `/v`
+	// sets yield ValueNull.
+	for _, tc := range []struct {
+		code string
+		want ValueKind
+	}{
+		{`const r = /(?<k>a)|(?<k>b)/;`, ValueRegExp},
+		{`const r = /(?<x>a)(?<x>b)/;`, ValueNull},
+		{`const r = /(?:(?<k>a)|(?<k>b))(?<k>c)/;`, ValueNull},
+		{`const r = /[[A--B]]/v;`, ValueRegExp},
+		{`const r = /[[A&&&]]/v;`, ValueNull},
+		{`const r = /(?i:foo)bar/;`, ValueRegExp},
+		{`const r = /\p{Letter}/;`, ValueRegExp},
+		{`const r = /\k<foo>/;`, ValueRegExp},
+		{`const r = /\01/;`, ValueRegExp},
+		{`const r = /[\1]/;`, ValueRegExp},
+		{`const r = /\u{61}/;`, ValueRegExp},
+		{`const r = /\u{NOT_HEX}/;`, ValueRegExp},
+		{`const r = /(?<a>x)\k<b>/;`, ValueNull},
+		{`const r = /a/gg;`, ValueNull},
+		{`const r = /a/z;`, ValueNull},
+		{`const r = /a/uv;`, ValueNull},
+		{`const r = /abc`, ValueNull},
+		{"const r = /a\u2028b/;", ValueNull},
+		{"const r = /a\u2029b/u;", ValueNull},
+	} {
+		if err := builder.WithTree(source("/regex_valid.ts", tc.code), TreeOptions{SourceType: "module"}, func(tree *Tree) {
+			found := false
+			var walk func(NodeID)
+			walk = func(id NodeID) {
+				if tree.Type(id) == typeLiteral {
+					if val := tree.Field(id, valueField); val.Kind != tc.want {
+						t.Fatalf("%s: Literal.value = %+v, want kind %d", tc.code, val, tc.want)
+					}
+					found = true
 				}
-				found = true
+				tree.ForEachChild(id, func(child NodeID) bool {
+					walk(child)
+					return false
+				})
 			}
-			tree.ForEachChild(id, func(child NodeID) bool {
-				walk(child)
-				return false
-			})
+			walk(tree.Root())
+			if !found {
+				t.Fatalf("%s: expected Literal node", tc.code)
+			}
+		}); err != nil {
+			t.Fatal(err)
 		}
-		walk(tree.Root())
-		if !found {
-			t.Fatal("expected Literal node for invalid regex")
+	}
+
+	// TS preserves CRLF/CR in TemplateElement.value.raw (@typescript-eslint/parser),
+	// whereas JS normalizes them to LF (espree) — for both plain and interpolated templates.
+	for _, tc := range []struct {
+		file     string
+		wantRaws []string
+	}{
+		{"/tpl_crlf.ts", []string{"a\r\nb\rc", "x\r\n", "y\rz"}},
+		{"/tpl_crlf.js", []string{"a\nb\nc", "x\n", "y\nz"}},
+	} {
+		if err := builder.WithTree(source(tc.file, "const s = `a\r\nb\rc`; const t = `x\r\n${1}y\rz`;"), TreeOptions{SourceType: "module"}, func(tree *Tree) {
+			var gotRaws []string
+			var walk func(NodeID)
+			walk = func(id NodeID) {
+				if tree.Type(id) == typeTemplateElement {
+					_, _, raw, ok := tree.TemplateValue(id)
+					if !ok {
+						t.Fatalf("%s: TemplateValue returned ok=false", tc.file)
+					}
+					gotRaws = append(gotRaws, raw)
+				}
+				tree.ForEachChild(id, func(child NodeID) bool {
+					walk(child)
+					return false
+				})
+			}
+			walk(tree.Root())
+			if !reflect.DeepEqual(gotRaws, tc.wantRaws) {
+				t.Fatalf("%s: TemplateElement.value.raw = %q, want %q", tc.file, gotRaws, tc.wantRaws)
+			}
+		}); err != nil {
+			t.Fatal(err)
 		}
-	}); err != nil {
-		t.Fatal(err)
 	}
 
 	// 5. Bounds safety on invalid NodeIDs/FieldIDs and defensive clone on TriggerKinds.

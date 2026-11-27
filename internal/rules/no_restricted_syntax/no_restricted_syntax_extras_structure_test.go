@@ -1933,10 +1933,15 @@ func TestNoRestrictedSyntaxTypeScriptNodes(t *testing.T) {
 			{Code: "foo();\n", Options: []any{`CallExpression[typeArguments=null]`}},
 			// Valid ES2024 /v regex literal is not null.
 			{Code: "const r = /[a-z]/v;\n", Options: []any{`Literal[value=null]`}},
-			// Unsupported JSDoc nullable type authored in TS fails projection cleanly without panicking.
-			{Code: "type Bad = ?number;\n", Options: []any{`TSTypeAliasDeclaration`}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Unsupported JSDoc nullable type authored in TS degrades locally
+			// without hiding surrounding declarations or statements.
+			{
+				Code:    "type Bad = ?number;\n",
+				Options: []any{`TSTypeAliasDeclaration`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 20}},
+			},
 			// Exact issue #2626 reproduction.
 			{
 				Code: "export const v: unknown = 1\nexport const a = v as string\nexport const b = v!\nexport const c = v satisfies unknown\nenum E { A }\nexport { E }\n",

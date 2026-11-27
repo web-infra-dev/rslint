@@ -199,12 +199,20 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 		}
 		return p.addLiteral(node, p.stringValue(node.Text()), undefinedValue(), undefinedValue(), undefinedValue())
 	case ast.KindNumericLiteral:
-		return p.addLiteral(node, p.numberValue(parseNumberLiteral(node.Text())), undefinedValue(), undefinedValue(), undefinedValue())
+		return p.addLiteral(node, p.numberValue(p.parseNumberLiteral(node.Text())), undefinedValue(), undefinedValue(), undefinedValue())
 	case ast.KindBigIntLiteral:
 		raw := p.rawText(node)
 		bigint := strings.TrimSuffix(strings.ReplaceAll(raw, "_", ""), "n")
-		integer, ok := new(big.Int).SetString(bigint, 0)
+		var integer *big.Int
+		var ok bool
+		// JavaScript BigInt literals disallow legacy leading-zero octal forms like `010n`.
+		if len(bigint) <= 1 || bigint[0] != '0' || bigint[1] < '0' || bigint[1] > '9' {
+			integer, ok = new(big.Int).SetString(bigint, 0)
+		}
 		if !ok {
+			if p.treeMode {
+				return p.addLiteral(node, nullValue(), undefinedValue(), undefinedValue(), undefinedValue())
+			}
 			failProjection(fmt.Errorf("invalid bigint literal %q", bigint))
 		}
 		bigint = integer.String()
@@ -403,7 +411,11 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 		return p.convertPropertyDefinition(node)
 	case ast.KindClassStaticBlockDeclaration:
 		body := node.AsClassStaticBlockDeclaration().Body
-		return p.addNode(typeStaticBlock, node, p.convertStatements(body.AsBlock().Statements, !p.isJS))
+		var stmts *ast.NodeList
+		if body != nil && body.AsBlock() != nil {
+			stmts = body.AsBlock().Statements
+		}
+		return p.addNode(typeStaticBlock, node, p.convertStatements(stmts, !p.isJS))
 
 	case ast.KindDecorator:
 		return p.addNode(typeDecorator, node, nodeValue(p.convert(node.AsDecorator().Expression, false)))
@@ -533,10 +545,17 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 	case ast.KindArrayType:
 		return p.addNode(typeTSArrayType, node, nodeValue(p.convert(node.AsArrayTypeNode().ElementType, false)))
 	case ast.KindLiteralType:
-		if node.AsLiteralTypeNode().Literal.Kind == ast.KindNullKeyword {
-			return p.addNode(typeTSNullKeyword, node.AsLiteralTypeNode().Literal)
+		lit := node.AsLiteralTypeNode().Literal
+		if lit == nil {
+			if p.treeMode {
+				return 0
+			}
+			failProjection(errors.New("missing literal type operand"))
 		}
-		return p.addNode(typeTSLiteralType, node, nodeValue(p.convert(node.AsLiteralTypeNode().Literal, false)))
+		if lit.Kind == ast.KindNullKeyword {
+			return p.addNode(typeTSNullKeyword, lit)
+		}
+		return p.addNode(typeTSLiteralType, node, nodeValue(p.convert(lit, false)))
 	case ast.KindTypeParameter:
 		n := node.AsTypeParameterDeclaration()
 		return p.addNode(typeTSTypeParameter, node,
@@ -573,13 +592,19 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 	case ast.KindConstructorType:
 		return p.convertFunctionType(node, true)
 	case ast.KindTupleType:
-		return p.addNode(typeTSTupleType, node, p.convertList(node.AsTupleTypeNode().Elements.Nodes, false))
+		var elems []*ast.Node
+		if list := node.AsTupleTypeNode().Elements; list != nil {
+			elems = list.Nodes
+		}
+		return p.addNode(typeTSTupleType, node, p.convertList(elems, false))
 	case ast.KindNamedTupleMember:
 		n := node.AsNamedTupleMember()
 		id := p.addNode(typeTSNamedTupleMember, node,
 			nodeValue(p.convert(n.Type, false)), nodeValue(p.convert(n.Name(), false)), boolValue(n.QuestionToken != nil))
 		if n.DotDotDotToken != nil {
-			p.nodes[id-1].start = p.offsets.At(p.tokenStart(n.Name()))
+			if n.Name() != nil {
+				p.nodes[id-1].start = p.offsets.At(p.tokenStart(n.Name()))
+			}
 			return p.addNode(typeTSRestType, node, nodeValue(id))
 		}
 		return id
@@ -684,6 +709,9 @@ func (p *estreeProjector) convertStatements(list *ast.NodeList, prologue bool) u
 	}
 	base := len(p.listScratch)
 	for _, statement := range list.Nodes {
+		if isJSDocCommentSyntax(statement) {
+			continue
+		}
 		// Advance the prologue once instead of rescanning every preceding
 		// string statement.
 		prologue = prologue && statement.Kind == ast.KindExpressionStatement &&
@@ -754,10 +782,12 @@ func (p *estreeProjector) wrapExport(node, origin *ast.Node, declaration uint32)
 	} else {
 		result = p.addNode(typeExportNamedDeclaration, origin, p.listValue(nil), nodeValue(declaration), p.stringValue(kind), nullValue(), p.listValue(nil))
 	}
-	for _, modifier := range node.Modifiers().Nodes {
-		if modifier.Kind == ast.KindExportKeyword {
-			p.nodes[result-1].start = p.offsets.At(p.tokenStart(modifier))
-			break
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind == ast.KindExportKeyword {
+				p.nodes[result-1].start = p.offsets.At(p.tokenStart(modifier))
+				break
+			}
 		}
 	}
 	return result
@@ -818,6 +848,9 @@ func (p *estreeProjector) rawTextFull(node *ast.Node) string {
 }
 
 func (p *estreeProjector) unsupported(node *ast.Node) uint32 {
+	if p.treeMode {
+		return 0
+	}
 	failProjection(fmt.Errorf("ESTree projection: unsupported syntax %s at byte %d", node.Kind, node.Pos()))
 	return 0
 }
@@ -1002,6 +1035,12 @@ func (p *estreeProjector) convertBindingElement(node *ast.Node) uint32 {
 
 func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 	n := node.AsBinaryExpression()
+	if n.OperatorToken == nil {
+		if p.treeMode {
+			return 0
+		}
+		failProjection(errors.New("missing binary operator token"))
+	}
 	p.recordTokenCover(n.OperatorToken, false)
 	operator := scanner.TokenToString(n.OperatorToken.Kind)
 	if n.OperatorToken.Kind == ast.KindCommaToken {
@@ -1010,7 +1049,9 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 		rights := []*ast.Node{n.Right}
 		var prefixes []*ast.Node
 		left := n.Left
-		for left.Kind == ast.KindBinaryExpression && left.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
+		for left != nil && left.Kind == ast.KindBinaryExpression &&
+			left.AsBinaryExpression().OperatorToken != nil &&
+			left.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
 			p.check()
 			nested := left.AsBinaryExpression()
 			if p.mapping != nil {
@@ -1096,7 +1137,7 @@ func (p *estreeProjector) convertNoSubstitutionTemplate(node *ast.Node) uint32 {
 		raw = raw[1:]
 	}
 	element := p.add(typeTemplateElement, start, end,
-		boolValue(true), p.templateCooked(node), p.stringValue(templateRaw(node, raw)))
+		boolValue(true), p.templateCooked(node), p.stringValue(p.templateRaw(raw)))
 	return p.addNode(typeTemplateLiteral, node, p.listValue(nil), p.listValue([]uint32{element}))
 }
 
@@ -1119,19 +1160,13 @@ func (p *estreeProjector) convertTemplateElement(node *ast.Node) uint32 {
 	tail := node.Kind == ast.KindTemplateTail
 	raw := node.RawText()
 	return p.addNode(typeTemplateElement, node,
-		boolValue(tail), p.templateCooked(node), p.stringValue(templateRaw(node, raw)))
+		boolValue(tail), p.templateCooked(node), p.stringValue(p.templateRaw(raw)))
 }
 
-func templateRaw(node *ast.Node, raw string) string {
-	// TypeScript template-literal types preserve source newlines in raw;
-	// expression templates use ECMAScript's normalized template raw value.
-	if node.Parent != nil {
-		switch node.Parent.Kind {
-		case ast.KindLiteralType, ast.KindTemplateLiteralType, ast.KindTemplateLiteralTypeSpan:
-			return raw
-		}
-	}
-	if strings.IndexByte(raw, '\r') < 0 {
+func (p *estreeProjector) templateRaw(raw string) string {
+	// @typescript-eslint/parser preserves source line terminators verbatim in
+	// TS/TSX TemplateElement.value.raw, whereas espree (JS) normalizes CRLF/CR to LF.
+	if !p.isJS || strings.IndexByte(raw, '\r') < 0 {
 		return raw
 	}
 	return strings.ReplaceAll(strings.ReplaceAll(raw, "\r\n", "\n"), "\r", "\n")
@@ -1194,16 +1229,26 @@ func (p *estreeProjector) convertClass(node *ast.Node, declaration bool) uint32 
 	implementsBase := len(p.listScratch)
 	if n.HeritageClauses != nil {
 		for _, clauseNode := range n.HeritageClauses.Nodes {
+			if isJSDocCommentSyntax(clauseNode) {
+				continue
+			}
 			clause := clauseNode.AsHeritageClause()
 			if clause.Types == nil {
 				continue
 			}
 			for index, heritageNode := range clause.Types.Nodes {
+				if isJSDocCommentSyntax(heritageNode) {
+					continue
+				}
 				previous := p.origin
 				if p.mapping != nil {
 					p.origin = heritageNode
 				}
-				heritageExpression, heritageTypeArguments := heritageParts(heritageNode)
+				heritageExpression, heritageTypeArguments, ok := p.heritageParts(heritageNode)
+				if !ok {
+					p.origin = previous
+					continue
+				}
 				if clause.Token == ast.KindExtendsKeyword && index == 0 {
 					superClass = p.convertHeritageName(heritageExpression)
 					superTypeArguments = p.typeParameters(heritageTypeArguments, false)
@@ -1253,8 +1298,14 @@ func (p *estreeProjector) convertMethod(node *ast.Node) uint32 {
 	function := node.FunctionLikeData()
 	bodyData := node.BodyData()
 	parameters := []*ast.Node(nil)
-	if function != nil && function.Parameters != nil {
-		parameters = function.Parameters.Nodes
+	var typeParams *ast.NodeList
+	var retType *ast.Node
+	if function != nil {
+		if function.Parameters != nil {
+			parameters = function.Parameters.Nodes
+		}
+		typeParams = function.TypeParameters
+		retType = function.Type
 	}
 	bodyNode := (*ast.Node)(nil)
 	asterisk := false
@@ -1269,15 +1320,20 @@ func (p *estreeProjector) convertMethod(node *ast.Node) uint32 {
 	value := p.addNode(functionType, node,
 		nullValue(), p.convertParameters(parameters), nodeValue(p.convert(bodyNode, false)),
 		boolValue(asterisk), boolValue(p.hasModifier(node, ast.ModifierFlagsAsync)),
-		boolValue(false), boolValue(false), p.typeParameters(function.TypeParameters, true),
-		p.typeAnnotation(function.Type))
+		boolValue(false), boolValue(false), p.typeParameters(typeParams, true),
+		p.typeAnnotation(retType))
 	name := node.Name()
-	if function.Parameters == nil {
-		failProjection(errors.New("missing method parameter list"))
-	}
-	functionStart := max(0, function.Parameters.Pos()-1)
-	if function.TypeParameters != nil && !p.isJS && (len(function.TypeParameters.Nodes) == 0 || !isJSDocCommentSyntax(function.TypeParameters.Nodes[0])) {
-		functionStart = max(0, function.TypeParameters.Pos()-1)
+	var functionStart int
+	if function == nil || function.Parameters == nil {
+		if !p.treeMode {
+			failProjection(errors.New("missing method parameter list"))
+		}
+		functionStart = p.tokenStart(node)
+	} else {
+		functionStart = max(0, function.Parameters.Pos()-1)
+		if function.TypeParameters != nil && !p.isJS && (len(function.TypeParameters.Nodes) == 0 || !isJSDocCommentSyntax(function.TypeParameters.Nodes[0])) {
+			functionStart = max(0, function.TypeParameters.Pos()-1)
+		}
 	}
 	p.nodes[value-1].start = p.offsets.At(functionStart)
 	kind := "method"
@@ -1323,10 +1379,17 @@ func (p *estreeProjector) convertMethod(node *ast.Node) uint32 {
 
 func (p *estreeProjector) constructorKey(node *ast.Node) uint32 {
 	// tsgo omits the constructor name node. The keyword or quoted name is
-	// the first token after its parsed modifiers, regardless of trivia.
+	// the first token after its authored (non-JSDoc) modifiers, regardless of trivia.
+	// Skip JSDoc-reparsed modifiers (e.g. `/** @private */ constructor()`), whose
+	// end offset lands inside the comment before `*/`.
 	start := node.Pos()
-	if modifiers := node.Modifiers(); modifiers != nil && len(modifiers.Nodes) > 0 {
-		start = modifiers.Nodes[len(modifiers.Nodes)-1].End()
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for i := len(modifiers.Nodes) - 1; i >= 0; i-- {
+			if !isJSDocCommentSyntax(modifiers.Nodes[i]) {
+				start = modifiers.Nodes[i].End()
+				break
+			}
+		}
 	}
 	scan := &p.scan
 	scan.SetText(p.text)
@@ -1344,6 +1407,9 @@ func (p *estreeProjector) constructorKey(node *ast.Node) uint32 {
 				p.stringValue("constructor"), p.stringValue(p.text[start:end]),
 				undefinedValue(), undefinedValue(), undefinedValue())
 		}
+	}
+	if p.treeMode {
+		return 0
 	}
 	failProjection(errors.New("missing constructor name token"))
 	return 0
@@ -1451,16 +1517,26 @@ func (p *estreeProjector) convertInterface(node *ast.Node) uint32 {
 	base := len(p.listScratch)
 	if n.HeritageClauses != nil {
 		for _, clauseNode := range n.HeritageClauses.Nodes {
+			if isJSDocCommentSyntax(clauseNode) {
+				continue
+			}
 			clause := clauseNode.AsHeritageClause()
 			if clause.Token != ast.KindExtendsKeyword || clause.Types == nil {
 				continue
 			}
 			for _, heritageNode := range clause.Types.Nodes {
+				if isJSDocCommentSyntax(heritageNode) {
+					continue
+				}
 				previous := p.origin
 				if p.mapping != nil {
 					p.origin = heritageNode
 				}
-				heritageExpression, heritageTypeArguments := heritageParts(heritageNode)
+				heritageExpression, heritageTypeArguments, ok := p.heritageParts(heritageNode)
+				if !ok {
+					p.origin = previous
+					continue
+				}
 				id := p.addNode(typeTSInterfaceHeritage, heritageNode,
 					nodeValue(p.convertHeritageName(heritageExpression)),
 					p.typeParameters(heritageTypeArguments, false))
@@ -1474,7 +1550,11 @@ func (p *estreeProjector) convertInterface(node *ast.Node) uint32 {
 	p.listScratch = p.listScratch[:base]
 	end := p.offsets.At(node.End())
 	start := p.offsets.At(p.bodyBrace(node, n.Members))
-	body := p.add(typeTSInterfaceBody, start, end, p.convertList(n.Members.Nodes, false))
+	var members []*ast.Node
+	if n.Members != nil {
+		members = n.Members.Nodes
+	}
+	body := p.add(typeTSInterfaceBody, start, end, p.convertList(members, false))
 	return p.addNode(typeTSInterfaceDeclaration, node,
 		nodeValue(p.convert(n.Name(), false)), p.typeParameters(n.TypeParameters, true),
 		extendsList, nodeValue(body), boolValue(p.hasModifier(node, ast.ModifierFlagsAmbient)))
@@ -1500,12 +1580,22 @@ func (p *estreeProjector) convertMethodSignature(node *ast.Node) uint32 {
 		kind = "set"
 	}
 	optional := node.PostfixToken() != nil && node.PostfixToken().Kind == ast.KindQuestionToken
+	var params []*ast.Node
+	var retType *ast.Node
+	var typeParams *ast.NodeList
+	if n != nil {
+		if n.Parameters != nil {
+			params = n.Parameters.Nodes
+		}
+		retType = n.Type
+		typeParams = n.TypeParameters
+	}
 	return p.addNode(typeTSMethodSignature, node,
 		p.accessibility(node), boolValue(node.Name() != nil && node.Name().Kind == ast.KindComputedPropertyName),
 		nodeValue(p.convert(node.Name(), false)), p.stringValue(kind), boolValue(optional),
-		p.convertParameters(n.Parameters.Nodes), boolValue(p.hasModifier(node, ast.ModifierFlagsReadonly)),
-		p.typeAnnotation(n.Type), boolValue(p.hasModifier(node, ast.ModifierFlagsStatic)),
-		p.typeParameters(n.TypeParameters, true))
+		p.convertParameters(params), boolValue(p.hasModifier(node, ast.ModifierFlagsReadonly)),
+		p.typeAnnotation(retType), boolValue(p.hasModifier(node, ast.ModifierFlagsStatic)),
+		p.typeParameters(typeParams, true))
 }
 
 func (p *estreeProjector) convertFunctionType(node *ast.Node, constructor bool) uint32 {
@@ -1525,6 +1615,12 @@ func (p *estreeProjector) convertFunctionType(node *ast.Node, constructor bool) 
 
 func (p *estreeProjector) convertMappedType(node *ast.Node) uint32 {
 	n := node.AsMappedTypeNode()
+	if n.TypeParameter == nil {
+		if p.treeMode {
+			return 0
+		}
+		failProjection(errors.New("missing mapped type parameter"))
+	}
 	typeParameter := n.TypeParameter.AsTypeParameterDeclaration()
 	optional := boolValue(false)
 	if n.QuestionToken != nil {
@@ -1568,60 +1664,81 @@ func (p *estreeProjector) convertTemplateLiteralType(node *ast.Node) uint32 {
 
 func (p *estreeProjector) convertImportType(node *ast.Node) uint32 {
 	n := node.AsImportTypeNode()
-	source := uint32(0)
+	// Mirror @typescript-eslint/typescript-estree: TSImportType.source is the
+	// inner Literal when Argument is a non-null LiteralType, and undefined
+	// otherwise (e.g., `import(null)`, or in treeMode `import(Name)`).
+	// Strict wire mode continues rejecting non-LiteralType arguments so omitted
+	// argument subtrees never leave uncovered template/identifier tokens behind.
+	source := undefinedValue()
 	if n.Argument != nil && n.Argument.Kind == ast.KindLiteralType {
-		source = p.convert(n.Argument.AsLiteralTypeNode().Literal, false)
-	} else {
-		failProjection(errors.New("invalid import type source"))
+		if lit := n.Argument.AsLiteralTypeNode().Literal; lit != nil && lit.Kind != ast.KindNullKeyword {
+			source = optionalNodeValue(p.convert(lit, false))
+		}
+	} else if !p.treeMode {
+		p.unsupported(node)
 	}
 	options := uint32(0)
-	if n.Attributes != nil {
-		attributes := n.Attributes.AsImportAttributes()
-		propsBase := len(p.listScratch)
-		if attributes.Attributes != nil {
-			for _, attributeNode := range attributes.Attributes.Nodes {
-				attribute := attributeNode.AsImportAttribute()
-				name := attribute.Name()
-				prop := p.addNode(typeProperty, attributeNode,
-					nodeValue(p.convert(name, false)), nodeValue(p.convert(attribute.Value, false)),
-					p.stringValue("init"), boolValue(false), boolValue(false),
-					boolValue(false), boolValue(false))
-				p.listScratch = append(p.listScratch, prop)
-			}
-		}
-		propsList := p.listValue(p.listScratch[propsBase:])
-		p.listScratch = p.listScratch[:propsBase]
-		inner := p.addNode(typeObjectExpression, n.Attributes, propsList)
-		keyword := "with"
-		if attributes.Token == ast.KindAssertKeyword {
-			keyword = "assert"
-		}
+	if n.Attributes != nil && n.Argument != nil {
 		// tsgo does not give the outer options object or with/assert key their
-		// own nodes. Read their authored ranges with the existing scanner.
+		// own nodes. Validate their authored ranges before emitting child nodes
+		// so malformed options in treeMode do not leave orphan nodes behind.
 		scan := &p.scan
 		scan.SetText(p.text)
 		scan.SetSkipTrivia(true)
 		scan.ResetTokenState(n.Argument.End())
-		if scan.Scan() != ast.KindCommaToken || scan.Scan() != ast.KindOpenBraceToken {
-			failProjection(errors.New("missing import type options"))
-		}
-		outerStart := p.offsets.At(scan.TokenStart())
-		scan.Scan()
-		keyStart, keyEnd := p.offsets.At(scan.TokenStart()), p.offsets.At(scan.TokenEnd())
-		end := p.offsets.At(n.Attributes.End())
-		key := p.add(typeIdentifier, keyStart, keyEnd,
-			p.listValue(nil), p.stringValue(keyword), boolValue(false), undefinedValue())
-		outerProperty := p.add(typeProperty, keyStart, end,
-			nodeValue(key), nodeValue(inner), p.stringValue("init"),
-			boolValue(false), boolValue(false), boolValue(false), boolValue(false))
-		scan.ResetTokenState(n.Attributes.End())
-		if scan.Scan() == ast.KindCommaToken {
+		hasOpen := scan.Scan() == ast.KindCommaToken && scan.Scan() == ast.KindOpenBraceToken
+		var outerStart, keyStart, keyEnd, outerEnd uint32
+		hasClose := false
+		if hasOpen {
+			outerStart = p.offsets.At(scan.TokenStart())
 			scan.Scan()
+			keyStart, keyEnd = p.offsets.At(scan.TokenStart()), p.offsets.At(scan.TokenEnd())
+			scan.ResetTokenState(n.Attributes.End())
+			if scan.Scan() == ast.KindCommaToken {
+				scan.Scan()
+			}
+			if scan.Token() == ast.KindCloseBraceToken {
+				outerEnd = p.offsets.At(scan.TokenEnd())
+				hasClose = true
+			}
 		}
-		if scan.Token() != ast.KindCloseBraceToken {
-			failProjection(errors.New("missing import type options closing brace"))
+		if !hasOpen {
+			if !p.treeMode {
+				failProjection(errors.New("missing import type options"))
+			}
+		} else if !hasClose {
+			if !p.treeMode {
+				failProjection(errors.New("missing import type options closing brace"))
+			}
+		} else {
+			attributes := n.Attributes.AsImportAttributes()
+			propsBase := len(p.listScratch)
+			if attributes.Attributes != nil {
+				for _, attributeNode := range attributes.Attributes.Nodes {
+					attribute := attributeNode.AsImportAttribute()
+					name := attribute.Name()
+					prop := p.addNode(typeProperty, attributeNode,
+						nodeValue(p.convert(name, false)), nodeValue(p.convert(attribute.Value, false)),
+						p.stringValue("init"), boolValue(false), boolValue(false),
+						boolValue(false), boolValue(false))
+					p.listScratch = append(p.listScratch, prop)
+				}
+			}
+			propsList := p.listValue(p.listScratch[propsBase:])
+			p.listScratch = p.listScratch[:propsBase]
+			inner := p.addNode(typeObjectExpression, n.Attributes, propsList)
+			keyword := "with"
+			if attributes.Token == ast.KindAssertKeyword {
+				keyword = "assert"
+			}
+			end := p.offsets.At(n.Attributes.End())
+			key := p.add(typeIdentifier, keyStart, keyEnd,
+				p.listValue(nil), p.stringValue(keyword), boolValue(false), undefinedValue())
+			outerProperty := p.add(typeProperty, keyStart, end,
+				nodeValue(key), nodeValue(inner), p.stringValue("init"),
+				boolValue(false), boolValue(false), boolValue(false), boolValue(false))
+			options = p.add(typeObjectExpression, outerStart, outerEnd, p.listValue([]uint32{outerProperty}))
 		}
-		options = p.add(typeObjectExpression, outerStart, p.offsets.At(scan.TokenEnd()), p.listValue([]uint32{outerProperty}))
 	}
 	typeArguments := p.typeParameters(n.TypeArguments, false)
 	if typeArguments == undefinedValue() {
@@ -1629,7 +1746,7 @@ func (p *estreeProjector) convertImportType(node *ast.Node) uint32 {
 	}
 	result := p.addNode(typeTSImportType, node,
 		nodeValue(options), nodeValue(p.convert(n.Qualifier, false)),
-		nodeValue(source), typeArguments)
+		source, typeArguments)
 	if n.IsTypeOf {
 		start := p.tokenStart(node)
 		p.nodes[result-1].start = p.offsets.At(scanner.SkipTrivia(p.text, start+len("typeof")))
@@ -1802,21 +1919,30 @@ func (p *estreeProjector) bodyBrace(node *ast.Node, list *ast.NodeList) int {
 			return pos
 		}
 	}
+	if p.treeMode {
+		if list != nil {
+			return max(0, list.Pos()-1)
+		}
+		return p.tokenStart(node)
+	}
 	failProjection(fmt.Errorf("missing body brace for %s", node.Kind))
 	return 0
 }
 
-func heritageParts(node *ast.Node) (*ast.Node, *ast.NodeList) {
+func (p *estreeProjector) heritageParts(node *ast.Node) (*ast.Node, *ast.NodeList, bool) {
 	switch node.Kind {
 	case ast.KindTypeReference:
 		data := node.AsTypeReferenceNode()
-		return data.TypeName, data.TypeArguments
+		return data.TypeName, data.TypeArguments, true
 	case ast.KindExpressionWithTypeArguments:
 		data := node.AsExpressionWithTypeArguments()
-		return data.Expression, data.TypeArguments
+		return data.Expression, data.TypeArguments, true
+	}
+	if p.treeMode {
+		return nil, nil, false
 	}
 	failProjection(fmt.Errorf("unsupported heritage syntax %s", node.Kind))
-	return nil, nil
+	return nil, nil, false
 }
 
 func (p *estreeProjector) convertTypeQueryName(node *ast.Node) uint32 {

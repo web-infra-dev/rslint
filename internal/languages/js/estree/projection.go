@@ -610,9 +610,12 @@ func (p *estreeProjector) typeParameters(list *ast.NodeList, declaration bool) u
 	scan.SetSkipTrivia(true)
 	scan.ResetTokenState(endPos)
 	if scan.Scan() != ast.KindGreaterThanToken {
-		failProjection(errors.New("missing type parameter closing token"))
+		if !p.treeMode {
+			failProjection(errors.New("missing type parameter closing token"))
+		}
+	} else {
+		endPos = scan.TokenEnd()
 	}
-	endPos = scan.TokenEnd()
 	end := p.offsets.At(endPos)
 	return nodeValue(p.addWithOrigin(typeID, origin, start, end, p.convertList(list.Nodes, false)))
 }
@@ -627,7 +630,9 @@ func (p *estreeProjector) identifierWithAnnotation(name, typeNode *ast.Node) uin
 	if slot >= 0 {
 		annotation := p.typeAnnotation(typeNode)
 		p.values[int(record.valueStart)+int(slot)] = annotation
-		p.nodes[id-1].end = p.offsets.At(typeNode.End())
+		if annotation != undefinedValue() {
+			p.nodes[id-1].end = p.offsets.At(typeNode.End())
+		}
 	}
 	return id
 }
@@ -638,9 +643,12 @@ func isJSDocCommentSyntax(node *ast.Node) bool {
 	return node != nil && node.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0
 }
 
-func parseNumberLiteral(text string) float64 {
+func (p *estreeProjector) parseNumberLiteral(text string) float64 {
 	value, ok := ecmascript.StringToNumber(strings.ReplaceAll(text, "_", ""))
 	if !ok {
+		if p.treeMode {
+			return math.NaN()
+		}
 		failProjection(fmt.Errorf("invalid numeric literal %q", text))
 	}
 	return value

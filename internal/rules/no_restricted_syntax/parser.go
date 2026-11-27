@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
+
+var errRegexBacktrack = errors.New("not a regex literal")
 
 // parseSelector parses an ESLint selector string into a selector tree.
 // It supports the subset of esquery used by `no-restricted-syntax` test
@@ -154,11 +157,11 @@ func (p *parser) parseSequence() (selector, error) {
 		return nil, errors.New("unexpected end of selector")
 	case c == '*':
 		p.pos++
-		head = newIdentifierSelector("*")
+		head = newWildcardSelector()
 	case c == '.' || c == '[' || c == ':':
 		// Filters without an explicit head — equivalent to `*` followed by
 		// the filter.
-		head = newIdentifierSelector("*")
+		head = newWildcardSelector()
 	case c == '#':
 		p.pos++
 		name, err := p.parseIdent()
@@ -204,7 +207,7 @@ func (p *parser) parseSequence() (selector, error) {
 			head = ps
 		case '*':
 			p.pos++
-			head = compoundSelector{Left: head, Right: newIdentifierSelector("*")}
+			head = compoundSelector{Left: head, Right: newWildcardSelector()}
 		case '#':
 			p.pos++
 			name, err := p.parseIdent()
@@ -243,15 +246,24 @@ var lowerEstreeTypes = func() map[string]estree.TypeID {
 	return m
 }()
 
+func newWildcardSelector() identifierSelector {
+	return identifierSelector{
+		Name:        "*",
+		TypeID:      estree.UnknownType,
+		ExactTypeID: estree.UnknownType,
+		Wildcard:    true,
+	}
+}
+
 func newIdentifierSelector(name string) identifierSelector {
-	name = strings.TrimPrefix(name, "#")
-	if name == "*" {
-		return identifierSelector{Name: "*", TypeID: estree.UnknownType, Wildcard: true}
+	exact, exactOK := estree.TypeIDByName(name)
+	if !exactOK {
+		exact = estree.UnknownType
 	}
 	if tid, ok := lowerEstreeTypes[ecmascript.StringToLowerCase(name)]; ok {
-		return identifierSelector{Name: tid.String(), TypeID: tid}
+		return identifierSelector{Name: tid.String(), TypeID: tid, ExactTypeID: exact}
 	}
-	return identifierSelector{Name: name, TypeID: estree.UnknownType}
+	return identifierSelector{Name: name, TypeID: estree.UnknownType, ExactTypeID: estree.UnknownType}
 }
 
 func (p *parser) parseIdent() (string, error) {
@@ -287,7 +299,7 @@ func (p *parser) parseAttr(inner selector) (selector, error) {
 		return nil, err
 	}
 	p.skipSpaces()
-	val, err := p.parseAttrValue()
+	val, err := p.parseAttrValue(op)
 	if err != nil {
 		return nil, err
 	}
@@ -356,10 +368,11 @@ func (p *parser) parseAttrOp() (attrOp, error) {
 	return 0, fmt.Errorf("unsupported operator at position %d", p.pos)
 }
 
-func (p *parser) parseAttrValue() (attrValue, error) {
+func (p *parser) parseAttrValue(op attrOp) (attrValue, error) {
 	if p.eof() {
 		return attrValue{}, fmt.Errorf("expected value at position %d", p.pos)
 	}
+	eqOp := op == attrEqual || op == attrNotEqual
 	c := p.peek()
 	switch {
 	case c == '"' || c == '\'':
@@ -368,22 +381,31 @@ func (p *parser) parseAttrValue() (attrValue, error) {
 			return attrValue{}, err
 		}
 		return attrValue{Kind: attrValueString, Str: s}, nil
-	case c == '/':
+	case c == '/' && eqOp:
+		savedPos := p.pos
 		pat, flags, err := p.parseRegex()
-		if err != nil {
+		if err == nil {
+			compiled, compileErr := esregexp.Compile(pat, flags)
+			if compileErr != nil {
+				return attrValue{}, fmt.Errorf("invalid regular expression: %w", compileErr)
+			}
+			return attrValue{
+				Kind:          attrValueRegex,
+				Regex:         pat,
+				Flags:         flags,
+				compiledRegex: compiled,
+				regexPrefix:   anchoredLiteralPrefix(pat, flags),
+			}, nil
+		}
+		if !errors.Is(err, errRegexBacktrack) {
 			return attrValue{}, err
 		}
-		compiled, compileErr := esregexp.Compile(pat, flags)
-		if compileErr != nil {
-			return attrValue{}, fmt.Errorf("invalid regular expression: %w", compileErr)
+		p.pos = savedPos
+		ident, identErr := p.parseIdent()
+		if identErr != nil {
+			return attrValue{}, identErr
 		}
-		return attrValue{
-			Kind:          attrValueRegex,
-			Regex:         pat,
-			Flags:         flags,
-			compiledRegex: compiled,
-			regexPrefix:   anchoredLiteralPrefix(pat, flags),
-		}, nil
+		return attrValue{Kind: attrValueIdent, Ident: ident}, nil
 	case c == '.' || (c >= '0' && c <= '9'):
 		num, err := p.parseNumber()
 		if err != nil {
@@ -395,7 +417,7 @@ func (p *parser) parseAttrValue() (attrValue, error) {
 		if err != nil {
 			return attrValue{}, err
 		}
-		if ident == "type" && !p.eof() && p.peek() == '(' {
+		if eqOp && ident == "type" && !p.eof() && p.peek() == '(' {
 			typeName, err := p.parseTypeValue()
 			if err != nil {
 				return attrValue{}, err
@@ -494,20 +516,32 @@ func (p *parser) parseString(quote byte) (string, error) {
 			switch next {
 			case 'b':
 				sb.WriteByte('\b')
+				p.pos += 2
 			case 'f':
 				sb.WriteByte('\f')
+				p.pos += 2
 			case 'n':
 				sb.WriteByte('\n')
+				p.pos += 2
 			case 'r':
 				sb.WriteByte('\r')
+				p.pos += 2
 			case 't':
 				sb.WriteByte('\t')
+				p.pos += 2
 			case 'v':
 				sb.WriteByte('\v')
+				p.pos += 2
 			default:
-				sb.WriteByte(next)
+				// esquery's strUnescape uses `/\\(.)/g` without `/s`, so
+				// backslashes before ECMAScript line terminators are preserved.
+				r, size := utf8.DecodeRuneInString(p.src[p.pos+1:])
+				if r == '\n' || r == '\r' || r == '\u2028' || r == '\u2029' {
+					sb.WriteByte('\\')
+				}
+				sb.WriteString(p.src[p.pos+1 : p.pos+1+size])
+				p.pos += 1 + size
 			}
-			p.pos += 2
 			continue
 		}
 		if c == quote {
@@ -527,21 +561,29 @@ func (p *parser) parseRegex() (string, string, error) {
 	p.pos++ // opening /
 	var pat strings.Builder
 	inClass := false
+	classLen := 0
 	for !p.eof() {
 		c := p.src[p.pos]
 		if c == '\\' && p.pos+1 < len(p.src) {
 			pat.WriteByte(c)
 			pat.WriteByte(p.src[p.pos+1])
 			p.pos += 2
+			if inClass {
+				classLen++
+			}
 			continue
 		}
-		if c == '[' {
+		if c == '[' && !inClass {
 			inClass = true
+			classLen = 0
 			pat.WriteByte(c)
 			p.pos++
 			continue
 		}
 		if c == ']' && inClass {
+			if classLen == 0 {
+				return "", "", errRegexBacktrack
+			}
 			inClass = false
 			pat.WriteByte(c)
 			p.pos++
@@ -549,6 +591,10 @@ func (p *parser) parseRegex() (string, string, error) {
 		}
 		if c == '/' && !inClass {
 			p.pos++ // closing /
+			pattern := pat.String()
+			if pattern == "" {
+				return "", "", errRegexBacktrack
+			}
 			flagsStart := p.pos
 			for !p.eof() {
 				fc := p.src[p.pos]
@@ -561,10 +607,6 @@ func (p *parser) parseRegex() (string, string, error) {
 			if p.pos < len(p.src) && (p.src[p.pos] >= 'a' && p.src[p.pos] <= 'z' || p.src[p.pos] >= 'A' && p.src[p.pos] <= 'Z') {
 				return "", "", fmt.Errorf("unsupported regular expression flag %q", p.src[p.pos])
 			}
-			pattern := pat.String()
-			if pattern == "" {
-				return "", "", errors.New("empty regular expression")
-			}
 			flags := p.src[flagsStart:p.pos]
 			for i := range len(flags) {
 				if strings.ContainsRune(flags[:i], rune(flags[i])) {
@@ -573,10 +615,13 @@ func (p *parser) parseRegex() (string, string, error) {
 			}
 			return pattern, flags, nil
 		}
+		if inClass {
+			classLen++
+		}
 		pat.WriteByte(c)
 		p.pos++
 	}
-	return "", "", errors.New("unterminated regex literal")
+	return "", "", errRegexBacktrack
 }
 
 func (p *parser) parseNumber() (float64, error) {
@@ -606,15 +651,22 @@ func (p *parser) parsePseudo(inner selector) (selector, error) {
 		return nil, fmt.Errorf("expected : at position %d", p.pos)
 	}
 	p.pos++ // :
+	// Match exact literal `:first-child` / `:last-child` prefixes before
+	// scanning an identifier so compound forms like `:first-childIdentifier`
+	// continue parsing the trailing atom.
+	if strings.HasPrefix(p.src[p.pos:], "first-child") {
+		p.pos += len("first-child")
+		return wrapPseudo(inner, pseudoSelector{Name: "nth-child", N: 1}), nil
+	}
+	if strings.HasPrefix(p.src[p.pos:], "last-child") {
+		p.pos += len("last-child")
+		return wrapPseudo(inner, pseudoSelector{Name: "nth-last-child", N: 1}), nil
+	}
 	name, err := p.parsePseudoName()
 	if err != nil {
 		return nil, err
 	}
 	switch name {
-	case "first-child":
-		return wrapPseudo(inner, pseudoSelector{Name: "nth-child", N: 1}), nil
-	case "last-child":
-		return wrapPseudo(inner, pseudoSelector{Name: "nth-last-child", N: 1}), nil
 	case "nth-child", "nth-last-child":
 		n, err := p.parsePseudoNumberArg()
 		if err != nil {
@@ -637,7 +689,7 @@ func (p *parser) parsePseudo(inner selector) (selector, error) {
 	className := ecmascript.StringToLowerCase(name)
 	switch className {
 	case "statement", "expression", "declaration", "function", "pattern":
-		return wrapPseudo(inner, pseudoSelector{Name: className}), nil
+		return wrapPseudo(inner, pseudoSelector{Name: className, ExactFunction: name == "function"}), nil
 	}
 	return nil, fmt.Errorf("unsupported pseudo class %q at position %d", name, p.pos)
 }
@@ -695,7 +747,7 @@ func (p *parser) parseHasSelectorArgs() ([]selector, error) {
 }
 
 func wrapPseudo(inner selector, p pseudoSelector) selector {
-	if id, ok := inner.(identifierSelector); ok && id.Name == "*" {
+	if id, ok := inner.(identifierSelector); ok && id.Wildcard {
 		// `*:not(X)` is just `:not(X)` — collapse to keep selector trees tidy
 		// but still report the constraint.
 		return p

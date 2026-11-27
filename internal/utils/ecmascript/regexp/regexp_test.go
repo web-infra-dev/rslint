@@ -399,6 +399,47 @@ func TestTestOrTimeoutFailsOpen(t *testing.T) {
 	}
 }
 
+// cspell:ignore FFFD DFFF
+func TestTestRunes(t *testing.T) {
+	tests := []struct {
+		name    string
+		source  string
+		flags   string
+		subject []rune
+		want    bool
+	}{
+		{name: "lone surrogate does not match U+FFFD", source: `\uFFFD`, subject: []rune{0xD83D}, want: false},
+		{name: "lone surrogate matches single dot", source: `^.$`, subject: []rune{0xD83D}, want: true},
+		{name: "lone surrogate matches exact escape", source: `^\uD83D$`, subject: []rune{0xD83D}, want: true},
+		{name: "lone surrogate matches surrogate range", source: `^[\uD800-\uDFFF]$`, subject: []rune{0xD83D}, want: true},
+		{name: "embedded lone surrogate matches", source: `^a\uD83Db$`, subject: []rune{'a', 0xD83D, 'b'}, want: true},
+		{name: "embedded lone surrogate does not match U+FFFD", source: `\uFFFD`, subject: []rune{'a', 0xD83D, 'b'}, want: false},
+		{name: "real U+FFFD matches", source: `^\uFFFD$`, subject: []rune{0xFFFD}, want: true},
+		{name: "u flag lone surrogate exact", source: `^\uD83D$`, flags: "u", subject: []rune{0xD83D}, want: true},
+		{name: "u flag lone surrogate braced", source: `^\u{D83D}$`, flags: "u", subject: []rune{0xD83D}, want: true},
+		{name: "u flag lone surrogate dot", source: `^.$`, flags: "u", subject: []rune{0xD83D}, want: true},
+		{name: "i flag with lone surrogate", source: `^a\uD83Db$`, flags: "i", subject: []rune{'A', 0xD83D, 'B'}, want: true},
+		{name: "s flag with lone surrogate", source: `^.\uD83D.$`, flags: "s", subject: []rune{'\n', 0xD83D, '\r'}, want: true},
+		{name: "mixed astral and lone surrogate", source: `^😀\uD83D$`, subject: []rune{0x1F600, 0xD83D}, want: true},
+		{name: "u flag mixed astral and lone surrogate", source: `^\u{1F600}\uD83D$`, flags: "u", subject: []rune{0x1F600, 0xD83D}, want: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			re, err := Compile(test.source, test.flags)
+			if err != nil {
+				t.Fatalf("Compile(%q, %q) = %v", test.source, test.flags, err)
+			}
+			if got := re.TestRunes(test.subject); got != test.want {
+				t.Errorf("/%s/%s.TestRunes(%U) = %v, want %v", test.source, test.flags, test.subject, got, test.want)
+			}
+		})
+	}
+	var nilRE *RegExp
+	if nilRE.TestRunes([]rune{'a'}) {
+		t.Error("nil RegExp.TestRunes matched")
+	}
+}
+
 func TestNilIsSafe(t *testing.T) {
 	var re *RegExp
 	if re.Test("anything") {

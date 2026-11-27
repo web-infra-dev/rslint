@@ -23,11 +23,14 @@ type subjectSelector struct {
 func (subjectSelector) isSelector() {}
 
 // identifierSelector matches a node by its ESTree TypeID. Wildcard == true is
-// `*`. Unknown type names carry TypeID == estree.UnknownType and Wildcard == false.
+// `*`. TypeID is resolved case-insensitively (for esquery.matches), while
+// ExactTypeID is resolved case-sensitively (matching ESLint's nodeTypes
+// listener dispatch).
 type identifierSelector struct {
-	Name     string
-	TypeID   estree.TypeID
-	Wildcard bool
+	Name        string
+	TypeID      estree.TypeID
+	ExactTypeID estree.TypeID
+	Wildcard    bool
 }
 
 func (identifierSelector) isSelector() {}
@@ -88,8 +91,13 @@ func canonicalArrayIndex(s string) int {
 	if s == "" || (len(s) > 1 && s[0] == '0') {
 		return -1
 	}
+	for i := range len(s) {
+		if s[i] < '0' || s[i] > '9' {
+			return -1
+		}
+	}
 	n, err := strconv.Atoi(s)
-	if err != nil || n < 0 {
+	if err != nil {
 		return -1
 	}
 	return n
@@ -192,10 +200,11 @@ func (relativeSelector) isSelector() {}
 // `:last-child`, and node-class (`:statement`, `:expression`, `:declaration`,
 // `:function`, `:pattern`) forms.
 type pseudoSelector struct {
-	Name   string
-	Args   []selector
-	N      int // for :nth-child / :nth-last-child
-	memoID uint32
+	Name          string
+	Args          []selector
+	N             int // for :nth-child / :nth-last-child
+	ExactFunction bool
+	memoID        uint32
 }
 
 func (pseudoSelector) isSelector() {}

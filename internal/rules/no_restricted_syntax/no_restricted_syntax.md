@@ -72,7 +72,8 @@ Leave this rule disabled if your project has no syntax restrictions.
 ## Differences from upstream
 
 - Malformed selectors are ignored instead of rejecting the rule configuration. For example, `["error", "[", "WithStatement"]` still restricts `WithStatement` in rslint; ESLint rejects the malformed `[` selector.
-- Files containing syntax errors or unsupported TypeScript constructs that cannot be projected to ESTree (such as Closure/JSDoc nullable type syntax like `?number` authored in TypeScript code) are skipped without reporting diagnostics for that file.
+- Unsupported constructs (such as Closure/JSDoc nullable type syntax like `?number` authored in TypeScript code) and malformed error-recovery nodes degrade locally during tree projection so the rest of the file is still linted, rather than aborting the file with a parse error.
+- Node location metadata (`range` and `loc`) is not exposed in attribute selector paths (for example, `[loc.start.line=1]` evaluates to `undefined`).
 
 ## Original Documentation
 

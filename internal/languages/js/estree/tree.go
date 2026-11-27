@@ -3,10 +3,11 @@ package estree
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // TreeOptions configures in-memory ESTree projection via Builder.WithTree.
@@ -360,13 +361,14 @@ func (t *Tree) Field(id NodeID, field FieldID) Value {
 			}
 			if patEnc := t.values[rec.valueStart+slotLiteralRegexPattern]; patEnc>>tagShift == tagString {
 				flagsEnc := t.values[rec.valueStart+slotLiteralRegexFlags]
-				if flagsEnc>>tagShift != tagString {
-					return Value{Kind: ValueNull}
-				}
-				pattern := t.strings[patEnc&payloadMask]
-				flags := t.strings[flagsEnc&payloadMask]
-				if isValidJSRegExp(pattern, flags) {
-					return Value{Kind: ValueRegExp, Node: id}
+				rawEnc := t.values[rec.valueStart+slotLiteralRaw]
+				if flagsEnc>>tagShift == tagString && rawEnc>>tagShift == tagString {
+					raw := t.strings[rawEnc&payloadMask]
+					pattern := t.strings[patEnc&payloadMask]
+					flags := t.strings[flagsEnc&payloadMask]
+					if isValidRegExpLiteral(raw, pattern, flags) {
+						return Value{Kind: ValueRegExp, Node: id}
+					}
 				}
 				return Value{Kind: ValueNull}
 			}
@@ -446,10 +448,13 @@ func (t *Tree) TemplateValue(id NodeID) (cooked string, cookedNull bool, raw str
 	return cooked, cookedNull, raw, true
 }
 
-// isValidJSRegExp checks whether new RegExp(pattern, flags) would succeed in
-// JavaScript without rejecting ES2024 `v`-flag literals that esregexp does not
-// compile.
-func isValidJSRegExp(pattern, flags string) bool {
+func isValidRegExpLiteral(raw, pattern, flags string) bool {
+	if len(raw) < 2 || raw[0] != '/' || strings.LastIndexByte(raw, '/') <= 0 {
+		return false
+	}
+	if strings.ContainsAny(pattern, "\n\r") || strings.Contains(pattern, "\u2028") || strings.Contains(pattern, "\u2029") {
+		return false
+	}
 	var seen uint8
 	for i := range len(flags) {
 		var bit uint8
@@ -478,17 +483,7 @@ func isValidJSRegExp(pattern, flags string) bool {
 		}
 		seen |= bit
 	}
-	// `u` and `v` flags are mutually exclusive in ECMAScript.
-	if seen&(1<<5) != 0 && seen&(1<<6) != 0 {
-		return false
-	}
-	// esregexp does not implement the ES2024 `v` flag yet; do not treat valid
-	// `/.../v` literals as null.
-	if seen&(1<<6) != 0 {
-		return true
-	}
-	_, err := esregexp.Compile(pattern, flags)
-	return err == nil
+	return utils.IsValidRegexPattern(pattern, utils.ParseRegexFlags(flags))
 }
 
 // triggerKindsTable maps provably closed ESTree TypeIDs to the complete set of

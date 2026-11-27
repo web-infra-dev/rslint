@@ -1808,8 +1808,11 @@ requests keep the existing bounded scheduler.
 Projection checks cancellation and the encoding's integer representation while
 generating nodes, strings, lists and tokens; it imposes no separate file-size
 quota. Initial capacity estimates limit speculative reservations, while columns
-can grow for larger frames. Unsupported syntax fails explicitly rather
-than producing a generic node or an empty successful lint.
+can grow for larger frames. Wire-frame projection (`Build`/`BuildInto`) fails
+explicitly on unsupported syntax rather than producing a generic node or an
+empty successful lint, whereas scoped `WithTree` projection degrades unsupported
+and error-recovery nodes locally so native selector rules still lint the rest of
+the file.
 The temporary token-cover index stores 32-bit byte offsets within that encoding.
 It contains no AST pointers and is discarded when the builder resets.
 
@@ -1965,9 +1968,9 @@ ESTree types, the frame schema/decoder, source positions, visitor keys, token
 reconstruction, JSX token text decoding, built-in globals and scope analyzers.
 Visitor keys use the public TypeScript-ESLint data for JS, JSX and TS, independently
 of the frame's supported node set. Unknown synthetic nodes use ESLint's public
-key lookup for traversal and scope analysis. Compiler-synthesized JSDoc remains
-comment data; unsupported types
-authored in source fail projection instead of becoming null AST fields.
+key lookup for traversal and scope analysis. Compiler-synthesized JSDoc remains comment data; unsupported types authored in
+source fail wire-frame projection instead of becoming null AST fields (while
+scoped `WithTree` degrades them locally).
 These modules consume syntax data and explicit language options; they import
 no ESLint plugin runtime, native binding, IPC, config loader or worker host.
 The dependency direction is `eslint-plugin → languages/js`. SourceCode and
@@ -1981,9 +1984,10 @@ dispatcher for selected plugin targets (wire frames) and by
 `internal/rules/no_restricted_syntax` (scoped read-only in-memory `Tree`,
 enforced by `TestEstreeImportBoundary`). It reads existing syntax helpers
 from `internal/utils`; all other native Go rules retain direct ts-go AST
-traversal and never depend on `languages/js`. Projection owns only
-its output bytes, not the input AST. No language registry or provider abstraction
-is introduced.
+traversal and never depend on `languages/js`. Wire-frame projection owns only
+its output bytes, not the input AST; `WithTree` borrows `Builder` scratch for
+the duration of its callback and clears all source references before returning.
+No language registry or provider abstraction is introduced.
 
 The worker TypeScript project includes the language modules. Library projects
 exclude them from file discovery, while public plugin entry points continue to

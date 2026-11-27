@@ -276,8 +276,8 @@ func candidateTypes(sel selector) *typeSet {
 		s := newTypeSet()
 		if v.Wildcard {
 			s.markAll()
-		} else if v.TypeID != estree.UnknownType {
-			s.add(v.TypeID)
+		} else if v.ExactTypeID != estree.UnknownType {
+			s.add(v.ExactTypeID)
 		}
 		return s
 	case compoundSelector:
@@ -290,8 +290,6 @@ func candidateTypes(sel selector) *typeSet {
 		return candidateTypes(v.Inner)
 	case combinatorSelector:
 		return candidateTypes(v.Right)
-	case relativeSelector:
-		return candidateTypes(v.Inner)
 	case pseudoSelector:
 		switch v.Name {
 		case "is", "matches":
@@ -300,14 +298,19 @@ func candidateTypes(sel selector) *typeSet {
 				s.unionWith(candidateTypes(arg))
 			}
 			return s
-		case "statement":
-			return classTypeSet(isStatementType)
-		case "declaration":
-			return classTypeSet(isDeclarationType)
 		case "function":
-			return classTypeSet(isFunctionType)
+			if v.ExactFunction {
+				return classTypeSet(isFunctionType)
+			}
+			s := newTypeSet()
+			s.markAll()
+			return s
 		default:
-			// :not, :has, :nth-child, :nth-last-child, :expression, :pattern
+			// Match ESLint's analyzeSelector: only `:function` narrows
+			// candidate node types; `:statement`, `:declaration`, `:expression`,
+			// `:pattern`, `:not`, `:has`, and `:nth-*` must visit every node
+			// type so reverse sibling subjects like `!A ~ :declaration` match
+			// both sides identically to upstream ESLint.
 			s := newTypeSet()
 			s.markAll()
 			return s

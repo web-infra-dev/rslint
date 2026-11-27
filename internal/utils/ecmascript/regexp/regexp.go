@@ -217,6 +217,22 @@ func (r *RegExp) Test(s string) bool {
 	return err == nil && matched
 }
 
+// TestRunes reports whether the regexp matches anywhere in runes. Callers that
+// hold WTF-8 strings with unpaired UTF-16 surrogates can decode them into runes
+// first so Go's string-to-rune conversion does not replace surrogates with
+// U+FFFD.
+func (r *RegExp) TestRunes(runes []rune) bool {
+	re, pooled := r.borrow()
+	if re == nil {
+		return false
+	}
+	matched, err := re.MatchRunes(runes)
+	if pooled {
+		r.pattern.backends.Put(re)
+	}
+	return err == nil && matched
+}
+
 // TestOrTimeout is Test for a caller whose no answer is what produces a
 // report: an allow-pattern, an ignore-pattern, a pattern a name is required to
 // match. Reading a bound match as no match would turn a skipped report into a
