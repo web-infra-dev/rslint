@@ -60,7 +60,11 @@ type RstestCallAnalysis struct {
 	boundCallExprCache             map[*ast.Node]boundCallResult
 	boundCallConstCache            map[*ast.Symbol]boundCallResult
 	boundCallPostAllWritesCache    map[boundCallPostKey]boundCallResult
-	symbolEscapedCache             map[*ast.Symbol]bool
+	objectLiteralMutations         map[*ast.Symbol]*objectLiteralMutationSummary
+	objectLiteralMutationVisiting  map[*ast.Symbol]bool
+	objectLiteralMutationCycleHits int
+	symbolNoExternalWrites         map[*ast.Symbol]bool
+	symbolDefinePropertyAccessor   map[*ast.Symbol]bool
 	boundCycleHits                 int
 	staticStrings                  *internalUtils.StaticStringEvaluator
 	hasImportMetaRstestWrites      bool
@@ -526,7 +530,7 @@ func (analysis *RstestCallAnalysis) extractBoundCallFirstArgs(
 			return cached
 		}
 	}
-	cycleBefore := analysis.boundCycleHits
+	cycleBefore := analysis.boundCycleHits + analysis.expectConfigCycleHits + analysis.expectConfigOverwriteCycleHits + analysis.objectLiteralMutationCycleHits
 	var res boundCallResult
 	switch node.Kind {
 	case ast.KindBinaryExpression:
@@ -574,7 +578,8 @@ func (analysis *RstestCallAnalysis) extractBoundCallFirstArgs(
 	case ast.KindIdentifier:
 		return analysis.extractBoundIdentifierArgs(node, depth+1, visitedWrites)
 	}
-	if node.Kind != ast.KindIdentifier && len(visitedWrites) == 0 && analysis.boundCycleHits == cycleBefore {
+	if node.Kind != ast.KindIdentifier && len(visitedWrites) == 0 &&
+		analysis.boundCycleHits+analysis.expectConfigCycleHits+analysis.expectConfigOverwriteCycleHits+analysis.objectLiteralMutationCycleHits == cycleBefore {
 		if analysis.boundCallExprCache == nil {
 			analysis.boundCallExprCache = map[*ast.Node]boundCallResult{}
 		}
@@ -603,6 +608,20 @@ func (analysis *RstestCallAnalysis) extractBoundMemberAccessArgs(
 		}
 		return boundCallResult{}
 	}
+	if mutableObj && recv != nil && recv.Kind == ast.KindIdentifier {
+		if sym := resolveRstestRootSymbol(analysis.ctx, recv); sym != nil {
+			if replacement, replaced := analysis.unconditionalPropertyReplacementBefore(sym, objExpr, member, node); replaced {
+				if analysis.expectConfigCallMember(replacement) == expectConfigNone {
+					return boundCallResult{}
+				}
+				sub := analysis.extractBoundCallFirstArgs(replacement, depth, visitedWrites)
+				if !sub.hasCallable {
+					return boundCallResult{hasCallable: true, alwaysBound: false}
+				}
+				return sub
+			}
+		}
+	}
 	lookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
 	var res boundCallResult
 	for _, expr := range lookup.possibleExprs {
@@ -623,6 +642,1604 @@ func (analysis *RstestCallAnalysis) extractBoundMemberAccessArgs(
 	return res
 }
 
+type objReplacementKey struct {
+	block  *ast.Node
+	member string
+}
+
+type objPropReplacementEvent struct {
+	pos        int
+	stmtPos    int
+	stmtEnd    int
+	node       *ast.Node
+	rhs        *ast.Node
+	viaMethod  bool
+	methodName string
+}
+
+type objMutationEvent struct {
+	pos     int
+	stmtPos int
+	stmtEnd int
+	fn      *ast.Node
+}
+
+type ownMethodAssignKey struct {
+	methodName string
+	targetProp string
+}
+
+type ownMethodAssignResult struct {
+	rhs *ast.Node
+	ok  bool
+}
+
+// objectLiteralMutationSummary caches a single-pass O(R) index of mutations,
+// escapes, and unconditional property replacements for a single-write `const`
+// object literal binding so repeated member lookups stay O(log R).
+type objectLiteralMutationSummary struct {
+	escaped                 bool
+	hasAnyMutation          bool
+	hasAnyGetter            bool
+	hasAnyAccessor          bool
+	pureExtend              bool
+	pureEquality            bool
+	replacements            map[objReplacementKey][]objPropReplacementEvent
+	mutationsByFn           map[*ast.Node][]objMutationEvent
+	methodInvalidationsByFn map[*ast.Node][]objMutationEvent
+	propWriteEventsByProp   map[string]map[*ast.Node][]objMutationEvent
+	ownMethodCache          map[ownMethodAssignKey]ownMethodAssignResult
+	restoredConfigMask      expectConfigKind
+}
+
+func (analysis *RstestCallAnalysis) objectLiteralHasAccessor(
+	objExpr *ast.Node,
+	propName string,
+	known bool,
+	includeSetters bool,
+	depth int,
+) bool {
+	if depth > 4 || objExpr == nil || objExpr.Kind != ast.KindObjectLiteralExpression ||
+		objExpr.AsObjectLiteralExpression().Properties == nil {
+		return depth > 4
+	}
+	var protoExpr *ast.Node
+	for _, prop := range objExpr.AsObjectLiteralExpression().Properties.Nodes {
+		if prop == nil {
+			continue
+		}
+		if prop.Kind == ast.KindPropertyAssignment && prop.Name() != nil && prop.Name().Kind != ast.KindComputedPropertyName {
+			if name, ok := internalUtils.GetStaticPropertyName(prop.Name()); ok && name == "__proto__" {
+				protoExpr = prop.AsPropertyAssignment().Initializer
+				continue
+			}
+		}
+		isAccessor := prop.Kind == ast.KindGetAccessor || (includeSetters && prop.Kind == ast.KindSetAccessor)
+		if !isAccessor {
+			continue
+		}
+		if !known || prop.Name() == nil {
+			return true
+		}
+		name, ok, staticKey := analysis.evalPropertyNameKey(prop.Name())
+		if !ok && !staticKey {
+			return true
+		}
+		if ok && name == propName {
+			return true
+		}
+	}
+	if protoExpr != nil {
+		unwrapped := internalUtils.SkipAssertionsAndParens(protoExpr)
+		if unwrapped != nil && unwrapped.Kind != ast.KindNullKeyword {
+			protoObj, mutableProto := analysis.resolveObjectLiteralForBoundLookup(protoExpr)
+			if protoObj == nil || mutableProto {
+				return true
+			}
+			if analysis.objectLiteralHasAccessor(protoObj, propName, known, includeSetters, depth+1) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (analysis *RstestCallAnalysis) isPureRstestExpectObject(expr *ast.Node, depth int) bool {
+	if depth > 4 || expr == nil {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return false
+	}
+	if ast.IsAccessExpression(expr) {
+		name, ok := analysis.evalExpectConfigAccessName(expr)
+		if !ok || name != "expect" {
+			return false
+		}
+		recv := internalUtils.SkipAssertionsAndParens(expr.Expression())
+		if recv == nil {
+			return false
+		}
+		if (!analysis.hasImportMetaRstestWrites && isImportMetaRstest(recv)) || isRstestRequireCall(recv) {
+			return true
+		}
+		if recv.Kind == ast.KindIdentifier {
+			if sym := resolveRstestRootSymbol(analysis.ctx, recv); sym != nil {
+				rootInfo, ok := analysis.expectRoots[sym]
+				if !ok {
+					rootInfo = classifyRstestExpectRoot(recv.AsIdentifier().Text, recv, sym, analysis)
+					analysis.expectRoots[sym] = rootInfo
+				}
+				return rootInfo.Kind == rstestExpectRootReceiver
+			}
+		}
+		return false
+	}
+	if expr.Kind == ast.KindIdentifier {
+		sym := resolveRstestRootSymbol(analysis.ctx, expr)
+		if sym == nil {
+			return expr.AsIdentifier().Text == "expect" && !analysis.globalExpectWritten
+		}
+		rootInfo, ok := analysis.expectRoots[sym]
+		if !ok {
+			rootInfo = classifyRstestExpectRoot(expr.AsIdentifier().Text, expr, sym, analysis)
+			analysis.expectRoots[sym] = rootInfo
+		}
+		if rootInfo.Kind == rstestExpectRootDirect {
+			return true
+		}
+		summary := analysis.getExpectConfigSymbolSummary(sym)
+		if len(summary.writes) == 1 && summary.writes[0].isConstDecl && summary.writes[0].rhs != nil &&
+			!nodeContains(summary.writes[0].rhs, expr) {
+			return analysis.isPureRstestExpectObject(summary.writes[0].rhs, depth+1)
+		}
+	}
+	return false
+}
+
+func (analysis *RstestCallAnalysis) isPureRstestExpectCallable(expr *ast.Node, depth int) bool {
+	if depth > 4 || expr == nil {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return false
+	}
+	if internalUtils.IsCommaOperator(expr) {
+		return analysis.isPureRstestExpectCallable(expr.AsBinaryExpression().Right, depth+1)
+	}
+	if expr.Kind == ast.KindCallExpression {
+		callee := internalUtils.SkipAssertionsAndParens(expr.AsCallExpression().Expression)
+		if callee != nil && ast.IsAccessExpression(callee) {
+			if method, ok := analysis.evalExpectConfigAccessName(callee); ok && method == "bind" {
+				return analysis.isPureRstestExpectCallable(callee.Expression(), depth+1)
+			}
+		}
+		return false
+	}
+	if ast.IsAccessExpression(expr) {
+		member, ok := analysis.evalExpectConfigAccessName(expr)
+		if !ok || (member != "extend" && member != "addEqualityTesters") {
+			return false
+		}
+		return analysis.isPureRstestExpectObject(expr.Expression(), depth+1)
+	}
+	if expr.Kind == ast.KindIdentifier {
+		sym := resolveRstestRootSymbol(analysis.ctx, expr)
+		if sym == nil {
+			return false
+		}
+		summary := analysis.getExpectConfigSymbolSummary(sym)
+		if len(summary.writes) == 1 && summary.writes[0].isConstDecl && summary.writes[0].rhs != nil &&
+			!nodeContains(summary.writes[0].rhs, expr) {
+			return analysis.isPureRstestExpectCallable(summary.writes[0].rhs, depth+1)
+		}
+	}
+	return false
+}
+
+func isSideEffectFreeNoOpFn(expr *ast.Node) bool {
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil || (expr.Kind != ast.KindArrowFunction && expr.Kind != ast.KindFunctionExpression && expr.Kind != ast.KindMethodDeclaration) {
+		return false
+	}
+	for _, p := range expr.Parameters() {
+		if p == nil {
+			continue
+		}
+		pd := p.AsParameterDeclaration()
+		if pd == nil || pd.Initializer != nil || pd.Name() == nil || pd.Name().Kind != ast.KindIdentifier {
+			return false
+		}
+	}
+	body := expr.Body()
+	if body == nil || body.Kind != ast.KindBlock {
+		return false
+	}
+	stmts := body.AsBlock().Statements
+	return stmts == nil || len(stmts.Nodes) == 0
+}
+
+func (analysis *RstestCallAnalysis) isPureOwnRstestExpectCallableProp(objExpr *ast.Node, propName string) bool {
+	if propName != "extend" && propName != "addEqualityTesters" {
+		return false
+	}
+	lookup := analysis.lookupObjectLiteralProperty(objExpr, propName, 0)
+	return lookup.foundExplicit && !lookup.mayHaveUnknownSource && lookup.exactExpr != nil &&
+		(analysis.isPureRstestExpectCallable(lookup.exactExpr, 0) || isSideEffectFreeNoOpFn(lookup.exactExpr))
+}
+
+func (analysis *RstestCallAnalysis) exprDependsOnMethodScope(expr *ast.Node, fnNode *ast.Node) bool {
+	if expr == nil || fnNode == nil {
+		return true
+	}
+	paramNames := map[string]bool{}
+	var collectParamNames func(*ast.Node)
+	collectParamNames = func(n *ast.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind {
+		case ast.KindIdentifier:
+			paramNames[n.AsIdentifier().Text] = true
+		case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
+			if bp := n.AsBindingPattern(); bp != nil && bp.Elements != nil {
+				for _, el := range bp.Elements.Nodes {
+					if el != nil && el.Kind == ast.KindBindingElement {
+						collectParamNames(el.Name())
+					}
+				}
+			}
+		}
+	}
+	for _, p := range fnNode.Parameters() {
+		if p != nil {
+			collectParamNames(p.Name())
+		}
+	}
+
+	depends := false
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil || depends || ast.IsTypeNode(node) || ast.IsPartOfTypeQuery(node) {
+			return
+		}
+		switch node.Kind {
+		case ast.KindThisKeyword, ast.KindSuperKeyword:
+			depends = true
+			return
+		case ast.KindIdentifier:
+			// Ignore property-access member names (`r.expect`), property keys, etc.
+			if parent := node.Parent; parent != nil {
+				switch parent.Kind {
+				case ast.KindPropertyAccessExpression:
+					if parent.AsPropertyAccessExpression().Name() == node {
+						return
+					}
+				case ast.KindPropertyAssignment, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+					if parent.Name() == node {
+						return
+					}
+				}
+			}
+			text := node.AsIdentifier().Text
+			if text == "arguments" || text == "eval" {
+				depends = true
+				return
+			}
+			sym := resolveRstestRootSymbol(analysis.ctx, node)
+			if sym != nil {
+				for _, d := range sym.Declarations {
+					if d != nil && nodeContains(fnNode, d) {
+						depends = true
+						return
+					}
+				}
+			} else if paramNames[text] {
+				depends = true
+				return
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return depends
+		})
+	}
+	visit(expr)
+	return depends
+}
+
+func functionNodeAsteriskToken(fn *ast.Node) *ast.Node {
+	if fn == nil {
+		return nil
+	}
+	switch fn.Kind {
+	case ast.KindFunctionDeclaration:
+		return fn.AsFunctionDeclaration().AsteriskToken
+	case ast.KindFunctionExpression:
+		return fn.AsFunctionExpression().AsteriskToken
+	case ast.KindMethodDeclaration:
+		return fn.AsMethodDeclaration().AsteriskToken
+	default:
+		return nil
+	}
+}
+
+func isPureSimpleAccessKey(lhs *ast.Node) bool {
+	if lhs == nil {
+		return false
+	}
+	if lhs.Kind == ast.KindPropertyAccessExpression {
+		return true
+	}
+	if lhs.Kind == ast.KindElementAccessExpression {
+		arg := internalUtils.SkipAssertionsAndParens(lhs.AsElementAccessExpression().ArgumentExpression)
+		if arg == nil {
+			return false
+		}
+		switch arg.Kind {
+		case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral,
+			ast.KindNumericLiteral, ast.KindIdentifier:
+			return true
+		}
+	}
+	return false
+}
+
+// ownMethodUnconditionalThisAssign reports whether `objExpr` defines a
+// synchronous non-generator own method `methodName` whose parameters have no
+// defaults/destructuring and whose entire body consists solely of straight-line
+// `this.<targetProp> = <rhs>` assignments with independent `<rhs>` and pure keys.
+func (analysis *RstestCallAnalysis) ownMethodUnconditionalThisAssign(objExpr *ast.Node, methodName, targetProp string) (*ast.Node, bool) {
+	if objExpr == nil || objExpr.Kind != ast.KindObjectLiteralExpression || objExpr.AsObjectLiteralExpression().Properties == nil {
+		return nil, false
+	}
+	var fnNode *ast.Node
+	for _, prop := range objExpr.AsObjectLiteralExpression().Properties.Nodes {
+		if prop == nil {
+			continue
+		}
+		if prop.Kind == ast.KindSpreadAssignment || prop.Name() == nil {
+			fnNode = nil
+			continue
+		}
+		name, ok, staticKey := analysis.evalPropertyNameKey(prop.Name())
+		if !ok {
+			if !staticKey {
+				fnNode = nil
+			}
+			continue
+		}
+		// Non-computed `__proto__` sets the prototype rather than an own method.
+		if prop.Kind == ast.KindPropertyAssignment && name == "__proto__" && prop.Name().Kind != ast.KindComputedPropertyName {
+			continue
+		}
+		if name != methodName {
+			continue
+		}
+		switch prop.Kind {
+		case ast.KindMethodDeclaration:
+			fnNode = prop
+		case ast.KindPropertyAssignment:
+			init := internalUtils.SkipAssertionsAndParens(prop.AsPropertyAssignment().Initializer)
+			if init != nil && init.Kind == ast.KindFunctionExpression {
+				fnNode = init
+			} else {
+				fnNode = nil
+			}
+		default:
+			fnNode = nil
+		}
+	}
+	if fnNode == nil || fnNode.Body() == nil || fnNode.Body().Kind != ast.KindBlock {
+		return nil, false
+	}
+	if functionNodeAsteriskToken(fnNode) != nil || ast.HasSyntacticModifier(fnNode, ast.ModifierFlagsAsync) {
+		return nil, false
+	}
+	// Reject methods with parameter defaults or destructuring patterns because
+	// parameter evaluation runs synchronously with `this === receiver`.
+	for _, param := range fnNode.Parameters() {
+		if param == nil {
+			continue
+		}
+		p := param.AsParameterDeclaration()
+		if p == nil || p.Initializer != nil || p.Name() == nil || p.Name().Kind != ast.KindIdentifier {
+			return nil, false
+		}
+	}
+	block := fnNode.Body().AsBlock()
+	if block == nil || block.Statements == nil {
+		return nil, false
+	}
+	var assignedRHS *ast.Node
+	for _, stmt := range block.Statements.Nodes {
+		if stmt == nil {
+			continue
+		}
+		if stmt.Kind != ast.KindExpressionStatement {
+			return nil, false
+		}
+		expr := ast.SkipParentheses(stmt.AsExpressionStatement().Expression)
+		if expr == nil || expr.Kind != ast.KindBinaryExpression {
+			return nil, false
+		}
+		bin := expr.AsBinaryExpression()
+		if bin == nil || bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindEqualsToken ||
+			internalUtils.IsDefaultValueInDestructuringAssignment(expr) {
+			return nil, false
+		}
+		lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
+		if lhs == nil || !ast.IsAccessExpression(lhs) || !isPureSimpleAccessKey(lhs) {
+			return nil, false
+		}
+		if lhs.Kind == ast.KindElementAccessExpression &&
+			analysis.exprDependsOnMethodScope(lhs.AsElementAccessExpression().ArgumentExpression, fnNode) {
+			return nil, false
+		}
+		recv := internalUtils.SkipAssertionsAndParens(lhs.Expression())
+		if recv == nil || recv.Kind != ast.KindThisKeyword {
+			return nil, false
+		}
+		pName, ok := analysis.evalExpectConfigAccessName(lhs)
+		if !ok || pName != targetProp {
+			return nil, false
+		}
+		if analysis.exprDependsOnMethodScope(bin.Right, fnNode) {
+			return nil, false
+		}
+		assignedRHS = bin.Right
+	}
+	if assignedRHS == nil {
+		return nil, false
+	}
+	return assignedRHS, true
+}
+
+// collectThisAssignedConfigBits walks a method or getter body on an object
+// literal and collects any expect-config bits that may be assigned onto `this`
+// (including conditional assignments, compound/destructuring writes, local
+// `const self = this` aliases, `Object.assign(this, ...)`,
+// `this.__defineGetter__`, and nested functions assigned onto `this.*`).
+func (analysis *RstestCallAnalysis) collectThisAssignedConfigBits(fnNode *ast.Node) expectConfigKind {
+	return analysis.collectThisAssignedConfigBitsDepth(fnNode, 0, nil)
+}
+
+func (analysis *RstestCallAnalysis) collectThisAssignedConfigBitsDepth(
+	fnNode *ast.Node,
+	depth int,
+	aliasVisited map[*ast.Symbol]bool,
+) expectConfigKind {
+	if depth > 4 || fnNode == nil || fnNode.Body() == nil {
+		return expectConfigNone
+	}
+	var bits expectConfigKind
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		if node != fnNode && testFramework.IsFunction(node) && node.Kind != ast.KindArrowFunction {
+			return
+		}
+		if node.Kind == ast.KindThisKeyword {
+			outer := outermostExpressionWrapper(node)
+			if outer != nil && outer.Parent != nil {
+				switch outer.Parent.Kind {
+				case ast.KindVariableDeclaration:
+					vd := outer.Parent.AsVariableDeclaration()
+					if vd != nil && vd.Initializer == outer && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+						selfSym := outer.Parent.Symbol()
+						if selfSym == nil {
+							selfSym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+						}
+						if selfSym != nil {
+							if aliasVisited == nil {
+								aliasVisited = map[*ast.Symbol]bool{}
+							}
+							bits |= analysis.collectAliasRestoredConfigBits(selfSym, aliasVisited)
+						}
+					}
+				case ast.KindBinaryExpression:
+					bin := outer.Parent.AsBinaryExpression()
+					if bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == outer {
+						if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
+							if selfSym := resolveRstestRootSymbol(analysis.ctx, lhs); selfSym != nil {
+								if aliasVisited == nil {
+									aliasVisited = map[*ast.Symbol]bool{}
+								}
+								bits |= analysis.collectAliasRestoredConfigBits(selfSym, aliasVisited)
+							}
+						}
+					}
+				case ast.KindCallExpression:
+					for bit, clears := range analysis.mutatingBuiltinOverwriteChanges(outer.Parent, outer) {
+						if !clears {
+							bits |= bit
+						}
+					}
+				}
+			}
+		} else if ast.IsAccessExpression(node) {
+			if recv := internalUtils.SkipAssertionsAndParens(node.Expression()); recv != nil && recv.Kind == ast.KindThisKeyword {
+				if internalUtils.IsWriteReference(node) {
+					pName, ok := analysis.evalExpectConfigAccessName(node)
+					outer := outermostExpressionWrapper(node)
+					if ok {
+						if bit := expectConfigOverwriteBit(pName); bit != expectConfigNone {
+							if outer != nil && outer.Parent != nil && outer.Parent.Kind == ast.KindBinaryExpression {
+								bin := outer.Parent.AsBinaryExpression()
+								if bin != nil && bin.OperatorToken != nil && bin.Left == outer {
+									switch bin.OperatorToken.Kind {
+									case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken,
+										ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+										if analysis.overwritePreservesConfigBit(bit, bin.Right) {
+											bits |= bit
+										}
+									default:
+										bits |= bit
+									}
+								}
+							} else {
+								bits |= bit
+							}
+						}
+					} else if outer != nil && outer.Parent != nil && outer.Parent.Kind == ast.KindBinaryExpression {
+						bin := outer.Parent.AsBinaryExpression()
+						if bin != nil && bin.Left == outer {
+							bits |= analysis.configBitsFromDynamicWriteRHS(bin.Right)
+						}
+					}
+					// A function/helper assigned onto `this.<prop>` (e.g.
+					// `this.restore = function () { this.extend = r.expect.extend; }; this.restore();`
+					// or `this.restore = restoreFn; this.restore();`) executes with
+					// `this` bound to the same object.
+					if outer != nil && outer.Parent != nil && outer.Parent.Kind == ast.KindBinaryExpression {
+						bin := outer.Parent.AsBinaryExpression()
+						if bin != nil && bin.Left == outer && bin.Right != nil {
+							bits |= analysis.collectThisBitsFromExpr(bin.Right, depth+1, nil)
+						}
+					}
+				} else if mName, ok := analysis.evalExpectConfigAccessName(node); ok && mName == "__defineGetter__" {
+					accessOuter := outermostExpressionWrapper(node)
+					if accessOuter != nil && accessOuter.Parent != nil &&
+						accessOuter.Parent.Kind == ast.KindCallExpression &&
+						accessOuter.Parent.AsCallExpression().Expression == accessOuter {
+						args := accessOuter.Parent.Arguments()
+						if len(args) >= 2 {
+							if propStr, pOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[0])); pOK {
+								if bit := expectConfigOverwriteBit(propStr); bit != expectConfigNone &&
+									analysis.getterPreservesConfigBit(bit, args[1]) {
+									bits |= bit
+								}
+							} else {
+								k := analysis.getterExpectConfigKind(internalUtils.SkipAssertionsAndParens(args[1]))
+								if k&(expectConfigExtend|expectConfigDynamicMember) != 0 {
+									bits |= expectConfigExpectExtend
+								}
+								if k&(expectConfigAddEqualityTesters|expectConfigDynamicMember) != 0 {
+									bits |= expectConfigExpectEquality
+								}
+								if k&expectConfigExpect != 0 {
+									bits |= expectConfigReceiver
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	for _, p := range fnNode.Parameters() {
+		visit(p)
+	}
+	visit(fnNode.Body())
+	return bits
+}
+
+func (analysis *RstestCallAnalysis) configBitsFromDynamicWriteRHS(rhs *ast.Node) expectConfigKind {
+	if rhs == nil {
+		return expectConfigNone
+	}
+	k := analysis.expectConfigMember(rhs)
+	var bits expectConfigKind
+	if k&expectConfigExtend != 0 {
+		bits |= expectConfigExpectExtend
+	}
+	if k&expectConfigAddEqualityTesters != 0 {
+		bits |= expectConfigExpectEquality
+	}
+	if k&expectConfigDynamicMember != 0 {
+		bits |= expectConfigExpect
+	}
+	if k&expectConfigExpect != 0 {
+		bits |= expectConfigReceiver
+	}
+	return bits
+}
+
+func (analysis *RstestCallAnalysis) collectThisBitsFromSymbolPropWrites(
+	sym *ast.Symbol,
+	propName string,
+	propKnown bool,
+	depth int,
+	visited map[*ast.Symbol]bool,
+) expectConfigKind {
+	if depth > 4 || sym == nil {
+		return expectConfigNone
+	}
+	var bits expectConfigKind
+	// Inspect object literals written to `sym` (covers `let helpers = { install() { ... } }`
+	// and `let proto = { restore() { ... } }`, not just `const` literals).
+	symSummary := analysis.getExpectConfigSymbolSummary(sym)
+	for i := range symSummary.writes {
+		if rhs := internalUtils.SkipAssertionsAndParens(symSummary.writes[i].rhs); rhs != nil &&
+			rhs.Kind == ast.KindObjectLiteralExpression {
+			bits |= analysis.ownObjectLiteralPropThisAssignedBits(rhs, propName, propKnown, depth+1, visited)
+		}
+	}
+	if analysis.ctx.Refs == nil {
+		return bits
+	}
+	for _, ref := range analysis.ctx.Refs.References(sym) {
+		if ref == nil {
+			continue
+		}
+		outer := outermostExpressionWrapper(ref)
+		if outer == nil || outer.Parent == nil || !ast.IsAccessExpression(outer.Parent) || outer.Parent.Expression() != outer {
+			continue
+		}
+		if !internalUtils.IsWriteReference(outer.Parent) {
+			continue
+		}
+		pName, pKnown := analysis.evalExpectConfigAccessName(outer.Parent)
+		if propKnown && pKnown && pName != propName {
+			continue
+		}
+		accessOuter := outermostExpressionWrapper(outer.Parent)
+		if accessOuter != nil && accessOuter.Parent != nil && accessOuter.Parent.Kind == ast.KindBinaryExpression {
+			bin := accessOuter.Parent.AsBinaryExpression()
+			if bin != nil && bin.Left == accessOuter && bin.Right != nil {
+				bits |= analysis.collectThisBitsFromExpr(bin.Right, depth+1, visited)
+			}
+		}
+	}
+	return bits
+}
+
+func (analysis *RstestCallAnalysis) collectThisBitsFromExpr(
+	expr *ast.Node,
+	depth int,
+	visited map[*ast.Symbol]bool,
+) expectConfigKind {
+	if depth > 4 || expr == nil {
+		return expectConfigNone
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return expectConfigNone
+	}
+	switch expr.Kind {
+	case ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration,
+		ast.KindGetAccessor, ast.KindSetAccessor:
+		return analysis.collectThisAssignedConfigBits(expr)
+	case ast.KindIdentifier:
+		sym := resolveRstestRootSymbol(analysis.ctx, expr)
+		if sym == nil || visited[sym] {
+			return expectConfigNone
+		}
+		if visited == nil {
+			visited = map[*ast.Symbol]bool{}
+		}
+		visited[sym] = true
+		defer delete(visited, sym)
+		var bits expectConfigKind
+		for _, decl := range sym.Declarations {
+			if decl != nil && decl.Kind == ast.KindFunctionDeclaration && decl.AsFunctionDeclaration().Body != nil &&
+				analysis.ctx.SourceFile != nil && ast.GetSourceFileOfNode(decl) == analysis.ctx.SourceFile {
+				bits |= analysis.collectThisAssignedConfigBits(decl)
+			}
+		}
+		symSummary := analysis.getExpectConfigSymbolSummary(sym)
+		for i := range symSummary.writes {
+			if rhs := symSummary.writes[i].rhs; rhs != nil && !nodeContains(rhs, expr) {
+				bits |= analysis.collectThisBitsFromExpr(rhs, depth+1, visited)
+			}
+		}
+		return bits
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		pName, pKnown := analysis.evalExpectConfigAccessName(expr)
+		recv := internalUtils.SkipAssertionsAndParens(expr.Expression())
+		if recv == nil {
+			return expectConfigNone
+		}
+		var bits expectConfigKind
+		if recvObj, mutable := analysis.resolveObjectLiteralForBoundLookup(recv); recvObj != nil {
+			bits |= analysis.ownObjectLiteralPropThisAssignedBits(recvObj, pName, pKnown, depth+1, visited)
+			if mutable && recv.Kind == ast.KindIdentifier {
+				if recvSym := resolveRstestRootSymbol(analysis.ctx, recv); recvSym != nil && !visited[recvSym] {
+					if visited == nil {
+						visited = map[*ast.Symbol]bool{}
+					}
+					visited[recvSym] = true
+					bits |= analysis.collectThisBitsFromSymbolPropWrites(recvSym, pName, pKnown, depth+1, visited)
+					delete(visited, recvSym)
+				}
+			}
+		} else if recv.Kind == ast.KindIdentifier {
+			if recvSym := resolveRstestRootSymbol(analysis.ctx, recv); recvSym != nil && !visited[recvSym] {
+				if visited == nil {
+					visited = map[*ast.Symbol]bool{}
+				}
+				visited[recvSym] = true
+				bits |= analysis.collectThisBitsFromSymbolPropWrites(recvSym, pName, pKnown, depth+1, visited)
+				delete(visited, recvSym)
+			}
+		}
+		return bits
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		if cond != nil {
+			return analysis.collectThisBitsFromExpr(cond.WhenTrue, depth+1, visited) |
+				analysis.collectThisBitsFromExpr(cond.WhenFalse, depth+1, visited)
+		}
+	case ast.KindBinaryExpression:
+		bin := expr.AsBinaryExpression()
+		if bin != nil && bin.OperatorToken != nil {
+			switch bin.OperatorToken.Kind {
+			case ast.KindCommaToken, ast.KindAmpersandAmpersandToken, ast.KindEqualsToken:
+				return analysis.collectThisBitsFromExpr(bin.Right, depth+1, visited)
+			case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+				return analysis.collectThisBitsFromExpr(bin.Left, depth+1, visited) |
+					analysis.collectThisBitsFromExpr(bin.Right, depth+1, visited)
+			}
+		}
+	}
+	return expectConfigNone
+}
+
+func (analysis *RstestCallAnalysis) ownObjectLiteralPropThisAssignedBits(
+	objExpr *ast.Node,
+	propName string,
+	propKnown bool,
+	depth int,
+	visited map[*ast.Symbol]bool,
+) expectConfigKind {
+	if depth > 4 || objExpr == nil || objExpr.Kind != ast.KindObjectLiteralExpression || objExpr.AsObjectLiteralExpression().Properties == nil {
+		return expectConfigNone
+	}
+	var bits expectConfigKind
+	for _, prop := range objExpr.AsObjectLiteralExpression().Properties.Nodes {
+		if prop == nil {
+			continue
+		}
+		switch prop.Kind {
+		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+			if propKnown && prop.Name() != nil {
+				if name, ok := analysis.staticStringEvaluator().EvalPropertyName(prop.Name()); ok && name != propName {
+					continue
+				}
+			}
+			bits |= analysis.collectThisAssignedConfigBits(prop)
+		case ast.KindPropertyAssignment:
+			if pName := prop.Name(); pName != nil && pName.Kind != ast.KindComputedPropertyName {
+				if name, ok := internalUtils.GetStaticPropertyName(pName); ok && name == "__proto__" {
+					protoExpr := internalUtils.SkipAssertionsAndParens(prop.AsPropertyAssignment().Initializer)
+					if protoObj, mutableProto := analysis.resolveObjectLiteralForBoundLookup(protoExpr); protoObj != nil {
+						bits |= analysis.ownObjectLiteralPropThisAssignedBits(protoObj, propName, propKnown, depth+1, visited)
+						if mutableProto && protoExpr != nil && protoExpr.Kind == ast.KindIdentifier {
+							if protoSym := resolveRstestRootSymbol(analysis.ctx, protoExpr); protoSym != nil && !visited[protoSym] {
+								if visited == nil {
+									visited = map[*ast.Symbol]bool{}
+								}
+								visited[protoSym] = true
+								bits |= analysis.collectThisBitsFromSymbolPropWrites(protoSym, propName, propKnown, depth+1, visited)
+								delete(visited, protoSym)
+							}
+						}
+					} else if protoExpr != nil && protoExpr.Kind == ast.KindIdentifier {
+						if protoSym := resolveRstestRootSymbol(analysis.ctx, protoExpr); protoSym != nil && !visited[protoSym] {
+							if visited == nil {
+								visited = map[*ast.Symbol]bool{}
+							}
+							visited[protoSym] = true
+							bits |= analysis.collectThisBitsFromSymbolPropWrites(protoSym, propName, propKnown, depth+1, visited)
+							delete(visited, protoSym)
+						}
+					}
+					continue
+				}
+			}
+			if propKnown && prop.Name() != nil {
+				if name, ok := analysis.staticStringEvaluator().EvalPropertyName(prop.Name()); ok && name != propName {
+					continue
+				}
+			}
+			bits |= analysis.collectThisBitsFromExpr(prop.AsPropertyAssignment().Initializer, depth+1, visited)
+		case ast.KindShorthandPropertyAssignment:
+			ident := prop.AsShorthandPropertyAssignment().Name()
+			if propKnown && ident != nil && ident.Kind == ast.KindIdentifier && ident.AsIdentifier().Text != propName {
+				continue
+			}
+			bits |= analysis.collectThisBitsFromExpr(ident, depth+1, visited)
+		case ast.KindSpreadAssignment:
+			spreadExpr := internalUtils.SkipAssertionsAndParens(prop.AsSpreadAssignment().Expression)
+			if spreadObj, mutableSpread := analysis.resolveObjectLiteralForBoundLookup(spreadExpr); spreadObj != nil {
+				bits |= analysis.ownObjectLiteralPropThisAssignedBits(spreadObj, propName, propKnown, depth+1, visited)
+				if mutableSpread && spreadExpr != nil && spreadExpr.Kind == ast.KindIdentifier {
+					if spreadSym := resolveRstestRootSymbol(analysis.ctx, spreadExpr); spreadSym != nil && !visited[spreadSym] {
+						if visited == nil {
+							visited = map[*ast.Symbol]bool{}
+						}
+						visited[spreadSym] = true
+						bits |= analysis.collectThisBitsFromSymbolPropWrites(spreadSym, propName, propKnown, depth+1, visited)
+						delete(visited, spreadSym)
+					}
+				}
+			} else if spreadExpr != nil && spreadExpr.Kind == ast.KindIdentifier {
+				if spreadSym := resolveRstestRootSymbol(analysis.ctx, spreadExpr); spreadSym != nil && !visited[spreadSym] {
+					if visited == nil {
+						visited = map[*ast.Symbol]bool{}
+					}
+					visited[spreadSym] = true
+					bits |= analysis.collectThisBitsFromSymbolPropWrites(spreadSym, propName, propKnown, depth+1, visited)
+					delete(visited, spreadSym)
+				}
+			}
+		}
+	}
+	return bits
+}
+
+func (analysis *RstestCallAnalysis) collectAliasRestoredConfigBits(sym *ast.Symbol, visited map[*ast.Symbol]bool) expectConfigKind {
+	if analysis.ctx.Refs == nil || sym == nil || visited[sym] {
+		return expectConfigNone
+	}
+	visited[sym] = true
+	var bits expectConfigKind
+	for _, ref := range analysis.ctx.Refs.References(sym) {
+		if ref == nil {
+			continue
+		}
+		if parent := ref.Parent; parent != nil &&
+			((parent.Kind == ast.KindVariableDeclaration && parent.Name() == ref) ||
+				(parent.Kind == ast.KindBindingElement && parent.Name() == ref)) {
+			continue
+		}
+		outer := outermostExpressionWrapper(ref)
+		if outer == nil || outer.Parent == nil {
+			continue
+		}
+		switch outer.Parent.Kind {
+		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+			if outer.Parent.Expression() != outer || !internalUtils.IsWriteReference(outer.Parent) {
+				continue
+			}
+			propName, propKnown := analysis.evalExpectConfigAccessName(outer.Parent)
+			accessOuter := outermostExpressionWrapper(outer.Parent)
+			if !propKnown {
+				if accessOuter != nil && accessOuter.Parent != nil && accessOuter.Parent.Kind == ast.KindBinaryExpression {
+					bin := accessOuter.Parent.AsBinaryExpression()
+					if bin != nil && bin.OperatorToken != nil && bin.Left == accessOuter {
+						bits |= analysis.configBitsFromDynamicWriteRHS(bin.Right)
+						continue
+					}
+				}
+				bits |= expectConfigExpect | expectConfigReceiver
+				continue
+			}
+			if bit := expectConfigOverwriteBit(propName); bit != expectConfigNone {
+				if accessOuter != nil && accessOuter.Parent != nil && accessOuter.Parent.Kind == ast.KindBinaryExpression {
+					bin := accessOuter.Parent.AsBinaryExpression()
+					if bin != nil && bin.OperatorToken != nil && bin.Left == accessOuter {
+						switch bin.OperatorToken.Kind {
+						case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken,
+							ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+							if analysis.overwritePreservesConfigBit(bit, bin.Right) {
+								bits |= bit
+							}
+						default:
+							bits |= bit
+						}
+						continue
+					}
+				}
+				bits |= bit
+			}
+		case ast.KindCallExpression:
+			for bit, clears := range analysis.mutatingBuiltinOverwriteChanges(outer.Parent, outer) {
+				if !clears {
+					bits |= bit
+				}
+			}
+		case ast.KindVariableDeclaration:
+			vd := outer.Parent.AsVariableDeclaration()
+			if vd != nil && vd.Initializer == outer && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+				aliasSym := outer.Parent.Symbol()
+				if aliasSym == nil {
+					aliasSym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+				}
+				bits |= analysis.collectAliasRestoredConfigBits(aliasSym, visited)
+			}
+		case ast.KindBinaryExpression:
+			bin := outer.Parent.AsBinaryExpression()
+			if bin != nil && bin.Right == outer && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
+				if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
+					bits |= analysis.collectAliasRestoredConfigBits(resolveRstestRootSymbol(analysis.ctx, lhs), visited)
+				}
+			}
+		}
+	}
+	return bits
+}
+
+func (analysis *RstestCallAnalysis) cachedOwnMethodThisAssign(
+	summary *objectLiteralMutationSummary,
+	objExpr *ast.Node,
+	methodName, targetProp string,
+) (*ast.Node, bool) {
+	key := ownMethodAssignKey{methodName: methodName, targetProp: targetProp}
+	if summary != nil && summary.ownMethodCache != nil {
+		if res, ok := summary.ownMethodCache[key]; ok {
+			return res.rhs, res.ok
+		}
+	}
+	rhs, ok := analysis.ownMethodUnconditionalThisAssign(objExpr, methodName, targetProp)
+	if summary != nil {
+		if summary.ownMethodCache == nil {
+			summary.ownMethodCache = map[ownMethodAssignKey]ownMethodAssignResult{}
+		}
+		summary.ownMethodCache[key] = ownMethodAssignResult{rhs: rhs, ok: ok}
+	}
+	return rhs, ok
+}
+
+func (analysis *RstestCallAnalysis) getObjectLiteralMutationSummary(
+	sym *ast.Symbol,
+	objExpr *ast.Node,
+) *objectLiteralMutationSummary {
+	if analysis.ctx.Refs == nil || sym == nil || objExpr == nil {
+		return &objectLiteralMutationSummary{escaped: true, hasAnyMutation: true, hasAnyGetter: true, hasAnyAccessor: true}
+	}
+	if cached, ok := analysis.objectLiteralMutations[sym]; ok {
+		return cached
+	}
+	if analysis.objectLiteralMutationVisiting[sym] {
+		analysis.objectLiteralMutationCycleHits++
+		return &objectLiteralMutationSummary{escaped: true, hasAnyMutation: true, hasAnyGetter: true, hasAnyAccessor: true}
+	}
+	if analysis.objectLiteralMutationVisiting == nil {
+		analysis.objectLiteralMutationVisiting = map[*ast.Symbol]bool{}
+	}
+	analysis.objectLiteralMutationVisiting[sym] = true
+	defer delete(analysis.objectLiteralMutationVisiting, sym)
+
+	cycleBefore := analysis.objectLiteralMutationCycleHits
+	expectCycleBefore := analysis.expectConfigCycleHits
+	overwriteCycleBefore := analysis.expectConfigOverwriteCycleHits
+	refs := analysis.ctx.Refs.References(sym)
+	summary := &objectLiteralMutationSummary{}
+
+	initialPureExtend := analysis.isPureOwnRstestExpectCallableProp(objExpr, "extend")
+	initialPureEquality := analysis.isPureOwnRstestExpectCallableProp(objExpr, "addEqualityTesters")
+
+	// Pass 1: track which properties are ever written or deleted, which writes
+	// could install a non-pure function on `extend`/`addEqualityTesters`,
+	// whether the object escapes, and all invoked static property names so
+	// `hasUntrustedCall` is evaluated AFTER all writes/deletes are known.
+	writtenOrDeletedProps := map[string]bool{}
+	nonPureWriteProps := map[string]bool{}
+	hasDynamicWriteOrDelete := false
+	hasPass1Escape := false
+	hasUntrustedCall := false
+	var calledStaticProps []string
+	seenCalledProp := map[string]bool{}
+	for _, ref := range refs {
+		if ref == nil {
+			continue
+		}
+		if parent := ref.Parent; parent != nil &&
+			((parent.Kind == ast.KindVariableDeclaration && parent.Name() == ref) ||
+				(parent.Kind == ast.KindBindingElement && parent.Name() == ref)) {
+			continue
+		}
+		outer := outermostExpressionWrapper(ref)
+		if outer == nil || outer.Parent == nil {
+			hasPass1Escape = true
+			continue
+		}
+		if !ast.IsAccessExpression(outer.Parent) || outer.Parent.Expression() != outer {
+			// Only plain object-pattern destructuring does not escape `sym` itself.
+			isObjDestruct := false
+			switch outer.Parent.Kind {
+			case ast.KindVariableDeclaration:
+				vd := outer.Parent.AsVariableDeclaration()
+				isObjDestruct = vd != nil && vd.Initializer == outer && vd.Name() != nil && vd.Name().Kind == ast.KindObjectBindingPattern
+			case ast.KindBinaryExpression:
+				bin := outer.Parent.AsBinaryExpression()
+				if bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == outer {
+					lhs := ast.SkipParentheses(bin.Left)
+					isObjDestruct = lhs != nil && lhs.Kind == ast.KindObjectLiteralExpression
+				}
+			}
+			if !isObjDestruct {
+				hasPass1Escape = true
+			}
+			continue
+		}
+		accessOuter := outermostExpressionWrapper(outer.Parent)
+		isWrite := internalUtils.IsWriteReference(outer.Parent)
+		isDelete := accessOuter != nil && accessOuter.Parent != nil && accessOuter.Parent.Kind == ast.KindDeleteExpression
+		if isWrite || isDelete {
+			if pName, pKnown := analysis.evalExpectConfigAccessName(outer.Parent); pKnown {
+				writtenOrDeletedProps[pName] = true
+				isPureAssign := false
+				if isWrite && accessOuter != nil && accessOuter.Parent != nil && accessOuter.Parent.Kind == ast.KindBinaryExpression {
+					bin := accessOuter.Parent.AsBinaryExpression()
+					if bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken &&
+						bin.Left == accessOuter && !internalUtils.IsDefaultValueInDestructuringAssignment(accessOuter.Parent) &&
+						(analysis.isPureRstestExpectCallable(bin.Right, 0) || isSideEffectFreeNoOpFn(bin.Right)) {
+						isPureAssign = true
+					}
+				}
+				if !isPureAssign {
+					nonPureWriteProps[pName] = true
+				}
+			} else {
+				hasDynamicWriteOrDelete = true
+			}
+			continue
+		}
+		isCall := accessOuter != nil && accessOuter.Parent != nil &&
+			accessOuter.Parent.Kind == ast.KindCallExpression &&
+			accessOuter.Parent.AsCallExpression().Expression == accessOuter
+		isTagged := accessOuter != nil && accessOuter.Parent != nil &&
+			accessOuter.Parent.Kind == ast.KindTaggedTemplateExpression &&
+			accessOuter.Parent.AsTaggedTemplateExpression().Tag == accessOuter
+		if isCall || isTagged {
+			if isCall && !ast.IsOptionalChain(accessOuter.Parent) {
+				if pName, pKnown := analysis.evalExpectConfigAccessName(outer.Parent); pKnown {
+					if !seenCalledProp[pName] {
+						seenCalledProp[pName] = true
+						calledStaticProps = append(calledStaticProps, pName)
+					}
+					continue
+				}
+			}
+			hasUntrustedCall = true
+		}
+	}
+	if !hasUntrustedCall {
+		for _, pName := range calledStaticProps {
+			if pName == "extend" && initialPureExtend && !nonPureWriteProps["extend"] {
+				continue
+			}
+			if pName == "addEqualityTesters" && initialPureEquality && !nonPureWriteProps["addEqualityTesters"] {
+				continue
+			}
+			trustedReset := false
+			if !writtenOrDeletedProps[pName] {
+				for _, targetProp := range []string{"extend", "addEqualityTesters", "expect"} {
+					if rhs, ok := analysis.cachedOwnMethodThisAssign(summary, objExpr, pName, targetProp); ok &&
+						(analysis.isPureRstestExpectCallable(rhs, 0) || isSideEffectFreeNoOpFn(rhs)) {
+						trustedReset = true
+						break
+					}
+				}
+			}
+			if !trustedReset {
+				hasUntrustedCall = true
+				break
+			}
+		}
+	}
+
+	hasAnyGetter := analysis.objectLiteralHasAccessor(objExpr, "", false, false, 0)
+	hasDefineProp := analysis.symbolHasDefineProperty(sym, nil)
+	hasAnyAccessor := hasAnyGetter || hasDefineProp || analysis.objectLiteralHasAccessor(objExpr, "", false, true, 0)
+	pureExtend := !hasAnyAccessor && !hasPass1Escape && !hasUntrustedCall && !hasDynamicWriteOrDelete && !nonPureWriteProps["extend"] && initialPureExtend
+	pureEquality := !hasAnyAccessor && !hasPass1Escape && !hasUntrustedCall && !hasDynamicWriteOrDelete && !nonPureWriteProps["addEqualityTesters"] && initialPureEquality
+	summary.hasAnyGetter = hasAnyGetter || hasDefineProp
+	summary.hasAnyAccessor = hasAnyAccessor
+	summary.pureExtend = pureExtend
+	summary.pureEquality = pureEquality
+
+	var allOwnMemberBitsComputed bool
+	var allOwnMemberBits expectConfigKind
+	addPropMemberBits := func(propName string, propKnown bool) {
+		if !propKnown {
+			if !allOwnMemberBitsComputed {
+				allOwnMemberBitsComputed = true
+				allOwnMemberBits = analysis.ownObjectLiteralPropThisAssignedBits(objExpr, "", false, 0, nil)
+			}
+			summary.restoredConfigMask |= allOwnMemberBits
+			return
+		}
+		summary.restoredConfigMask |= analysis.ownObjectLiteralPropThisAssignedBits(objExpr, propName, true, 0, nil)
+	}
+
+	addMutation := func(ref, stmt *ast.Node, refFn *ast.Node, wildcardInvalidation bool, writtenProp string) {
+		summary.hasAnyMutation = true
+		if stmt == nil {
+			summary.escaped = true
+			return
+		}
+		ev := objMutationEvent{
+			pos:     ref.Pos(),
+			stmtPos: stmt.Pos(),
+			stmtEnd: stmt.End(),
+			fn:      refFn,
+		}
+		if summary.mutationsByFn == nil {
+			summary.mutationsByFn = map[*ast.Node][]objMutationEvent{}
+		}
+		summary.mutationsByFn[refFn] = append(summary.mutationsByFn[refFn], ev)
+		if wildcardInvalidation {
+			if summary.methodInvalidationsByFn == nil {
+				summary.methodInvalidationsByFn = map[*ast.Node][]objMutationEvent{}
+			}
+			summary.methodInvalidationsByFn[refFn] = append(summary.methodInvalidationsByFn[refFn], ev)
+		} else if writtenProp != "" {
+			if summary.propWriteEventsByProp == nil {
+				summary.propWriteEventsByProp = map[string]map[*ast.Node][]objMutationEvent{}
+			}
+			byFn := summary.propWriteEventsByProp[writtenProp]
+			if byFn == nil {
+				byFn = map[*ast.Node][]objMutationEvent{}
+				summary.propWriteEventsByProp[writtenProp] = byFn
+			}
+			byFn[refFn] = append(byFn[refFn], ev)
+		}
+	}
+
+	addReplacement := func(block *ast.Node, member string, ev objPropReplacementEvent) {
+		if summary.replacements == nil {
+			summary.replacements = map[objReplacementKey][]objPropReplacementEvent{}
+		}
+		key := objReplacementKey{block: block, member: member}
+		summary.replacements[key] = append(summary.replacements[key], ev)
+	}
+
+	aliasVisited := map[*ast.Symbol]bool{sym: true}
+
+	for _, ref := range refs {
+		if ref == nil {
+			continue
+		}
+		if parent := ref.Parent; parent != nil &&
+			((parent.Kind == ast.KindVariableDeclaration && parent.Name() == ref) ||
+				(parent.Kind == ast.KindBindingElement && parent.Name() == ref)) {
+			continue
+		}
+		outer := outermostExpressionWrapper(ref)
+		if outer == nil || outer.Parent == nil {
+			summary.escaped = true
+			summary.hasAnyMutation = true
+			continue
+		}
+		stmt, block, unconditional := writeStatementInfo(ref)
+		refFn := ast.GetContainingFunction(ref)
+
+		switch outer.Parent.Kind {
+		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+			if outer.Parent.Expression() != outer {
+				summary.escaped = true
+				summary.hasAnyMutation = true
+				continue
+			}
+			accessOuter := outermostExpressionWrapper(outer.Parent)
+			propName, propKnown := analysis.evalExpectConfigAccessName(outer.Parent)
+			if internalUtils.IsWriteReference(outer.Parent) {
+				hasAccessorOnProp := hasAnyAccessor && (hasDefineProp || analysis.objectLiteralHasAccessor(objExpr, propName, propKnown, true, 0))
+				if hasAccessorOnProp {
+					// Writing through a setter executes user code with `this === sym`,
+					// which can escape `this` into an outer alias or assign `this.extend`.
+					summary.escaped = true
+					addPropMemberBits(propName, propKnown)
+				}
+				wildcardInv := !propKnown || hasAccessorOnProp
+				writtenProp := ""
+				if propKnown {
+					writtenProp = propName
+				}
+				addMutation(ref, stmt, refFn, wildcardInv, writtenProp)
+				handledBinWrite := false
+				if accessOuter != nil && accessOuter.Parent != nil && accessOuter.Parent.Kind == ast.KindBinaryExpression {
+					bin := accessOuter.Parent.AsBinaryExpression()
+					if bin != nil && bin.OperatorToken != nil && bin.Left == accessOuter {
+						handledBinWrite = true
+						switch bin.OperatorToken.Kind {
+						case ast.KindEqualsToken:
+							if !internalUtils.IsDefaultValueInDestructuringAssignment(accessOuter.Parent) {
+								if propKnown {
+									if bit := expectConfigOverwriteBit(propName); bit != expectConfigNone &&
+										analysis.overwritePreservesConfigBit(bit, bin.Right) {
+										summary.restoredConfigMask |= bit
+									}
+								} else {
+									summary.restoredConfigMask |= analysis.configBitsFromDynamicWriteRHS(bin.Right)
+								}
+								if unconditional && propKnown && stmt != nil && block != nil &&
+									stmt.Kind == ast.KindExpressionStatement &&
+									ast.SkipParentheses(stmt.AsExpressionStatement().Expression) == accessOuter.Parent &&
+									!hasAccessorOnProp {
+									addReplacement(block, propName, objPropReplacementEvent{
+										pos:       ref.Pos(),
+										stmtPos:   stmt.Pos(),
+										stmtEnd:   stmt.End(),
+										node:      ref,
+										rhs:       bin.Right,
+										viaMethod: false,
+									})
+								}
+							} else if propKnown {
+								if bit := expectConfigOverwriteBit(propName); bit != expectConfigNone {
+									summary.restoredConfigMask |= bit
+								}
+							} else {
+								summary.restoredConfigMask |= expectConfigExpect | expectConfigReceiver
+							}
+						case ast.KindQuestionQuestionEqualsToken, ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+							if propKnown {
+								if bit := expectConfigOverwriteBit(propName); bit != expectConfigNone &&
+									analysis.overwritePreservesConfigBit(bit, bin.Right) {
+									summary.restoredConfigMask |= bit
+								}
+							} else {
+								summary.restoredConfigMask |= analysis.configBitsFromDynamicWriteRHS(bin.Right)
+							}
+						default:
+							if propKnown {
+								if bit := expectConfigOverwriteBit(propName); bit != expectConfigNone {
+									summary.restoredConfigMask |= bit
+								}
+							} else {
+								summary.restoredConfigMask |= expectConfigExpect | expectConfigReceiver
+							}
+						}
+					}
+				}
+				if !handledBinWrite {
+					if propKnown {
+						if bit := expectConfigOverwriteBit(propName); bit != expectConfigNone {
+							summary.restoredConfigMask |= bit
+						}
+					} else {
+						summary.restoredConfigMask |= expectConfigExpect | expectConfigReceiver
+					}
+				}
+				continue
+			}
+			if accessOuter != nil && accessOuter.Parent != nil && accessOuter.Parent.Kind == ast.KindDeleteExpression {
+				addMutation(ref, stmt, refFn, true, "")
+				continue
+			}
+			isCall := accessOuter != nil && accessOuter.Parent != nil &&
+				accessOuter.Parent.Kind == ast.KindCallExpression &&
+				accessOuter.Parent.AsCallExpression().Expression == accessOuter
+			isTagged := accessOuter != nil && accessOuter.Parent != nil &&
+				accessOuter.Parent.Kind == ast.KindTaggedTemplateExpression &&
+				accessOuter.Parent.AsTaggedTemplateExpression().Tag == accessOuter
+			if isCall || isTagged {
+				if isCall && propKnown && ((propName == "extend" && pureExtend) || (propName == "addEqualityTesters" && pureEquality)) {
+					continue
+				}
+				isPureSingleTargetReset := false
+				writtenTargetProp := ""
+				if isCall && !ast.IsOptionalChain(accessOuter.Parent) && propKnown {
+					for _, targetProp := range []string{"extend", "addEqualityTesters", "expect"} {
+						rhs, ok := analysis.cachedOwnMethodThisAssign(summary, objExpr, propName, targetProp)
+						if !ok {
+							continue
+						}
+						isPureSingleTargetReset = true
+						writtenTargetProp = targetProp
+						if bit := expectConfigOverwriteBit(targetProp); bit != expectConfigNone &&
+							analysis.overwritePreservesConfigBit(bit, rhs) {
+							summary.restoredConfigMask |= bit
+						}
+						hasTargetAccessor := hasAnyAccessor && (hasDefineProp || analysis.objectLiteralHasAccessor(objExpr, targetProp, true, true, 0))
+						if hasTargetAccessor {
+							summary.escaped = true
+						}
+						if unconditional && stmt != nil && block != nil &&
+							stmt.Kind == ast.KindExpressionStatement &&
+							ast.SkipParentheses(stmt.AsExpressionStatement().Expression) == accessOuter.Parent &&
+							!hasTargetAccessor {
+							addReplacement(block, targetProp, objPropReplacementEvent{
+								pos:        ref.Pos(),
+								stmtPos:    stmt.Pos(),
+								stmtEnd:    stmt.End(),
+								node:       ref,
+								rhs:        rhs,
+								viaMethod:  true,
+								methodName: propName,
+							})
+						}
+					}
+				}
+				// Any non-pure method/tagged-template call — or a call to a method
+				// property that was written/deleted elsewhere — can execute user code
+				// with `this === sym` and escape `this` into an alias.
+				if !isPureSingleTargetReset || hasDynamicWriteOrDelete || writtenOrDeletedProps[propName] {
+					summary.escaped = true
+					addPropMemberBits(propName, propKnown)
+					if hasDynamicWriteOrDelete || !propKnown || writtenOrDeletedProps[propName] {
+						summary.restoredConfigMask |= analysis.collectThisBitsFromSymbolPropWrites(sym, propName, propKnown, 0, nil)
+					}
+					if callOuter := outermostExpressionWrapper(accessOuter.Parent); callOuter != nil && callOuter.Parent != nil {
+						switch callOuter.Parent.Kind {
+						case ast.KindVariableDeclaration:
+							vd := callOuter.Parent.AsVariableDeclaration()
+							if vd != nil && vd.Initializer == callOuter && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+								aliasSym := callOuter.Parent.Symbol()
+								if aliasSym == nil {
+									aliasSym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+								}
+								summary.restoredConfigMask |= analysis.collectAliasRestoredConfigBits(aliasSym, aliasVisited)
+							}
+						case ast.KindBinaryExpression:
+							bin := callOuter.Parent.AsBinaryExpression()
+							if bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == callOuter {
+								if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
+									summary.restoredConfigMask |= analysis.collectAliasRestoredConfigBits(resolveRstestRootSymbol(analysis.ctx, lhs), aliasVisited)
+								}
+							}
+						}
+					}
+				}
+				addMutation(ref, stmt, refFn, !isPureSingleTargetReset, writtenTargetProp)
+				continue
+			}
+			if hasAnyGetter && analysis.objectLiteralHasAccessor(objExpr, propName, propKnown, false, 0) {
+				summary.escaped = true
+				addPropMemberBits(propName, propKnown)
+				addMutation(ref, stmt, refFn, true, "")
+			}
+		case ast.KindVariableDeclaration:
+			vd := outer.Parent.AsVariableDeclaration()
+			if vd != nil && vd.Initializer == outer && vd.Name() != nil && vd.Name().Kind == ast.KindObjectBindingPattern {
+				if hasAnyGetter {
+					summary.escaped = true
+					addPropMemberBits("", false)
+					addMutation(ref, stmt, refFn, true, "")
+				}
+				continue
+			}
+			summary.escaped = true
+			summary.hasAnyMutation = true
+			if vd != nil && vd.Initializer == outer && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+				aliasSym := outer.Parent.Symbol()
+				if aliasSym == nil {
+					aliasSym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+				}
+				summary.restoredConfigMask |= analysis.collectAliasRestoredConfigBits(aliasSym, aliasVisited)
+			}
+		case ast.KindBinaryExpression:
+			bin := outer.Parent.AsBinaryExpression()
+			if bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == outer {
+				lhs := ast.SkipParentheses(bin.Left)
+				if lhs != nil && lhs.Kind == ast.KindObjectLiteralExpression {
+					if hasAnyGetter {
+						summary.escaped = true
+						addPropMemberBits("", false)
+						addMutation(ref, stmt, refFn, true, "")
+					}
+					continue
+				}
+				if lhs != nil && lhs.Kind == ast.KindIdentifier {
+					summary.restoredConfigMask |= analysis.collectAliasRestoredConfigBits(resolveRstestRootSymbol(analysis.ctx, lhs), aliasVisited)
+				}
+			}
+			summary.escaped = true
+			summary.hasAnyMutation = true
+		case ast.KindCallExpression:
+			for bit, clears := range analysis.mutatingBuiltinOverwriteChanges(outer.Parent, outer) {
+				if !clears {
+					summary.restoredConfigMask |= bit
+				}
+			}
+			summary.escaped = true
+			summary.hasAnyMutation = true
+		default:
+			summary.escaped = true
+			summary.hasAnyMutation = true
+		}
+	}
+
+	sortMutEvents := func(evs []objMutationEvent) {
+		sort.Slice(evs, func(i, j int) bool {
+			if evs[i].pos != evs[j].pos {
+				return evs[i].pos < evs[j].pos
+			}
+			return evs[i].stmtEnd < evs[j].stmtEnd
+		})
+	}
+	for _, evs := range summary.mutationsByFn {
+		sortMutEvents(evs)
+	}
+	for _, evs := range summary.methodInvalidationsByFn {
+		sortMutEvents(evs)
+	}
+	for _, byFn := range summary.propWriteEventsByProp {
+		for _, evs := range byFn {
+			sortMutEvents(evs)
+		}
+	}
+	for _, reps := range summary.replacements {
+		sort.Slice(reps, func(i, j int) bool {
+			if reps[i].stmtEnd != reps[j].stmtEnd {
+				return reps[i].stmtEnd < reps[j].stmtEnd
+			}
+			return reps[i].pos < reps[j].pos
+		})
+	}
+
+	if analysis.objectLiteralMutationCycleHits == cycleBefore &&
+		analysis.expectConfigCycleHits == expectCycleBefore &&
+		analysis.expectConfigOverwriteCycleHits == overwriteCycleBefore {
+		if analysis.objectLiteralMutations == nil {
+			analysis.objectLiteralMutations = map[*ast.Symbol]*objectLiteralMutationSummary{}
+		}
+		analysis.objectLiteralMutations[sym] = summary
+	}
+	return summary
+}
+
+func (analysis *RstestCallAnalysis) hasInvalidatingEventForCall(
+	sym *ast.Symbol,
+	evsByFn map[*ast.Node][]objMutationEvent,
+	refFn *ast.Node,
+	callRef *ast.Node,
+	callStmtEnd int,
+) bool {
+	for fn := range evsByFn {
+		if fn == refFn {
+			continue
+		}
+		if fn == nil || analysis.functionCanExecuteBefore(fn, callRef, sym, nil) {
+			return true
+		}
+	}
+	sameFnEvs := evsByFn[refFn]
+	if len(sameFnEvs) == 0 {
+		return false
+	}
+	// Reject any invalidation before `callStmtEnd` (including earlier statements
+	// and same-statement computed-key mutations like `holder[(holder.reset = ..., 'reset')]()`),
+	// skipping only the exact callRef position itself.
+	for _, ev := range sameFnEvs {
+		if ev.pos >= callStmtEnd {
+			break
+		}
+		if ev.pos != callRef.Pos() {
+			return true
+		}
+	}
+	if last := sameFnEvs[len(sameFnEvs)-1]; last.pos >= callStmtEnd {
+		idx := sort.Search(len(sameFnEvs), func(i int) bool {
+			return sameFnEvs[i].pos >= callStmtEnd
+		})
+		if idx < len(sameFnEvs) && !directRangeCannotExecuteBefore(sameFnEvs[idx].pos, last.stmtEnd, callRef, sym) {
+			return true
+		}
+	}
+	return false
+}
+
+func (analysis *RstestCallAnalysis) hasMethodInvalidatingMutationForCall(
+	sym *ast.Symbol,
+	summary *objectLiteralMutationSummary,
+	callRef *ast.Node,
+	methodName string,
+) bool {
+	if summary == nil || summary.escaped || callRef == nil {
+		return true
+	}
+	callStmt, _ := enclosingStatementAndList(callRef)
+	if callStmt == nil {
+		return true
+	}
+	callStmtEnd := callStmt.End()
+	refFn := ast.GetContainingFunction(callRef)
+	if analysis.hasInvalidatingEventForCall(sym, summary.methodInvalidationsByFn, refFn, callRef, callStmtEnd) {
+		return true
+	}
+	if byFn := summary.propWriteEventsByProp[methodName]; len(byFn) > 0 {
+		if analysis.hasInvalidatingEventForCall(sym, byFn, refFn, callRef, callStmtEnd) {
+			return true
+		}
+	}
+	return false
+}
+
+// unconditionalPropertyReplacementBefore reports whether `sym` (a single-write
+// `const` object literal `objExpr`) unconditionally replaced its own property
+// `member` strictly before `useNode` in the same block — either directly
+// (`holder.extend = rhs;`) or via an own method call (`holder.reset();`) —
+// with no intervening, concurrent, or loop-re-executed mutation or escape.
+func (analysis *RstestCallAnalysis) unconditionalPropertyReplacementBefore(
+	sym *ast.Symbol,
+	objExpr *ast.Node,
+	member string,
+	useNode *ast.Node,
+) (*ast.Node, bool) {
+	if analysis.ctx.Refs == nil || sym == nil || objExpr == nil || useNode == nil {
+		return nil, false
+	}
+	summary := analysis.getObjectLiteralMutationSummary(sym, objExpr)
+	if summary.escaped {
+		return nil, false
+	}
+	if useNode.Kind == ast.KindIdentifier && summary.hasAnyGetter {
+		return nil, false
+	}
+	useStmt, useBlock := enclosingStatementAndList(useNode)
+	if useStmt == nil || useBlock == nil {
+		return nil, false
+	}
+	reps := summary.replacements[objReplacementKey{block: useBlock, member: member}]
+	if len(reps) == 0 {
+		return nil, false
+	}
+	useStmtPos := useStmt.Pos()
+	useStmtEnd := useStmt.End()
+	idx := sort.Search(len(reps), func(i int) bool {
+		return reps[i].stmtEnd > useStmtPos
+	})
+	if idx == 0 {
+		return nil, false
+	}
+	rep := reps[idx-1]
+
+	useFn := ast.GetContainingFunction(useNode)
+	for fn := range summary.mutationsByFn {
+		if fn == useFn {
+			continue
+		}
+		if fn == nil || analysis.functionCanExecuteBefore(fn, useNode, sym, nil) {
+			return nil, false
+		}
+	}
+
+	sameFnMuts := summary.mutationsByFn[useFn]
+	if len(sameFnMuts) > 0 {
+		// Reject any mutation strictly after `rep.stmtEnd` and before `useStmtEnd`
+		// (including same-statement mutations such as `(holder.extend = ..., holder.extend())`,
+		// computed-key mutations `holder[(holder.extend = ..., 'extend')]()`, and
+		// sibling destructuring mutations), skipping only the exact self-call at `useNode`.
+		afterIdx := sort.Search(len(sameFnMuts), func(i int) bool {
+			return sameFnMuts[i].pos >= rep.stmtEnd
+		})
+		for i := afterIdx; i < len(sameFnMuts) && sameFnMuts[i].pos < useStmtEnd; i++ {
+			if ast.IsAccessExpression(useNode) && sameFnMuts[i].pos == useNode.Pos() {
+				continue
+			}
+			return nil, false
+		}
+		// Reject any mutation in a strictly later statement (`>= useStmtEnd`) that
+		// can run before `useNode` on a subsequent loop iteration or re-invocation.
+		if last := sameFnMuts[len(sameFnMuts)-1]; last.pos >= useStmtEnd {
+			postIdx := sort.Search(len(sameFnMuts), func(i int) bool {
+				return sameFnMuts[i].pos >= useStmtEnd
+			})
+			if postIdx < len(sameFnMuts) && !directRangeCannotExecuteBefore(sameFnMuts[postIdx].pos, last.stmtEnd, useNode, sym) {
+				return nil, false
+			}
+		}
+	}
+
+	if rep.viaMethod && analysis.hasMethodInvalidatingMutationForCall(sym, summary, rep.node, rep.methodName) {
+		return nil, false
+	}
+	return rep.rhs, true
+}
+
 func (analysis *RstestCallAnalysis) resolveObjectLiteralForBoundLookup(expr *ast.Node) (objExpr *ast.Node, mutableObj bool) {
 	expr = internalUtils.SkipAssertionsAndParens(expr)
 	if expr == nil {
@@ -640,75 +2257,16 @@ func (analysis *RstestCallAnalysis) resolveObjectLiteralForBoundLookup(expr *ast
 		if len(summary.writes) == 1 && summary.writes[0].isConstDecl && summary.writes[0].rhs != nil {
 			if initObj := internalUtils.SkipAssertionsAndParens(summary.writes[0].rhs); initObj != nil &&
 				initObj.Kind == ast.KindObjectLiteralExpression {
-				return initObj, analysis.symbolHasAnyPropertyMutation(sym)
+				return initObj, analysis.symbolHasAnyPropertyMutation(sym, initObj)
 			}
 		}
 	}
 	return nil, false
 }
 
-func (analysis *RstestCallAnalysis) symbolHasAnyPropertyMutation(sym *ast.Symbol) bool {
-	if analysis.ctx.Refs == nil || sym == nil {
-		return true
-	}
-	if escaped, cached := analysis.symbolEscapedCache[sym]; cached {
-		return escaped
-	}
-	escaped := false
-	for _, ref := range analysis.ctx.Refs.References(sym) {
-		if ref == nil {
-			continue
-		}
-		if parent := ref.Parent; parent != nil &&
-			((parent.Kind == ast.KindVariableDeclaration && parent.Name() == ref) ||
-				(parent.Kind == ast.KindBindingElement && parent.Name() == ref)) {
-			continue
-		}
-		outer := outermostExpressionWrapper(ref)
-		if outer == nil || outer.Parent == nil {
-			escaped = true
-			break
-		}
-		switch outer.Parent.Kind {
-		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-			if outer.Parent.Expression() != outer {
-				escaped = true
-				break
-			}
-			accessOuter := outermostExpressionWrapper(outer.Parent)
-			if internalUtils.IsWriteReference(outer.Parent) ||
-				(accessOuter != nil && accessOuter.Parent != nil && accessOuter.Parent.Kind == ast.KindDeleteExpression) {
-				escaped = true
-			}
-		case ast.KindVariableDeclaration:
-			vd := outer.Parent.AsVariableDeclaration()
-			if vd == nil || vd.Initializer != outer || vd.Name() == nil || vd.Name().Kind != ast.KindObjectBindingPattern {
-				escaped = true
-			}
-		case ast.KindBinaryExpression:
-			bin := outer.Parent.AsBinaryExpression()
-			if bin == nil || bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindEqualsToken || bin.Right != outer {
-				escaped = true
-				break
-			}
-			lhs := ast.SkipParentheses(bin.Left)
-			if lhs == nil || lhs.Kind != ast.KindObjectLiteralExpression {
-				escaped = true
-			}
-		default:
-			// Any other use (alias assignment, call argument, array/object
-			// literal element, return value, etc.) may escape and mutate `sym`.
-			escaped = true
-		}
-		if escaped {
-			break
-		}
-	}
-	if analysis.symbolEscapedCache == nil {
-		analysis.symbolEscapedCache = map[*ast.Symbol]bool{}
-	}
-	analysis.symbolEscapedCache[sym] = escaped
-	return escaped
+func (analysis *RstestCallAnalysis) symbolHasAnyPropertyMutation(sym *ast.Symbol, objExpr *ast.Node) bool {
+	summary := analysis.getObjectLiteralMutationSummary(sym, objExpr)
+	return summary.escaped || summary.hasAnyMutation
 }
 
 func (analysis *RstestCallAnalysis) extractBoundIdentifierArgs(
@@ -750,7 +2308,7 @@ func (analysis *RstestCallAnalysis) extractBoundIdentifierArgs(
 		}
 	}
 
-	cycleBefore := analysis.boundCycleHits
+	cycleBefore := analysis.boundCycleHits + analysis.expectConfigCycleHits + analysis.expectConfigOverwriteCycleHits + analysis.objectLiteralMutationCycleHits
 	var res boundCallResult
 	evalWrite := func(w *expectConfigWrite) {
 		if visitedWrites[w] {
@@ -769,10 +2327,10 @@ func (analysis *RstestCallAnalysis) extractBoundIdentifierArgs(
 			return
 		}
 		visitedWrites[w] = true
-		wCycleBefore := analysis.boundCycleHits
+		wCycleBefore := analysis.boundCycleHits + analysis.expectConfigCycleHits + analysis.expectConfigOverwriteCycleHits + analysis.objectLiteralMutationCycleHits
 		wRes := analysis.evalWriteBoundArgs(w, 0, visitedWrites)
 		delete(visitedWrites, w)
-		if analysis.boundCycleHits == wCycleBefore {
+		if analysis.boundCycleHits+analysis.expectConfigCycleHits+analysis.expectConfigOverwriteCycleHits+analysis.objectLiteralMutationCycleHits == wCycleBefore {
 			w.boundCached = true
 			w.boundRes = wRes
 		}
@@ -844,7 +2402,8 @@ func (analysis *RstestCallAnalysis) extractBoundIdentifierArgs(
 		}
 	}
 
-	if len(visitedWrites) == 0 && analysis.boundCycleHits == cycleBefore {
+	if len(visitedWrites) == 0 &&
+		analysis.boundCycleHits+analysis.expectConfigCycleHits+analysis.expectConfigOverwriteCycleHits+analysis.objectLiteralMutationCycleHits == cycleBefore {
 		if len(summary.writes) == 1 && summary.writes[0].isConstDecl {
 			if analysis.boundCallConstCache == nil {
 				analysis.boundCallConstCache = map[*ast.Symbol]boundCallResult{}
@@ -951,18 +2510,34 @@ func (analysis *RstestCallAnalysis) destructuredBoundSources(declaration *ast.No
 	member, known, staticKey := analysis.evalBindingElementPropertyName(binding)
 	defaultSkipped := false
 	exactFromLiteral := false
-	sources, definiteSrc := analysis.bindingPatternSourceExprs(pattern)
+	sources, definiteSrc, sourcesMayBeMutable := analysis.bindingPatternSourceExprs(pattern)
+	if sourcesMayBeMutable {
+		hasUnbound = true
+	}
 	if known {
 		if definiteSrc != nil {
-			defLookup := analysis.lookupObjectLiteralProperty(definiteSrc, member, 0)
-			defaultSkipped = defLookup.definitelyDefined
+			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(definiteSrc); objExpr != nil && !mutableObj {
+				defLookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
+				defaultSkipped = defLookup.definitelyDefined
+			}
 		}
-		allExact := len(sources) > 0
+		allExact := len(sources) > 0 && !sourcesMayBeMutable
 		for _, srcExpr := range sources {
 			objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr)
 			if objExpr == nil {
 				allExact = false
 				continue
+			}
+			if mutableObj && !sourcesMayBeMutable && len(sources) == 1 {
+				if unwrapped := internalUtils.SkipAssertionsAndParens(srcExpr); unwrapped != nil && unwrapped.Kind == ast.KindIdentifier {
+					if sym := resolveRstestRootSymbol(analysis.ctx, unwrapped); sym != nil {
+						if replacement, replaced := analysis.unconditionalPropertyReplacementBefore(sym, objExpr, member, unwrapped); replaced {
+							exprs = append(exprs, replacement)
+							defaultSkipped = analysis.isDefinitelyDefinedExpr(replacement, 0, nil)
+							continue
+						}
+					}
+				}
 			}
 			lookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
 			exprs = append(exprs, lookup.possibleExprs...)
@@ -1007,18 +2582,34 @@ func (analysis *RstestCallAnalysis) assignmentDestructBoundSources(prop, default
 	member, known, staticKey := analysis.evalPropertyNameKey(propName)
 	defaultSkipped := false
 	exactFromLiteral := false
-	sources, definiteSrc := analysis.assignmentObjectSourceExprs(obj)
+	sources, definiteSrc, sourcesMayBeMutable := analysis.assignmentObjectSourceExprs(obj)
+	if sourcesMayBeMutable {
+		hasUnbound = true
+	}
 	if known {
 		if definiteSrc != nil {
-			defLookup := analysis.lookupObjectLiteralProperty(definiteSrc, member, 0)
-			defaultSkipped = defLookup.definitelyDefined
+			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(definiteSrc); objExpr != nil && !mutableObj {
+				defLookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
+				defaultSkipped = defLookup.definitelyDefined
+			}
 		}
-		allExact := len(sources) > 0
+		allExact := len(sources) > 0 && !sourcesMayBeMutable
 		for _, srcExpr := range sources {
 			objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr)
 			if objExpr == nil {
 				allExact = false
 				continue
+			}
+			if mutableObj && !sourcesMayBeMutable && len(sources) == 1 {
+				if unwrapped := internalUtils.SkipAssertionsAndParens(srcExpr); unwrapped != nil && unwrapped.Kind == ast.KindIdentifier {
+					if sym := resolveRstestRootSymbol(analysis.ctx, unwrapped); sym != nil {
+						if replacement, replaced := analysis.unconditionalPropertyReplacementBefore(sym, objExpr, member, unwrapped); replaced {
+							exprs = append(exprs, replacement)
+							defaultSkipped = analysis.isDefinitelyDefinedExpr(replacement, 0, nil)
+							continue
+						}
+					}
+				}
 			}
 			lookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
 			exprs = append(exprs, lookup.possibleExprs...)
@@ -1276,10 +2867,21 @@ func (analysis *RstestCallAnalysis) expectConfigMember(node *ast.Node) expectCon
 }
 
 func (analysis *RstestCallAnalysis) applyObjectLiteralPropertiesToKind(kind expectConfigKind, objNode *ast.Node) expectConfigKind {
+	return analysis.applyObjectLiteralPropertiesWithTargetAccessors(kind, objNode, expectConfigNone)
+}
+
+func (analysis *RstestCallAnalysis) applyObjectLiteralPropertiesWithTargetAccessors(
+	kind expectConfigKind,
+	objNode *ast.Node,
+	targetAccessorMask expectConfigKind,
+) expectConfigKind {
 	obj := objNode.AsObjectLiteralExpression()
 	if obj == nil || obj.Properties == nil {
 		return kind
 	}
+	var protoExpr *ast.Node
+	var ownExplicitMask expectConfigKind
+	var hasGetterMask expectConfigKind
 	for _, prop := range obj.Properties.Nodes {
 		if prop == nil {
 			continue
@@ -1293,16 +2895,37 @@ func (analysis *RstestCallAnalysis) applyObjectLiteralPropertiesToKind(kind expe
 		if propName == nil {
 			continue
 		}
-		name, ok := internalUtils.GetStaticPropertyName(propName)
+		name, ok, staticKey := analysis.evalPropertyNameKey(propName)
 		if !ok {
-			name, ok = analysis.staticStringEvaluator().EvalPropertyName(propName)
-		}
-		if !ok {
+			// A dynamically computed key (`{ [key]: r.expect.extend }`) may
+			// define `"extend"`, `"addEqualityTesters"`, or `"expect"` at runtime.
+			if !staticKey {
+				var dynKind expectConfigKind
+				switch prop.Kind {
+				case ast.KindPropertyAssignment:
+					dynKind = analysis.expectConfigMember(prop.AsPropertyAssignment().Initializer)
+				case ast.KindShorthandPropertyAssignment:
+					dynKind = analysis.expectConfigIdentifierMember(prop.AsShorthandPropertyAssignment().Name())
+				case ast.KindGetAccessor:
+					dynKind = analysis.getterExpectConfigKind(prop)
+				}
+				if dynKind&expectConfigExtend != 0 {
+					kind |= expectConfigExpectExtend
+				}
+				if dynKind&expectConfigAddEqualityTesters != 0 {
+					kind |= expectConfigExpectEquality
+				}
+				if dynKind&expectConfigDynamicMember != 0 {
+					kind |= expectConfigExpect
+				}
+				if dynKind&expectConfigExpect != 0 {
+					kind |= expectConfigReceiver
+				}
+			}
 			continue
 		}
 		if name == "__proto__" && prop.Kind == ast.KindPropertyAssignment && propName.Kind != ast.KindComputedPropertyName {
-			protoKind := analysis.expectConfigMember(prop.AsPropertyAssignment().Initializer)
-			kind |= protoKind & (expectConfigReceiver | expectConfigExpect)
+			protoExpr = prop.AsPropertyAssignment().Initializer
 			continue
 		}
 		var valKind expectConfigKind
@@ -1314,23 +2937,42 @@ func (analysis *RstestCallAnalysis) applyObjectLiteralPropertiesToKind(kind expe
 		case ast.KindGetAccessor:
 			valKind = analysis.getterExpectConfigKind(prop)
 		}
-		switch name {
-		case "extend":
-			kind &^= expectConfigExpectExtend
-			if valKind&expectConfigExtend != 0 {
-				kind |= expectConfigExpectExtend
+		applySlot := func(slotBit, matchBit expectConfigKind) {
+			ownExplicitMask |= slotBit
+			// A setter (`set extend(v) {}`) paired with an earlier getter keeps
+			// the getter readable in JS rather than wiping it out.
+			if prop.Kind == ast.KindSetAccessor {
+				if hasGetterMask&slotBit == 0 && targetAccessorMask&slotBit == 0 {
+					kind &^= slotBit
+				}
+				return
 			}
-		case "addEqualityTesters":
-			kind &^= expectConfigExpectEquality
-			if valKind&expectConfigAddEqualityTesters != 0 {
-				kind |= expectConfigExpectEquality
+			if prop.Kind == ast.KindGetAccessor {
+				hasGetterMask |= slotBit
+			} else {
+				hasGetterMask &^= slotBit
 			}
-		case "expect":
-			kind &^= expectConfigReceiver
-			if valKind&expectConfigExpect != 0 {
-				kind |= expectConfigReceiver
+			if targetAccessorMask&slotBit == 0 {
+				kind &^= slotBit
+			}
+			if valKind&matchBit != 0 {
+				kind |= slotBit
 			}
 		}
+		switch name {
+		case "extend":
+			applySlot(expectConfigExpectExtend, expectConfigExtend|expectConfigDynamicMember)
+		case "addEqualityTesters":
+			applySlot(expectConfigExpectEquality, expectConfigAddEqualityTesters|expectConfigDynamicMember)
+		case "expect":
+			applySlot(expectConfigReceiver, expectConfigExpect)
+		}
+	}
+	// In JS, own properties (even set to `undefined`) always shadow `__proto__`
+	// regardless of whether `__proto__` appears before or after them in the literal.
+	if protoExpr != nil {
+		protoKind := analysis.expectConfigMember(protoExpr) & (expectConfigReceiver | expectConfigExpect)
+		kind |= protoKind &^ ownExplicitMask
 	}
 	return kind
 }
@@ -1342,18 +2984,37 @@ func (analysis *RstestCallAnalysis) expectConfigObjectLiteralSpreadMember(node *
 	return analysis.applyObjectLiteralPropertiesToKind(expectConfigNone, node)
 }
 
+func (analysis *RstestCallAnalysis) objectAccessorConfigMask(expr *ast.Node) expectConfigKind {
+	var mask expectConfigKind
+	if analysis.exprMayHaveAccessorOnProp(expr, "extend", true, 0) {
+		mask |= expectConfigExpectExtend
+	}
+	if analysis.exprMayHaveAccessorOnProp(expr, "addEqualityTesters", true, 0) {
+		mask |= expectConfigExpectEquality
+	}
+	if analysis.exprMayHaveAccessorOnProp(expr, "expect", true, 0) {
+		mask |= expectConfigReceiver
+	}
+	return mask
+}
+
 func (analysis *RstestCallAnalysis) expectConfigObjectAssignMember(args []*ast.Node) expectConfigKind {
 	if len(args) == 0 {
 		return expectConfigNone
 	}
+	targetAccessorMask := analysis.objectAccessorConfigMask(args[0])
 	var kind expectConfigKind
-	for _, arg := range args {
+	for i, arg := range args {
 		a := internalUtils.SkipAssertionsAndParens(arg)
 		if a == nil || a.Kind == ast.KindSpreadElement {
 			continue
 		}
 		if a.Kind == ast.KindObjectLiteralExpression {
-			kind = analysis.applyObjectLiteralPropertiesToKind(kind, a)
+			accMask := expectConfigNone
+			if i > 0 {
+				accMask = targetAccessorMask
+			}
+			kind = analysis.applyObjectLiteralPropertiesWithTargetAccessors(kind, a, accMask)
 			continue
 		}
 		kind |= analysis.expectConfigMember(a) & (expectConfigReceiver | expectConfigExpect)
@@ -1386,17 +3047,18 @@ type expectConfigBlockKill struct {
 }
 
 type expectConfigSymbolSummary struct {
-	writes              []expectConfigWrite
-	blockKills          map[*ast.Node][]expectConfigBlockKill
-	configWritesByFn    map[*ast.Node][]int // indices into writes sorted by exprEnd
-	allConfigMask       expectConfigKind
-	hasAnyConfigSource  bool
-	evaluatedSources    bool
-	shallowAliasTarget  *ast.Symbol
-	isDirectShallowCopy bool
-	maxWriteEnd         int
-	singleEnclosingFnOK bool
-	singleEnclosingFn   *ast.Node
+	writes                   []expectConfigWrite
+	blockKills               map[*ast.Node][]expectConfigBlockKill
+	configWritesByFn         map[*ast.Node][]int // indices into writes sorted by exprEnd
+	allConfigMask            expectConfigKind
+	initialObjectLiteralKind expectConfigKind
+	hasAnyConfigSource       bool
+	evaluatedSources         bool
+	shallowAliasTarget       *ast.Symbol
+	isDirectShallowCopy      bool
+	maxWriteEnd              int
+	singleEnclosingFnOK      bool
+	singleEnclosingFn        *ast.Node
 }
 
 type expectConfigOverwriteKey struct {
@@ -1405,9 +3067,10 @@ type expectConfigOverwriteKey struct {
 }
 
 type expectConfigOverwriteEvent struct {
-	pos     int
-	stmtEnd int
-	clears  bool
+	pos          int
+	stmtEnd      int
+	clears       bool
+	postCallNode *ast.Node // non-nil when this restore runs only after evaluating/calling `postCallNode`
 }
 
 // expectConfigOverwriteSummary stores, for each (block, config bit), the
@@ -1416,8 +3079,10 @@ type expectConfigOverwriteEvent struct {
 // a bit. Queries binary-search the latest event before `useStmt` (and after
 // the reaching write), running in O(log E) with sound MUST-overwrite semantics.
 type expectConfigOverwriteSummary struct {
-	events     map[expectConfigOverwriteKey][]expectConfigOverwriteEvent
-	fnRestores map[expectConfigKind][]*ast.Node
+	events        map[expectConfigOverwriteKey][]expectConfigOverwriteEvent
+	maxRestoreEnd map[expectConfigOverwriteKey]int
+	fnRestores    map[expectConfigKind][]*ast.Node
+	escaped       bool
 }
 
 type expectConfigPosRange struct {
@@ -1506,9 +3171,19 @@ func (analysis *RstestCallAnalysis) expectConfigIdentifierMember(node *ast.Node)
 	var allMask expectConfigKind
 	if !summary.evaluatedSources {
 		localEvaluated = make([]expectConfigKind, len(summary.writes))
+		var initObj *ast.Node
+		if len(summary.writes) == 1 && summary.writes[0].isConstDecl && summary.writes[0].rhs != nil {
+			if obj := internalUtils.SkipAssertionsAndParens(summary.writes[0].rhs); obj != nil &&
+				obj.Kind == ast.KindObjectLiteralExpression {
+				initObj = obj
+			}
+		}
+		var origObjKind expectConfigKind
 		otherCycleHit := false
 		for range 6 {
 			otherBefore := analysis.expectConfigOtherCycleHits[symbol]
+			mutCycleBefore := analysis.objectLiteralMutationCycleHits
+			overwriteCycleBefore := analysis.expectConfigOverwriteCycleHits
 			delete(analysis.expectConfigSelfHit, symbol)
 			allMask = expectConfigNone
 			for i := range summary.writes {
@@ -1516,13 +3191,35 @@ func (analysis *RstestCallAnalysis) expectConfigIdentifierMember(node *ast.Node)
 				localEvaluated[i] = k
 				allMask |= k
 			}
-			otherCycleHit = analysis.expectConfigOtherCycleHits[symbol] != otherBefore
+			// A single-write `const holder = { extend: () => {}, reset() { this.extend = r.expect.extend; } }`
+			// starts with `expectConfigNone` on its initializer but can acquire
+			// `expect.extend` / `expect.addEqualityTesters` / `expect` via direct
+			// writes, aliases, mutating builtins, or own-method `this.<prop> = ...`.
+			// Running this inside the fixed-point loop ensures mutual cycles are
+			// observed by `otherCycleHit` and self-cycles converge cleanly.
+			if initObj != nil {
+				origObjKind = localEvaluated[0]
+				mutSummary := analysis.getObjectLiteralMutationSummary(symbol, initObj)
+				if restored := mutSummary.restoredConfigMask; restored != expectConfigNone {
+					localEvaluated[0] |= restored
+					allMask |= restored
+				}
+			}
+			otherCycleHit = analysis.expectConfigOtherCycleHits[symbol] != otherBefore ||
+				analysis.objectLiteralMutationCycleHits != mutCycleBefore ||
+				analysis.expectConfigOverwriteCycleHits != overwriteCycleBefore
 			if !analysis.expectConfigSelfHit[symbol] || allMask == analysis.expectConfigPartial[symbol] {
 				break
 			}
 			analysis.expectConfigPartial[symbol] = allMask
 		}
 		if !otherCycleHit {
+			if initObj != nil {
+				summary.initialObjectLiteralKind = origObjKind
+				if localEvaluated[0] != origObjKind {
+					summary.writes[0].isShallowCopy = true
+				}
+			}
 			summary.evaluatedSources = true
 			summary.allConfigMask = allMask
 			summary.hasAnyConfigSource = allMask != expectConfigNone
@@ -1706,14 +3403,40 @@ func isObjectLiteralSpread(node *ast.Node) bool {
 	if node.Kind == ast.KindObjectLiteralExpression {
 		return true
 	}
-	// `Object.assign({}, expect)` also allocates a shallow copy.
+	// `Object.assign({}, expect)` allocates a fresh shallow copy ONLY when
+	// arg 0 is a fresh accessor-free object literal (never an existing shared
+	// target or a target literal with getters/setters/spread/`__proto__` that
+	// could execute user code during `Object.assign`).
 	if node.Kind == ast.KindCallExpression {
 		callee := internalUtils.SkipAssertionsAndParens(node.AsCallExpression().Expression)
 		if callee != nil && ast.IsAccessExpression(callee) {
 			if name, ok := internalUtils.AccessExpressionStaticName(callee); ok && name == "assign" {
 				if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee)); recv != nil &&
 					recv.Kind == ast.KindIdentifier && recv.AsIdentifier().Text == "Object" {
-					return true
+					args := node.Arguments()
+					if len(args) > 0 {
+						if first := internalUtils.SkipAssertionsAndParens(args[0]); first != nil &&
+							first.Kind == ast.KindObjectLiteralExpression {
+							if props := first.AsObjectLiteralExpression().Properties; props != nil {
+								for _, prop := range props.Nodes {
+									if prop == nil {
+										continue
+									}
+									if prop.Kind == ast.KindGetAccessor || prop.Kind == ast.KindSetAccessor ||
+										prop.Kind == ast.KindSpreadAssignment {
+										return false
+									}
+									if prop.Kind == ast.KindPropertyAssignment && prop.Name() != nil &&
+										prop.Name().Kind != ast.KindComputedPropertyName {
+										if pName, pOK := internalUtils.GetStaticPropertyName(prop.Name()); pOK && pName == "__proto__" {
+											return false
+										}
+									}
+								}
+							}
+							return true
+						}
+					}
 				}
 			}
 		}
@@ -2018,7 +3741,7 @@ func (analysis *RstestCallAnalysis) expectConfigMustOverwrittenMask(
 				minBlock = write.block
 				minPos = write.exprEnd
 			}
-			ev, found := analysis.latestSymbolOverwriteEvent(summary, bit, useNode, minBlock, minPos)
+			ev, found := analysis.latestSymbolOverwriteEvent(summary, bit, useNode, cur, minBlock, minPos)
 			if !found {
 				continue
 			}
@@ -2038,17 +3761,18 @@ func isLaterOverwriteEvent(a, b expectConfigOverwriteEvent) bool {
 	if a.stmtEnd != b.stmtEnd {
 		return a.stmtEnd > b.stmtEnd
 	}
-	if a.pos != b.pos {
-		return a.pos > b.pos
+	// Within the same statement, a restore (`!clears`) always dominates an overwrite (`clears`).
+	if a.clears != b.clears {
+		return !a.clears
 	}
-	// On exact tie, a restore (`!clears`) wins over an overwrite (`clears`).
-	return !a.clears && b.clears
+	return a.pos > b.pos
 }
 
 func (analysis *RstestCallAnalysis) latestSymbolOverwriteEvent(
 	summary *expectConfigOverwriteSummary,
 	bit expectConfigKind,
 	useNode *ast.Node,
+	symbol *ast.Symbol,
 	writeBlock *ast.Node,
 	writeExprEnd int,
 ) (expectConfigOverwriteEvent, bool) {
@@ -2064,7 +3788,9 @@ func (analysis *RstestCallAnalysis) latestSymbolOverwriteEvent(
 			break
 		}
 		stmtPos := stmt.Pos()
-		events := summary.events[expectConfigOverwriteKey{block: block, bit: bit}]
+		stmtEnd := stmt.End()
+		key := expectConfigOverwriteKey{block: block, bit: bit}
+		events := summary.events[key]
 		if len(events) > 0 {
 			// Find the latest event whose statement finished before `stmtPos`.
 			idx := sort.Search(len(events), func(i int) bool {
@@ -2076,6 +3802,31 @@ func (analysis *RstestCallAnalysis) latestSymbolOverwriteEvent(
 					// Overwrite happened before this reaching write (e.g. before
 					// `mock = { ...expect }` replaced the object).
 					return expectConfigOverwriteEvent{}, false
+				}
+				if ev.clears {
+					// A restore in the SAME statement (e.g. computed key
+					// `holder[(holder.extend = r.expect.extend, 'extend')]()`)
+					// can execute before `useNode` unconditionally. Because
+					// `events` sorts `!clears` last within each `stmtEnd`,
+					// the last event with `stmtEnd <= stmt.End()` reveals any
+					// same-statement restore in O(log E).
+					sameStmtEndIdx := sort.Search(len(events), func(i int) bool {
+						return events[i].stmtEnd > stmtEnd
+					})
+					allowSkipSelfPostCall := cur == useNode && !ast.IsIterationStatement(stmt, false)
+					for k := sameStmtEndIdx - 1; k >= idx && events[k].stmtEnd == stmtEnd && !events[k].clears; k-- {
+						if allowSkipSelfPostCall && events[k].postCallNode == useNode {
+							continue
+						}
+						return events[k], true
+					}
+					// A restore in a strictly later statement cancels the clear
+					// whenever `useNode` sits inside a loop or capturing function
+					// that can re-execute after that restore.
+					if maxRestoreEnd := summary.maxRestoreEnd[key]; maxRestoreEnd > stmtEnd &&
+						!directRangeCannotExecuteBefore(stmtEnd, maxRestoreEnd, useNode, symbol) {
+						return expectConfigOverwriteEvent{pos: maxRestoreEnd, stmtEnd: maxRestoreEnd, clears: false}, true
+					}
 				}
 				return ev, true
 			}
@@ -2090,11 +3841,455 @@ func (analysis *RstestCallAnalysis) latestSymbolOverwriteEvent(
 }
 
 type expectConfigOverwriteEventDedupKey struct {
-	block   *ast.Node
-	bit     expectConfigKind
-	pos     int
-	stmtEnd int
-	clears  bool
+	block        *ast.Node
+	bit          expectConfigKind
+	pos          int
+	stmtEnd      int
+	clears       bool
+	postCallNode *ast.Node
+}
+
+func (analysis *RstestCallAnalysis) isAccessorDefiningBuiltinCall(call *ast.Node) (isAssign bool, isDefineOrCreate bool) {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return false, false
+	}
+	callee := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
+	if callee == nil || !ast.IsAccessExpression(callee) {
+		return false, false
+	}
+	method, ok := analysis.evalExpectConfigAccessName(callee)
+	if !ok {
+		return false, false
+	}
+	obj := internalUtils.SkipAssertionsAndParens(callee.Expression())
+	if obj == nil || obj.Kind != ast.KindIdentifier {
+		return false, false
+	}
+	objName := obj.AsIdentifier().Text
+	if objName != "Object" && objName != "Reflect" {
+		return false, false
+	}
+	if analysis.ctx.Refs != nil {
+		if !analysis.ctx.Refs.IsGlobalReference(obj) {
+			return false, false
+		}
+	} else if internalUtils.IsShadowed(obj, objName) {
+		return false, false
+	}
+	if objName == "Object" {
+		switch method {
+		case "assign":
+			return true, false
+		case "defineProperty", "defineProperties", "create", "setPrototypeOf":
+			return false, true
+		}
+	}
+	if objName == "Reflect" {
+		if method == "defineProperty" || method == "setPrototypeOf" {
+			return false, true
+		}
+	}
+	return false, false
+}
+
+// symbolHasDefineProperty reports whether `symbol` (or a tracked alias of it)
+// is passed as the target of `Object.defineProperty`, `Object.defineProperties`,
+// `Reflect.defineProperty`, `Object.setPrototypeOf`, `Reflect.setPrototypeOf`,
+// `__defineGetter__`, or `__defineSetter__`.
+func (analysis *RstestCallAnalysis) symbolHasDefineProperty(symbol *ast.Symbol, visited map[*ast.Symbol]bool) bool {
+	if symbol == nil || analysis.ctx.Refs == nil {
+		return false
+	}
+	if cached, ok := analysis.symbolDefinePropertyAccessor[symbol]; ok {
+		return cached
+	}
+	if visited[symbol] {
+		return false
+	}
+	isRoot := visited == nil
+	if visited == nil {
+		visited = map[*ast.Symbol]bool{}
+	}
+	visited[symbol] = true
+
+	found := false
+	for _, ref := range analysis.ctx.Refs.References(symbol) {
+		if ref == nil {
+			continue
+		}
+		if parent := ref.Parent; parent != nil &&
+			((parent.Kind == ast.KindVariableDeclaration && parent.Name() == ref) ||
+				(parent.Kind == ast.KindBindingElement && parent.Name() == ref)) {
+			continue
+		}
+		outer := outermostExpressionWrapper(ref)
+		if outer == nil || outer.Parent == nil {
+			continue
+		}
+		switch outer.Parent.Kind {
+		case ast.KindCallExpression:
+			args := outer.Parent.Arguments()
+			if len(args) > 0 && internalUtils.SkipAssertionsAndParens(args[0]) == internalUtils.SkipAssertionsAndParens(outer) {
+				if _, isDef := analysis.isAccessorDefiningBuiltinCall(outer.Parent); isDef {
+					found = true
+				}
+			}
+		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+			if outer.Parent.Expression() == outer {
+				if mName, ok := analysis.evalExpectConfigAccessName(outer.Parent); ok &&
+					(mName == "__defineGetter__" || mName == "__defineSetter__") {
+					found = true
+				}
+			}
+		case ast.KindVariableDeclaration:
+			vd := outer.Parent.AsVariableDeclaration()
+			if vd != nil && vd.Initializer == outer && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+				aliasSym := outer.Parent.Symbol()
+				if aliasSym == nil {
+					aliasSym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+				}
+				if aliasSym != nil && aliasSym != symbol && analysis.symbolHasDefineProperty(aliasSym, visited) {
+					found = true
+				}
+			}
+		case ast.KindBinaryExpression:
+			bin := outer.Parent.AsBinaryExpression()
+			if bin != nil && bin.Right == outer && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
+				if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
+					if aliasSym := resolveRstestRootSymbol(analysis.ctx, lhs); aliasSym != nil && aliasSym != symbol &&
+						analysis.symbolHasDefineProperty(aliasSym, visited) {
+						found = true
+					}
+				}
+			}
+		}
+		if found {
+			break
+		}
+	}
+	if isRoot {
+		if analysis.symbolDefinePropertyAccessor == nil {
+			analysis.symbolDefinePropertyAccessor = map[*ast.Symbol]bool{}
+		}
+		analysis.symbolDefinePropertyAccessor[symbol] = found
+	}
+	return found
+}
+
+func (analysis *RstestCallAnalysis) exprMayHaveAccessorOnProp(
+	expr *ast.Node,
+	propName string,
+	propStatic bool,
+	depth int,
+) bool {
+	if depth > 4 {
+		return true
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindObjectLiteralExpression:
+		return analysis.objectLiteralHasAccessor(expr, propName, propStatic, true, 0)
+	case ast.KindIdentifier:
+		if targetSym := resolveRstestRootSymbol(analysis.ctx, expr); targetSym != nil {
+			return analysis.symbolMayHaveAccessorOnProp(targetSym, propName, propStatic, depth+1)
+		}
+	case ast.KindCallExpression:
+		isAssign, isDef := analysis.isAccessorDefiningBuiltinCall(expr)
+		if isDef {
+			return true
+		}
+		if isAssign {
+			args := expr.Arguments()
+			if len(args) > 0 {
+				return analysis.exprMayHaveAccessorOnProp(args[0], propName, propStatic, depth+1)
+			}
+		}
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		if cond != nil {
+			return analysis.exprMayHaveAccessorOnProp(cond.WhenTrue, propName, propStatic, depth+1) ||
+				analysis.exprMayHaveAccessorOnProp(cond.WhenFalse, propName, propStatic, depth+1)
+		}
+	case ast.KindBinaryExpression:
+		bin := expr.AsBinaryExpression()
+		if bin != nil && bin.OperatorToken != nil {
+			switch bin.OperatorToken.Kind {
+			case ast.KindCommaToken, ast.KindAmpersandAmpersandToken, ast.KindEqualsToken:
+				return analysis.exprMayHaveAccessorOnProp(bin.Right, propName, propStatic, depth+1)
+			case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+				return analysis.exprMayHaveAccessorOnProp(bin.Left, propName, propStatic, depth+1) ||
+					analysis.exprMayHaveAccessorOnProp(bin.Right, propName, propStatic, depth+1)
+			}
+		}
+	}
+	return false
+}
+
+// symbolMayHaveAccessorOnProp reports whether any write, alias, `Object.assign`,
+// or `Object.defineProperty` call on `symbol` may define a getter/setter accessor
+// for `propName`. Covers `let` bindings, aliases, and dynamic descriptor installs.
+func (analysis *RstestCallAnalysis) symbolMayHaveAccessorOnProp(
+	symbol *ast.Symbol,
+	propName string,
+	propStatic bool,
+	depth int,
+) bool {
+	if depth > 4 || symbol == nil {
+		return depth > 4
+	}
+	if analysis.symbolHasDefineProperty(symbol, nil) {
+		return true
+	}
+	symSummary := analysis.getExpectConfigSymbolSummary(symbol)
+	for i := range symSummary.writes {
+		rhs := internalUtils.SkipAssertionsAndParens(symSummary.writes[i].rhs)
+		if rhs == nil {
+			continue
+		}
+		if rhs.Kind == ast.KindIdentifier {
+			if targetSym := resolveRstestRootSymbol(analysis.ctx, rhs); targetSym == symbol {
+				continue
+			}
+		}
+		if analysis.exprMayHaveAccessorOnProp(rhs, propName, propStatic, depth+1) {
+			return true
+		}
+	}
+	return false
+}
+
+func (analysis *RstestCallAnalysis) isNonEscapingSymbolUse(parent, current *ast.Node, symHasAnyAccessor bool) bool {
+	if parent == nil {
+		return true
+	}
+	if internalUtils.IsWriteReference(current) {
+		return true
+	}
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		vd := parent.AsVariableDeclaration()
+		return vd != nil && vd.Initializer == current && vd.Name() != nil &&
+			(vd.Name().Kind == ast.KindIdentifier || vd.Name().Kind == ast.KindObjectBindingPattern)
+	case ast.KindBinaryExpression:
+		bin := parent.AsBinaryExpression()
+		if bin == nil || bin.OperatorToken == nil {
+			return false
+		}
+		switch bin.OperatorToken.Kind {
+		case ast.KindEqualsToken:
+			if bin.Right != current {
+				return false
+			}
+			// Only discarded top-level assignment statements do not leak the
+			// expression value (`(a = holder).extend = ...`, `b = a = holder`).
+			binOuter := outermostExpressionWrapper(parent)
+			if binOuter == nil || binOuter.Parent == nil || binOuter.Parent.Kind != ast.KindExpressionStatement {
+				return false
+			}
+			lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
+			if lhs == nil {
+				return false
+			}
+			if lhs.Kind == ast.KindObjectLiteralExpression {
+				return true
+			}
+			if lhs.Kind == ast.KindIdentifier {
+				return resolveRstestRootSymbol(analysis.ctx, lhs) != nil
+			}
+			return false
+		case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+			return true
+		case ast.KindInKeyword:
+			// `'k' in holder` only checks property presence; `holder in {}`
+			// coerces `holder` via `ToPropertyKey` (`toString`/`valueOf`).
+			return bin.Right == current
+		}
+		return false
+	case ast.KindTypeOfExpression, ast.KindVoidExpression, ast.KindExpressionStatement:
+		return true
+	case ast.KindPrefixUnaryExpression:
+		return parent.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
+	case ast.KindIfStatement:
+		return parent.AsIfStatement().Expression == current
+	case ast.KindWhileStatement:
+		return parent.AsWhileStatement().Expression == current
+	case ast.KindDoStatement:
+		return parent.AsDoStatement().Expression == current
+	case ast.KindConditionalExpression:
+		return parent.AsConditionalExpression().Condition == current
+	case ast.KindSpreadAssignment:
+		return !symHasAnyAccessor
+	}
+	return false
+}
+
+func (analysis *RstestCallAnalysis) objectLiteralHasNonPureProp(objNode *ast.Node, propName string) bool {
+	if objNode == nil || objNode.Kind != ast.KindObjectLiteralExpression || objNode.AsObjectLiteralExpression().Properties == nil {
+		return false
+	}
+	for _, prop := range objNode.AsObjectLiteralExpression().Properties.Nodes {
+		if prop == nil {
+			continue
+		}
+		if prop.Kind == ast.KindSpreadAssignment {
+			spreadExpr := internalUtils.SkipAssertionsAndParens(prop.AsSpreadAssignment().Expression)
+			if analysis.isPureRstestExpectObject(spreadExpr, 0) {
+				continue
+			}
+			if spreadExpr != nil && spreadExpr.Kind == ast.KindObjectLiteralExpression {
+				if analysis.objectLiteralHasNonPureProp(spreadExpr, propName) {
+					return true
+				}
+				continue
+			}
+			return true
+		}
+		if prop.Name() != nil {
+			n, nOK := analysis.staticStringEvaluator().EvalPropertyName(prop.Name())
+			if nOK && n != propName {
+				continue
+			}
+			switch prop.Kind {
+			case ast.KindMethodDeclaration:
+				if !isSideEffectFreeNoOpFn(prop) {
+					return true
+				}
+			case ast.KindPropertyAssignment:
+				rhs := prop.AsPropertyAssignment().Initializer
+				if !analysis.isPureRstestExpectCallable(rhs, 0) && !isSideEffectFreeNoOpFn(rhs) {
+					return true
+				}
+			case ast.KindShorthandPropertyAssignment:
+				ident := prop.AsShorthandPropertyAssignment().Name()
+				if !analysis.isPureRstestExpectCallable(ident, 0) {
+					return true
+				}
+			default:
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (analysis *RstestCallAnalysis) symbolHasNonPurePropWrite(
+	symbol *ast.Symbol,
+	propName string,
+	depth int,
+	visited map[*ast.Symbol]bool,
+) bool {
+	if depth > 4 || symbol == nil || analysis.ctx.Refs == nil {
+		return depth > 4
+	}
+	if visited[symbol] {
+		return false
+	}
+	if visited == nil {
+		visited = map[*ast.Symbol]bool{}
+	}
+	visited[symbol] = true
+
+	symSummary := analysis.getExpectConfigSymbolSummary(symbol)
+	for i := range symSummary.writes {
+		if rhs := internalUtils.SkipAssertionsAndParens(symSummary.writes[i].rhs); rhs != nil &&
+			rhs.Kind == ast.KindObjectLiteralExpression {
+			if analysis.objectLiteralHasNonPureProp(rhs, propName) {
+				return true
+			}
+		}
+	}
+
+	for _, ref := range analysis.ctx.Refs.References(symbol) {
+		if ref == nil {
+			continue
+		}
+		outer := outermostExpressionWrapper(ref)
+		if outer == nil || outer.Parent == nil {
+			continue
+		}
+		if ast.IsAccessExpression(outer.Parent) && outer.Parent.Expression() == outer {
+			if !internalUtils.IsWriteReference(outer.Parent) {
+				continue
+			}
+			pName, pKnown := analysis.evalExpectConfigAccessName(outer.Parent)
+			if pKnown && pName != propName {
+				continue
+			}
+			accessOuter := outermostExpressionWrapper(outer.Parent)
+			if accessOuter != nil && accessOuter.Parent != nil && accessOuter.Parent.Kind == ast.KindBinaryExpression {
+				bin := accessOuter.Parent.AsBinaryExpression()
+				if bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken &&
+					bin.Left == accessOuter && !internalUtils.IsDefaultValueInDestructuringAssignment(accessOuter.Parent) &&
+					(analysis.isPureRstestExpectCallable(bin.Right, 0) || isSideEffectFreeNoOpFn(bin.Right)) {
+					continue
+				}
+			}
+			return true
+		}
+		switch outer.Parent.Kind {
+		case ast.KindCallExpression:
+			args := outer.Parent.Arguments()
+			if len(args) > 0 && internalUtils.SkipAssertionsAndParens(args[0]) == internalUtils.SkipAssertionsAndParens(outer) {
+				callee := internalUtils.SkipAssertionsAndParens(outer.Parent.AsCallExpression().Expression)
+				isAssign, _ := analysis.isAccessorDefiningBuiltinCall(outer.Parent)
+				if isAssign {
+					for _, src := range args[1:] {
+						s := internalUtils.SkipAssertionsAndParens(src)
+						if s == nil {
+							continue
+						}
+						if s.Kind == ast.KindObjectLiteralExpression {
+							if analysis.objectLiteralHasNonPureProp(s, propName) {
+								return true
+							}
+						} else if !analysis.isPureRstestExpectObject(s, 0) {
+							return true
+						}
+					}
+				} else if analysis.isGlobalBuiltinMemberCall(callee, "Reflect", "set") {
+					if len(args) < 3 {
+						return true
+					}
+					kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[1]))
+					if !kOK || kName == propName {
+						if !analysis.isPureRstestExpectCallable(args[2], 0) && !isSideEffectFreeNoOpFn(args[2]) {
+							return true
+						}
+					}
+				}
+			}
+		case ast.KindVariableDeclaration:
+			vd := outer.Parent.AsVariableDeclaration()
+			if vd != nil && vd.Initializer == outer && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+				aliasSym := outer.Parent.Symbol()
+				if aliasSym == nil {
+					aliasSym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+				}
+				if aliasSym != nil && analysis.symbolHasNonPurePropWrite(aliasSym, propName, depth+1, visited) {
+					return true
+				}
+			}
+		case ast.KindBinaryExpression:
+			bin := outer.Parent.AsBinaryExpression()
+			if bin != nil && bin.Right == outer && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
+				if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
+					if aliasSym := resolveRstestRootSymbol(analysis.ctx, lhs); aliasSym != nil &&
+						analysis.symbolHasNonPurePropWrite(aliasSym, propName, depth+1, visited) {
+						return true
+					}
+				}
+			}
+		}
+	}
+	if symSummary.shallowAliasTarget != nil && symSummary.shallowAliasTarget != symbol {
+		if analysis.symbolHasNonPurePropWrite(symSummary.shallowAliasTarget, propName, depth+1, visited) {
+			return true
+		}
+	}
+	return false
 }
 
 func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.Symbol) *expectConfigOverwriteSummary {
@@ -2112,19 +4307,22 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 	defer delete(analysis.expectConfigOverwriteVisit, symbol)
 
 	cycleBefore := analysis.expectConfigOverwriteCycleHits
+	expectCycleBefore := analysis.expectConfigCycleHits
+	mutCycleBefore := analysis.objectLiteralMutationCycleHits
 	summary := &expectConfigOverwriteSummary{}
 	seenEvents := map[expectConfigOverwriteEventDedupKey]bool{}
 	seenAliases := map[*ast.Symbol]bool{}
-	addEvent := func(block *ast.Node, pos, stmtEnd int, bit expectConfigKind, clears bool) {
+	addEvent := func(block *ast.Node, pos, stmtEnd int, bit expectConfigKind, clears bool, postCallNode *ast.Node) {
 		if block == nil || bit == expectConfigNone {
 			return
 		}
 		dk := expectConfigOverwriteEventDedupKey{
-			block:   block,
-			bit:     bit,
-			pos:     pos,
-			stmtEnd: stmtEnd,
-			clears:  clears,
+			block:        block,
+			bit:          bit,
+			pos:          pos,
+			stmtEnd:      stmtEnd,
+			clears:       clears,
+			postCallNode: postCallNode,
 		}
 		if seenEvents[dk] {
 			return
@@ -2135,10 +4333,19 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 		}
 		key := expectConfigOverwriteKey{block: block, bit: bit}
 		summary.events[key] = append(summary.events[key], expectConfigOverwriteEvent{
-			pos:     pos,
-			stmtEnd: stmtEnd,
-			clears:  clears,
+			pos:          pos,
+			stmtEnd:      stmtEnd,
+			clears:       clears,
+			postCallNode: postCallNode,
 		})
+		if !clears {
+			if summary.maxRestoreEnd == nil {
+				summary.maxRestoreEnd = map[expectConfigOverwriteKey]int{}
+			}
+			if stmtEnd > summary.maxRestoreEnd[key] {
+				summary.maxRestoreEnd[key] = stmtEnd
+			}
+		}
 	}
 	addFnRestore := func(fn *ast.Node, bit expectConfigKind) {
 		if fn == nil || bit == expectConfigNone {
@@ -2151,12 +4358,12 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 			summary.fnRestores[bit] = append(summary.fnRestores[bit], fn)
 		}
 	}
-	record := func(node, stmt, block *ast.Node, bit expectConfigKind, clears bool) {
+	recordWithPostCall := func(node, stmt, block *ast.Node, bit expectConfigKind, clears bool, postCallNode *ast.Node) {
 		if block == nil || stmt == nil || bit == expectConfigNone {
 			return
 		}
 		if clears {
-			addEvent(block, stmt.Pos(), stmt.End(), bit, true)
+			addEvent(block, stmt.Pos(), stmt.End(), bit, true, nil)
 			return
 		}
 		// A restore inside a nested block (e.g. `if (cond) { mock.extend = ... }`)
@@ -2166,7 +4373,7 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 		curBlock := block
 		curStmt := stmt
 		for curBlock != nil && curStmt != nil {
-			addEvent(curBlock, curStmt.Pos(), curStmt.End(), bit, false)
+			addEvent(curBlock, curStmt.Pos(), curStmt.End(), bit, false, postCallNode)
 			if curBlock.Parent == nil || testFramework.IsFunction(curBlock.Parent) ||
 				curBlock.Kind == ast.KindSourceFile || curBlock.Kind == ast.KindModuleBlock {
 				break
@@ -2177,6 +4384,44 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 			addFnRestore(fn, bit)
 		}
 	}
+	record := func(node, stmt, block *ast.Node, bit expectConfigKind, clears bool) {
+		recordWithPostCall(node, stmt, block, bit, clears, nil)
+	}
+	recordAllRestores := func(node, stmt, block *ast.Node) {
+		recordWithPostCall(node, stmt, block, expectConfigExpectExtend, false, nil)
+		recordWithPostCall(node, stmt, block, expectConfigExpectEquality, false, nil)
+		recordWithPostCall(node, stmt, block, expectConfigReceiver, false, nil)
+	}
+	recordAllPostCallRestores := func(node, stmt, block *ast.Node) {
+		recordWithPostCall(node, stmt, block, expectConfigExpectExtend, false, node)
+		recordWithPostCall(node, stmt, block, expectConfigExpectEquality, false, node)
+		recordWithPostCall(node, stmt, block, expectConfigReceiver, false, node)
+	}
+	var constInitObj *ast.Node
+	var constMutSummary *objectLiteralMutationSummary
+	symSummary := analysis.getExpectConfigSymbolSummary(symbol)
+	if len(symSummary.writes) == 1 && symSummary.writes[0].isConstDecl && symSummary.writes[0].rhs != nil {
+		if initObj := internalUtils.SkipAssertionsAndParens(symSummary.writes[0].rhs); initObj != nil &&
+			initObj.Kind == ast.KindObjectLiteralExpression {
+			constInitObj = initObj
+			constMutSummary = analysis.getObjectLiteralMutationSummary(symbol, initObj)
+			// Only emit synthetic initial clears once `symSummary.evaluatedSources`
+			// is latched so an active cycle with zeroed `initialObjectLiteralKind`
+			// can never fabricate a bogus clear.
+			if symSummary.evaluatedSources && !constMutSummary.escaped &&
+				symSummary.writes[0].block != nil && symSummary.writes[0].stmt != nil {
+				if missing := constMutSummary.restoredConfigMask &^ symSummary.initialObjectLiteralKind; missing != expectConfigNone {
+					for _, bit := range []expectConfigKind{expectConfigExpectExtend, expectConfigExpectEquality, expectConfigReceiver} {
+						if missing&bit != 0 {
+							addEvent(symSummary.writes[0].block, symSummary.writes[0].exprEnd, symSummary.writes[0].stmt.End(), bit, true, nil)
+						}
+					}
+				}
+			}
+		}
+	}
+	symHasAnyAccessor := (constMutSummary != nil && constMutSummary.hasAnyAccessor) ||
+		analysis.symbolMayHaveAccessorOnProp(symbol, "", false, 0)
 	if analysis.ctx.Refs != nil {
 		for _, reference := range analysis.ctx.Refs.References(symbol) {
 			if reference == nil {
@@ -2199,28 +4444,41 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 				switch refOuter.Parent.Kind {
 				case ast.KindVariableDeclaration:
 					vd := refOuter.Parent.AsVariableDeclaration()
-					if vd != nil && vd.Initializer == refOuter && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
-						aliasSym = refOuter.Parent.Symbol()
-						if aliasSym == nil {
-							aliasSym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+					if vd != nil && vd.Initializer == refOuter && vd.Name() != nil {
+						if vd.Name().Kind == ast.KindIdentifier {
+							aliasSym = refOuter.Parent.Symbol()
+							if aliasSym == nil {
+								aliasSym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+							}
+						} else if vd.Name().Kind == ast.KindObjectBindingPattern && symHasAnyAccessor {
+							summary.escaped = true
+							recordAllRestores(reference, stmt, block)
 						}
 					}
 				case ast.KindBinaryExpression:
 					bin := refOuter.Parent.AsBinaryExpression()
 					if bin != nil && bin.Right == refOuter && bin.OperatorToken != nil &&
 						bin.OperatorToken.Kind == ast.KindEqualsToken {
-						if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
-							aliasSym = resolveRstestRootSymbol(analysis.ctx, lhs)
+						if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil {
+							if lhs.Kind == ast.KindIdentifier {
+								aliasSym = resolveRstestRootSymbol(analysis.ctx, lhs)
+							} else if lhs.Kind == ast.KindObjectLiteralExpression && symHasAnyAccessor {
+								summary.escaped = true
+								recordAllRestores(reference, stmt, block)
+							}
 						}
 					}
 				}
 				if aliasSym != nil && aliasSym != symbol && !seenAliases[aliasSym] {
 					seenAliases[aliasSym] = true
 					aliasSummary := analysis.getExpectConfigOverwriteSummary(aliasSym)
+					if aliasSummary.escaped {
+						summary.escaped = true
+					}
 					for key, evs := range aliasSummary.events {
 						for _, ev := range evs {
 							if !ev.clears {
-								addEvent(key.block, ev.pos, ev.stmtEnd, key.bit, false)
+								addEvent(key.block, ev.pos, ev.stmtEnd, key.bit, false, ev.postCallNode)
 							}
 						}
 					}
@@ -2261,7 +4519,22 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 							break
 						}
 						propName, propStatic := analysis.evalExpectConfigAccessName(firstAccess)
+						hasSetterOrAccessor := symHasAnyAccessor &&
+							((constInitObj != nil && analysis.objectLiteralHasAccessor(constInitObj, propName, propStatic, true, 0)) ||
+								analysis.symbolMayHaveAccessorOnProp(symbol, propName, propStatic, 0))
+						if isWrite && hasSetterOrAccessor {
+							// Writing through a setter does not overwrite the
+							// getter and may execute user code that restores `this.*`.
+							summary.escaped = true
+							recordAllRestores(reference, stmt, block)
+							break
+						}
 						if !propStatic {
+							// Dynamic-key write `(holder as any)[key] = r.expect.extend`
+							// can restore any config property at runtime.
+							if isWrite {
+								recordAllRestores(reference, stmt, block)
+							}
 							break
 						}
 						bit := expectConfigOverwriteBit(propName)
@@ -2304,18 +4577,149 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 						record(reference, stmt, block, bit, false)
 						break
 					}
+					// Own method/tagged-template calls and getter reads on any
+					// object binding (`const`, `let`, or alias) can clear or
+					// restore `this.*` bits or leak `this`.
+					if current == firstAccess {
+						isCall := outerAccess != nil && outerAccess.Parent != nil &&
+							outerAccess.Parent.Kind == ast.KindCallExpression &&
+							outerAccess.Parent.AsCallExpression().Expression == outerAccess
+						isTagged := outerAccess != nil && outerAccess.Parent != nil &&
+							outerAccess.Parent.Kind == ast.KindTaggedTemplateExpression &&
+							outerAccess.Parent.AsTaggedTemplateExpression().Tag == outerAccess
+						propName, propStatic := analysis.evalExpectConfigAccessName(firstAccess)
+						if isCall || isTagged {
+							if constInitObj != nil && constMutSummary != nil {
+								if isCall && propStatic && !constMutSummary.escaped &&
+									((propName == "extend" && constMutSummary.pureExtend) ||
+										(propName == "addEqualityTesters" && constMutSummary.pureEquality)) {
+									break
+								}
+								handledStraightLine := false
+								if isCall && !ast.IsOptionalChain(outerAccess.Parent) && propStatic &&
+									!analysis.hasMethodInvalidatingMutationForCall(symbol, constMutSummary, reference, propName) {
+									for _, targetProp := range []string{"extend", "addEqualityTesters", "expect"} {
+										rhs, ok := analysis.cachedOwnMethodThisAssign(constMutSummary, constInitObj, propName, targetProp)
+										if !ok {
+											continue
+										}
+										handledStraightLine = true
+										bit := expectConfigOverwriteBit(targetProp)
+										if bit == expectConfigNone {
+											continue
+										}
+										hasTargetAccessor := symHasAnyAccessor &&
+											(analysis.objectLiteralHasAccessor(constInitObj, targetProp, true, true, 0) ||
+												analysis.symbolMayHaveAccessorOnProp(symbol, targetProp, true, 0))
+										if analysis.overwritePreservesConfigBit(bit, rhs) || hasTargetAccessor {
+											record(reference, stmt, block, bit, false)
+										} else if unconditional && !constMutSummary.escaped &&
+											stmt.Kind == ast.KindExpressionStatement &&
+											ast.SkipParentheses(stmt.AsExpressionStatement().Expression) == outerAccess.Parent {
+											record(reference, stmt, block, bit, true)
+										}
+									}
+								}
+								if !handledStraightLine {
+									// Any non-straight-line, optional, tagged, or
+									// potentially overwritten method call may restore `this.*` or escape `this`.
+									summary.escaped = true
+									recordAllRestores(reference, stmt, block)
+								}
+								break
+							}
+							// Non-const or aliased object: calling `extend`/`addEqualityTesters`
+							// still records restores for subsequent statements without
+							// retroactively cancelling an immediately preceding clear, while
+							// any other method/tagged call may restore or leak `this`.
+							if isCall && propStatic && (propName == "extend" || propName == "addEqualityTesters") &&
+								!analysis.symbolHasNonPurePropWrite(symbol, propName, 0, nil) {
+								recordAllPostCallRestores(reference, stmt, block)
+							} else {
+								summary.escaped = true
+								recordAllRestores(reference, stmt, block)
+							}
+							break
+						}
+						if symHasAnyAccessor &&
+							((constInitObj != nil && analysis.objectLiteralHasAccessor(constInitObj, propName, propStatic, false, 0)) ||
+								analysis.symbolMayHaveAccessorOnProp(symbol, propName, propStatic, 0)) {
+							summary.escaped = true
+							recordAllRestores(reference, stmt, block)
+							break
+						}
+					}
 					continue
 				}
-				if firstAccess == nil && parent.Kind == ast.KindCallExpression {
-					for bit, clears := range analysis.mutatingBuiltinOverwriteChanges(parent, current) {
-						if !clears {
-							record(reference, stmt, block, bit, false)
-						} else if unconditional {
-							record(reference, stmt, block, bit, true)
+				if firstAccess == nil {
+					if parent.Kind == ast.KindCallExpression {
+						isAssignCall, _ := analysis.isAccessorDefiningBuiltinCall(parent)
+						isReflectSet := analysis.isGlobalBuiltinMemberCall(
+							internalUtils.SkipAssertionsAndParens(parent.AsCallExpression().Expression),
+							"Reflect",
+							"set",
+						)
+						changes := analysis.mutatingBuiltinOverwriteChanges(parent, current)
+						if len(changes) > 0 && ((!isAssignCall && !isReflectSet) || !symHasAnyAccessor) {
+							for bit, clears := range changes {
+								if !clears {
+									record(reference, stmt, block, bit, false)
+								} else if unconditional {
+									bitProp := ""
+									switch bit {
+									case expectConfigExpectExtend:
+										bitProp = "extend"
+									case expectConfigExpectEquality:
+										bitProp = "addEqualityTesters"
+									case expectConfigReceiver:
+										bitProp = "expect"
+									}
+									hasAcc := symHasAnyAccessor && bitProp != "" &&
+										analysis.symbolMayHaveAccessorOnProp(symbol, bitProp, true, 0)
+									if hasAcc {
+										summary.escaped = true
+										record(reference, stmt, block, bit, false)
+									} else {
+										record(reference, stmt, block, bit, true)
+									}
+								}
+							}
+						} else {
+							// Passing `symbol` into an opaque helper call (`restore(holder)`,
+							// `Object.defineProperty(holder, ...)`) or `Object.assign` on an
+							// object with accessors (which can invoke a setter on any property)
+							// may mutate/escape `symbol`.
+							summary.escaped = true
+							recordAllRestores(reference, stmt, block)
 						}
+					} else if !analysis.isNonEscapingSymbolUse(parent, current, symHasAnyAccessor) {
+						// Any non-call escape (`box.h = holder`, `new Mutator(holder)`,
+						// `[holder]`, `{ h: holder }`, `return holder`, `(a = holder).x`,
+						// `holder == 1`, etc.) can mutate `symbol` indirectly later.
+						summary.escaped = true
+						recordAllRestores(reference, stmt, block)
 					}
 				}
 				break
+			}
+		}
+	}
+	if summary.escaped {
+		// Once `symbol` has an untracked escape (e.g. `box.h = holder`, `capture(holder)`,
+		// `let leaked; set trap(_) { leaked = this; }`), indirect mutations via the
+		// escaped reference can restore properties without mentioning `symbol`, so
+		// MUST-overwrite `clears: true` events are no longer sound.
+		for key, events := range summary.events {
+			kept := events[:0]
+			for _, ev := range events {
+				if !ev.clears {
+					kept = append(kept, ev)
+				}
+			}
+			if len(kept) == 0 {
+				delete(summary.events, key)
+			} else {
+				summary.events[key] = kept
 			}
 		}
 	}
@@ -2324,14 +4728,18 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 			if events[i].stmtEnd != events[j].stmtEnd {
 				return events[i].stmtEnd < events[j].stmtEnd
 			}
-			if events[i].pos != events[j].pos {
-				return events[i].pos < events[j].pos
+			// Put clears before restores within the same statement so `events[idx-1]`
+			// always picks any same-statement restore over a same-statement clear.
+			if events[i].clears != events[j].clears {
+				return events[i].clears
 			}
-			// Put clears before restores so `events[idx-1]` picks the restore on ties.
-			return events[i].clears && !events[j].clears
+			return events[i].pos < events[j].pos
 		})
 	}
-	if analysis.expectConfigOverwriteCycleHits == cycleBefore {
+	if analysis.expectConfigOverwriteCycleHits == cycleBefore &&
+		analysis.expectConfigCycleHits == expectCycleBefore &&
+		analysis.objectLiteralMutationCycleHits == mutCycleBefore &&
+		(constInitObj == nil || symSummary.evaluatedSources) {
 		if analysis.expectConfigMustOverwrite == nil {
 			analysis.expectConfigMustOverwrite = map[*ast.Symbol]*expectConfigOverwriteSummary{}
 		}
@@ -2360,9 +4768,9 @@ func (analysis *RstestCallAnalysis) overwritePreservesConfigBit(bit expectConfig
 	k := analysis.expectConfigMember(rhs)
 	switch bit {
 	case expectConfigExpectExtend:
-		return k&expectConfigExtend != 0
+		return k&(expectConfigExtend|expectConfigDynamicMember) != 0
 	case expectConfigExpectEquality:
-		return k&expectConfigAddEqualityTesters != 0
+		return k&(expectConfigAddEqualityTesters|expectConfigDynamicMember) != 0
 	case expectConfigReceiver:
 		return k&expectConfigExpect != 0
 	default:
@@ -2433,9 +4841,9 @@ func (analysis *RstestCallAnalysis) getterPreservesConfigBit(bit expectConfigKin
 		kind := analysis.getterExpectConfigKind(getterExpr)
 		switch bit {
 		case expectConfigExpectExtend:
-			return kind&expectConfigExtend != 0
+			return kind&(expectConfigExtend|expectConfigDynamicMember) != 0
 		case expectConfigExpectEquality:
-			return kind&expectConfigAddEqualityTesters != 0
+			return kind&(expectConfigAddEqualityTesters|expectConfigDynamicMember) != 0
 		case expectConfigReceiver:
 			return kind&expectConfigExpect != 0
 		default:
@@ -3025,16 +5433,31 @@ func (analysis *RstestCallAnalysis) destructuredExpectConfigMember(declaration *
 	}
 	member, known, staticKey := analysis.evalBindingElementPropertyName(binding)
 	defaultSkipped := false
-	sources, definiteSrc := analysis.bindingPatternSourceExprs(pattern)
+	sources, definiteSrc, sourcesMayBeMutable := analysis.bindingPatternSourceExprs(pattern)
 	if known {
 		if definiteSrc != nil {
-			defLookup := analysis.lookupObjectLiteralProperty(definiteSrc, member, 0)
-			defaultSkipped = defLookup.definitelyDefined
+			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(definiteSrc); objExpr != nil && !mutableObj {
+				defLookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
+				defaultSkipped = defLookup.definitelyDefined
+			}
 		}
 		for _, srcExpr := range sources {
-			lookup := analysis.lookupObjectLiteralProperty(srcExpr, member, 0)
-			for _, expr := range lookup.possibleExprs {
-				out |= analysis.expectConfigMember(expr)
+			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr); objExpr != nil {
+				if mutableObj && !sourcesMayBeMutable && len(sources) == 1 {
+					if unwrapped := internalUtils.SkipAssertionsAndParens(srcExpr); unwrapped != nil && unwrapped.Kind == ast.KindIdentifier {
+						if sym := resolveRstestRootSymbol(analysis.ctx, unwrapped); sym != nil {
+							if replacement, replaced := analysis.unconditionalPropertyReplacementBefore(sym, objExpr, member, unwrapped); replaced {
+								out |= analysis.expectConfigMember(replacement)
+								defaultSkipped = analysis.isDefinitelyDefinedExpr(replacement, 0, nil)
+								continue
+							}
+						}
+					}
+				}
+				lookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
+				for _, expr := range lookup.possibleExprs {
+					out |= analysis.expectConfigMember(expr)
+				}
 			}
 		}
 	} else if !staticKey {
@@ -3054,78 +5477,98 @@ func (analysis *RstestCallAnalysis) destructuredExpectConfigMember(declaration *
 	return out | classifyDestructuredExpectConfigProperty(container, member, known, staticKey)
 }
 
-func (analysis *RstestCallAnalysis) bindingPatternSourceExprs(pattern *ast.Node) (sources []*ast.Node, definiteSource *ast.Node) {
+func (analysis *RstestCallAnalysis) bindingPatternSourceExprs(pattern *ast.Node) (sources []*ast.Node, definiteSource *ast.Node, sourcesMayBeMutable bool) {
 	if pattern == nil || pattern.Parent == nil {
-		return nil, nil
+		return nil, nil, false
 	}
 	switch pattern.Parent.Kind {
 	case ast.KindVariableDeclaration:
 		init := pattern.Parent.AsVariableDeclaration().Initializer
 		if init != nil {
-			return []*ast.Node{init}, init
+			return []*ast.Node{init}, init, false
 		}
 	case ast.KindBindingElement:
 		be := pattern.Parent.AsBindingElement()
 		if be == nil || be.DotDotDotToken != nil {
-			return nil, nil
+			return nil, nil, false
 		}
 		parentPattern := pattern.Parent.Parent
 		if parentPattern == nil {
-			return nil, nil
+			return nil, nil, false
 		}
 		if parentPattern.Kind != ast.KindObjectBindingPattern {
 			if be.Initializer != nil {
-				return []*ast.Node{be.Initializer}, nil
+				return []*ast.Node{be.Initializer}, nil, false
 			}
-			return nil, nil
+			return nil, nil, false
 		}
 		member, known, _ := analysis.evalBindingElementPropertyName(be)
 		if !known {
 			if be.Initializer != nil {
-				return []*ast.Node{be.Initializer}, nil
+				return []*ast.Node{be.Initializer}, nil, false
 			}
-			return nil, nil
+			return nil, nil, false
 		}
-		parentSources, parentDefinite := analysis.bindingPatternSourceExprs(parentPattern)
+		parentSources, parentDefinite, parentMutable := analysis.bindingPatternSourceExprs(parentPattern)
+		sourcesMayBeMutable = parentMutable
 		parentDefDefined := false
+		// Only step `definiteSource` across a direct fresh `ObjectLiteralExpression`
+		// (not a `const` alias `cfg` whose nested sub-object `cfg.nested` could
+		// have been mutated before destructuring).
 		if parentDefinite != nil {
-			defLookup := analysis.lookupObjectLiteralProperty(parentDefinite, member, 0)
-			if defLookup.definitelyDefined && defLookup.exactExpr != nil {
-				parentDefDefined = true
-				definiteSource = defLookup.exactExpr
+			if directObj := internalUtils.SkipAssertionsAndParens(parentDefinite); directObj != nil &&
+				directObj.Kind == ast.KindObjectLiteralExpression {
+				defLookup := analysis.lookupObjectLiteralProperty(directObj, member, 0)
+				if defLookup.definitelyDefined && defLookup.exactExpr != nil &&
+					!defLookup.fromNonFreshSource && !defLookup.mayHaveUnknownSource {
+					parentDefDefined = true
+					definiteSource = defLookup.exactExpr
+				}
 			}
 		}
 		for _, pSrc := range parentSources {
-			lookup := analysis.lookupObjectLiteralProperty(pSrc, member, 0)
-			sources = append(sources, lookup.possibleExprs...)
+			unwrapped := internalUtils.SkipAssertionsAndParens(pSrc)
+			if unwrapped == nil || unwrapped.Kind != ast.KindObjectLiteralExpression {
+				sourcesMayBeMutable = true
+			}
+			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(pSrc); objExpr != nil {
+				if mutableObj {
+					sourcesMayBeMutable = true
+				}
+				lookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
+				if lookup.mayHaveUnknownSource || lookup.fromNonFreshSource {
+					sourcesMayBeMutable = true
+				}
+				sources = append(sources, lookup.possibleExprs...)
+			}
 		}
 		if be.Initializer != nil && !parentDefDefined {
 			sources = append(sources, be.Initializer)
 		}
-		return sources, definiteSource
+		return sources, definiteSource, sourcesMayBeMutable
 	}
-	return nil, nil
+	return nil, nil, false
 }
 
-func (analysis *RstestCallAnalysis) assignmentObjectSourceExprs(obj *ast.Node) (sources []*ast.Node, definiteSource *ast.Node) {
+func (analysis *RstestCallAnalysis) assignmentObjectSourceExprs(obj *ast.Node) (sources []*ast.Node, definiteSource *ast.Node, sourcesMayBeMutable bool) {
 	if obj == nil || obj.Parent == nil {
-		return nil, nil
+		return nil, nil, false
 	}
 	outer := internalUtils.OutermostParenthesizedExpression(obj)
 	if outer == nil || outer.Parent == nil {
-		return nil, nil
+		return nil, nil, false
 	}
 	switch outer.Parent.Kind {
 	case ast.KindBinaryExpression:
 		bin := outer.Parent.AsBinaryExpression()
 		if bin == nil || bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindEqualsToken || bin.Left != outer {
-			return nil, nil
+			return nil, nil, false
 		}
 		if !internalUtils.IsDefaultValueInDestructuringAssignment(outer.Parent) {
 			if bin.Right != nil {
-				return []*ast.Node{bin.Right}, bin.Right
+				return []*ast.Node{bin.Right}, bin.Right, false
 			}
-			return nil, nil
+			return nil, nil, false
 		}
 		// Nested destructuring assignment default, e.g.
 		// `({ a: { register = r.expect.extend } = fallback } = { a: {} })` or
@@ -3134,45 +5577,62 @@ func (analysis *RstestCallAnalysis) assignmentObjectSourceExprs(obj *ast.Node) (
 		// guaranteed defined (never mistaking `fallback` for `definiteSource`).
 		if outer.Parent.Parent != nil && outer.Parent.Parent.Kind == ast.KindPropertyAssignment &&
 			outer.Parent.Parent.AsPropertyAssignment().Initializer == outer.Parent {
-			pSources, pDef := analysis.assignmentPropertySourceExprs(outer.Parent.Parent)
+			pSources, pDef, pMut := analysis.assignmentPropertySourceExprs(outer.Parent.Parent)
 			sources = append(sources, pSources...)
 			if pDef != nil {
-				return sources, pDef
+				return sources, pDef, pMut
 			}
 			if bin.Right != nil {
 				sources = append(sources, bin.Right)
 			}
-			return sources, nil
+			return sources, nil, pMut
 		}
 		if bin.Right != nil {
-			return []*ast.Node{bin.Right}, nil
+			return []*ast.Node{bin.Right}, nil, false
 		}
 	case ast.KindPropertyAssignment:
 		return analysis.assignmentPropertySourceExprs(outer.Parent)
 	}
-	return nil, nil
+	return nil, nil, false
 }
 
-func (analysis *RstestCallAnalysis) assignmentPropertySourceExprs(prop *ast.Node) (sources []*ast.Node, definiteSource *ast.Node) {
+func (analysis *RstestCallAnalysis) assignmentPropertySourceExprs(prop *ast.Node) (sources []*ast.Node, definiteSource *ast.Node, sourcesMayBeMutable bool) {
 	if prop == nil || prop.Parent == nil || prop.Parent.Kind != ast.KindObjectLiteralExpression || prop.Name() == nil {
-		return nil, nil
+		return nil, nil, false
 	}
 	member, known, _ := analysis.evalPropertyNameKey(prop.Name())
 	if !known {
-		return nil, nil
+		return nil, nil, false
 	}
-	parentSources, parentDefinite := analysis.assignmentObjectSourceExprs(prop.Parent)
+	parentSources, parentDefinite, parentMutable := analysis.assignmentObjectSourceExprs(prop.Parent)
+	sourcesMayBeMutable = parentMutable
 	if parentDefinite != nil {
-		defLookup := analysis.lookupObjectLiteralProperty(parentDefinite, member, 0)
-		if defLookup.definitelyDefined && defLookup.exactExpr != nil {
-			definiteSource = defLookup.exactExpr
+		if directObj := internalUtils.SkipAssertionsAndParens(parentDefinite); directObj != nil &&
+			directObj.Kind == ast.KindObjectLiteralExpression {
+			defLookup := analysis.lookupObjectLiteralProperty(directObj, member, 0)
+			if defLookup.definitelyDefined && defLookup.exactExpr != nil &&
+				!defLookup.fromNonFreshSource && !defLookup.mayHaveUnknownSource {
+				definiteSource = defLookup.exactExpr
+			}
 		}
 	}
 	for _, pSrc := range parentSources {
-		lookup := analysis.lookupObjectLiteralProperty(pSrc, member, 0)
-		sources = append(sources, lookup.possibleExprs...)
+		unwrapped := internalUtils.SkipAssertionsAndParens(pSrc)
+		if unwrapped == nil || unwrapped.Kind != ast.KindObjectLiteralExpression {
+			sourcesMayBeMutable = true
+		}
+		if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(pSrc); objExpr != nil {
+			if mutableObj {
+				sourcesMayBeMutable = true
+			}
+			lookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
+			if lookup.mayHaveUnknownSource || lookup.fromNonFreshSource {
+				sourcesMayBeMutable = true
+			}
+			sources = append(sources, lookup.possibleExprs...)
+		}
 	}
-	return sources, definiteSource
+	return sources, definiteSource, sourcesMayBeMutable
 }
 
 type objectLiteralPropertyLookup struct {
@@ -3181,6 +5641,7 @@ type objectLiteralPropertyLookup struct {
 	definitelyDefined    bool
 	foundExplicit        bool
 	mayHaveUnknownSource bool
+	fromNonFreshSource   bool
 }
 
 func collectGetterReturnExprs(getter *ast.Node) []*ast.Node {
@@ -3274,6 +5735,7 @@ func (analysis *RstestCallAnalysis) lookupObjectLiteralProperty(
 	}
 	var res objectLiteralPropertyLookup
 	var protoExpr *ast.Node
+	hasGetter := false
 	for _, prop := range obj.AsObjectLiteralExpression().Properties.Nodes {
 		if prop == nil {
 			continue
@@ -3286,6 +5748,7 @@ func (analysis *RstestCallAnalysis) lookupObjectLiteralProperty(
 			res.exactExpr = nil
 			res.definitelyDefined = false
 			res.mayHaveUnknownSource = true
+			res.fromNonFreshSource = true
 			if spreadObj, _ := analysis.resolveObjectLiteralForBoundLookup(prop.AsSpreadAssignment().Expression); spreadObj != nil {
 				spreadLookup := analysis.lookupObjectLiteralProperty(spreadObj, propName, depth+1)
 				res.possibleExprs = append(res.possibleExprs, spreadLookup.possibleExprs...)
@@ -3327,43 +5790,71 @@ func (analysis *RstestCallAnalysis) lookupObjectLiteralProperty(
 		}
 		res.foundExplicit = true
 		res.mayHaveUnknownSource = false
+		res.fromNonFreshSource = false
 		switch prop.Kind {
 		case ast.KindMethodDeclaration:
+			hasGetter = false
 			res.exactExpr = nil
 			res.possibleExprs = nil
 			res.definitelyDefined = true
 		case ast.KindPropertyAssignment:
+			hasGetter = false
 			val := prop.AsPropertyAssignment().Initializer
 			res.exactExpr = val
 			res.possibleExprs = []*ast.Node{val}
 			res.definitelyDefined = analysis.isDefinitelyDefinedExpr(val, 0, nil)
 		case ast.KindShorthandPropertyAssignment:
+			hasGetter = false
 			val := prop.AsShorthandPropertyAssignment().Name()
 			res.exactExpr = val
 			res.possibleExprs = []*ast.Node{val}
 			res.definitelyDefined = analysis.isDefinitelyDefinedExpr(val, 0, nil)
 		case ast.KindGetAccessor:
+			hasGetter = true
 			res.exactExpr = nil
 			res.possibleExprs = collectGetterReturnExprs(prop)
 			res.definitelyDefined = false
+		case ast.KindSetAccessor:
+			res.exactExpr = nil
+			if !hasGetter {
+				res.possibleExprs = nil
+			}
+			res.definitelyDefined = false
 		default:
+			hasGetter = false
 			res.exactExpr = nil
 			res.possibleExprs = nil
 			res.definitelyDefined = false
 		}
 	}
-	// If no own property unconditionally shadows the prototype chain and a
-	// non-computed `__proto__: protoExpr` was specified, resolve inherited
-	// properties from `protoExpr` (including immutable const object-literal aliases).
-	if protoExpr != nil && !res.definitelyDefined && propName != "__proto__" {
+	// If `obj` (or its `__proto__`) has any getter, destructuring an earlier
+	// property on `obj` can invoke that getter and mutate `this[propName] = undefined`,
+	// so `propName` is NOT guaranteed defined.
+	hasAnyGetter := analysis.objectLiteralHasAccessor(obj, "", false, false, 0)
+	if hasAnyGetter {
+		res.definitelyDefined = false
+	}
+	// If no own property shadows the prototype chain (even an own property set
+	// to `undefined` shadows `__proto__` in JS) and a non-computed
+	// `__proto__: protoExpr` was specified, resolve inherited properties from
+	// `protoExpr` (including immutable const object-literal aliases).
+	if protoExpr != nil && !res.foundExplicit && propName != "__proto__" {
+		unwrappedProto := internalUtils.SkipAssertionsAndParens(protoExpr)
 		if protoObj, mutableProto := analysis.resolveObjectLiteralForBoundLookup(protoExpr); protoObj != nil {
 			protoLookup := analysis.lookupObjectLiteralProperty(protoObj, propName, depth+1)
 			res.possibleExprs = append(res.possibleExprs, protoLookup.possibleExprs...)
+			if unwrappedProto == nil || unwrappedProto.Kind != ast.KindObjectLiteralExpression || protoLookup.fromNonFreshSource {
+				res.fromNonFreshSource = true
+			}
 			if mutableProto || protoLookup.mayHaveUnknownSource {
 				res.mayHaveUnknownSource = true
+			} else if !res.mayHaveUnknownSource && !hasAnyGetter && protoLookup.definitelyDefined {
+				res.definitelyDefined = true
+				res.exactExpr = protoLookup.exactExpr
 			}
-		} else if unwrapped := internalUtils.SkipAssertionsAndParens(protoExpr); unwrapped != nil && unwrapped.Kind != ast.KindNullKeyword {
+		} else if unwrappedProto != nil && unwrappedProto.Kind != ast.KindNullKeyword {
 			res.mayHaveUnknownSource = true
+			res.fromNonFreshSource = true
 		}
 	}
 	return res
@@ -3455,9 +5946,13 @@ func (analysis *RstestCallAnalysis) isDefinitelyDefinedExpr(expr *ast.Node, dept
 }
 
 func (analysis *RstestCallAnalysis) hasNoExternalWrites(sym *ast.Symbol, decl *ast.Node) bool {
-	if analysis.ctx.Refs == nil {
+	if analysis.ctx.Refs == nil || sym == nil {
 		return false
 	}
+	if cached, ok := analysis.symbolNoExternalWrites[sym]; ok {
+		return cached
+	}
+	clean := true
 	for _, ref := range analysis.ctx.Refs.References(sym) {
 		if ref == nil || !internalUtils.IsWriteReference(ref) {
 			continue
@@ -3465,9 +5960,14 @@ func (analysis *RstestCallAnalysis) hasNoExternalWrites(sym *ast.Symbol, decl *a
 		if ref.Parent == decl && decl.Name() == ref {
 			continue
 		}
-		return false
+		clean = false
+		break
 	}
-	return true
+	if analysis.symbolNoExternalWrites == nil {
+		analysis.symbolNoExternalWrites = map[*ast.Symbol]bool{}
+	}
+	analysis.symbolNoExternalWrites[sym] = clean
+	return clean
 }
 
 func (analysis *RstestCallAnalysis) assignmentDestructuredExpectConfigMember(prop, defaultExpr *ast.Node) expectConfigKind {
@@ -3486,16 +5986,31 @@ func (analysis *RstestCallAnalysis) assignmentDestructuredExpectConfigMember(pro
 	var out expectConfigKind
 	member, known, staticKey := analysis.evalPropertyNameKey(propName)
 	defaultSkipped := false
-	sources, definiteSrc := analysis.assignmentObjectSourceExprs(obj)
+	sources, definiteSrc, sourcesMayBeMutable := analysis.assignmentObjectSourceExprs(obj)
 	if known {
 		if definiteSrc != nil {
-			defLookup := analysis.lookupObjectLiteralProperty(definiteSrc, member, 0)
-			defaultSkipped = defLookup.definitelyDefined
+			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(definiteSrc); objExpr != nil && !mutableObj {
+				defLookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
+				defaultSkipped = defLookup.definitelyDefined
+			}
 		}
 		for _, srcExpr := range sources {
-			lookup := analysis.lookupObjectLiteralProperty(srcExpr, member, 0)
-			for _, expr := range lookup.possibleExprs {
-				out |= analysis.expectConfigMember(expr)
+			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr); objExpr != nil {
+				if mutableObj && !sourcesMayBeMutable && len(sources) == 1 {
+					if unwrapped := internalUtils.SkipAssertionsAndParens(srcExpr); unwrapped != nil && unwrapped.Kind == ast.KindIdentifier {
+						if sym := resolveRstestRootSymbol(analysis.ctx, unwrapped); sym != nil {
+							if replacement, replaced := analysis.unconditionalPropertyReplacementBefore(sym, objExpr, member, unwrapped); replaced {
+								out |= analysis.expectConfigMember(replacement)
+								defaultSkipped = analysis.isDefinitelyDefinedExpr(replacement, 0, nil)
+								continue
+							}
+						}
+					}
+				}
+				lookup := analysis.lookupObjectLiteralProperty(objExpr, member, 0)
+				for _, expr := range lookup.possibleExprs {
+					out |= analysis.expectConfigMember(expr)
+				}
 			}
 		}
 	} else if !staticKey {

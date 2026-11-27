@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -280,6 +282,112 @@ func TestRstestExpectCustomizationAnalysis(t *testing.T) {
 			{Code: `import * as r from '@rstest/core'; const holder = { get extend() { return r.expect.extend.bind(r.expect, { toBe() {} }); } }; holder.extend(); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 			{Code: `import * as r from '@rstest/core'; const spreadObj = { ...{ extend: r.expect.extend.bind(r.expect, { toBe() {} }) } }; spreadObj.extend(); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 			{Code: `import * as r from '@rstest/core'; const proto = { extend: r.expect.extend.bind(r.expect, { toBe() {} }) }; const protoObj = { __proto__: proto }; protoObj.extend(); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			// Resetting a bound matcher through an object method replaces the stale bound map cleanly.
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }), reset() { this.extend = r.expect.extend; } }; holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }), reset() { this.extend = r.expect.extend; } }; if (cond) { holder.reset(); } holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }) }; holder.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			// Immutable object-literal alias skips destructuring default; own `undefined` hides inherited `__proto__`.
+			{Code: `import * as r from '@rstest/core'; function ignore(_m: any) {} const hooks = { register: ignore }; const { register = r.expect.extend } = hooks; register({ toBeDefined() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function ignore(_m: any) {} const hooks = { register: ignore }; hooks.register = undefined as any; const { register = r.expect.extend } = hooks; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const { register } = { __proto__: { register: r.expect.extend }, register: undefined }; register?.({ toBeDefined() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			// Own `undefined` before `__proto__` and inherited defined property on `__proto__`.
+			{Code: `import * as r from '@rstest/core'; const { extend } = { extend: undefined, __proto__: r.expect }; extend?.({ toBeDefined() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function ignore(_m: any) {} const { register = r.expect.extend } = { __proto__: { register: ignore } }; register({ toBeDefined() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			// Nested `const` object-literal alias mutations must not be treated as deeply immutable.
+			{Code: `import * as r from '@rstest/core'; function ignore(_m: any) {} const cfg = { nested: { register: ignore } }; cfg.nested.register = undefined as any; const { nested: { register = r.expect.extend } } = cfg; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const cfg = { nested: { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }) } }; cfg.nested.extend = r.expect.extend; const { nested: { extend } } = cfg; extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			// Getter side effects during destructuring and inherited `__proto__` getters.
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }), get trigger() { this.extend = r.expect.extend; return 1; } }; const { trigger } = holder; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			{Code: `import * as r from '@rstest/core'; function ignore(_m: any) {} const hooks = { get nuke() { this.register = undefined as any; return 0; }, register: ignore }; const { nuke, register = r.expect.extend } = hooks; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const proto = { get trigger() { this.extend = r.expect.extend; return 1; } }; const holder = { __proto__: proto, extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }) }; holder.trigger; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			// User methods named `addEqualityTesters` / `extend` are never blindly exempted.
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }), addEqualityTesters() { this.extend = r.expect.extend; } }; holder.addEqualityTesters(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }), addEqualityTesters() { if (cond) { this.extend = r.expect.extend; } } }; holder.addEqualityTesters(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			{Code: `import * as r from '@rstest/core'; function ignore(_m: any) {} const hooks = { register: ignore, extend() { this.register = undefined as any; } }; hooks.extend(); const { register = r.expect.extend } = hooks; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			// Soundness guards on own-method replacement: overwritten method, top-level mutation, loops, comma expr, tagged template, setter, generator/async, blocks, spreads, `this`/param RHS.
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, reset() { this.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); } }; holder.reset = () => {}; holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, reset() { this.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); } }; holder.reset = () => {}; function run() { holder.reset(); holder.extend({ toBe() {} }); } run(); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, reset() { this.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); } }; for (let i = 0; i < 2; i++) { holder.reset(); holder.extend({ toBe() {} }); holder.reset = () => {}; holder.extend = r.expect.extend; } probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, reset() { this.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); } }; holder.reset(); (holder.extend = r.expect.extend, holder.extend({ toBe() {} })); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, reset() { this.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); }, restore(_s: TemplateStringsArray) { this.extend = r.expect.extend; } }; holder.reset(); holder.restore` + "``" + `; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { _extend: r.expect.extend, get extend() { return this._extend; }, set extend(_v: any) {} }; holder.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBe() {} }), *reset() { this.extend = r.expect.extend; } }; holder.reset(); holder.extend(); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBe() {} }), async reset() { await Promise.resolve(); this.extend = r.expect.extend; } }; holder.reset(); holder.extend(); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, reset() { { return; } this.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); } }; holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const override = { reset() {} }; const holder = { extend: r.expect.extend, reset() { this.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); }, ...override }; holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBe() {} }), wrap() { this.extend = this.extend.bind(r.expect, { toBeDefined() {} }); } }; holder.wrap(); holder.extend(); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, reset(fn = r.expect.extend.bind(r.expect, { toBeDefined() {} })) { this.extend = fn; } }; holder.reset(r.expect.extend); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			// Destructuring after reset(), placeholder-initialized holder restored via method/write, and reset() clearing `this.extend = () => {}`.
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }), reset() { this.extend = r.expect.extend; } }; holder.reset(); const { extend } = holder; extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: (() => {}) as typeof r.expect.extend, reset() { this.extend = r.expect.extend; } }; holder.extend({ toBeDefined() {} }); holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }), reset() { this.extend = () => {}; } }; holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			// Post-fix adversarial regressions: `this`-escaping methods/setters, non-straight-line restore methods, hijacked pure calls, multi-stmt/param-default/computed-key methods, per-prop method invalidations, mutual/self cycles, same-stmt computed-key/getter/destructuring mutations, synthetic clear tie-breaking, non-fresh __proto__/spread destructuring, alias-restored placeholders, and getter+setter pairs.
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, self() { return this; } }; const alias = holder.self(); holder.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); alias.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let leaked: any; const holder = { extend: r.expect.extend, set trap(_v: any) { leaked = this; } }; holder.trap = 1; holder.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); leaked.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, restore() { if (Math.random() >= 0) { this.extend = r.expect.extend; } } }; holder.extend = (() => {}) as any; holder.restore(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function mutateThis(this: any) { this.extend = r.expect.extend; } const holder = { extend: r.expect.extend, addEqualityTesters: r.expect.addEqualityTesters, hijack() { this.addEqualityTesters = mutateThis as any; } }; holder.hijack(); holder.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); holder.addEqualityTesters(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, reset() { this.extend = ((this.reset = function (this: any) { this.extend = r.expect.extend; }), (() => {}) as any); this.extend = (() => {}) as any; } }; holder.reset(); holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, addEqualityTesters: r.expect.addEqualityTesters, reset(_ = (this.extend = r.expect.extend)) { this.addEqualityTesters = (() => {}) as any; } }; holder.extend = (() => {}) as any; holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, addEqualityTesters: r.expect.addEqualityTesters, reset() { this[(this.extend = r.expect.extend, 'addEqualityTesters')] = (() => {}) as any; } }; holder.extend = (() => {}) as any; holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, addEqualityTesters() { this.extend = (() => {}) as any; } }; holder.addEqualityTesters = function (this: any) { this.extend = r.expect.extend; } as any; holder.addEqualityTesters(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const a: any = { extend: () => {} }; const b: any = { extend: () => {} }; a.extend = b.extend; a.extend = r.expect.extend; b.extend = a.extend; a.extend({}); b.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let cycle: any = () => {}; const holder = { extend: cond ? r.expect.extend : cycle }; cycle = holder.extend; cycle(); holder.extend({ toBe() {} }); holder.extend = r.expect.extend; probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend, get trigger() { this.extend = r.expect.extend; return 1; } }; holder.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); const { trigger, extend } = holder; extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend }; holder.extend = (() => {}) as any; holder[(holder.extend = r.expect.extend, 'extend')]({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: r.expect.extend }; holder.extend = r.expect.extend.bind(r.expect, { toBeDefined() {} }); const { a: { extend } } = { a: holder, b: (holder.extend = r.expect.extend) }; extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: (() => {}) as typeof r.expect.extend, reset() { this.extend = r.expect.extend; } }, _ = holder.reset(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function ignore(_m: any) {} const proto = { nested: { register: ignore } }; proto.nested.register = undefined as any; const { nested: { register = r.expect.extend } } = { __proto__: proto }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const a = { nested: { extend: r.expect.extend.bind(r.expect, { toBeDefined() {} }) } }; let b = { nested: { extend: r.expect.extend } }; const { nested: { extend } } = { ...a, ...b }; extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: (() => {}) as typeof r.expect.extend }; const alias = holder; alias.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { get extend() { return r.expect.extend; }, set extend(_v: any) {} }; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			// Final sanity regressions: cross-cache cycle poisoning, destructuring no-op param, mutating addEqualityTesters, let/alias/Object.assign setter guards, opaque escape & dynamic writes, non-inline methods, and dynamic object keys.
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: (() => {}) as typeof r.expect.extend }; const { extend: fn } = holder; holder.extend = holder.extend; holder.extend = r.expect.extend; fn(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { get extend() { return r.expect.extend; }, set extend(_v: any) {} }; const { extend: fn } = holder; holder.extend = holder.extend; holder.extend = (() => {}) as any; fn(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: function ({ a = (this.extend = r.expect.extend) }: any) {} }; holder.extend({}); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function restoreExtend(this: any) { this.extend = r.expect.extend; } const holder = { extend: r.expect.extend, addEqualityTesters() { this.extend = restoreExtend; } }; holder.addEqualityTesters(); holder.extend({} as any); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let holder = { get extend() { return r.expect.extend; }, set extend(_v: any) {} }; holder.extend = (() => {}) as any; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { get extend() { return r.expect.extend; }, set extend(_v: any) {} }; const alias = holder; alias.extend = (() => {}) as any; alias.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { get extend() { return r.expect.extend; }, set extend(_v: any) {} }; Object.assign(holder, { extend: () => {} }); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function restore(obj: any) { obj.extend = r.expect.extend; } const holder = { extend: r.expect.extend }; holder.extend = (() => {}) as typeof r.expect.extend; restore(holder); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const key = getKey(); const holder = { extend: r.expect.extend }; holder.extend = (() => {}) as typeof r.expect.extend; (holder as any)[key] = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function install(this: any) { this.extend = r.expect.extend; } const holder = { extend: (() => {}) as typeof r.expect.extend, install }; holder.install(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const key = getKey(); const holder = { extend: (() => {}) as typeof r.expect.extend }; (holder as any)[key] = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const key = getKey(); const holder = { [key]: r.expect.extend }; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			// Sign-off audit regressions: overwrite cycle poisoning, escaped/overwritten/setter-trap pure flags, let/alias/escape/Object.defineProperty/Object.assign-accessor overwrites, non-inline/reassigned/this-escaping own methods, expectConfigDynamicMember, and pure-reset writtenTargetProp invalidation.
+			{Code: `import * as r from '@rstest/core'; let a = { ...r.expect }; let b = a; let d = { ...r.expect }; d.extend = () => {}; b = d; b.extend = r.expect.extend; const fn = d.extend; b.addEqualityTesters = fn; a.addEqualityTesters([]); fn({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function install(h: any) { h.addEqualityTesters = function () { this.extend = r.expect.extend; }; } const holder = { extend: r.expect.extend, addEqualityTesters: () => {} }; install(holder); holder.extend = (() => {}) as any; holder.addEqualityTesters(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder: any = { extend: r.expect.extend, addEqualityTesters: () => {} }; holder.extend = function () { this.addEqualityTesters = function () { this.extend = r.expect.extend; }; }; holder.extend(); holder.extend = () => {}; holder.addEqualityTesters(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder: any = { extend: r.expect.extend, addEqualityTesters: () => {}, reset() { this.extend = () => {}; } }; holder.reset = function () { this.addEqualityTesters = function () { this.extend = r.expect.extend; }; }; holder.reset(); holder.extend = () => {}; holder.addEqualityTesters(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder: any = { extend: r.expect.extend, addEqualityTesters: () => {}, set trap(_v: any) { this.addEqualityTesters = function () { this.extend = r.expect.extend; }; } }; holder.trap = 1; holder.extend = () => {}; holder.addEqualityTesters(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let holder = { extend: r.expect.extend, restore() { this.extend = r.expect.extend; } }; holder.extend = (() => {}) as any; holder.restore(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const box: { h?: any } = {}; const holder = { ...r.expect }; holder.extend = (() => {}) as any; box.h = holder; box.h.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const box: { h?: any } = {}; const holder = { ...r.expect }; box.h = holder; holder.extend = (() => {}) as any; box.h.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder: any = { ...r.expect }; Object.defineProperty(holder, 'extend', { get() { return r.expect.extend; }, set() {} }); holder.extend = () => {}; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const base = { get extend() { return r.expect.extend; }, set extend(_v: any) {} }; const alias = Object.assign(base, { a: 1 }); alias.extend = (() => {}) as any; alias.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const helpers = { install(this: any) { this.extend = r.expect.extend; } }; const holder = { extend: (() => {}) as typeof r.expect.extend, install: helpers.install }; holder.install(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function install() {} install = function (this: any) { this.extend = r.expect.extend; }; const holder = { extend: (() => {}) as typeof r.expect.extend, install }; holder.install(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; declare const k: string; const holder: any = { ...r.expect }; holder.extend = r.expect[k]; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder = { extend: (() => {}) as typeof r.expect.extend, install() { const self = this; self.extend = r.expect.extend; } }; holder.install(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function restoreFn(this: any) { this.extend = r.expect.extend; } const holder: any = { extend: r.expect.extend, expect() { this.extend = () => {}; }, tamper() { this.expect = restoreFn; } }; holder.tamper(); holder.expect(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			// Verification audit regressions: non-const leaking extend, assignment-result & coercion escapes, Object.assign non-config setter & existing target alias, unrelated object literal false-positive guard, dynamic getter, mutable __proto__, this.__defineGetter__, and nested this-method install.
+			{Code: `import * as r from '@rstest/core'; let leaked: any; let mock: any = { ...r.expect }; mock.extend = function () { leaked = this; }; mock.extend(); mock.extend = () => {}; leaked.extend = r.expect.extend; mock.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let a: any; const holder: any = { ...r.expect }; holder.extend = () => {}; (a = holder).extend = r.expect.extend; const fn = holder.extend; fn({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder: any = { ...r.expect, valueOf() { this.extend = r.expect.extend; return 1; } }; holder.extend = () => {}; void (holder == 1); const fn = holder.extend; fn({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder: any = { ...r.expect, set trap(_v: any) { this.extend = r.expect.extend; } }; Object.assign(holder, { extend: () => {}, trap: 1 }); const fn = holder.extend; fn({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const target: any = {}; const holder: any = Object.assign(target, r.expect); holder.extend = () => {}; target.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `const prefix = 'v1'; const config = { prefix, extend(opts: any) { return { ...opts }; } }; config.extend(extra); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; declare const k: string; const holder: any = { ...r.expect }; Object.assign(holder, { get extend() { return r.expect[k]; } }); const fn = holder.extend; fn({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const proto: any = {}; const holder: any = { __proto__: proto, extend: () => {} }; proto.restore = function () { this.extend = r.expect.extend; }; holder.restore(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder: any = { extend: () => {}, install() { this.__defineGetter__('extend', () => r.expect.extend); } }; holder.install(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const holder: any = { extend: () => {}, install() { this.restore = function () { this.extend = r.expect.extend; }; this.restore(); } }; holder.install(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			// Final P2 polish regressions: non-pure literal method / Reflect.set / forward alias on non-const self-call, `holder in {}` coercion, Reflect.set & Object.assign target-literal setters, `this.restore = restoreFn`, and `let` helper/proto objects.
+			{Code: `import * as r from '@rstest/core'; let leaked: any; let mock: any = { ...r.expect, addEqualityTesters() { leaked = this; } }; mock.addEqualityTesters([]); mock.extend = () => {}; leaked.extend = r.expect.extend; mock.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let leaked: any; let mock: any = { ...r.expect }; Reflect.set(mock, 'extend', function () { leaked = this; }); mock.extend({}); mock.extend = () => {}; leaked.extend = r.expect.extend; mock.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let leaked: any; let holder: any = { ...r.expect, toString() { leaked = this; return 'k'; } }; holder in {}; holder.extend = () => {}; leaked.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let leaked: any; let holder: any = { ...r.expect, set addEqualityTesters(_v: any) { leaked = this; } }; Reflect.set(holder, 'addEqualityTesters', r.expect.addEqualityTesters); holder.extend = () => {}; leaked.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let leaked: any; const holder: any = Object.assign({ set trap(_v: any) { leaked = this; } }, { trap: 1 }, r.expect); holder.extend = () => {}; leaked.extend = r.expect.extend; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; function restoreFn(this: any) { this.extend = r.expect.extend; } const holder: any = { extend: () => {}, install() { this.restore = restoreFn; this.restore(); } }; holder.install(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; let helpers = { install(this: any) { this.extend = r.expect.extend; } }; const holder = { extend: (() => {}) as typeof r.expect.extend, install: helpers.install }; holder.install(); holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 		},
 	)
 }
@@ -344,20 +452,60 @@ func TestRstestExpectCustomizationLinearScaling(t *testing.T) {
 	for range 300 {
 		b.WriteString("multiFn();\n")
 	}
+	// 9. 1,000 destructuring defaults reusing one local helper `noop` (would be O(N^2) without hasNoExternalWrites memoization).
+	b.WriteString("function noop(_m: any) {}\n")
+	for i := range 1000 {
+		fmt.Fprintf(&b, "test('t%d', () => { const { hook = core.expect.extend } = { hook: noop }; hook({ toBeDefined() {} }); });\n", i)
+	}
+	// 10. 1,000 calls on a mutated const object literal (would be O(N^2) without cached objectLiteralMutationSummary).
+	b.WriteString("const holder = { extend: core.expect.extend.bind(core.expect, { toBeDefined() {} }), reset() { this.extend = core.expect.extend; } };\n")
+	b.WriteString("holder.reset();\n")
+	for range 1000 {
+		b.WriteString("holder.extend({});\n")
+	}
+	// 11. 500 distinct written properties + 500 reset() calls (would be O(R*P) with flat propWriteEventsByFn).
+	b.WriteString("const wide: any = { extend: core.expect.extend.bind(core.expect, { toBeDefined() {} }), reset() { this.extend = core.expect.extend; } };\n")
+	for i := range 500 {
+		fmt.Fprintf(&b, "wide.p%d = %d;\n", i, i)
+	}
+	for range 500 {
+		b.WriteString("wide.reset();\n")
+	}
+	b.WriteString("wide.extend({});\n")
 	b.WriteString("probe();\n")
 
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, sourceFile, err := helper.CreateTestProgram(b.String(), "scaling.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	start := time.Now()
-	rule_tester.RunRuleTester(
-		fixtures.GetRootDir(), "tsconfig.json", t, &expectCustomizationProbe,
-		[]rule_tester.ValidTestCase{},
-		[]rule_tester.InvalidTestCase{
-			{
-				Code:   b.String(),
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "customization", Message: "toBe=true toBeDefined=false equality=false"}},
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:     lintprogram.NewFromCompiler(program),
+		File:        sourceFile.FileName(),
+		HasTypeInfo: true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     expectCustomizationProbe.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return expectCustomizationProbe.Run(ctx, nil)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandNone,
+			Report: func(d rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, d)
 			},
 		},
-	)
+	})
 	if elapsed := time.Since(start); elapsed > 10*time.Second {
 		t.Fatalf("customization analysis took %v; expected linear-time execution", elapsed)
+	}
+	if len(diagnostics) != 1 || diagnostics[0].Message.Description != "toBe=true toBeDefined=false equality=false" {
+		t.Fatalf("unexpected diagnostics: %#v", diagnostics)
 	}
 }

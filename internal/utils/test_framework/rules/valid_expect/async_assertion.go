@@ -12,6 +12,7 @@ package valid_expect
 
 import (
 	"fmt"
+	"strconv"
 	"unicode"
 	"unicode/utf8"
 
@@ -37,9 +38,18 @@ type blockExitSummary struct {
 	escapedLabels     []string
 }
 
+type promiseTryArgPos struct {
+	runtimeIdx       int  // 0-based runtime argument index in Promise.try (0 = callback, >= 1 = callback arg)
+	hasUnknownSpread bool // true if a non-statically-sized spread precedes this arg
+}
+
 type promiseTryCallIndex struct {
-	argIndex       map[*ast.Node]int
-	firstSpreadIdx int // -1 if no spread argument at index >= 1
+	cb                    *ast.Node // resolved runtime arg 0 callback if statically known
+	cbUnknown             bool      // true if runtime arg 0 may come from an unknown spread
+	cbMissing             bool      // true if runtime arg 0 is omitted (e.g. `...[, cb]`)
+	firstUnknownSpreadIdx int       // first 1-based callback arg index at/after an unknown spread (0 if none)
+	args                  map[*ast.Node]promiseTryArgPos
+	argExprByIdx          map[int]*ast.Node // 1-based callback arg index -> expr when no unknown spread precedes it
 }
 
 type inlineCallbackSummary struct {
@@ -48,8 +58,20 @@ type inlineCallbackSummary struct {
 }
 
 type arrayLiteralIndex struct {
-	elemIndex      map[*ast.Node]int
-	firstSpreadIdx int // -1 if no spread element
+	elemIndex          map[*ast.Node]int
+	firstSpreadIdx     int  // -1 if no spread element
+	lastSideEffectInit bool // lazily computed only when autofix checks siblings
+	lastSideEffectIdx  int  // -1 if no side-effecting element
+}
+
+type callArgsIndex struct {
+	argIndex          map[*ast.Node]int
+	lastSideEffectIdx int // -1 if no side-effecting argument
+}
+
+type nodeListSideEffectIndex struct {
+	nodeIndex         map[*ast.Node]int
+	lastSideEffectIdx int // -1 if no side-effecting item
 }
 
 // AsyncAssertionResolver caches per-file shadowing and static-string lookups
@@ -57,18 +79,24 @@ type arrayLiteralIndex struct {
 // `const Promise = globalThis.Promise` aliases resolve accurately, and computed
 // `Promise[key]` method names fold through `StaticStringEvaluator`.
 type AsyncAssertionResolver struct {
-	sourceFile       *ast.SourceFile
-	typeChecker      *checker.Checker
-	refs             *rule.RefStore
-	shadowCache      *internalUtils.ShadowCache
-	staticStrings    *internalUtils.StaticStringEvaluator
-	blockIndices     map[*ast.Node]*blockStatementIndex
-	blockExits       map[*ast.Node]blockExitSummary
-	bindingObserved  map[*ast.Symbol]bool
-	tryCallIndices   map[*ast.Node]*promiseTryCallIndex
-	callbackInfos    map[*ast.Node]inlineCallbackSummary
-	arrayElemIndices map[*ast.Node]*arrayLiteralIndex
-	arrayRestIndices map[*ast.Node]int
+	sourceFile            *ast.SourceFile
+	typeChecker           *checker.Checker
+	refs                  *rule.RefStore
+	shadowCache           *internalUtils.ShadowCache
+	staticStrings         *internalUtils.StaticStringEvaluator
+	blockIndices          map[*ast.Node]*blockStatementIndex
+	blockExits            map[*ast.Node]blockExitSummary
+	bindingObserved       map[*ast.Symbol]bool
+	tryCallIndices        map[*ast.Node]*promiseTryCallIndex
+	callbackInfos         map[*ast.Node]inlineCallbackSummary
+	arrayElemIndices      map[*ast.Node]*arrayLiteralIndex
+	callArgIndices        map[*ast.Node]*callArgsIndex
+	exprMutates           map[*ast.Node]bool
+	listSideEffectIndices map[*ast.Node]*nodeListSideEffectIndex
+	fnMutatesState        map[*ast.Node]bool
+	arrayRestIndices      map[*ast.Node]int
+	bindingWritten        map[*ast.Symbol]bool
+	objMutated            map[*ast.Symbol]bool
 }
 
 // NewAsyncAssertionResolver creates a per-file resolver backed by ctx.
@@ -414,18 +442,58 @@ func (r *AsyncAssertionResolver) getPromiseTryCallIndex(call *ast.Node) *promise
 		}
 	}
 	args := call.AsCallExpression().Arguments
-	idx := &promiseTryCallIndex{firstSpreadIdx: -1}
-	if args != nil {
-		idx.argIndex = make(map[*ast.Node]int, len(args.Nodes))
-		for i, a := range args.Nodes {
-			if a == nil {
-				continue
-			}
-			idx.argIndex[a] = i
-			if i >= 1 && idx.firstSpreadIdx < 0 && a.Kind == ast.KindSpreadElement {
-				idx.firstSpreadIdx = i
+	idx := &promiseTryCallIndex{}
+	if args != nil && len(args.Nodes) > 0 {
+		idx.args = make(map[*ast.Node]promiseTryArgPos, len(args.Nodes))
+		idx.argExprByIdx = make(map[int]*ast.Node, len(args.Nodes))
+		runtimeIdx := 0
+		hasUnknownSpread := false
+		var walkArgList func(nodes []*ast.Node, depth int)
+		walkArgList = func(nodes []*ast.Node, depth int) {
+			for _, a := range nodes {
+				if a == nil || a.Kind == ast.KindOmittedExpression {
+					if !hasUnknownSpread && runtimeIdx == 0 {
+						idx.cbMissing = true
+					}
+					runtimeIdx++
+					continue
+				}
+				if a.Kind == ast.KindSpreadElement {
+					spreadExpr := internalUtils.SkipAssertionsAndParens(a.AsSpreadElement().Expression)
+					if depth < 4 && spreadExpr != nil && spreadExpr.Kind == ast.KindArrayLiteralExpression {
+						if elems := spreadExpr.AsArrayLiteralExpression().Elements; elems != nil {
+							walkArgList(elems.Nodes, depth+1)
+						}
+						continue
+					}
+					if !hasUnknownSpread {
+						if runtimeIdx == 0 && idx.cb == nil && !idx.cbMissing {
+							idx.cbUnknown = true
+						}
+						if runtimeIdx >= 1 {
+							idx.firstUnknownSpreadIdx = runtimeIdx
+						} else {
+							idx.firstUnknownSpreadIdx = 1
+						}
+						hasUnknownSpread = true
+					}
+					continue
+				}
+				if !hasUnknownSpread {
+					if runtimeIdx == 0 {
+						idx.cb = internalUtils.SkipAssertionsAndParens(a)
+					} else {
+						idx.argExprByIdx[runtimeIdx] = a
+					}
+				}
+				idx.args[a] = promiseTryArgPos{
+					runtimeIdx:       runtimeIdx,
+					hasUnknownSpread: hasUnknownSpread,
+				}
+				runtimeIdx++
 			}
 		}
+		walkArgList(args.Nodes, 0)
 	}
 	if r != nil {
 		if r.tryCallIndices == nil {
@@ -453,52 +521,6 @@ func (r *AsyncAssertionResolver) getInlineCallbackSummary(cb *ast.Node) inlineCa
 		r.callbackInfos[cb] = info
 	}
 	return info
-}
-
-// inlineCallbackAcceptsArg reports whether an inline function literal (`cb`)
-// can read argument `argIdx` (1-based for `Promise.try(cb, arg1, ...)`).
-func (r *AsyncAssertionResolver) inlineCallbackAcceptsArg(cb *ast.Node, argIdx int) bool {
-	if cb == nil || argIdx < 1 {
-		return false
-	}
-	params := runtimeParameters(cb)
-	for i, param := range params {
-		if param == nil {
-			continue
-		}
-		if p := param.AsParameterDeclaration(); p != nil && p.DotDotDotToken != nil && i < argIdx {
-			return true
-		}
-	}
-	if len(params) >= argIdx {
-		return true
-	}
-	return r.getInlineCallbackSummary(cb).usesArguments
-}
-
-func (r *AsyncAssertionResolver) inlineCallbackAcceptsAnyArg(cb *ast.Node) bool {
-	if cb == nil {
-		return false
-	}
-	if len(runtimeParameters(cb)) > 0 {
-		return true
-	}
-	return r.getInlineCallbackSummary(cb).usesArguments
-}
-
-func (r *AsyncAssertionResolver) inlineCallbackAcceptsArbitraryTrailingArg(cb *ast.Node) bool {
-	if cb == nil {
-		return false
-	}
-	for _, param := range runtimeParameters(cb) {
-		if param == nil {
-			continue
-		}
-		if p := param.AsParameterDeclaration(); p != nil && p.DotDotDotToken != nil {
-			return true
-		}
-	}
-	return r.getInlineCallbackSummary(cb).usesArguments
 }
 
 func isIdentifierValueReference(node *ast.Node) bool {
@@ -657,23 +679,1049 @@ func inlineCallbackBodyCanConsume(cb *ast.Node) bool {
 	return consumes
 }
 
-// inlineCallbackCanConsumePromiseArg reports whether an inline `Promise.try`
-// callback can actually await or return the forwarded argument at `argIdx`.
-// Callbacks that ignore the argument (e.g. `() => {}`), generator callbacks,
-// or block bodies with neither `return <expr>` nor `await`/`for await` cannot
-// keep the assertion pending.
-func (r *AsyncAssertionResolver) inlineCallbackCanConsumePromiseArg(cb *ast.Node, argIdx int) bool {
-	if !r.inlineCallbackAcceptsArg(cb, argIdx) {
-		return false
+func collectBindingIdentifiers(pattern *ast.Node) []*ast.Node {
+	if pattern == nil {
+		return nil
 	}
-	return r.getInlineCallbackSummary(cb).bodyCanConsume
+	var out []*ast.Node
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		switch node.Kind {
+		case ast.KindIdentifier:
+			out = append(out, node)
+		case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
+			if bp := node.AsBindingPattern(); bp != nil && bp.Elements != nil {
+				for _, el := range bp.Elements.Nodes {
+					if el != nil && el.Kind == ast.KindBindingElement {
+						visit(el.Name())
+					}
+				}
+			}
+		}
+	}
+	visit(pattern)
+	return out
 }
 
-func (r *AsyncAssertionResolver) inlineCallbackCanConsumeSpreadArg(cb *ast.Node) bool {
-	if !r.inlineCallbackAcceptsArbitraryTrailingArg(cb) {
+type trackedBindings struct {
+	symbols        map[*ast.Symbol]bool
+	names          map[string]bool
+	restSymbols    map[*ast.Symbol]bool
+	restNames      map[string]bool
+	restOffset     int // >= 0 exact expected 0-based index into rest/`arguments`, -1 if unknown
+	trackArguments bool
+}
+
+func (tb *trackedBindings) isEmpty() bool {
+	return len(tb.symbols) == 0 && len(tb.names) == 0 &&
+		len(tb.restSymbols) == 0 && len(tb.restNames) == 0 && !tb.trackArguments
+}
+
+func (r *AsyncAssertionResolver) addTrackedIdent(tb *trackedBindings, ident *ast.Node, isRest bool) {
+	if ident == nil || ident.Kind != ast.KindIdentifier {
+		return
+	}
+	var sym *ast.Symbol
+	if ident.Parent != nil && ident.Parent.Symbol() != nil {
+		sym = ident.Parent.Symbol()
+	} else if r != nil {
+		sym = r.resolveSymbol(ident)
+	}
+	if r != nil && r.refs != nil && sym != nil {
+		if isRest {
+			if tb.restSymbols == nil {
+				tb.restSymbols = map[*ast.Symbol]bool{}
+			}
+			tb.restSymbols[sym] = true
+		} else {
+			if tb.symbols == nil {
+				tb.symbols = map[*ast.Symbol]bool{}
+			}
+			tb.symbols[sym] = true
+		}
+		return
+	}
+	if isRest {
+		if tb.restNames == nil {
+			tb.restNames = map[string]bool{}
+		}
+		tb.restNames[ident.AsIdentifier().Text] = true
+	} else {
+		if tb.names == nil {
+			tb.names = map[string]bool{}
+		}
+		tb.names[ident.AsIdentifier().Text] = true
+	}
+}
+
+func (r *AsyncAssertionResolver) matchesTrackedDirectIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) bool {
+	if node == nil || node.Kind != ast.KindIdentifier || !isIdentifierValueReference(node) {
 		return false
 	}
-	return r.getInlineCallbackSummary(cb).bodyCanConsume
+	name := node.AsIdentifier().Text
+	if r != nil && r.refs != nil && len(tb.symbols) > 0 {
+		if sym := r.resolveSymbol(node); sym != nil {
+			return tb.symbols[sym]
+		}
+		if len(tb.names) > 0 && tb.names[name] && !shadowed[name] {
+			return true
+		}
+		return false
+	}
+	return tb.names[name] && !shadowed[name]
+}
+
+func (r *AsyncAssertionResolver) matchesTrackedRestIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) bool {
+	if node == nil || node.Kind != ast.KindIdentifier || !isIdentifierValueReference(node) {
+		return false
+	}
+	name := node.AsIdentifier().Text
+	if tb.trackArguments && name == "arguments" && !shadowed["arguments"] {
+		return true
+	}
+	if r != nil && r.refs != nil && len(tb.restSymbols) > 0 {
+		if sym := r.resolveSymbol(node); sym != nil {
+			return tb.restSymbols[sym]
+		}
+		if len(tb.restNames) > 0 && tb.restNames[name] && !shadowed[name] {
+			return true
+		}
+		return false
+	}
+	return tb.restNames[name] && !shadowed[name]
+}
+
+func (r *AsyncAssertionResolver) matchesTrackedIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) bool {
+	return r.matchesTrackedDirectIdent(node, tb, shadowed) || r.matchesTrackedRestIdent(node, tb, shadowed)
+}
+
+func scopeShadowsNames(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) map[string]bool {
+	if node == nil {
+		return shadowed
+	}
+	var added []string
+	checkName := func(n string) {
+		if (tb.names[n] || tb.restNames[n] || (tb.trackArguments && n == "arguments")) && !shadowed[n] {
+			added = append(added, n)
+		}
+	}
+	if ast.IsLocalsContainer(node) {
+		locals := ast.GetLocals(node)
+		for n, sym := range locals {
+			if sym != nil && sym.Flags&(ast.SymbolFlagsValue|ast.SymbolFlagsAlias) != 0 && hasValueDeclaration(sym) {
+				checkName(n)
+			}
+		}
+	}
+	if testFramework.IsFunction(node) {
+		for _, p := range node.Parameters() {
+			if p != nil {
+				for _, ident := range collectBindingIdentifiers(p.Name()) {
+					checkName(ident.AsIdentifier().Text)
+				}
+			}
+		}
+		if node.Kind == ast.KindFunctionExpression {
+			if fnName := node.Name(); fnName != nil && fnName.Kind == ast.KindIdentifier {
+				checkName(fnName.AsIdentifier().Text)
+			}
+		}
+		// Non-arrow nested functions bind their own `arguments`.
+		if node.Kind != ast.KindArrowFunction {
+			checkName("arguments")
+		}
+	}
+	if node.Kind == ast.KindClassExpression {
+		if cn := node.Name(); cn != nil && cn.Kind == ast.KindIdentifier {
+			checkName(cn.AsIdentifier().Text)
+		}
+	}
+	if len(added) == 0 {
+		return shadowed
+	}
+	next := make(map[string]bool, len(shadowed)+len(added))
+	for k, v := range shadowed {
+		next[k] = v
+	}
+	for _, n := range added {
+		next[n] = true
+	}
+	return next
+}
+
+// exprReferencesTracked reports whether `root` contains a value reference to
+// any binding in `tb` (respecting shadowing and stopping at non-arrow
+// functions for `arguments`).
+func (r *AsyncAssertionResolver) exprReferencesTracked(root *ast.Node, tb *trackedBindings, enterNestedFunctions bool) bool {
+	if root == nil {
+		return false
+	}
+	found := false
+	var visit func(*ast.Node, map[string]bool)
+	visit = func(node *ast.Node, shadowed map[string]bool) {
+		if node == nil || found || ast.IsTypeNode(node) || ast.IsPartOfTypeQuery(node) {
+			return
+		}
+		if node != root {
+			switch node.Kind {
+			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+				ast.KindClassStaticBlockDeclaration:
+				if !enterNestedFunctions {
+					return
+				}
+				shadowed = scopeShadowsNames(node, tb, shadowed)
+			case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
+				if mods := node.Modifiers(); mods != nil {
+					for _, mod := range mods.Nodes {
+						if mod != nil && mod.Kind == ast.KindDecorator {
+							visit(mod, shadowed)
+						}
+					}
+				}
+				if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+					visit(name, shadowed)
+				}
+				if !enterNestedFunctions {
+					return
+				}
+				shadowed = scopeShadowsNames(node, tb, shadowed)
+			default:
+				if ast.IsLocalsContainer(node) || node.Kind == ast.KindClassExpression {
+					shadowed = scopeShadowsNames(node, tb, shadowed)
+				}
+			}
+		}
+		if node.Kind == ast.KindIdentifier && r.matchesTrackedIdent(node, tb, shadowed) {
+			found = true
+			return
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child, shadowed)
+			return found
+		})
+	}
+	visit(root, nil)
+	return found
+}
+
+func isConsoleCall(call *ast.Node) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return false
+	}
+	callee := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
+	if callee == nil || !ast.IsAccessExpression(callee) {
+		return false
+	}
+	recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+	return recv != nil && recv.Kind == ast.KindIdentifier && recv.AsIdentifier().Text == "console"
+}
+
+func (r *AsyncAssertionResolver) isRestElementAccess(expr *ast.Node, tb *trackedBindings) bool {
+	if expr == nil || expr.Kind != ast.KindElementAccessExpression {
+		return false
+	}
+	recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(expr))
+	if !r.matchesTrackedRestIdent(recv, tb, nil) {
+		return false
+	}
+	if name, ok := r.accessStaticNameThroughAssertions(expr); ok {
+		return tb.restOffset >= 0 && name == strconv.Itoa(tb.restOffset)
+	}
+	return true
+}
+
+// exprEvaluatesToTrackedPromise reports whether `expr` can evaluate directly to
+// a tracked Promise itself (used for `throw <expr>` rethrow checks so
+// `throw new Error(String(err))` is not mistaken for rethrowing `err`).
+func (r *AsyncAssertionResolver) exprEvaluatesToTrackedPromise(expr *ast.Node, tb *trackedBindings) bool {
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	for expr != nil && internalUtils.IsCommaOperator(expr) {
+		expr = internalUtils.SkipAssertionsAndParens(expr.AsBinaryExpression().Right)
+	}
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindIdentifier:
+		return r.matchesTrackedDirectIdent(expr, tb, nil)
+	case ast.KindElementAccessExpression:
+		return r.isRestElementAccess(expr, tb)
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		if cond == nil {
+			return false
+		}
+		return r.exprEvaluatesToTrackedPromise(cond.WhenTrue, tb) ||
+			r.exprEvaluatesToTrackedPromise(cond.WhenFalse, tb)
+	case ast.KindBinaryExpression:
+		bin := expr.AsBinaryExpression()
+		if bin == nil || bin.OperatorToken == nil {
+			return false
+		}
+		switch bin.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken, ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+			return r.exprEvaluatesToTrackedPromise(bin.Right, tb)
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken,
+			ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			return r.exprEvaluatesToTrackedPromise(bin.Left, tb) ||
+				r.exprEvaluatesToTrackedPromise(bin.Right, tb)
+		}
+	}
+	return false
+}
+
+// exprCanReturnTrackedPromise reports whether evaluating `expr` can produce a
+// Promise/thenable derived from a binding in `tb` (rejecting primitive-only
+// expressions such as `void p`, `!p`, `p ? 1 : 2`, `p.message`, `args.length`,
+// `console.log(p)`, uncalled closures `() => p`, array literals `[p]`, and
+// non-thenable objects `{ p }` / `{ ...p }`).
+func (r *AsyncAssertionResolver) exprCanReturnTrackedPromise(expr *ast.Node, tb *trackedBindings) bool {
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	for expr != nil && internalUtils.IsCommaOperator(expr) {
+		expr = internalUtils.SkipAssertionsAndParens(expr.AsBinaryExpression().Right)
+	}
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindIdentifier:
+		return r.matchesTrackedDirectIdent(expr, tb, nil)
+	case ast.KindAwaitExpression:
+		return r.exprCanReturnTrackedPromise(expr.AsAwaitExpression().Expression, tb)
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		if cond == nil {
+			return false
+		}
+		return r.exprCanReturnTrackedPromise(cond.WhenTrue, tb) ||
+			r.exprCanReturnTrackedPromise(cond.WhenFalse, tb)
+	case ast.KindBinaryExpression:
+		bin := expr.AsBinaryExpression()
+		if bin == nil || bin.OperatorToken == nil {
+			return false
+		}
+		switch bin.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken, ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+			return r.exprCanReturnTrackedPromise(bin.Right, tb)
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken,
+			ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			return r.exprCanReturnTrackedPromise(bin.Left, tb) ||
+				r.exprCanReturnTrackedPromise(bin.Right, tb)
+		}
+		return false
+	case ast.KindElementAccessExpression:
+		return r.isRestElementAccess(expr, tb)
+	case ast.KindCallExpression:
+		if isConsoleCall(expr) {
+			return false
+		}
+		if method, ok := r.promiseMethodName(expr); ok && method == "reject" {
+			return false
+		}
+		return r.exprReferencesTracked(expr, tb, true)
+	case ast.KindNewExpression, ast.KindTaggedTemplateExpression:
+		return r.exprReferencesTracked(expr, tb, true)
+	case ast.KindObjectLiteralExpression:
+		// Plain objects (including `{ ...promise }`, since `Promise.prototype.then`
+		// is non-enumerable) are not Promises unless they define an own `then`
+		// property/method referencing `tb`.
+		obj := expr.AsObjectLiteralExpression()
+		if obj == nil || obj.Properties == nil {
+			return false
+		}
+		for _, prop := range obj.Properties.Nodes {
+			if prop == nil {
+				continue
+			}
+			if pName := prop.Name(); pName != nil {
+				if name, ok := internalUtils.GetStaticPropertyName(pName); ok && name == "then" {
+					if r.exprReferencesTracked(prop, tb, true) {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	default:
+		return false
+	}
+}
+
+func (r *AsyncAssertionResolver) isDefinitelyUndefinedExpr(expr *ast.Node) bool {
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return true
+	}
+	switch expr.Kind {
+	case ast.KindUndefinedKeyword, ast.KindVoidExpression, ast.KindOmittedExpression:
+		return true
+	case ast.KindIdentifier:
+		return expr.AsIdentifier().Text == "undefined" && !r.isLocallyValueShadowed(expr, "undefined")
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) propagateParamDefaults(params []*ast.Node, startIdx int, tb *trackedBindings, passedArgs map[int]*ast.Node, firstUnknownSpreadIdx int) {
+	var visitPattern func(pattern *ast.Node, initExpr *ast.Node)
+	visitPattern = func(pattern *ast.Node, initExpr *ast.Node) {
+		if pattern == nil || initExpr == nil {
+			return
+		}
+		initExpr = internalUtils.SkipAssertionsAndParens(initExpr)
+		if initExpr == nil {
+			return
+		}
+		switch pattern.Kind {
+		case ast.KindObjectBindingPattern:
+			if initExpr.Kind != ast.KindObjectLiteralExpression {
+				return
+			}
+			obj := initExpr.AsObjectLiteralExpression()
+			presentProps := map[string]bool{}
+			if obj != nil && obj.Properties != nil {
+				for _, prop := range obj.Properties.Nodes {
+					if prop == nil {
+						continue
+					}
+					if prop.Kind == ast.KindSpreadAssignment || prop.Name() == nil {
+						return
+					}
+					pName, ok := internalUtils.GetStaticPropertyName(prop.Name())
+					if !ok && r != nil && r.staticStringEvaluator() != nil {
+						pName, ok = r.staticStringEvaluator().EvalPropertyName(prop.Name())
+					}
+					if !ok {
+						return
+					}
+					presentProps[pName] = true
+				}
+			}
+			bp := pattern.AsBindingPattern()
+			if bp == nil || bp.Elements == nil {
+				return
+			}
+			for _, el := range bp.Elements.Nodes {
+				if el == nil || el.Kind != ast.KindBindingElement {
+					continue
+				}
+				be := el.AsBindingElement()
+				if be.DotDotDotToken != nil {
+					continue
+				}
+				var keyName string
+				var keyOK bool
+				if be.PropertyName != nil {
+					keyName, keyOK = internalUtils.GetStaticPropertyName(be.PropertyName)
+					if !keyOK && r != nil && r.staticStringEvaluator() != nil {
+						keyName, keyOK = r.staticStringEvaluator().EvalPropertyName(be.PropertyName)
+					}
+				} else if be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
+					keyName, keyOK = be.Name().AsIdentifier().Text, true
+				}
+				if !keyOK || presentProps[keyName] {
+					continue
+				}
+				if be.Initializer != nil && r.exprCanReturnTrackedPromise(be.Initializer, tb) {
+					if be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
+						r.addTrackedIdent(tb, be.Name(), false)
+					}
+				}
+				visitPattern(be.Name(), be.Initializer)
+			}
+		case ast.KindArrayBindingPattern:
+			if initExpr.Kind != ast.KindArrayLiteralExpression {
+				return
+			}
+			arr := initExpr.AsArrayLiteralExpression()
+			var elems []*ast.Node
+			if arr != nil && arr.Elements != nil {
+				elems = arr.Elements.Nodes
+			}
+			bp := pattern.AsBindingPattern()
+			if bp == nil || bp.Elements == nil {
+				return
+			}
+			for i, el := range bp.Elements.Nodes {
+				if i < len(elems) && elems[i] != nil && elems[i].Kind == ast.KindSpreadElement {
+					return
+				}
+				if el == nil || el.Kind != ast.KindBindingElement {
+					continue
+				}
+				be := el.AsBindingElement()
+				if be.DotDotDotToken != nil {
+					return
+				}
+				if i < len(elems) && !r.isDefinitelyUndefinedExpr(elems[i]) {
+					continue
+				}
+				if be.Initializer != nil && r.exprCanReturnTrackedPromise(be.Initializer, tb) {
+					if be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
+						r.addTrackedIdent(tb, be.Name(), false)
+					}
+				}
+				visitPattern(be.Name(), be.Initializer)
+			}
+		}
+	}
+	for i := startIdx; i < len(params); i++ {
+		if params[i] == nil {
+			continue
+		}
+		p := params[i].AsParameterDeclaration()
+		if p == nil {
+			continue
+		}
+		paramMayBeNonUndefined := false
+		if firstUnknownSpreadIdx > 0 && i+1 >= firstUnknownSpreadIdx {
+			paramMayBeNonUndefined = true
+		} else if passedArgs != nil {
+			if argExpr, ok := passedArgs[i+1]; ok && !r.isDefinitelyUndefinedExpr(argExpr) {
+				paramMayBeNonUndefined = true
+			}
+		}
+		if !paramMayBeNonUndefined {
+			if p.Initializer != nil && r.exprCanReturnTrackedPromise(p.Initializer, tb) {
+				if p.Name() != nil && p.Name().Kind == ast.KindIdentifier {
+					r.addTrackedIdent(tb, p.Name(), false)
+				}
+			}
+			visitPattern(p.Name(), p.Initializer)
+		}
+	}
+}
+
+func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb *trackedBindings) {
+	if root == nil || root.Kind != ast.KindBlock {
+		return
+	}
+	// Two passes handle short local alias chains (`const p = err; const q = p;`).
+	for range 2 {
+		var visit func(*ast.Node)
+		visit = func(node *ast.Node) {
+			if node == nil {
+				return
+			}
+			if node != root {
+				switch node.Kind {
+				case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+					ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor,
+					ast.KindClassStaticBlockDeclaration:
+					return
+				}
+			}
+			switch node.Kind {
+			case ast.KindVariableDeclaration:
+				vd := node.AsVariableDeclaration()
+				if vd != nil && vd.Initializer != nil && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier &&
+					r.exprCanReturnTrackedPromise(vd.Initializer, tb) {
+					r.addTrackedIdent(tb, vd.Name(), false)
+				}
+			case ast.KindBinaryExpression:
+				bin := node.AsBinaryExpression()
+				if bin != nil && bin.OperatorToken != nil {
+					switch bin.OperatorToken.Kind {
+					case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken,
+						ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+						if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil &&
+							lhs.Kind == ast.KindIdentifier && r.exprCanReturnTrackedPromise(bin.Right, tb) {
+							r.addTrackedIdent(tb, lhs, false)
+						}
+					}
+				}
+			}
+			node.ForEachChild(func(child *ast.Node) bool {
+				visit(child)
+				return false
+			})
+		}
+		visit(root)
+	}
+}
+
+// scopeConsumesTracked reports whether `root` (a callback body or catch block)
+// awaits or returns a Promise derived from `tb` in its own synchronous scope.
+func (r *AsyncAssertionResolver) scopeConsumesTracked(root *ast.Node, tb *trackedBindings, allowReturn bool) bool {
+	if root == nil {
+		return false
+	}
+	if root.Kind != ast.KindBlock {
+		if allowReturn && r.exprCanReturnTrackedPromise(root, tb) {
+			return true
+		}
+	}
+	consumed := false
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil || consumed {
+			return
+		}
+		if node != root {
+			switch node.Kind {
+			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+				ast.KindClassStaticBlockDeclaration:
+				return
+			case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
+				// Decorators and computed property keys evaluate in the enclosing scope.
+				if mods := node.Modifiers(); mods != nil {
+					for _, mod := range mods.Nodes {
+						if mod != nil && mod.Kind == ast.KindDecorator {
+							visit(mod)
+						}
+					}
+				}
+				if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+					visit(name)
+				}
+				return
+			}
+		}
+		switch node.Kind {
+		case ast.KindAwaitExpression:
+			if r.exprCanReturnTrackedPromise(node.AsAwaitExpression().Expression, tb) {
+				consumed = true
+				return
+			}
+		case ast.KindForOfStatement:
+			if forOf := node.AsForInOrOfStatement(); forOf != nil && forOf.AwaitModifier != nil &&
+				r.exprReferencesTracked(forOf.Expression, tb, false) {
+				consumed = true
+				return
+			}
+		case ast.KindReturnStatement:
+			if allowReturn {
+				if ret := node.AsReturnStatement(); ret != nil && ret.Expression != nil &&
+					r.exprCanReturnTrackedPromise(ret.Expression, tb) {
+					consumed = true
+					return
+				}
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return consumed
+		})
+	}
+	visit(root)
+	return consumed
+}
+
+// addTrackedRestParam adds bindings from a rest parameter (`...rest` or
+// `...[first, second, ...tail]`) corresponding to 0-based `restOffset` into the
+// rest slice (`restOffset < 0` means unknown offset due to an earlier spread).
+func (r *AsyncAssertionResolver) addTrackedRestParam(tb *trackedBindings, pattern *ast.Node, restOffset int) bool {
+	if pattern == nil {
+		return false
+	}
+	if pattern.Kind == ast.KindIdentifier {
+		tb.restOffset = restOffset
+		r.addTrackedIdent(tb, pattern, true)
+		return true
+	}
+	if pattern.Kind != ast.KindArrayBindingPattern {
+		return false
+	}
+	bp := pattern.AsBindingPattern()
+	if bp == nil || bp.Elements == nil {
+		return false
+	}
+	if restOffset < 0 {
+		// Unknown offset: handled by caller checking every positional element up to a nested rest.
+		return false
+	}
+	for i, el := range bp.Elements.Nodes {
+		if el == nil || el.Kind != ast.KindBindingElement {
+			continue
+		}
+		be := el.AsBindingElement()
+		if be.DotDotDotToken != nil {
+			if i <= restOffset && be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
+				tb.restOffset = restOffset - i
+				r.addTrackedIdent(tb, be.Name(), true)
+				return true
+			}
+			return false
+		}
+		if i == restOffset {
+			if be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
+				r.addTrackedIdent(tb, be.Name(), false)
+				return true
+			}
+			return false
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) buildCallbackTrackedBindings(
+	cb *ast.Node,
+	targetParam *ast.Node,
+	paramIdx int,
+	restOffset int,
+	includeArguments bool,
+	passedArgs map[int]*ast.Node,
+	firstUnknownSpreadIdx int,
+) *trackedBindings {
+	tb := &trackedBindings{
+		trackArguments: includeArguments,
+		restOffset:     -1,
+	}
+	if includeArguments {
+		tb.restOffset = restOffset
+	}
+	if targetParam != nil {
+		p := targetParam.AsParameterDeclaration()
+		if p != nil && p.DotDotDotToken != nil {
+			r.addTrackedRestParam(tb, p.Name(), restOffset)
+		} else if targetParam.Name() != nil && targetParam.Name().Kind == ast.KindIdentifier {
+			r.addTrackedIdent(tb, targetParam.Name(), false)
+		}
+		if !tb.isEmpty() {
+			params := runtimeParameters(cb)
+			r.propagateParamDefaults(params, paramIdx+1, tb, passedArgs, firstUnknownSpreadIdx)
+		}
+	}
+	if cb != nil && !tb.isEmpty() {
+		r.propagateLocalAliasesInScope(cb.Body(), tb)
+	}
+	return tb
+}
+
+func (r *AsyncAssertionResolver) isParamConsumedByCallback(cb *ast.Node, targetParam *ast.Node, paramIdx int, restOffset int, passedArgs map[int]*ast.Node, firstUnknownSpreadIdx int) bool {
+	if cb == nil || targetParam == nil || cb.Body() == nil {
+		return false
+	}
+	tb := r.buildCallbackTrackedBindings(cb, targetParam, paramIdx, restOffset, false, passedArgs, firstUnknownSpreadIdx)
+	if tb.isEmpty() {
+		return false
+	}
+	return r.scopeConsumesTracked(cb.Body(), tb, true)
+}
+
+func (r *AsyncAssertionResolver) isRestArrayPatternConsumedForSpread(cb *ast.Node, restParam *ast.Node, restParamIdx int, minRestOffset int) bool {
+	if cb == nil || restParam == nil || restParam.Name() == nil || restParam.Name().Kind != ast.KindArrayBindingPattern {
+		return false
+	}
+	bp := restParam.Name().AsBindingPattern()
+	if bp == nil || bp.Elements == nil {
+		return false
+	}
+	if minRestOffset < 0 {
+		minRestOffset = 0
+	}
+	for i, el := range bp.Elements.Nodes {
+		if el == nil || el.Kind != ast.KindBindingElement {
+			continue
+		}
+		be := el.AsBindingElement()
+		if be.DotDotDotToken != nil {
+			if be.Name() == nil || be.Name().Kind != ast.KindIdentifier {
+				return false
+			}
+			tb := &trackedBindings{restOffset: -1}
+			r.addTrackedIdent(tb, be.Name(), true)
+			r.propagateLocalAliasesInScope(cb.Body(), tb)
+			if !r.scopeConsumesTracked(cb.Body(), tb, true) {
+				return false
+			}
+			for j := minRestOffset; j < i; j++ {
+				if j >= len(bp.Elements.Nodes) {
+					return false
+				}
+				posEl := bp.Elements.Nodes[j]
+				if posEl == nil || posEl.Kind != ast.KindBindingElement || posEl.Name() == nil || posEl.Name().Kind != ast.KindIdentifier {
+					return false
+				}
+				posTB := &trackedBindings{restOffset: -1}
+				r.addTrackedIdent(posTB, posEl.Name(), false)
+				r.propagateLocalAliasesInScope(cb.Body(), posTB)
+				if !r.scopeConsumesTracked(cb.Body(), posTB, true) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) statementAlwaysThrows(stmt *ast.Node, tb *trackedBindings) bool {
+	if stmt == nil {
+		return false
+	}
+	switch stmt.Kind {
+	case ast.KindThrowStatement:
+		if tb == nil {
+			return true
+		}
+		return r.exprEvaluatesToTrackedPromise(stmt.AsThrowStatement().Expression, tb)
+	case ast.KindBlock:
+		block := stmt.AsBlock()
+		if block == nil || block.Statements == nil {
+			return false
+		}
+		for _, s := range block.Statements.Nodes {
+			if s == nil {
+				continue
+			}
+			if r.statementAlwaysThrows(s, tb) {
+				return true
+			}
+			if r.statementMayExitEarly(s) {
+				return false
+			}
+		}
+		return false
+	case ast.KindIfStatement:
+		ifStmt := stmt.AsIfStatement()
+		if ifStmt == nil || ifStmt.ElseStatement == nil {
+			return false
+		}
+		return r.statementAlwaysThrows(ifStmt.ThenStatement, tb) &&
+			r.statementAlwaysThrows(ifStmt.ElseStatement, tb)
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) exprReturnsRejectedTrackedPromise(expr *ast.Node, tb *trackedBindings, isAsync bool, depth int) int {
+	if depth > 6 {
+		return 0
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	for expr != nil && internalUtils.IsCommaOperator(expr) {
+		expr = internalUtils.SkipAssertionsAndParens(expr.AsBinaryExpression().Right)
+	}
+	if expr == nil {
+		return 0
+	}
+	switch expr.Kind {
+	case ast.KindAwaitExpression:
+		if isAsync {
+			return r.exprReturnsRejectedTrackedPromise(expr.AsAwaitExpression().Expression, tb, true, depth+1)
+		}
+	case ast.KindCallExpression:
+		if method, ok := r.promiseMethodName(expr); ok && method == "reject" {
+			firstArg, argOK := staticCallArgAt(expr, 0)
+			if !argOK || firstArg == nil {
+				return 0
+			}
+			firstArgUnwrapped := internalUtils.SkipAssertionsAndParens(firstArg)
+			if isAsync && firstArgUnwrapped != nil && firstArgUnwrapped.Kind == ast.KindAwaitExpression {
+				// `await` throws before `Promise.reject` is invoked.
+				return r.exprReturnsRejectedTrackedPromise(firstArgUnwrapped, tb, true, depth+1)
+			}
+			if nested := r.exprReturnsRejectedTrackedPromise(firstArg, tb, isAsync, depth+1); nested > 0 {
+				return 1 + nested
+			}
+			if r.exprEvaluatesToTrackedPromise(firstArg, tb) {
+				return 1
+			}
+		}
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		if cond != nil {
+			a := r.exprReturnsRejectedTrackedPromise(cond.WhenTrue, tb, isAsync, depth+1)
+			b := r.exprReturnsRejectedTrackedPromise(cond.WhenFalse, tb, isAsync, depth+1)
+			if a > 0 && b > 0 {
+				return min(a, b)
+			}
+		}
+	case ast.KindIdentifier:
+		if decl := r.singleSameFileValueDeclaration(r.resolveSymbol(expr)); decl != nil &&
+			decl.Kind == ast.KindVariableDeclaration && ast.IsVarConst(decl) &&
+			decl.AsVariableDeclaration().Initializer != nil &&
+			!nodeContains(decl.AsVariableDeclaration().Initializer, expr) {
+			return r.exprReturnsRejectedTrackedPromise(decl.AsVariableDeclaration().Initializer, tb, isAsync, depth+1)
+		}
+	}
+	return 0
+}
+
+func (r *AsyncAssertionResolver) statementAlwaysRejectsTracked(stmt *ast.Node, tb *trackedBindings, isAsync bool) int {
+	if stmt == nil {
+		return 0
+	}
+	switch stmt.Kind {
+	case ast.KindThrowStatement:
+		if r.exprEvaluatesToTrackedPromise(stmt.AsThrowStatement().Expression, tb) {
+			return 1
+		}
+		return 0
+	case ast.KindReturnStatement:
+		return r.exprReturnsRejectedTrackedPromise(stmt.AsReturnStatement().Expression, tb, isAsync, 0)
+	case ast.KindExpressionStatement:
+		if isAsync {
+			if expr := internalUtils.SkipAssertionsAndParens(stmt.AsExpressionStatement().Expression); expr != nil &&
+				expr.Kind == ast.KindAwaitExpression {
+				return r.exprReturnsRejectedTrackedPromise(expr.AsAwaitExpression().Expression, tb, true, 0)
+			}
+		}
+		return 0
+	case ast.KindBlock:
+		block := stmt.AsBlock()
+		if block == nil || block.Statements == nil {
+			return 0
+		}
+		for _, s := range block.Statements.Nodes {
+			if s == nil {
+				continue
+			}
+			if d := r.statementAlwaysRejectsTracked(s, tb, isAsync); d > 0 {
+				return d
+			}
+			if s.Kind == ast.KindIfStatement {
+				ifStmt := s.AsIfStatement()
+				if ifStmt != nil && ifStmt.ElseStatement == nil &&
+					r.statementAlwaysRejectsTracked(ifStmt.ThenStatement, tb, isAsync) > 0 {
+					continue
+				}
+			}
+			if r.statementMayExitEarly(s) {
+				return 0
+			}
+		}
+		return 0
+	case ast.KindIfStatement:
+		ifStmt := stmt.AsIfStatement()
+		if ifStmt == nil || ifStmt.ElseStatement == nil {
+			return 0
+		}
+		a := r.statementAlwaysRejectsTracked(ifStmt.ThenStatement, tb, isAsync)
+		b := r.statementAlwaysRejectsTracked(ifStmt.ElseStatement, tb, isAsync)
+		if a > 0 && b > 0 {
+			return min(a, b)
+		}
+		return 0
+	}
+	return 0
+}
+
+// inlineCallbackPropagatesRejection reports whether an inline rejection handler
+// unconditionally re-rejects with the tracked parameter (`throw e`,
+// `return Promise.reject(e)`, `(e) => Promise.reject(e)`, or `async (e) => { await Promise.reject(e); }`).
+// Returns the number of rejection layers produced (0 if not unconditionally propagating).
+func (r *AsyncAssertionResolver) inlineCallbackPropagatesRejection(cb *ast.Node, argIdx int) int {
+	if cb == nil || argIdx < 1 || functionAsteriskToken(cb) != nil {
+		return 0
+	}
+	body := cb.Body()
+	if body == nil {
+		return 0
+	}
+	isAsync := IsAsyncFunctionLike(cb)
+	checkBody := func(tb *trackedBindings) int {
+		if body.Kind != ast.KindBlock {
+			return r.exprReturnsRejectedTrackedPromise(body, tb, isAsync, 0)
+		}
+		return r.statementAlwaysRejectsTracked(body, tb, isAsync)
+	}
+	summary := r.getInlineCallbackSummary(cb)
+	if summary.usesArguments {
+		tb := r.buildCallbackTrackedBindings(cb, nil, 0, argIdx-1, true, nil, 0)
+		if d := checkBody(tb); d > 0 {
+			return d
+		}
+	}
+	params := runtimeParameters(cb)
+	for i, param := range params {
+		if param == nil {
+			continue
+		}
+		if p := param.AsParameterDeclaration(); p != nil && p.DotDotDotToken != nil && i < argIdx {
+			tb := r.buildCallbackTrackedBindings(cb, param, i, argIdx-1-i, false, nil, 0)
+			if !tb.isEmpty() {
+				return checkBody(tb)
+			}
+			return 0
+		}
+	}
+	if len(params) >= argIdx && params[argIdx-1] != nil {
+		tb := r.buildCallbackTrackedBindings(cb, params[argIdx-1], argIdx-1, -1, false, nil, 0)
+		if !tb.isEmpty() {
+			return checkBody(tb)
+		}
+	}
+	return 0
+}
+
+// inlineCallbackCanConsumePromiseArg reports whether an inline `Promise.try`
+// or `.catch` callback can actually await or return the forwarded argument at
+// `argIdx`. Callbacks that ignore the argument (e.g. `() => {}`,
+// `(first, second) => first`), generator callbacks, or bodies that never await
+// or return a Promise derived from `argIdx` cannot keep the assertion pending.
+func (r *AsyncAssertionResolver) inlineCallbackCanConsumePromiseArg(cb *ast.Node, argIdx int, passedArgs map[int]*ast.Node, firstUnknownSpreadIdx int) bool {
+	if cb == nil || argIdx < 1 {
+		return false
+	}
+	summary := r.getInlineCallbackSummary(cb)
+	if !summary.bodyCanConsume {
+		return false
+	}
+	if summary.usesArguments {
+		tb := r.buildCallbackTrackedBindings(cb, nil, 0, argIdx-1, true, passedArgs, firstUnknownSpreadIdx)
+		if r.scopeConsumesTracked(cb.Body(), tb, true) {
+			return true
+		}
+	}
+	params := runtimeParameters(cb)
+	for i, param := range params {
+		if param == nil {
+			continue
+		}
+		if p := param.AsParameterDeclaration(); p != nil && p.DotDotDotToken != nil && i < argIdx {
+			return r.isParamConsumedByCallback(cb, param, i, argIdx-1-i, passedArgs, firstUnknownSpreadIdx)
+		}
+	}
+	if len(params) >= argIdx {
+		return r.isParamConsumedByCallback(cb, params[argIdx-1], argIdx-1, -1, passedArgs, firstUnknownSpreadIdx)
+	}
+	return false
+}
+
+// inlineCallbackCanConsumeSpreadArg reports whether `cb` is guaranteed to
+// consume an argument whose exact runtime position is >= `minRuntimeIdx` due
+// to a preceding unknown-length spread. It requires either `arguments` usage
+// or a consumed rest parameter plus consumption of every earlier positional
+// parameter from `minRuntimeIdx-1` up to the rest parameter.
+func (r *AsyncAssertionResolver) inlineCallbackCanConsumeSpreadArg(cb *ast.Node, minRuntimeIdx int) bool {
+	if cb == nil || minRuntimeIdx < 1 {
+		return false
+	}
+	summary := r.getInlineCallbackSummary(cb)
+	if !summary.bodyCanConsume {
+		return false
+	}
+	if summary.usesArguments {
+		tb := r.buildCallbackTrackedBindings(cb, nil, 0, -1, true, nil, 1)
+		if r.scopeConsumesTracked(cb.Body(), tb, true) {
+			return true
+		}
+	}
+	params := runtimeParameters(cb)
+	for i, param := range params {
+		if param == nil {
+			continue
+		}
+		if p := param.AsParameterDeclaration(); p != nil && p.DotDotDotToken != nil {
+			if p.Name() != nil && p.Name().Kind == ast.KindArrayBindingPattern {
+				if !r.isRestArrayPatternConsumedForSpread(cb, param, i, minRuntimeIdx-1-i) {
+					return false
+				}
+			} else if !r.isParamConsumedByCallback(cb, param, i, -1, nil, 1) {
+				return false
+			}
+			for j := minRuntimeIdx - 1; j < i; j++ {
+				if !r.isParamConsumedByCallback(cb, params[j], j, -1, nil, 1) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
 }
 
 // outermostTransparentExpression walks upward across parentheses and
@@ -697,69 +1745,257 @@ func outermostTransparentExpression(node *ast.Node) *ast.Node {
 	return current
 }
 
-func (r *AsyncAssertionResolver) getPromiseCallExpressionNode(node *ast.Node, directArg *ast.Node) *ast.Node {
+func outermostChainedBase(node *ast.Node) *ast.Node {
+	outer := outermostTransparentExpression(node)
+	for outer != nil && outer.Parent != nil {
+		parent := outer.Parent
+		if parent.Kind == ast.KindConditionalExpression {
+			cond := parent.AsConditionalExpression()
+			if cond != nil && (cond.WhenTrue == outer || cond.WhenFalse == outer) {
+				outer = outermostTransparentExpression(parent)
+				continue
+			}
+			return nil
+		}
+		if internalUtils.IsCommaOperator(parent) && parent.AsBinaryExpression().Right == outer {
+			outer = outermostTransparentExpression(parent)
+			continue
+		}
+		break
+	}
+	return outer
+}
+
+func (r *AsyncAssertionResolver) isNonCallablePromiseHandler(node *ast.Node) bool {
 	if node == nil {
-		return nil
+		return true
+	}
+	switch node.Kind {
+	case ast.KindNullKeyword, ast.KindUndefinedKeyword, ast.KindVoidExpression,
+		ast.KindTrueKeyword, ast.KindFalseKeyword,
+		ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression,
+		ast.KindRegularExpressionLiteral,
+		ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression,
+		ast.KindPrefixUnaryExpression, ast.KindPostfixUnaryExpression, ast.KindTypeOfExpression:
+		return true
+	case ast.KindIdentifier:
+		return node.AsIdentifier().Text == "undefined" && !r.isLocallyValueShadowed(node, "undefined")
+	}
+	return false
+}
+
+// staticCallArgAt resolves the 0-based argument `targetIdx` of `call`,
+// unpacking static array literal spreads (`...[]`, `...[undefined, fn]`).
+// Returns `(nil, true)` when the call statically passes fewer than `targetIdx+1`
+// arguments (so the slot is `undefined`), and `(nil, false)` when an unknown
+// spread prevents determining the argument statically.
+func staticCallArgAt(call *ast.Node, targetIdx int) (*ast.Node, bool) {
+	if call == nil || call.Kind != ast.KindCallExpression || targetIdx < 0 {
+		return nil, false
+	}
+	args := call.AsCallExpression().Arguments
+	if args == nil {
+		return nil, true
+	}
+	curIdx := 0
+	var result *ast.Node
+	found := false
+	unknown := false
+	var walk func(nodes []*ast.Node, depth int)
+	walk = func(nodes []*ast.Node, depth int) {
+		for _, a := range nodes {
+			if found || unknown {
+				return
+			}
+			if a == nil || a.Kind == ast.KindOmittedExpression {
+				if curIdx == targetIdx {
+					found = true
+					return
+				}
+				curIdx++
+				continue
+			}
+			if a.Kind == ast.KindSpreadElement {
+				spreadExpr := internalUtils.SkipAssertionsAndParens(a.AsSpreadElement().Expression)
+				if depth < 4 && spreadExpr != nil && spreadExpr.Kind == ast.KindArrayLiteralExpression {
+					if elems := spreadExpr.AsArrayLiteralExpression().Elements; elems != nil {
+						walk(elems.Nodes, depth+1)
+					}
+					continue
+				}
+				unknown = true
+				return
+			}
+			if curIdx == targetIdx {
+				result = a
+				found = true
+				return
+			}
+			curIdx++
+		}
+	}
+	walk(args.Nodes, 0)
+	if unknown {
+		return nil, false
+	}
+	return result, true
+}
+
+type rejectChainOutcome uint8
+
+const (
+	rejectPropagated rejectChainOutcome = iota
+	rejectRecovered
+	rejectDropped
+)
+
+// walkPromiseRejectChain walks `.then`/`.catch`/`.finally` chains starting from
+// a rejected Promise whose rejection reason is an assertion Promise. Unlike
+// `Promise.resolve(assertion)`, `Promise.reject(assertion)` rejects immediately
+// with the still-pending `assertion` Promise as its reason:
+//   - a `.catch(cb)` or 2-arg `.then(_, cb)` whose inline handler returns or
+//     awaits the reason recovers it (`rejectRecovered`);
+//   - a handler that unconditionally rethrows the reason, a non-callable
+//     handler, or a non-throwing `.finally` propagates the rejection
+//     (`rejectPropagated`);
+//   - a handler that swallows the reason or a `.finally` that unconditionally
+//     throws drops the assertion (`rejectDropped`).
+func (r *AsyncAssertionResolver) walkPromiseRejectChain(start *ast.Node) (*ast.Node, rejectChainOutcome, int) {
+	cur := start
+	extraRejects := 0
+	for cur != nil {
+		outer := outermostChainedBase(cur)
+		if outer == nil || outer.Parent == nil ||
+			!ast.IsAccessExpression(outer.Parent) ||
+			internalUtils.AccessExpressionObject(outer.Parent) != outer {
+			return cur, rejectPropagated, extraRejects
+		}
+		memberOuter := outermostTransparentExpression(outer.Parent)
+		if memberOuter == nil || memberOuter.Parent == nil ||
+			memberOuter.Parent.Kind != ast.KindCallExpression ||
+			memberOuter.Parent.AsCallExpression().Expression != memberOuter {
+			return cur, rejectPropagated, extraRejects
+		}
+		grandParent := memberOuter.Parent
+		method, ok := r.accessStaticNameThroughAssertions(outer.Parent)
+		if !ok {
+			return cur, rejectPropagated, extraRejects
+		}
+		var onRejected *ast.Node
+		var argOK bool
+		switch method {
+		case "finally":
+			if fnArg, ok := staticCallArgAt(grandParent, 0); ok && fnArg != nil {
+				fnArg = internalUtils.SkipAssertionsAndParens(fnArg)
+				if (fnArg.Kind == ast.KindArrowFunction || fnArg.Kind == ast.KindFunctionExpression) &&
+					functionAsteriskToken(fnArg) == nil && r.statementAlwaysThrows(fnArg.Body(), nil) {
+					return grandParent, rejectDropped, extraRejects
+				}
+			}
+			cur = grandParent
+			continue
+		case "then":
+			onRejected, argOK = staticCallArgAt(grandParent, 1)
+		case "catch":
+			onRejected, argOK = staticCallArgAt(grandParent, 0)
+		default:
+			return cur, rejectPropagated, extraRejects
+		}
+		if !argOK {
+			// Unknown spread in `.then`/`.catch`: stop conservatively.
+			return grandParent, rejectRecovered, extraRejects
+		}
+		onRejected = internalUtils.SkipAssertionsAndParens(onRejected)
+		if r.isNonCallablePromiseHandler(onRejected) {
+			cur = grandParent
+			continue
+		}
+		if onRejected.Kind == ast.KindArrowFunction || onRejected.Kind == ast.KindFunctionExpression {
+			// Check unconditional rejection propagation (`throw e`, `(e) => Promise.reject(e)`)
+			// BEFORE general consumption so `Promise.reject(e)` is not mistaken for recovery.
+			if rejDepth := r.inlineCallbackPropagatesRejection(onRejected, 1); rejDepth > 0 {
+				extraRejects += rejDepth - 1
+				cur = grandParent
+				continue
+			}
+			if r.inlineCallbackCanConsumePromiseArg(onRejected, 1, nil, 0) {
+				return grandParent, rejectRecovered, extraRejects
+			}
+			return grandParent, rejectDropped, extraRejects
+		}
+		// Non-inline rejection handler (e.g. identifier): conservatively assume it handles the reason.
+		return grandParent, rejectRecovered, extraRejects
+	}
+	return cur, rejectPropagated, extraRejects
+}
+
+func (r *AsyncAssertionResolver) getPromiseCallExpressionNode(node *ast.Node, directArg *ast.Node) (*ast.Node, string) {
+	if node == nil {
+		return nil, ""
 	}
 
 	if node.Kind == ast.KindArrayLiteralExpression {
 		outer := outermostTransparentExpression(node)
 		if outer == nil || outer.Parent == nil || outer.Parent.Kind != ast.KindCallExpression {
-			return nil
+			return nil, ""
 		}
 		call := outer.Parent
-		args := call.AsCallExpression().Arguments
-		if args == nil || len(args.Nodes) == 0 || args.Nodes[0] != outer {
-			return nil
+		firstArg, argOK := staticCallArgAt(call, 0)
+		if !argOK || firstArg != outer {
+			return nil, ""
 		}
 		method, ok := r.promiseMethodName(call)
 		// `Promise.resolve([...])`, `Promise.reject([...])`,
 		// `Promise.withResolvers([...])`, and `Promise.try([...])` do not await
 		// array elements, unlike `Promise.all` / `allSettled` / `race` / `any`
 		// (or custom combinators such as `Promise.x`).
-		if !ok || method == "resolve" || method == "reject" || method == "withResolvers" || method == "try" {
-			return nil
+		if !ok || method == "" || method == "resolve" || method == "reject" || method == "withResolvers" || method == "try" {
+			return nil, ""
 		}
-		return call
+		return call, method
 	}
 
 	method, ok := r.promiseMethodName(node)
-	if !ok || method == "withResolvers" {
-		return nil
+	if !ok || method == "" || method == "withResolvers" {
+		return nil, ""
 	}
 	if directArg != nil {
 		args := node.AsCallExpression().Arguments
 		switch method {
 		case "resolve", "reject", "all", "allSettled", "race", "any":
-			if args == nil || len(args.Nodes) == 0 || args.Nodes[0] != directArg {
-				return nil
+			firstArg, argOK := staticCallArgAt(node, 0)
+			if !argOK || firstArg != directArg {
+				return nil, ""
 			}
 		case "try":
-			if args == nil || len(args.Nodes) < 2 {
-				return nil
+			if args == nil || len(args.Nodes) == 0 {
+				return nil, ""
 			}
 			tryIdx := r.getPromiseTryCallIndex(node)
-			argIdx, ok := tryIdx.argIndex[directArg]
-			if !ok || argIdx < 1 {
-				return nil
+			pos, ok := tryIdx.args[directArg]
+			if !ok || tryIdx.cbUnknown || tryIdx.cbMissing || pos.runtimeIdx < 1 {
+				return nil, ""
 			}
-			hasPrecedingSpread := tryIdx.firstSpreadIdx >= 1 && tryIdx.firstSpreadIdx < argIdx
-			cb := internalUtils.SkipAssertionsAndParens(args.Nodes[0])
-			if cb != nil && (cb.Kind == ast.KindArrowFunction || cb.Kind == ast.KindFunctionExpression) {
-				if hasPrecedingSpread {
-					if !r.inlineCallbackCanConsumeSpreadArg(cb) {
-						return nil
+			cb := tryIdx.cb
+			if cb == nil || r.isNonCallablePromiseHandler(cb) {
+				return nil, ""
+			}
+			if cb.Kind == ast.KindArrowFunction || cb.Kind == ast.KindFunctionExpression {
+				if pos.hasUnknownSpread {
+					if !r.inlineCallbackCanConsumeSpreadArg(cb, pos.runtimeIdx) {
+						return nil, ""
 					}
-				} else if !r.inlineCallbackCanConsumePromiseArg(cb, argIdx) {
-					return nil
+				} else if !r.inlineCallbackCanConsumePromiseArg(cb, pos.runtimeIdx, tryIdx.argExprByIdx, tryIdx.firstUnknownSpreadIdx) {
+					return nil, ""
 				}
 			}
 		}
 	}
-	return node
+	return node, method
 }
 
-func (r *AsyncAssertionResolver) findPromiseCallExpressionNode(node *ast.Node) *ast.Node {
+func (r *AsyncAssertionResolver) findPromiseCallExpressionNode(node *ast.Node) (*ast.Node, string) {
 	current := outermostTransparentExpression(node)
 	for current != nil && current.Parent != nil {
 		parent := current.Parent
@@ -772,7 +2008,7 @@ func (r *AsyncAssertionResolver) findPromiseCallExpressionNode(node *ast.Node) *
 				current = outermostTransparentExpression(parent)
 				continue
 			}
-			return nil
+			return nil, ""
 		}
 		if internalUtils.IsCommaOperator(parent) && parent.AsBinaryExpression().Right == current {
 			current = outermostTransparentExpression(parent)
@@ -780,36 +2016,45 @@ func (r *AsyncAssertionResolver) findPromiseCallExpressionNode(node *ast.Node) *
 		}
 		if parent.Kind == ast.KindCallExpression {
 			if parent.AsCallExpression().Expression == current {
-				return nil
+				return nil, ""
 			}
 			return r.getPromiseCallExpressionNode(parent, current)
 		}
 		if parent.Kind == ast.KindArrayLiteralExpression {
-			return r.getPromiseCallExpressionNode(parent, nil)
+			arr := parent
+			for depth := 0; depth < 4 && arr != nil; depth++ {
+				arrOuter := outermostTransparentExpression(arr)
+				if arrOuter == nil || arrOuter.Parent == nil {
+					return nil, ""
+				}
+				if arrOuter.Parent.Kind == ast.KindCallExpression {
+					return r.getPromiseCallExpressionNode(arr, nil)
+				}
+				if arrOuter.Parent.Kind == ast.KindSpreadElement && arrOuter.Parent.AsSpreadElement().Expression == arrOuter {
+					sp := arrOuter.Parent
+					if sp.Parent == nil {
+						return nil, ""
+					}
+					if sp.Parent.Kind == ast.KindCallExpression {
+						// Spread-wrapped argument to `Promise.try(cb, ...[expect(...)])`.
+						return r.getPromiseCallExpressionNode(sp.Parent, current)
+					}
+					if sp.Parent.Kind == ast.KindArrayLiteralExpression {
+						arr = sp.Parent
+						continue
+					}
+				}
+				return nil, ""
+			}
+			return nil, ""
 		}
-		return nil
+		return nil, ""
 	}
-	return nil
+	return nil, ""
 }
 
 func getParentIfPromiseChained(node *ast.Node) *ast.Node {
-	outer := outermostTransparentExpression(node)
-	for outer != nil && outer.Parent != nil {
-		parent := outer.Parent
-		if parent.Kind == ast.KindConditionalExpression {
-			cond := parent.AsConditionalExpression()
-			if cond != nil && (cond.WhenTrue == outer || cond.WhenFalse == outer) {
-				outer = outermostTransparentExpression(parent)
-				continue
-			}
-			return node
-		}
-		if internalUtils.IsCommaOperator(parent) && parent.AsBinaryExpression().Right == outer {
-			outer = outermostTransparentExpression(parent)
-			continue
-		}
-		break
-	}
+	outer := outermostChainedBase(node)
 	if outer == nil || outer.Parent == nil {
 		return node
 	}
@@ -1221,250 +2466,1097 @@ func (r *AsyncAssertionResolver) CanSafelyAwaitFix(node *ast.Node) bool {
 	}
 	outer := outermostTransparentExpression(node)
 	if outer == nil || outer.Parent == nil {
+		return false
+	}
+
+	// Inserting `await` directly in front of an unhandled `Promise.reject(assertion)`
+	// (including wrapped/chained forms such as `Promise.resolve(Promise.reject(...))`
+	// or `Promise.reject(...).finally(() => {})`) is only safe at a top-level
+	// statement/return outside `try/catch` or an abruptly exiting `finally` block
+	// (never inside `Promise.allSettled([...])`, `Promise.any([...])`, or `try/catch`).
+	if r.unhandledPromiseRejectDepth(outer, 0) > 0 {
+		if r.isInsideTryWithCatchOrAbruptFinally(outer) {
+			return false
+		}
+		switch outer.Parent.Kind {
+		case ast.KindExpressionStatement:
+			return outer.Parent.AsExpressionStatement().Expression == outer
+		case ast.KindReturnStatement:
+			return outer.Parent.AsReturnStatement().Expression == outer
+		case ast.KindArrowFunction:
+			return outer.Parent.AsArrowFunction().Body == outer
+		default:
+			return false
+		}
+	}
+
+	hasExplicitNonAnyType := func(typeNode *ast.Node) bool {
+		return typeNode != nil && typeNode.Kind != ast.KindAnyKeyword && typeNode.Kind != ast.KindUnknownKeyword
+	}
+
+	isSafeVarDecl := func(vdNode *ast.Node, initExpr *ast.Node) bool {
+		vd := vdNode.AsVariableDeclaration()
+		if vd == nil || vd.Initializer != initExpr || vd.Name() == nil || vd.Name().Kind != ast.KindIdentifier {
+			return false
+		}
+		if hasExplicitNonAnyType(vd.Type) {
+			return false
+		}
+		if r.isBindingReadOrExported(vdNode, vd.Name()) {
+			return false
+		}
+		if vdNode.Parent == nil || vdNode.Parent.Kind != ast.KindVariableDeclarationList {
+			return false
+		}
+		declList := vdNode.Parent
+		if declList.Parent == nil || declList.Parent.Kind != ast.KindVariableStatement {
+			return false
+		}
+		if r.hasFollowingSideEffectDecl(declList, vdNode) {
+			return false
+		}
 		return true
 	}
 
-	// Walk upward through value-propagating expressions to detect member/call/
-	// syntax-forbidden positions, destructuring, comparisons, truthiness tests,
-	// switch discriminants, or short-circuiting operators where turning a
-	// Promise into its resolved value (`undefined`) breaks syntax or semantics.
+	isStatementLevelPromiseCall := func(call *ast.Node, method string) bool {
+		callOuter := outermostTransparentExpression(call)
+		if callOuter != nil && callOuter.Parent != nil && callOuter.Parent.Kind == ast.KindAwaitExpression &&
+			callOuter.Parent.AsAwaitExpression().Expression == callOuter {
+			callOuter = outermostTransparentExpression(callOuter.Parent)
+		}
+		if callOuter == nil || callOuter.Parent == nil || callOuter.Parent.Kind != ast.KindExpressionStatement ||
+			callOuter.Parent.AsExpressionStatement().Expression != callOuter {
+			return false
+		}
+		if method == "reject" && r.isInsideTryWithCatchOrAbruptFinally(callOuter.Parent) {
+			return false
+		}
+		return true
+	}
+
+	// Walk all the way up to the enclosing statement/function boundary through
+	// an explicit allowlist of safe containers so inserting `await` can never
+	// delay sibling setup mutations, mutating callees/constructors, `Promise.try`
+	// callbacks, returned containers, or observed properties/bindings across a
+	// microtask yield.
 	cur := outer
+	fromComputedProp := false
+	inContainer := false
 	for cur != nil && cur.Parent != nil {
 		parent := cur.Parent
 		switch parent.Kind {
-		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-			if internalUtils.AccessExpressionObject(parent) == cur {
+		case ast.KindExpressionStatement:
+			return parent.AsExpressionStatement().Expression == cur
+		case ast.KindReturnStatement:
+			if inContainer {
 				return false
 			}
-			return true
-		case ast.KindCallExpression:
-			if parent.AsCallExpression().Expression == cur {
+			return parent.AsReturnStatement().Expression == cur
+		case ast.KindArrowFunction:
+			if inContainer {
 				return false
 			}
-			// If `Promise.try(cb, expect(...))` has an inline callback that
-			// accepts this argument (e.g. `(check) => { check.then(...); }`
-			// without `return`/`await`), awaiting `expect(...)` would turn the
-			// parameter into `undefined` and crash the callback.
-			if r.promiseTryCallbackAcceptsArg(parent, cur) {
-				return false
-			}
-			return true
-		case ast.KindNewExpression:
-			if parent.AsNewExpression().Expression == cur {
-				return false
-			}
-			return true
-		case ast.KindTaggedTemplateExpression:
-			if parent.AsTaggedTemplateExpression().Tag == cur {
-				return false
-			}
-			return true
-		case ast.KindExpressionWithTypeArguments, ast.KindDecorator,
-			ast.KindPostfixUnaryExpression, ast.KindTypeOfExpression:
-			return false
+			return parent.AsArrowFunction().Body == cur
 		case ast.KindVariableDeclaration:
-			vd := parent.AsVariableDeclaration()
-			if vd != nil && vd.Initializer == cur && vd.Name() != nil {
-				switch vd.Name().Kind {
-				case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
-					return false
-				case ast.KindIdentifier:
-					if r.isBindingReadOrExported(parent, vd.Name()) {
-						return false
-					}
-				}
+			return isSafeVarDecl(parent, cur)
+		case ast.KindAwaitExpression:
+			if cur == outer || parent.AsAwaitExpression().Expression != cur {
+				return false
 			}
-			return true
+			cur = outermostTransparentExpression(parent)
+			continue
 		case ast.KindConditionalExpression:
 			cond := parent.AsConditionalExpression()
-			if cond == nil {
-				return true
-			}
-			if cond.Condition == cur {
+			if cond == nil || (cond.WhenTrue != cur && cond.WhenFalse != cur) {
 				return false
 			}
-			if cond.WhenTrue == cur || cond.WhenFalse == cur {
-				cur = outermostTransparentExpression(parent)
-				continue
-			}
-			return true
-		case ast.KindIfStatement:
-			if stmt := parent.AsIfStatement(); stmt != nil && stmt.Expression == cur {
-				return false
-			}
-			return true
-		case ast.KindWhileStatement:
-			if stmt := parent.AsWhileStatement(); stmt != nil && stmt.Expression == cur {
-				return false
-			}
-			return true
-		case ast.KindDoStatement:
-			if stmt := parent.AsDoStatement(); stmt != nil && stmt.Expression == cur {
-				return false
-			}
-			return true
-		case ast.KindForStatement:
-			if stmt := parent.AsForStatement(); stmt != nil && stmt.Condition == cur {
-				return false
-			}
-			return true
-		case ast.KindSwitchStatement:
-			if stmt := parent.AsSwitchStatement(); stmt != nil && stmt.Expression == cur {
-				return false
-			}
-			return true
-		case ast.KindCaseClause:
-			if clause := parent.AsCaseOrDefaultClause(); clause != nil && clause.Expression == cur {
-				return false
-			}
-			return true
-		case ast.KindPrefixUnaryExpression:
-			if unary := parent.AsPrefixUnaryExpression(); unary != nil && unary.Operator == ast.KindExclamationToken && unary.Operand == cur {
-				return false
-			}
-			return true
+			cur = outermostTransparentExpression(parent)
+			continue
 		case ast.KindBinaryExpression:
 			bin := parent.AsBinaryExpression()
 			if bin == nil || bin.OperatorToken == nil {
-				return true
+				return false
 			}
 			switch bin.OperatorToken.Kind {
-			case ast.KindAsteriskAsteriskToken:
-				if bin.Left == cur {
-					return false
-				}
-			case ast.KindInKeyword, ast.KindInstanceOfKeyword,
-				ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken,
-				ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken,
-				ast.KindLessThanToken, ast.KindGreaterThanToken,
-				ast.KindLessThanEqualsToken, ast.KindGreaterThanEqualsToken:
-				return false
 			case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-				if bin.Left == cur {
+				if bin.Right != cur {
 					return false
 				}
-				if bin.Right == cur {
-					cur = outermostTransparentExpression(parent)
-					continue
-				}
-			case ast.KindEqualsToken:
-				if bin.Right == cur {
-					lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
-					if r.isAssignmentTargetObserved(lhs) {
-						return false
-					}
-					cur = outermostTransparentExpression(parent)
-					continue
-				}
+				cur = outermostTransparentExpression(parent)
+				continue
 			case ast.KindCommaToken:
 				if bin.Right == cur {
 					cur = outermostTransparentExpression(parent)
 					continue
 				}
-			case ast.KindQuestionQuestionEqualsToken, ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
-				if bin.Right == cur {
-					lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
-					if r.isAssignmentTargetObserved(lhs) {
-						return false
-					}
+				if bin.Left == cur && !r.exprMayMutateState(bin.Right) {
 					cur = outermostTransparentExpression(parent)
 					continue
 				}
-			}
-			return true
-		case ast.KindArrayLiteralExpression:
-			arrOuter := outermostTransparentExpression(parent)
-			if arrOuter != nil && arrOuter.Parent != nil {
-				switch arrOuter.Parent.Kind {
-				case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-					if internalUtils.AccessExpressionObject(arrOuter.Parent) == arrOuter {
-						return false
-					}
-				case ast.KindVariableDeclaration:
-					vd := arrOuter.Parent.AsVariableDeclaration()
-					if vd != nil && vd.Initializer == arrOuter && vd.Name() != nil {
-						switch vd.Name().Kind {
-						case ast.KindArrayBindingPattern, ast.KindObjectBindingPattern:
-							return false
-						case ast.KindIdentifier:
-							if r.isBindingReadOrExported(arrOuter.Parent, vd.Name()) {
+				return false
+			case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken,
+				ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+				if bin.Right != cur {
+					return false
+				}
+				lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
+				if r.isAssignmentTargetObserved(lhs) {
+					return false
+				}
+				if lhs != nil && lhs.Kind == ast.KindIdentifier {
+					if sym := r.resolveSymbol(lhs); sym != nil {
+						for _, decl := range sym.Declarations {
+							if decl == nil {
+								continue
+							}
+							if decl.Kind != ast.KindVariableDeclaration ||
+								decl.Parent == nil || decl.Parent.Kind != ast.KindVariableDeclarationList ||
+								decl.Parent.Parent == nil || decl.Parent.Parent.Kind != ast.KindVariableStatement {
 								return false
 							}
-						}
-					}
-				case ast.KindBinaryExpression:
-					bin := arrOuter.Parent.AsBinaryExpression()
-					if bin != nil && bin.OperatorToken != nil && bin.Right == arrOuter {
-						switch bin.OperatorToken.Kind {
-						case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken,
-							ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
-							lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
-							if r.isAssignmentTargetObserved(lhs) {
+							vd := decl.AsVariableDeclaration()
+							if vd == nil {
 								return false
 							}
-							cur = outermostTransparentExpression(arrOuter.Parent)
-							continue
-						case ast.KindCommaToken, ast.KindAmpersandAmpersandToken,
-							ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-							cur = outermostTransparentExpression(arrOuter.Parent)
-							continue
-						}
-					}
-				case ast.KindConditionalExpression:
-					cond := arrOuter.Parent.AsConditionalExpression()
-					if cond != nil && (cond.WhenTrue == arrOuter || cond.WhenFalse == arrOuter) {
-						cur = outermostTransparentExpression(arrOuter.Parent)
-						continue
-					}
-				case ast.KindCallExpression:
-					call := arrOuter.Parent
-					if r.promiseTryCallbackAcceptsArg(call, arrOuter) {
-						return false
-					}
-					if method, ok := r.promiseMethodName(call); ok && (method == "resolve" || method == "reject") {
-						callOuter := outermostTransparentExpression(call)
-						if callOuter != nil && callOuter.Parent != nil && callOuter.Parent.Kind == ast.KindAwaitExpression {
-							callOuter = outermostTransparentExpression(callOuter.Parent)
-						}
-						if callOuter == nil || callOuter.Parent == nil || callOuter.Parent.Kind != ast.KindExpressionStatement {
-							return false
-						}
-						if method == "reject" && isInsideTryWithCatch(callOuter.Parent) {
-							return false
+							if vd.Type != nil {
+								if hasExplicitNonAnyType(vd.Type) {
+									return false
+								}
+							} else if vd.Initializer != nil {
+								return false
+							}
 						}
 					}
 				}
+				cur = outermostTransparentExpression(parent)
+				continue
 			}
-			return true
+			return false
+		case ast.KindCallExpression:
+			if parent.AsCallExpression().Expression == cur {
+				return false
+			}
+			if r.isPromiseTryOrRejectCall(parent) {
+				return false
+			}
+			if r.calleeMayMutateState(parent.AsCallExpression().Expression, 0) {
+				return false
+			}
+			if r.hasFollowingSideEffectArg(parent, cur) {
+				return false
+			}
+			if method, ok := r.promiseMethodName(parent); ok && (method == "resolve" || method == "reject") {
+				if !isStatementLevelPromiseCall(parent, method) {
+					return false
+				}
+			}
+			inContainer = true
+			cur = outermostTransparentExpression(parent)
+			continue
+		case ast.KindNewExpression:
+			if parent.AsNewExpression().Expression == cur {
+				return false
+			}
+			if r.calleeMayMutateState(parent.AsNewExpression().Expression, 0) {
+				return false
+			}
+			if r.hasFollowingSideEffectArg(parent, cur) {
+				return false
+			}
+			inContainer = true
+			cur = outermostTransparentExpression(parent)
+			continue
+		case ast.KindArrayLiteralExpression:
+			if r.hasFollowingSideEffectElem(parent, cur) {
+				return false
+			}
+			arrOuter := outermostTransparentExpression(parent)
+			if arrOuter != nil && arrOuter.Parent != nil && arrOuter.Parent.Kind == ast.KindCallExpression {
+				call := arrOuter.Parent
+				if method, ok := r.promiseMethodName(call); ok && (method == "resolve" || method == "reject") {
+					if !isStatementLevelPromiseCall(call, method) {
+						return false
+					}
+				}
+			}
+			inContainer = true
+			cur = outermostTransparentExpression(parent)
+			continue
+		case ast.KindSpreadElement:
+			if parent.AsSpreadElement().Expression != cur {
+				return false
+			}
+			inContainer = true
+			cur = outermostTransparentExpression(parent)
+			continue
+		case ast.KindComputedPropertyName:
+			if parent.AsComputedPropertyName().Expression != cur {
+				return false
+			}
+			fromComputedProp = true
+			inContainer = true
+			cur = parent
+			continue
+		case ast.KindMethodDeclaration:
+			if !fromComputedProp || parent.Name() != cur {
+				return false
+			}
+			cur = parent
+			continue
+		case ast.KindObjectLiteralExpression:
+			if !fromComputedProp {
+				return false
+			}
+			fromComputedProp = false
+			if r.hasFollowingSideEffectObjProp(parent, cur) {
+				return false
+			}
+			inContainer = true
+			cur = outermostTransparentExpression(parent)
+			continue
 		default:
+			return false
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) isPromiseTryOrRejectCallee(callee *ast.Node, depth int) bool {
+	if depth > 4 || callee == nil {
+		return false
+	}
+	callee = internalUtils.SkipAssertionsAndParens(callee)
+	if callee == nil {
+		return false
+	}
+	if ast.IsAccessExpression(callee) {
+		obj := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+		method, ok := r.accessStaticNameThroughAssertions(callee)
+		if r.isGlobalPromiseObject(obj, 0) && (!ok || method == "try" || method == "reject") {
 			return true
+		}
+		// `Promise.try.call(...)`, `Promise.try.apply(...)`, `Promise.try.bind(...)`.
+		if ok && (method == "call" || method == "apply" || method == "bind") {
+			return r.isPromiseTryOrRejectCallee(obj, depth+1)
+		}
+		return false
+	}
+	if callee.Kind == ast.KindIdentifier {
+		decl := r.singleSameFileValueDeclaration(r.resolveSymbol(callee))
+		if decl == nil {
+			return false
+		}
+		switch decl.Kind {
+		case ast.KindVariableDeclaration:
+			if ast.IsVarConst(decl) {
+				init := decl.AsVariableDeclaration().Initializer
+				if init != nil && !nodeContains(init, callee) {
+					return r.isPromiseTryOrRejectCallee(init, depth+1)
+				}
+			}
+		case ast.KindBindingElement:
+			b := decl.AsBindingElement()
+			if b == nil || b.DotDotDotToken != nil || decl.Parent == nil || decl.Parent.Kind != ast.KindObjectBindingPattern {
+				return false
+			}
+			vd := internalUtils.EnclosingVariableDeclarationOfBindingElement(decl)
+			if vd == nil || !ast.IsVarConst(vd) || vd.AsVariableDeclaration().Initializer == nil ||
+				!r.isGlobalPromiseObject(vd.AsVariableDeclaration().Initializer, 0) {
+				return false
+			}
+			var propName string
+			var ok bool
+			if b.PropertyName != nil {
+				propName, ok = internalUtils.GetStaticPropertyName(b.PropertyName)
+				if !ok && r.staticStringEvaluator() != nil {
+					propName, ok = r.staticStringEvaluator().EvalPropertyName(b.PropertyName)
+				}
+			} else if b.Name() != nil && b.Name().Kind == ast.KindIdentifier {
+				propName, ok = b.Name().AsIdentifier().Text, true
+			}
+			return ok && (propName == "try" || propName == "reject")
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) isPromiseTryOrRejectCall(call *ast.Node) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return false
+	}
+	if method, ok := r.promiseMethodName(call); ok && (method == "try" || method == "reject") {
+		return true
+	}
+	callee := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
+	if r.isPromiseTryOrRejectCallee(callee, 0) {
+		return true
+	}
+	// `Reflect.apply(Promise.try, ...)`
+	if callee != nil && ast.IsAccessExpression(callee) {
+		if m, ok := r.accessStaticNameThroughAssertions(callee); ok && m == "apply" {
+			obj := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+			if obj != nil && obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "Reflect" &&
+				!r.isLocallyValueShadowed(obj, "Reflect") {
+				if args := call.AsCallExpression().Arguments; args != nil && len(args.Nodes) > 0 {
+					return r.isPromiseTryOrRejectCallee(args.Nodes[0], 0)
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) isExpectCallWithoutCallback(call *ast.Node) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return false
+	}
+	callee := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
+	if callee == nil || callee.Kind != ast.KindIdentifier || callee.AsIdentifier().Text != "expect" {
+		return false
+	}
+	// Reject locally shadowed `const expect = () => { started = true; }` (allow imports).
+	if sym := r.resolveSymbol(callee); sym != nil {
+		for _, decl := range sym.Declarations {
+			if !isValueDeclarationNode(decl) {
+				continue
+			}
+			if r != nil && r.sourceFile != nil && ast.GetSourceFileOfNode(decl) != r.sourceFile {
+				continue
+			}
+			switch decl.Kind {
+			case ast.KindImportClause, ast.KindImportSpecifier, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration:
+				continue
+			default:
+				return false
+			}
+		}
+	}
+	// Reject `expect(() => { started = true; })` since `.toThrow()` invokes the callback synchronously.
+	if args := call.AsCallExpression().Arguments; args != nil {
+		for _, arg := range args.Nodes {
+			unwrapped := internalUtils.SkipAssertionsAndParens(arg)
+			if unwrapped != nil && (unwrapped.Kind == ast.KindArrowFunction || unwrapped.Kind == ast.KindFunctionExpression) {
+				return false
+			}
 		}
 	}
 	return true
 }
 
-func (r *AsyncAssertionResolver) promiseTryCallbackAcceptsArg(call *ast.Node, arg *ast.Node) bool {
-	method, ok := r.promiseMethodName(call)
-	if !ok || method != "try" {
+func (r *AsyncAssertionResolver) isPureExpectOrPromiseWrapperCall(call *ast.Node) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
 	}
-	args := call.AsCallExpression().Arguments
-	if args == nil || len(args.Nodes) < 2 {
+	if method, ok := r.promiseMethodName(call); ok && (method == "resolve" || method == "reject") {
+		return true
+	}
+	if r.isExpectCallWithoutCallback(call) {
+		return true
+	}
+	// Accept matcher calls chained onto a genuine `expect(...)` call (rejecting
+	// static mutators like `expect.extend(...)` / `expect.assertions(...)` and
+	// callback-invoking matchers like `.toThrow()`).
+	cur := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
+	if cur == nil || !ast.IsAccessExpression(cur) {
 		return false
 	}
-	tryIdx := r.getPromiseTryCallIndex(call)
-	argIdx, ok := tryIdx.argIndex[arg]
-	if !ok || argIdx < 1 {
+	if mName, ok := r.accessStaticNameThroughAssertions(cur); ok && (mName == "toThrow" || mName == "toThrowError") {
 		return false
 	}
-	cb := internalUtils.SkipAssertionsAndParens(args.Nodes[0])
-	if cb == nil || (cb.Kind != ast.KindArrowFunction && cb.Kind != ast.KindFunctionExpression) {
+	for cur != nil {
+		if ast.IsAccessExpression(cur) {
+			cur = internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(cur))
+			continue
+		}
+		if cur.Kind == ast.KindCallExpression {
+			if r.isExpectCallWithoutCallback(cur) {
+				return true
+			}
+			cur = internalUtils.SkipAssertionsAndParens(cur.AsCallExpression().Expression)
+			continue
+		}
 		return false
 	}
-	if tryIdx.firstSpreadIdx >= 1 && tryIdx.firstSpreadIdx < argIdx {
-		return r.inlineCallbackAcceptsAnyArg(cb)
+	return false
+}
+
+// exprMayMutateState reports whether synchronously evaluating `root` may mutate
+// state or invoke arbitrary user code (calls other than pure `expect(...)` /
+// `Promise.resolve` / `Promise.reject` chains, constructors, tagged templates,
+// assignments, updates, `delete`, `yield`, `await`, class static blocks, or
+// method computed keys/decorators). Results are memoized per node in
+// `r.exprMutates` so nested expressions stay O(N) total.
+func (r *AsyncAssertionResolver) exprMayMutateState(root *ast.Node) bool {
+	if root == nil || ast.IsTypeNode(root) {
+		return false
 	}
-	return r.inlineCallbackAcceptsArg(cb, argIdx)
+	if r != nil && r.exprMutates != nil {
+		if cached, ok := r.exprMutates[root]; ok {
+			return cached
+		}
+	}
+	var compute func(node *ast.Node) bool
+	compute = func(node *ast.Node) bool {
+		if node == nil || ast.IsTypeNode(node) {
+			return false
+		}
+		if r != nil && r.exprMutates != nil {
+			if cached, ok := r.exprMutates[node]; ok {
+				return cached
+			}
+		}
+		switch node.Kind {
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
+			return false
+		case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
+			mutates := false
+			if mods := node.Modifiers(); mods != nil {
+				for _, mod := range mods.Nodes {
+					if mod != nil && mod.Kind == ast.KindDecorator && compute(mod) {
+						mutates = true
+						break
+					}
+				}
+			}
+			if !mutates {
+				if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+					mutates = compute(name)
+				}
+			}
+			if r != nil {
+				if r.exprMutates == nil {
+					r.exprMutates = map[*ast.Node]bool{}
+				}
+				r.exprMutates[node] = mutates
+			}
+			return mutates
+		}
+		mutates := false
+		switch node.Kind {
+		case ast.KindDeleteExpression, ast.KindYieldExpression, ast.KindAwaitExpression,
+			ast.KindPostfixUnaryExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression,
+			ast.KindThrowStatement:
+			mutates = true
+		case ast.KindPrefixUnaryExpression:
+			if op := node.AsPrefixUnaryExpression().Operator; op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
+				mutates = true
+			}
+		case ast.KindBinaryExpression:
+			if bin := node.AsBinaryExpression(); bin != nil && bin.OperatorToken != nil &&
+				ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
+				mutates = true
+			}
+		case ast.KindCallExpression:
+			if !r.isPureExpectOrPromiseWrapperCall(node) {
+				mutates = true
+			}
+		}
+		if !mutates {
+			node.ForEachChild(func(child *ast.Node) bool {
+				if compute(child) {
+					mutates = true
+					return true
+				}
+				return false
+			})
+		}
+		if r != nil {
+			if r.exprMutates == nil {
+				r.exprMutates = map[*ast.Node]bool{}
+			}
+			r.exprMutates[node] = mutates
+		}
+		return mutates
+	}
+	return compute(root)
+}
+
+func hasExplicitNonAnyTypeNode(typeNode *ast.Node) bool {
+	return typeNode != nil && typeNode.Kind != ast.KindAnyKeyword && typeNode.Kind != ast.KindUnknownKeyword
+}
+
+func fnBodyInspectsOrBranchesOnArgs(body *ast.Node) bool {
+	if body == nil {
+		return false
+	}
+	unsafe := false
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil || unsafe || ast.IsTypeNode(node) {
+			return
+		}
+		switch node.Kind {
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+			ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor,
+			ast.KindClassStaticBlockDeclaration:
+			return
+		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression,
+			ast.KindSpreadElement, ast.KindSpreadAssignment,
+			ast.KindObjectBindingPattern, ast.KindArrayBindingPattern,
+			ast.KindIfStatement, ast.KindConditionalExpression, ast.KindSwitchStatement,
+			ast.KindForInStatement, ast.KindForOfStatement, ast.KindWithStatement,
+			ast.KindBinaryExpression, ast.KindPrefixUnaryExpression, ast.KindThrowStatement:
+			unsafe = true
+			return
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return unsafe
+		})
+	}
+	visit(body)
+	return unsafe
+}
+
+func (r *AsyncAssertionResolver) fnBodyMayMutateState(fn *ast.Node) bool {
+	if fn == nil {
+		return true
+	}
+	if r != nil && r.fnMutatesState != nil {
+		if cached, ok := r.fnMutatesState[fn]; ok {
+			return cached
+		}
+	}
+	mutates := r.exprMayMutateState(fn.Body()) || fnBodyInspectsOrBranchesOnArgs(fn.Body())
+	if !mutates {
+		for _, p := range fn.Parameters() {
+			if p == nil {
+				continue
+			}
+			pd := p.AsParameterDeclaration()
+			// Reject destructuring parameters, default initializers, explicit
+			// non-any parameter types, or mutating decorators because awaiting
+			// changes a Promise argument into `undefined`.
+			if pd == nil || p.Name() == nil || p.Name().Kind != ast.KindIdentifier ||
+				pd.Initializer != nil || hasExplicitNonAnyTypeNode(pd.Type) || r.exprMayMutateState(p) {
+				mutates = true
+				break
+			}
+		}
+	}
+	if r != nil {
+		if r.fnMutatesState == nil {
+			r.fnMutatesState = map[*ast.Node]bool{}
+		}
+		r.fnMutatesState[fn] = mutates
+	}
+	return mutates
+}
+
+func (r *AsyncAssertionResolver) hasSymbolWrite(sym *ast.Symbol) bool {
+	if sym == nil || r == nil || r.refs == nil {
+		return true
+	}
+	if written, cached := r.bindingWritten[sym]; cached {
+		return written
+	}
+	written := false
+	for _, ref := range r.refs.References(sym) {
+		if ref != nil && internalUtils.IsWriteReference(ref) {
+			written = true
+			break
+		}
+	}
+	if r.bindingWritten == nil {
+		r.bindingWritten = map[*ast.Symbol]bool{}
+	}
+	r.bindingWritten[sym] = written
+	return written
+}
+
+func (r *AsyncAssertionResolver) isKnownPromiseExpression(expr *ast.Node, depth int) bool {
+	if depth > 8 || expr == nil {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindNewExpression:
+		return r.isGlobalPromiseObject(expr.AsNewExpression().Expression, 0)
+	case ast.KindCallExpression:
+		if method, ok := r.promiseMethodName(expr); ok &&
+			(method == "resolve" || method == "reject" || method == "all" ||
+				method == "allSettled" || method == "race" || method == "any" || method == "try") {
+			return true
+		}
+		callee := internalUtils.SkipAssertionsAndParens(expr.AsCallExpression().Expression)
+		if callee != nil && ast.IsAccessExpression(callee) {
+			if m, ok := r.accessStaticNameThroughAssertions(callee); ok &&
+				(m == "then" || m == "catch" || m == "finally") {
+				return r.isKnownPromiseExpression(internalUtils.AccessExpressionObject(callee), depth+1)
+			}
+		}
+		return false
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		return cond != nil &&
+			r.isKnownPromiseExpression(cond.WhenTrue, depth+1) &&
+			r.isKnownPromiseExpression(cond.WhenFalse, depth+1)
+	}
+	return false
+}
+
+func hasNonAnyTypeAssertionWrapper(expr *ast.Node) bool {
+	cur := expr
+	for cur != nil {
+		switch cur.Kind {
+		case ast.KindParenthesizedExpression:
+			cur = cur.AsParenthesizedExpression().Expression
+		case ast.KindAsExpression:
+			if hasExplicitNonAnyTypeNode(cur.AsAsExpression().Type) {
+				return true
+			}
+			cur = cur.AsAsExpression().Expression
+		case ast.KindTypeAssertionExpression:
+			if hasExplicitNonAnyTypeNode(cur.AsTypeAssertion().Type) {
+				return true
+			}
+			cur = cur.AsTypeAssertion().Expression
+		case ast.KindSatisfiesExpression:
+			if hasExplicitNonAnyTypeNode(cur.AsSatisfiesExpression().Type) {
+				return true
+			}
+			cur = cur.AsSatisfiesExpression().Expression
+		case ast.KindNonNullExpression:
+			cur = cur.AsNonNullExpression().Expression
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) isPureSimpleCallableExpr(expr *ast.Node, depth int) bool {
+	if depth > 4 || expr == nil || hasNonAnyTypeAssertionWrapper(expr) {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindArrowFunction, ast.KindFunctionExpression:
+		return !r.fnBodyMayMutateState(expr)
+	case ast.KindClassExpression:
+		return !r.classConstructionMayMutateState(expr)
+	case ast.KindIdentifier:
+		sym := r.resolveSymbol(expr)
+		if sym == nil {
+			return false
+		}
+		decl := r.singleSameFileValueDeclaration(sym)
+		if decl == nil {
+			return false
+		}
+		switch decl.Kind {
+		case ast.KindFunctionDeclaration:
+			return !r.hasSymbolWrite(sym) && !r.fnBodyMayMutateState(decl)
+		case ast.KindClassDeclaration:
+			return !r.hasSymbolWrite(sym) && !r.classConstructionMayMutateState(decl)
+		case ast.KindVariableDeclaration:
+			vd := decl.AsVariableDeclaration()
+			if ast.IsVarConst(decl) && vd != nil && !hasExplicitNonAnyTypeNode(vd.Type) &&
+				vd.Initializer != nil && !nodeContains(vd.Initializer, expr) {
+				return r.isPureSimpleCallableExpr(vd.Initializer, depth+1)
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) hasObjectBindingMutationOrEscape(objSym *ast.Symbol, decl *ast.Node, initObj *ast.Node) bool {
+	if r == nil || r.refs == nil || objSym == nil || decl == nil || initObj == nil ||
+		initObj.Kind != ast.KindObjectLiteralExpression || initObj.AsObjectLiteralExpression().Properties == nil {
+		return true
+	}
+	if mutated, cached := r.objMutated[objSym]; cached {
+		return mutated
+	}
+	mutated := isDeclarationExportedOrAmbient(decl)
+	var propByName map[string]*ast.Node
+	if !mutated {
+		props := initObj.AsObjectLiteralExpression().Properties.Nodes
+		propByName = make(map[string]*ast.Node, len(props))
+		for _, prop := range props {
+			if prop == nil {
+				continue
+			}
+			if prop.Kind == ast.KindSpreadAssignment || prop.Kind == ast.KindGetAccessor ||
+				prop.Kind == ast.KindSetAccessor || prop.Name() == nil {
+				mutated = true
+				break
+			}
+			name, ok := internalUtils.GetStaticPropertyName(prop.Name())
+			if !ok {
+				mutated = true
+				break
+			}
+			propByName[name] = prop
+		}
+	}
+	if !mutated {
+		for _, ref := range r.refs.References(objSym) {
+			if ref == nil || ref == decl.Name() {
+				continue
+			}
+			if internalUtils.IsWriteReference(ref) {
+				mutated = true
+				break
+			}
+			outer := outermostTransparentExpression(ref)
+			if outer == nil || outer.Parent == nil ||
+				!ast.IsAccessExpression(outer.Parent) ||
+				internalUtils.AccessExpressionObject(outer.Parent) != outer {
+				mutated = true
+				break
+			}
+			member := outer.Parent
+			memberOuter := outermostTransparentExpression(member)
+			if internalUtils.IsWriteReference(member) || internalUtils.IsWriteReference(memberOuter) {
+				mutated = true
+				break
+			}
+			if memberOuter != nil && memberOuter.Parent != nil {
+				if memberOuter.Parent.Kind == ast.KindDeleteExpression {
+					mutated = true
+					break
+				}
+				invoked := false
+				switch memberOuter.Parent.Kind {
+				case ast.KindCallExpression:
+					invoked = memberOuter.Parent.AsCallExpression().Expression == memberOuter
+				case ast.KindNewExpression:
+					invoked = memberOuter.Parent.AsNewExpression().Expression == memberOuter
+				case ast.KindTaggedTemplateExpression:
+					invoked = memberOuter.Parent.AsTaggedTemplateExpression().Tag == memberOuter
+				}
+				if invoked {
+					mName, ok := r.accessStaticNameThroughAssertions(member)
+					if !ok {
+						mutated = true
+						break
+					}
+					prop := propByName[mName]
+					if prop == nil {
+						mutated = true
+						break
+					}
+					pure := false
+					switch prop.Kind {
+					case ast.KindMethodDeclaration:
+						pure = !r.fnBodyMayMutateState(prop)
+					case ast.KindPropertyAssignment:
+						pure = r.isPureSimpleCallableExpr(prop.AsPropertyAssignment().Initializer, 0)
+					case ast.KindShorthandPropertyAssignment:
+						pure = r.isPureSimpleCallableExpr(prop.AsShorthandPropertyAssignment().Name(), 0)
+					}
+					if !pure {
+						mutated = true
+						break
+					}
+				}
+			}
+		}
+	}
+	if r.objMutated == nil {
+		r.objMutated = map[*ast.Symbol]bool{}
+	}
+	r.objMutated[objSym] = mutated
+	return mutated
+}
+
+// calleeMayMutateState fails closed (returns `true`) unless `callee` is proven
+// non-mutating: global `Promise.*` (non-`try`/`reject`), `.then`/`.catch`/
+// `.finally` Promise chains on known Promise expressions, unresolved ambient
+// helpers (preserving upstream Jest tests like `Promise.all([foo(expect(...))])`),
+// or same-file `const`/never-reassigned declared pure functions, non-extending
+// pure classes, and non-mutated object literal methods/properties whose bodies
+// have no state mutations.
+func (r *AsyncAssertionResolver) calleeMayMutateState(callee *ast.Node, depth int) bool {
+	if depth > 4 || callee == nil || hasNonAnyTypeAssertionWrapper(callee) {
+		return true
+	}
+	callee = internalUtils.SkipAssertionsAndParens(callee)
+	if callee == nil {
+		return true
+	}
+	switch callee.Kind {
+	case ast.KindArrowFunction, ast.KindFunctionExpression:
+		return r.fnBodyMayMutateState(callee)
+	case ast.KindClassExpression:
+		return r.classConstructionMayMutateState(callee)
+	case ast.KindIdentifier:
+		sym := r.resolveSymbol(callee)
+		if sym == nil {
+			// Unresolved ambient identifier (e.g. upstream `foo(expect(...))`).
+			return false
+		}
+		decl := r.singleSameFileValueDeclaration(sym)
+		if decl == nil {
+			// Imported or multi-declaration symbol may mutate state or expect a Promise.
+			return true
+		}
+		switch decl.Kind {
+		case ast.KindFunctionDeclaration:
+			return r.hasSymbolWrite(sym) || r.fnBodyMayMutateState(decl)
+		case ast.KindClassDeclaration:
+			return r.hasSymbolWrite(sym) || r.classConstructionMayMutateState(decl)
+		case ast.KindVariableDeclaration:
+			vd := decl.AsVariableDeclaration()
+			if ast.IsVarConst(decl) && vd != nil && !hasExplicitNonAnyTypeNode(vd.Type) &&
+				vd.Initializer != nil && !nodeContains(vd.Initializer, callee) {
+				return r.calleeMayMutateState(vd.Initializer, depth+1)
+			}
+		}
+		return true
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		propName, ok := r.accessStaticNameThroughAssertions(callee)
+		rawObj := internalUtils.AccessExpressionObject(callee)
+		obj := internalUtils.SkipAssertionsAndParens(rawObj)
+		if obj == nil {
+			return true
+		}
+		// Global `Promise.*` (excluding `try`/`reject` and dynamic keys)
+		// and custom `Promise.all.x(...)` (upstream Jest test).
+		if r.isGlobalPromiseObject(obj, 0) {
+			return !ok || propName == "try" || propName == "reject"
+		}
+		if ast.IsAccessExpression(obj) && r.isGlobalPromiseObject(internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(obj)), 0) {
+			objMethod, objOK := r.accessStaticNameThroughAssertions(obj)
+			return !objOK || objMethod == "try" || objMethod == "reject"
+		}
+		// Chained `.then`/`.catch`/`.finally` on a known Promise expression.
+		if ok && (propName == "then" || propName == "catch" || propName == "finally") &&
+			r.isKnownPromiseExpression(obj, 0) {
+			return false
+		}
+		if !ok || hasNonAnyTypeAssertionWrapper(rawObj) {
+			return true
+		}
+		if obj.Kind == ast.KindIdentifier {
+			objSym := r.resolveSymbol(obj)
+			decl := r.singleSameFileValueDeclaration(objSym)
+			if decl == nil || decl.Kind != ast.KindVariableDeclaration || !ast.IsVarConst(decl) ||
+				hasExplicitNonAnyTypeNode(decl.AsVariableDeclaration().Type) ||
+				hasNonAnyTypeAssertionWrapper(decl.AsVariableDeclaration().Initializer) {
+				return true
+			}
+			initObj := internalUtils.SkipAssertionsAndParens(decl.AsVariableDeclaration().Initializer)
+			if r.hasObjectBindingMutationOrEscape(objSym, decl, initObj) {
+				return true
+			}
+			obj = initObj
+		}
+		if obj != nil && obj.Kind == ast.KindObjectLiteralExpression && obj.AsObjectLiteralExpression().Properties != nil {
+			// Last matching property wins in JS; any trailing spread or dynamic
+			// key invalidates static resolution.
+			var matched *ast.Node
+			for _, prop := range obj.AsObjectLiteralExpression().Properties.Nodes {
+				if prop == nil {
+					continue
+				}
+				if prop.Kind == ast.KindSpreadAssignment || prop.Name() == nil {
+					matched = nil
+					continue
+				}
+				name, nameOK := internalUtils.GetStaticPropertyName(prop.Name())
+				if !nameOK {
+					if prop.Name().Kind == ast.KindComputedPropertyName {
+						matched = nil
+					}
+					continue
+				}
+				if name == propName {
+					matched = prop
+				}
+			}
+			if matched == nil {
+				return true
+			}
+			switch matched.Kind {
+			case ast.KindMethodDeclaration:
+				return r.fnBodyMayMutateState(matched)
+			case ast.KindPropertyAssignment:
+				return r.calleeMayMutateState(matched.AsPropertyAssignment().Initializer, depth+1)
+			case ast.KindShorthandPropertyAssignment:
+				return r.calleeMayMutateState(matched.AsShorthandPropertyAssignment().Name(), depth+1)
+			}
+		}
+		return true
+	}
+	return true
+}
+
+func (r *AsyncAssertionResolver) classConstructionMayMutateState(cls *ast.Node) bool {
+	if cls == nil {
+		return true
+	}
+	if r != nil && r.fnMutatesState != nil {
+		if cached, ok := r.fnMutatesState[cls]; ok {
+			return cached
+		}
+	}
+	mutates := internalUtils.GetHeritageClauses(cls) != nil
+	if !mutates {
+		for _, member := range cls.Members() {
+			if member == nil {
+				continue
+			}
+			switch member.Kind {
+			case ast.KindConstructor:
+				if r.fnBodyMayMutateState(member) {
+					mutates = true
+				}
+			case ast.KindPropertyDeclaration:
+				if !ast.HasSyntacticModifier(member, ast.ModifierFlagsStatic) &&
+					r.exprMayMutateState(member.AsPropertyDeclaration().Initializer) {
+					mutates = true
+				}
+			default:
+				if ast.IsAutoAccessorPropertyDeclaration(member) &&
+					!ast.HasSyntacticModifier(member, ast.ModifierFlagsStatic) &&
+					r.exprMayMutateState(member.Initializer()) {
+					mutates = true
+				}
+			}
+			if mutates {
+				break
+			}
+		}
+	}
+	if r != nil {
+		if r.fnMutatesState == nil {
+			r.fnMutatesState = map[*ast.Node]bool{}
+		}
+		r.fnMutatesState[cls] = mutates
+	}
+	return mutates
+}
+
+func (r *AsyncAssertionResolver) getCallArgsIndex(call *ast.Node) *callArgsIndex {
+	if r != nil && r.callArgIndices != nil {
+		if idx, ok := r.callArgIndices[call]; ok {
+			return idx
+		}
+	}
+	var nodes []*ast.Node
+	switch call.Kind {
+	case ast.KindCallExpression:
+		if args := call.AsCallExpression().Arguments; args != nil {
+			nodes = args.Nodes
+		}
+	case ast.KindNewExpression:
+		if args := call.AsNewExpression().Arguments; args != nil {
+			nodes = args.Nodes
+		}
+	}
+	idx := &callArgsIndex{
+		argIndex:          make(map[*ast.Node]int, len(nodes)),
+		lastSideEffectIdx: -1,
+	}
+	for i, n := range nodes {
+		if n != nil {
+			idx.argIndex[n] = i
+		}
+	}
+	for i := len(nodes) - 1; i >= 0; i-- {
+		if r.exprMayMutateState(nodes[i]) {
+			idx.lastSideEffectIdx = i
+			break
+		}
+	}
+	if r != nil {
+		if r.callArgIndices == nil {
+			r.callArgIndices = map[*ast.Node]*callArgsIndex{}
+		}
+		r.callArgIndices[call] = idx
+	}
+	return idx
+}
+
+func (r *AsyncAssertionResolver) hasFollowingSideEffectArg(call *ast.Node, cur *ast.Node) bool {
+	idx := r.getCallArgsIndex(call)
+	pos, ok := idx.argIndex[cur]
+	return ok && pos < idx.lastSideEffectIdx
+}
+
+func (r *AsyncAssertionResolver) hasFollowingSideEffectElem(arrNode *ast.Node, cur *ast.Node) bool {
+	idx := r.getArrayLiteralIndex(arrNode)
+	if !idx.lastSideEffectInit {
+		idx.lastSideEffectInit = true
+		idx.lastSideEffectIdx = -1
+		if arr := arrNode.AsArrayLiteralExpression(); arr != nil && arr.Elements != nil {
+			nodes := arr.Elements.Nodes
+			for i := len(nodes) - 1; i >= 0; i-- {
+				if r.exprMayMutateState(nodes[i]) {
+					idx.lastSideEffectIdx = i
+					break
+				}
+			}
+		}
+	}
+	pos, ok := idx.elemIndex[cur]
+	return ok && pos < idx.lastSideEffectIdx
+}
+
+func (r *AsyncAssertionResolver) getNodeListSideEffectIndex(
+	container *ast.Node,
+	nodes []*ast.Node,
+	extractExpr func(*ast.Node) *ast.Node,
+) *nodeListSideEffectIndex {
+	if r != nil && r.listSideEffectIndices != nil {
+		if idx, ok := r.listSideEffectIndices[container]; ok {
+			return idx
+		}
+	}
+	idx := &nodeListSideEffectIndex{
+		nodeIndex:         make(map[*ast.Node]int, len(nodes)),
+		lastSideEffectIdx: -1,
+	}
+	for i, n := range nodes {
+		if n != nil {
+			idx.nodeIndex[n] = i
+		}
+	}
+	for i := len(nodes) - 1; i >= 0; i-- {
+		if nodes[i] != nil && r.exprMayMutateState(extractExpr(nodes[i])) {
+			idx.lastSideEffectIdx = i
+			break
+		}
+	}
+	if r != nil {
+		if r.listSideEffectIndices == nil {
+			r.listSideEffectIndices = map[*ast.Node]*nodeListSideEffectIndex{}
+		}
+		r.listSideEffectIndices[container] = idx
+	}
+	return idx
+}
+
+func (r *AsyncAssertionResolver) hasFollowingSideEffectDecl(declList *ast.Node, cur *ast.Node) bool {
+	decls := declList.AsVariableDeclarationList().Declarations
+	if decls == nil || len(decls.Nodes) <= 1 {
+		return false
+	}
+	idx := r.getNodeListSideEffectIndex(declList, decls.Nodes, func(n *ast.Node) *ast.Node {
+		return n
+	})
+	pos, ok := idx.nodeIndex[cur]
+	return ok && pos < idx.lastSideEffectIdx
+}
+
+func (r *AsyncAssertionResolver) hasFollowingSideEffectObjProp(objNode *ast.Node, cur *ast.Node) bool {
+	props := objNode.AsObjectLiteralExpression().Properties
+	if props == nil || len(props.Nodes) <= 1 {
+		return false
+	}
+	idx := r.getNodeListSideEffectIndex(objNode, props.Nodes, func(n *ast.Node) *ast.Node {
+		return n
+	})
+	pos, ok := idx.nodeIndex[cur]
+	return ok && pos < idx.lastSideEffectIdx
 }
 
 func (r *AsyncAssertionResolver) isAssignmentTargetObserved(lhs *ast.Node) bool {
@@ -1583,15 +3675,127 @@ func (r *AsyncAssertionResolver) isBindingReadOrExported(declNode *ast.Node, ide
 	return observed
 }
 
-func isInsideTryWithCatch(node *ast.Node) bool {
+func (r *AsyncAssertionResolver) unhandledPromiseRejectDepth(node *ast.Node, depth int) int {
+	if depth > 8 || node == nil {
+		return 0
+	}
+	node = internalUtils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return 0
+	}
+	switch node.Kind {
+	case ast.KindConditionalExpression:
+		cond := node.AsConditionalExpression()
+		if cond == nil {
+			return 0
+		}
+		return max(
+			r.unhandledPromiseRejectDepth(cond.WhenTrue, depth+1),
+			r.unhandledPromiseRejectDepth(cond.WhenFalse, depth+1),
+		)
+	case ast.KindBinaryExpression:
+		if internalUtils.IsCommaOperator(node) {
+			return r.unhandledPromiseRejectDepth(node.AsBinaryExpression().Right, depth+1)
+		}
+		return 0
+	case ast.KindArrayLiteralExpression:
+		arr := node.AsArrayLiteralExpression()
+		if arr == nil || arr.Elements == nil {
+			return 0
+		}
+		maxDepth := 0
+		for _, el := range arr.Elements.Nodes {
+			if el != nil && el.Kind == ast.KindSpreadElement {
+				el = el.AsSpreadElement().Expression
+			}
+			if d := r.unhandledPromiseRejectDepth(el, depth+1); d > maxDepth {
+				maxDepth = d
+			}
+		}
+		return maxDepth
+	case ast.KindCallExpression:
+		if method, ok := r.promiseMethodName(node); ok {
+			if method == "reject" {
+				inner := 0
+				if firstArg, argOK := staticCallArgAt(node, 0); argOK && firstArg != nil {
+					inner = r.unhandledPromiseRejectDepth(firstArg, depth+1)
+				}
+				return 1 + inner
+			}
+			if method == "allSettled" || method == "any" || method == "withResolvers" {
+				return 0
+			}
+			maxDepth := 0
+			if args := node.AsCallExpression().Arguments; args != nil {
+				for _, arg := range args.Nodes {
+					if arg != nil && arg.Kind == ast.KindSpreadElement {
+						arg = arg.AsSpreadElement().Expression
+					}
+					if d := r.unhandledPromiseRejectDepth(arg, depth+1); d > maxDepth {
+						maxDepth = d
+					}
+				}
+			}
+			return maxDepth
+		}
+		callee := internalUtils.SkipAssertionsAndParens(node.AsCallExpression().Expression)
+		if callee != nil && ast.IsAccessExpression(callee) {
+			if m, ok := r.accessStaticNameThroughAssertions(callee); ok {
+				recv := internalUtils.AccessExpressionObject(callee)
+				switch m {
+				case "finally":
+					return r.unhandledPromiseRejectDepth(recv, depth+1)
+				case "then", "catch":
+					recvDepth := r.unhandledPromiseRejectDepth(recv, depth+1)
+					if recvDepth == 0 {
+						return 0
+					}
+					argIdx := 0
+					if m == "then" {
+						argIdx = 1
+					}
+					onRejected, argOK := staticCallArgAt(node, argIdx)
+					if !argOK {
+						return max(0, recvDepth-1)
+					}
+					onRejected = internalUtils.SkipAssertionsAndParens(onRejected)
+					if r.isNonCallablePromiseHandler(onRejected) {
+						return recvDepth
+					}
+					if onRejected.Kind == ast.KindArrowFunction || onRejected.Kind == ast.KindFunctionExpression {
+						if rejDepth := r.inlineCallbackPropagatesRejection(onRejected, 1); rejDepth > 0 {
+							return recvDepth + rejDepth - 1
+						}
+					}
+					return max(0, recvDepth-1)
+				}
+			}
+		}
+	}
+	return 0
+}
+
+func (r *AsyncAssertionResolver) isInsideTryWithCatchOrAbruptFinally(node *ast.Node) bool {
 	for current := node; current != nil; current = current.Parent {
-		if testFramework.IsFunction(current) {
+		if testFramework.IsFunction(current) || current.Kind == ast.KindClassStaticBlockDeclaration {
 			return false
 		}
 		if current.Parent != nil && current.Parent.Kind == ast.KindTryStatement {
 			tryStmt := current.Parent.AsTryStatement()
-			if tryStmt != nil && tryStmt.TryBlock == current && tryStmt.CatchClause != nil {
-				return true
+			if tryStmt == nil {
+				continue
+			}
+			if tryStmt.TryBlock == current {
+				if tryStmt.CatchClause != nil {
+					return true
+				}
+				if tryStmt.FinallyBlock != nil && r.statementMayExitEarly(tryStmt.FinallyBlock) {
+					return true
+				}
+			} else if tryStmt.CatchClause == current {
+				if tryStmt.FinallyBlock != nil && r.statementMayExitEarly(tryStmt.FinallyBlock) {
+					return true
+				}
 			}
 		}
 	}
@@ -1694,12 +3898,170 @@ func (r *AsyncAssertionResolver) ResolveAsyncAssertionReportNode(
 	assertionNode *ast.Node,
 	alwaysAwait bool,
 ) (reportNode *ast.Node, promiseWrapped bool, insideAssertionArray bool, shouldReport bool) {
-	return r.resolveAsyncAssertionReportNode(assertionNode, alwaysAwait, 0)
+	return r.resolveAsyncAssertionReportNode(assertionNode, alwaysAwait, 0, 0)
+}
+
+func (r *AsyncAssertionResolver) enclosingAwaitOfValue(node *ast.Node) *ast.Node {
+	outer := outermostChainedBase(node)
+	if outer != nil && outer.Parent != nil && outer.Parent.Kind == ast.KindAwaitExpression &&
+		outer.Parent.AsAwaitExpression().Expression == outer {
+		return outer.Parent
+	}
+	return nil
+}
+
+func (r *AsyncAssertionResolver) hasEnclosingAbruptFinally(start *ast.Node) bool {
+	for current := start; current != nil; current = current.Parent {
+		if testFramework.IsFunction(current) || current.Kind == ast.KindClassStaticBlockDeclaration {
+			return false
+		}
+		if current.Parent != nil && current.Parent.Kind == ast.KindTryStatement {
+			tryStmt := current.Parent.AsTryStatement()
+			if tryStmt != nil && (tryStmt.TryBlock == current || tryStmt.CatchClause == current) &&
+				tryStmt.FinallyBlock != nil && r.statementMayExitEarly(tryStmt.FinallyBlock) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) findTrackedConsumablesInScope(root *ast.Node, tb *trackedBindings) (awaits []*ast.Node, returns []*ast.Node, hasForAwaitOf bool) {
+	if root == nil {
+		return nil, nil, false
+	}
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		if node != root {
+			switch node.Kind {
+			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+				ast.KindClassStaticBlockDeclaration:
+				return
+			case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
+				if mods := node.Modifiers(); mods != nil {
+					for _, mod := range mods.Nodes {
+						if mod != nil && mod.Kind == ast.KindDecorator {
+							visit(mod)
+						}
+					}
+				}
+				if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+					visit(name)
+				}
+				return
+			}
+		}
+		switch node.Kind {
+		case ast.KindAwaitExpression:
+			if r.exprCanReturnTrackedPromise(node.AsAwaitExpression().Expression, tb) {
+				awaits = append(awaits, node)
+			}
+		case ast.KindForOfStatement:
+			if forOf := node.AsForInOrOfStatement(); forOf != nil && forOf.AwaitModifier != nil &&
+				r.exprReferencesTracked(forOf.Expression, tb, false) {
+				hasForAwaitOf = true
+			}
+		case ast.KindReturnStatement:
+			if ret := node.AsReturnStatement(); ret != nil && ret.Expression != nil &&
+				r.exprCanReturnTrackedPromise(ret.Expression, tb) {
+				returns = append(returns, node)
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(root)
+	return awaits, returns, hasForAwaitOf
+}
+
+// tryCatchDropsRejection reports whether `awaitExpr` (awaiting a
+// `Promise.reject(assertion)` whose rejection reason is an assertion Promise
+// nested `rejectDepth` levels deep) is caught by an enclosing `try { ... } catch`
+// block that swallows the caught reason without awaiting, returning (when
+// `!alwaysAwait`), or rethrowing it, or overridden by an abruptly exiting
+// `finally` block.
+func (r *AsyncAssertionResolver) tryCatchDropsRejection(awaitExpr *ast.Node, alwaysAwait bool, rejectDepth int) bool {
+	depth := rejectDepth
+	for current := awaitExpr; current != nil; current = current.Parent {
+		if testFramework.IsFunction(current) || current.Kind == ast.KindClassStaticBlockDeclaration {
+			return false
+		}
+		if current.Parent != nil && current.Parent.Kind == ast.KindTryStatement {
+			tryStmt := current.Parent.AsTryStatement()
+			if tryStmt == nil {
+				continue
+			}
+			if tryStmt.CatchClause == current {
+				// Throwing from `catch` enters `finally`; an abrupt `finally`
+				// overrides the thrown rejection reason.
+				if tryStmt.FinallyBlock != nil && r.statementMayExitEarly(tryStmt.FinallyBlock) {
+					return true
+				}
+				continue
+			}
+			if tryStmt.TryBlock == current {
+				if tryStmt.CatchClause != nil {
+					cc := tryStmt.CatchClause.AsCatchClause()
+					if cc == nil || cc.VariableDeclaration == nil ||
+						cc.VariableDeclaration.Name() == nil || cc.VariableDeclaration.Name().Kind != ast.KindIdentifier {
+						return true
+					}
+					tb := &trackedBindings{restOffset: -1}
+					r.addTrackedIdent(tb, cc.VariableDeclaration.Name(), false)
+					r.propagateLocalAliasesInScope(cc.Block, tb)
+					// Check `catch` before `finally`: `await e` runs before
+					// `finally` and awaits the caught Promise directly. For
+					// `depth > 1`, recurse from the specific `await` node so
+					// inner `try/catch`/`finally` inside `cc.Block` and outer
+					// enclosing `try` blocks are both checked accurately.
+					awaits, returns, hasForAwaitOf := r.findTrackedConsumablesInScope(cc.Block, tb)
+					if depth == 1 && (len(awaits) > 0 || hasForAwaitOf) {
+						return false
+					}
+					if depth > 1 {
+						for _, aw := range awaits {
+							if !r.tryCatchDropsRejection(aw, alwaysAwait, depth-1) {
+								return false
+							}
+						}
+					}
+					// `return e` in `catch` is overridden if ANY enclosing `try`
+					// (including an inner `try` inside `cc.Block` or an outer
+					// `try`) has an abruptly exiting `finally` block.
+					if !alwaysAwait {
+						for _, ret := range returns {
+							if !r.hasEnclosingAbruptFinally(ret) {
+								return false
+							}
+						}
+					}
+					if r.statementAlwaysThrows(cc.Block, tb) {
+						if tryStmt.FinallyBlock != nil && r.statementMayExitEarly(tryStmt.FinallyBlock) {
+							return true
+						}
+						continue
+					}
+					return true
+				}
+				// No `catch` clause: an abrupt `finally` overrides the rejection.
+				if tryStmt.FinallyBlock != nil && r.statementMayExitEarly(tryStmt.FinallyBlock) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (r *AsyncAssertionResolver) resolveAsyncAssertionReportNode(
 	assertionNode *ast.Node,
 	alwaysAwait bool,
+	rejectDepth int,
 	depth int,
 ) (reportNode *ast.Node, promiseWrapped bool, insideAssertionArray bool, shouldReport bool) {
 	if assertionNode == nil || depth > 2 {
@@ -1711,9 +4073,36 @@ func (r *AsyncAssertionResolver) resolveAsyncAssertionReportNode(
 	// and enclosing `Promise.*` wrappers (including `Promise.all([...]).then(...)`
 	// and nested `Promise.all([Promise.resolve(...)])`).
 	for {
-		chained := getParentIfPromiseChained(reportNode)
+		var chained *ast.Node
+		if rejectDepth > 0 {
+			var outcome rejectChainOutcome
+			var extraRejects int
+			chained, outcome, extraRejects = r.walkPromiseRejectChain(reportNode)
+			rejectDepth += extraRejects
+			if outcome == rejectDropped {
+				return reportNode, promiseWrapped, insideAssertionArray, true
+			}
+			if outcome == rejectRecovered {
+				reportNode = chained
+				rejectDepth--
+				continue
+			}
+		} else {
+			chained = getParentIfPromiseChained(reportNode)
+		}
 		outerChained := outermostTransparentExpression(chained)
-		if promiseCallNode := r.findPromiseCallExpressionNode(chained); promiseCallNode != nil {
+		if promiseCallNode, method := r.findPromiseCallExpressionNode(chained); promiseCallNode != nil {
+			if rejectDepth > 0 && (method == "allSettled" || method == "any") {
+				// `Promise.allSettled` and `Promise.any` absorb the rejected
+				// `Promise.reject(assertion)` without awaiting `assertion`.
+				return reportNode, promiseWrapped, insideAssertionArray, true
+			}
+			if method == "reject" {
+				if _, outcome, _ := r.walkPromiseRejectChain(promiseCallNode); outcome == rejectDropped {
+					return reportNode, promiseWrapped, insideAssertionArray, true
+				}
+				rejectDepth++
+			}
 			reportNode = promiseCallNode
 			promiseWrapped = true
 			if outerChained != nil && outerChained.Parent != nil && outerChained.Parent.Kind == ast.KindArrayLiteralExpression {
@@ -1732,11 +4121,16 @@ func (r *AsyncAssertionResolver) resolveAsyncAssertionReportNode(
 	// erased at runtime, so the await or return that consumes the Promise may
 	// sit above one or more wrappers. reportNode itself stays the report range.
 	outermost := outermostTransparentExpression(reportNode)
+	if rejectDepth > 0 {
+		if awaitExpr := r.enclosingAwaitOfValue(outermost); awaitExpr != nil && r.tryCatchDropsRejection(awaitExpr, alwaysAwait, rejectDepth) {
+			return reportNode, promiseWrapped, insideAssertionArray, true
+		}
+	}
 	if outermost.Parent == nil || isAcceptableReturnNode(outermost, outermost.Parent, !alwaysAwait) {
 		return reportNode, promiseWrapped, insideAssertionArray, false
 	}
 
-	if depth < 2 && r.isBoundToAwaitedConst(outermost, alwaysAwait, depth) {
+	if depth < 2 && r.isBoundToAwaitedConst(outermost, alwaysAwait, rejectDepth, depth) {
 		return reportNode, promiseWrapped, insideAssertionArray, false
 	}
 
@@ -1779,7 +4173,7 @@ func (r *AsyncAssertionResolver) getBlockIndex(block *ast.Node) *blockStatementI
 // `const [check] = await Promise.resolve([expect(...)] as const)`) — and that
 // binding is unconditionally awaited (or returned when !alwaysAwait) later in
 // the same straight-line block with no intervening early exit.
-func (r *AsyncAssertionResolver) isBoundToAwaitedConst(outermost *ast.Node, alwaysAwait bool, depth int) bool {
+func (r *AsyncAssertionResolver) isBoundToAwaitedConst(outermost *ast.Node, alwaysAwait bool, rejectDepth int, depth int) bool {
 	bindingIdent, declNode := r.extractConstPromiseBinding(outermost)
 	if bindingIdent == nil || declNode == nil {
 		return false
@@ -1866,11 +4260,18 @@ func (r *AsyncAssertionResolver) isBoundToAwaitedConst(outermost *ast.Node, alwa
 		// or inside `refStmt` before the awaited/returned wrapper completes
 		// (e.g. `use(yield 1, await c)`, `await Promise.all([c, yield 1])`, `await c.then(yield 1)`).
 		// Guarded by O(1) `exitPrefix` checks so statements without exits pay zero cost.
-		if blockIdx.exitPrefix[declIdx+1] != blockIdx.exitPrefix[declIdx] &&
-			hasYieldInRange(declStmt, outermost.Pos(), declStmt.End()) {
-			continue
+		if blockIdx.exitPrefix[declIdx+1] != blockIdx.exitPrefix[declIdx] {
+			if hasYieldInRange(declStmt, outermost.Pos(), declStmt.End()) {
+				continue
+			}
+			if declNode.Kind == ast.KindBindingElement {
+				if vd := internalUtils.EnclosingVariableDeclarationOfBindingElement(declNode); vd != nil &&
+					vd.Name() != nil && hasYieldInRange(vd.Name(), vd.Name().Pos(), vd.Name().End()) {
+					continue
+				}
+			}
 		}
-		refReportNode, _, _, shouldReport := r.resolveAsyncAssertionReportNode(ref, alwaysAwait, depth+1)
+		refReportNode, _, _, shouldReport := r.resolveAsyncAssertionReportNode(ref, alwaysAwait, rejectDepth, depth+1)
 		if shouldReport {
 			continue
 		}
