@@ -233,14 +233,7 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 		return p.addLiteral(node, nullValue(), undefinedValue(), undefinedValue(), undefinedValue())
 
 	case ast.KindParenthesizedExpression:
-		expression := node.AsParenthesizedExpression().Expression
-		if ast.IsJSDocTypeAssertion(node) && expression != nil && expression.Kind == ast.KindAsExpression {
-			// `/** @type {T} */ (value)` is ordinary JavaScript syntax. tsgo
-			// internally reparses it as an AsExpression for checking, whereas the
-			// ESTree exposed to ESLint rules contains only `value`.
-			return p.convert(expression.AsAsExpression().Expression, pattern)
-		}
-		return p.convert(expression, pattern)
+		return p.convert(node.AsParenthesizedExpression().Expression, false)
 	case ast.KindBinaryExpression:
 		return p.convertBinary(node, pattern)
 	case ast.KindConditionalExpression:
@@ -1664,14 +1657,19 @@ func (p *estreeProjector) convertTemplateLiteralType(node *ast.Node) uint32 {
 
 func (p *estreeProjector) convertImportType(node *ast.Node) uint32 {
 	n := node.AsImportTypeNode()
-	// Mirror @typescript-eslint/typescript-estree: TSImportType.source is the
-	// inner Literal when Argument is a non-null LiteralType, and undefined
-	// otherwise (e.g., `import(null)`, or in treeMode `import(Name)`).
+	// Mirror @typescript-eslint/typescript-estree: ParenthesizedType is
+	// transparent, so TSImportType.source is the inner Literal when the
+	// unwrapped Argument is a non-null LiteralType, and undefined otherwise
+	// (e.g., `import(null)`, or in treeMode `import(Name)`).
 	// Strict wire mode continues rejecting non-LiteralType arguments so omitted
 	// argument subtrees never leave uncovered template/identifier tokens behind.
+	arg := n.Argument
+	for arg != nil && arg.Kind == ast.KindParenthesizedType {
+		arg = arg.AsParenthesizedTypeNode().Type
+	}
 	source := undefinedValue()
-	if n.Argument != nil && n.Argument.Kind == ast.KindLiteralType {
-		if lit := n.Argument.AsLiteralTypeNode().Literal; lit != nil && lit.Kind != ast.KindNullKeyword {
+	if arg != nil && arg.Kind == ast.KindLiteralType {
+		if lit := arg.AsLiteralTypeNode().Literal; lit != nil && lit.Kind != ast.KindNullKeyword {
 			source = optionalNodeValue(p.convert(lit, false))
 		}
 	} else if !p.treeMode {
@@ -1681,28 +1679,37 @@ func (p *estreeProjector) convertImportType(node *ast.Node) uint32 {
 	if n.Attributes != nil && n.Argument != nil {
 		// tsgo does not give the outer options object or with/assert key their
 		// own nodes. Validate their authored ranges before emitting child nodes
-		// so malformed options in treeMode do not leave orphan nodes behind.
+		// so malformed options in treeMode do not leave orphan nodes or inverted
+		// spans behind.
+		attributes := n.Attributes.AsImportAttributes()
 		scan := &p.scan
 		scan.SetText(p.text)
 		scan.SetSkipTrivia(true)
 		scan.ResetTokenState(n.Argument.End())
 		hasOpen := scan.Scan() == ast.KindCommaToken && scan.Scan() == ast.KindOpenBraceToken
-		var outerStart, keyStart, keyEnd, outerEnd uint32
+		var outerStart, keyStart, keyEnd, end, outerEnd uint32
+		hasKey := false
 		hasClose := false
 		if hasOpen {
 			outerStart = p.offsets.At(scan.TokenStart())
-			scan.Scan()
-			keyStart, keyEnd = p.offsets.At(scan.TokenStart()), p.offsets.At(scan.TokenEnd())
-			scan.ResetTokenState(n.Attributes.End())
-			if scan.Scan() == ast.KindCommaToken {
-				scan.Scan()
-			}
-			if scan.Token() == ast.KindCloseBraceToken {
-				outerEnd = p.offsets.At(scan.TokenEnd())
-				hasClose = true
+			keyTok := scan.Scan()
+			if (keyTok == ast.KindWithKeyword || keyTok == ast.KindAssertKeyword) && keyTok == attributes.Token {
+				keyStart, keyEnd = p.offsets.At(scan.TokenStart()), p.offsets.At(scan.TokenEnd())
+				end = p.offsets.At(n.Attributes.End())
+				if keyEnd <= end {
+					hasKey = true
+					scan.ResetTokenState(n.Attributes.End())
+					if scan.Scan() == ast.KindCommaToken {
+						scan.Scan()
+					}
+					if scan.Token() == ast.KindCloseBraceToken {
+						outerEnd = p.offsets.At(scan.TokenEnd())
+						hasClose = outerStart <= outerEnd
+					}
+				}
 			}
 		}
-		if !hasOpen {
+		if !hasOpen || !hasKey {
 			if !p.treeMode {
 				failProjection(errors.New("missing import type options"))
 			}
@@ -1711,7 +1718,6 @@ func (p *estreeProjector) convertImportType(node *ast.Node) uint32 {
 				failProjection(errors.New("missing import type options closing brace"))
 			}
 		} else {
-			attributes := n.Attributes.AsImportAttributes()
 			propsBase := len(p.listScratch)
 			if attributes.Attributes != nil {
 				for _, attributeNode := range attributes.Attributes.Nodes {
@@ -1731,7 +1737,6 @@ func (p *estreeProjector) convertImportType(node *ast.Node) uint32 {
 			if attributes.Token == ast.KindAssertKeyword {
 				keyword = "assert"
 			}
-			end := p.offsets.At(n.Attributes.End())
 			key := p.add(typeIdentifier, keyStart, keyEnd,
 				p.listValue(nil), p.stringValue(keyword), boolValue(false), undefinedValue())
 			outerProperty := p.add(typeProperty, keyStart, end,

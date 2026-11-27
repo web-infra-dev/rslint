@@ -806,17 +806,34 @@ describe('decoded data ownership', () => {
     expect(decoded.comments[0].value).toBe(' hi');
   });
 
-  test('handles import(null), strict non-literal import(), JS JSDoc skips, and TS vs JS template raw', () => {
-    const tsDecoded = projectSyntax('file.ts', 'type D = import(null);');
+  test('handles import(null), parenthesized import() literals, strict non-literal import(), JS JSDoc skips, and TS vs JS template raw', () => {
+    const tsDecoded = projectSyntax(
+      'file.ts',
+      'type D = import(null); type P = import(("./m")).Foo; type PN = import((null)).Foo; type PO = import(("./m"), { with: { type: "json" } }).Foo;',
+    );
     const tsBody = tsDecoded.ast.body as ESTreeNode[];
     const importD = tsBody[0].typeAnnotation as ESTreeNode;
+    const importP = tsBody[1].typeAnnotation as ESTreeNode;
+    const importPN = tsBody[2].typeAnnotation as ESTreeNode;
+    const importPO = tsBody[3].typeAnnotation as ESTreeNode;
     expect(importD.type).toBe('TSImportType');
     expect(importD.source).toBeUndefined();
+    expect(importP.type).toBe('TSImportType');
+    expect((importP.source as ESTreeNode).value).toBe('./m');
+    expect(importPN.source).toBeUndefined();
+    expect((importPO.source as ESTreeNode).value).toBe('./m');
+    expect((importPO.options as ESTreeNode).type).toBe('ObjectExpression');
 
-    // Strict wire mode rejects non-LiteralType import() arguments instead of
-    // dropping their token covers and corrupting subsequent template/comment streams.
+    // Strict wire mode rejects non-LiteralType import() arguments and malformed
+    // empty options instead of corrupting token streams or emitting inverted spans.
     expect(() =>
       projectFrame('file.ts', "type Name = 'pkg'; type T = import(Name);"),
+    ).toThrow();
+    expect(() =>
+      projectFrame(
+        'file.ts',
+        "type Name = 'pkg'; type T = import((Name)).Foo;",
+      ),
     ).toThrow();
     expect(() =>
       projectFrame(
@@ -824,6 +841,18 @@ describe('decoded data ownership', () => {
         'type T = import(`a${string}b`); const after = 1; // comment',
       ),
     ).toThrow();
+    expect(() =>
+      projectFrame('file.ts', 'type T = import((`a${string}b`)).Foo;'),
+    ).toThrow();
+    expect(() =>
+      projectFrame('file.ts', 'type T = import(("./m"), { });'),
+    ).toThrow();
+
+    // Parenthesized LHS stays an expression (not a destructuring pattern).
+    const lhsDecoded = projectSyntax('file.ts', '(([a]) = x);');
+    const lhsExpr = (lhsDecoded.ast.body as ESTreeNode[])[0]
+      .expression as ESTreeNode;
+    expect((lhsExpr.left as ESTreeNode).type).toBe('ArrayExpression');
 
     const jsDecoded = projectSyntax(
       'file.js',

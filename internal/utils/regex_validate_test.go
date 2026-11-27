@@ -148,6 +148,14 @@ func TestIsValidRegexPatternUnicode(t *testing.T) {
 		{name: "group text in class", pattern: `[(?<a>x)]\k<a>`, flags: u},
 		{name: "unicode property long alias", pattern: `\p{Letter}`, flags: u, want: true},
 		{name: "unicode property script", pattern: `\p{Script=Greek}`, flags: u, want: true},
+		// cspell:ignore Tolong Siki Berf
+		{name: "unicode 16 script Garay", pattern: `\p{Script=Garay}`, flags: v, want: true},
+		{name: "unicode 16 script short Gara", pattern: `\p{sc=Gara}`, flags: u, want: true},
+		{name: "unicode 17 script Tolong_Siki", pattern: `\p{Script_Extensions=Tolong_Siki}`, flags: v, want: true},
+		{name: "unicode 17 script short Berf", pattern: `\p{scx=Berf}`, flags: u, want: true},
+		{name: "unicode 16 script invalid under gc", pattern: `\p{gc=Garay}`, flags: v},
+		{name: "unicode 16 script invalid bare", pattern: `\p{Garay}`, flags: v},
+		{name: "unicode 16 script without u/v uses Annex B", pattern: `\p{Script=Garay}`, want: true},
 		{name: "unicode set subtraction", pattern: `[\d--[3]]`, flags: v, want: true},
 		{name: "unicode set string", pattern: `[\q{abc}]`, flags: v, want: true},
 		{name: "raw slash in u class", pattern: `[/]`, flags: u, want: true},
@@ -219,9 +227,10 @@ func TestIsValidRegexPatternUnicodeSuggestionSafety(t *testing.T) {
 		{name: "nested union retains strings", pattern: `[^a[\q{bc}]]`},
 		{name: "string in positive class", pattern: `[a\q{bc}]`, want: true},
 		{name: "property in positive class", pattern: `[a\p{Letter}]`, want: true},
-		// The bundled TypeScript scanner is the grammar authority and can trail
-		// the Unicode data used by the JavaScript runtime and regexpp.
-		{name: "property from newer Unicode data", pattern: `[^a\p{Script=Gara}]`},
+		// Unicode 16/17 Script values match single code points (safe in negated v classes),
+		// while unrecognized property values still fail closed.
+		{name: "unicode 16 script in negated class", pattern: `[^a\p{Script=Gara}]`, want: true},
+		{name: "unknown future script fails closed", pattern: `[^a\p{Script=FutureScript}]`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if got := IsValidRegexPatternForECMAVersion(test.pattern, v, 2024); got != test.want {

@@ -116,6 +116,8 @@ func TestWithTreePanicAndErrorCleanup(t *testing.T) {
 	}{
 		{"/import_name.ts", "type Name = 'pkg';\ntype T = import(Name);\ndebugger;", []TypeID{typeTSImportType, typeDebuggerStatement}},
 		{"/import_null.ts", "type D = import(null);\ndebugger;", []TypeID{typeTSImportType, typeDebuggerStatement}},
+		{"/import_paren_null.ts", "type D = import((null)).Foo;\ndebugger;", []TypeID{typeTSImportType, typeDebuggerStatement}},
+		{"/import_paren_name.ts", "type Name = 'pkg';\ntype T = import((Name)).Foo;\ndebugger;", []TypeID{typeTSImportType, typeDebuggerStatement}},
 		{"/import_template.ts", "type T = import(`a${string}b`);\ndebugger;", []TypeID{typeTSImportType, typeDebuggerStatement}},
 		{"/jsdoc_nullable.ts", "type T = ?number;\ndebugger;", []TypeID{typeTSTypeAliasDeclaration, typeDebuggerStatement}},
 		{"/bad_bigint.ts", "const x = 0xn;\ndebugger;", []TypeID{typeDebuggerStatement}},
@@ -129,7 +131,7 @@ func TestWithTreePanicAndErrorCleanup(t *testing.T) {
 			walk = func(id NodeID) {
 				tid := tree.Type(id)
 				seen[tid] = true
-				if (tc.name == "/import_name.ts" || tc.name == "/import_null.ts" || tc.name == "/import_template.ts") && tid == typeTSImportType {
+				if (tc.name == "/import_name.ts" || tc.name == "/import_null.ts" || tc.name == "/import_paren_null.ts" || tc.name == "/import_paren_name.ts" || tc.name == "/import_template.ts") && tid == typeTSImportType {
 					if got := tree.Field(id, sourceField); got.Kind != ValueUndefined {
 						t.Fatalf("%s TSImportType.source = %+v, want ValueUndefined", tc.name, got)
 					}
@@ -157,23 +159,40 @@ func TestWithTreePanicAndErrorCleanup(t *testing.T) {
 		assertClearedProjectionStrings(t, &builder)
 	}
 
-	// Malformed import-type options in treeMode must not leave orphan nodes in Tree.
-	if err := builder.WithTree(source("/bad_import_opts.ts", `type T = import("a", { with: { type: "json" }`), TreeOptions{SourceType: "module"}, func(tree *Tree) {
-		visited := 0
-		var walk func(NodeID)
-		walk = func(id NodeID) {
-			visited++
-			tree.ForEachChild(id, func(child NodeID) bool {
-				walk(child)
-				return false
-			})
+	// Malformed import-type options in treeMode must not leave orphan nodes or inverted spans in Tree.
+	for _, tc := range []struct {
+		name string
+		code string
+	}{
+		{"/bad_import_opts_unclosed.ts", `type T = import("a", { with: { type: "json" }`},
+		{"/bad_import_opts_empty.ts", `type T = import(("./m"), { });`},
+		{"/bad_import_opts_comma.ts", `type T = import("./m", { , });`},
+		{"/bad_import_opts_colon.ts", `type T = import("./m", { : { type: "json" } });`},
+		{"/bad_import_unclosed_paren.ts", `type T = import(("./m"`},
+		{"/bad_import_empty_paren.ts", `type T = import(())`},
+		{"/bad_import_dangling_paren.ts", `type T = import((`},
+	} {
+		if err := builder.WithTree(source(tc.name, tc.code), TreeOptions{SourceType: "module"}, func(tree *Tree) {
+			visited := 0
+			var walk func(NodeID)
+			walk = func(id NodeID) {
+				visited++
+				r := tree.Range(id)
+				if r.Pos() < 0 || r.End() < r.Pos() || r.End() > len(tc.code)+1 {
+					t.Fatalf("%s: node %s has invalid range [%d, %d]", tc.name, tree.Type(id), r.Pos(), r.End())
+				}
+				tree.ForEachChild(id, func(child NodeID) bool {
+					walk(child)
+					return false
+				})
+			}
+			walk(tree.Root())
+			if visited != tree.NodeCount() {
+				t.Fatalf("%s: malformed import left orphan nodes: visited=%d NodeCount=%d", tc.name, visited, tree.NodeCount())
+			}
+		}); err != nil {
+			t.Fatalf("WithTree(%s) failed: %v", tc.name, err)
 		}
-		walk(tree.Root())
-		if visited != tree.NodeCount() {
-			t.Fatalf("malformed import options left orphan nodes: visited=%d NodeCount=%d", visited, tree.NodeCount())
-		}
-	}); err != nil {
-		t.Fatalf("WithTree(bad_import_opts.ts) failed: %v", err)
 	}
 
 	// Wire-mode Build() remains strict on unsupported/malformed syntax and non-LiteralType import().
@@ -185,7 +204,12 @@ func TestWithTreePanicAndErrorCleanup(t *testing.T) {
 		{"/wire_leading_zero_bigint.ts", "const x = 0_10n;"},
 		{"/wire_bad_bigint.ts", "const x = 0xn;"},
 		{"/wire_import_name.ts", "type Name = 'pkg'; type T = import(Name);"},
+		{"/wire_import_paren_name.ts", "type Name = 'pkg'; type T = import((Name)).Foo;"},
 		{"/wire_import_template.ts", "type T = import(`a${string}b`); const after = 1; // comment"},
+		{"/wire_import_paren_template.ts", "type T = import((`a${string}b`)).Foo; const after = 1;"},
+		{"/wire_import_empty_opts.ts", `type T = import(("./m"), { });`},
+		{"/wire_import_comma_opts.ts", `type T = import("./m", { , });`},
+		{"/wire_import_colon_opts.ts", `type T = import("./m", { : { type: "json" } });`},
 	} {
 		if _, err := builder.Build(context.Background(), source(tc.name, tc.code), Options{SourceType: "module"}); err == nil {
 			t.Fatalf("Build(%s) succeeded, want error in strict wire mode", tc.name)
@@ -557,6 +581,11 @@ func TestWithTreeLiteralsTemplatesSparseAndUndefined(t *testing.T) {
 		{`const r = /[\1]/;`, ValueRegExp},
 		{`const r = /\u{61}/;`, ValueRegExp},
 		{`const r = /\u{NOT_HEX}/;`, ValueRegExp},
+		{`const r = /\p{Script=Garay}/v;`, ValueRegExp},
+		{`const r = /\p{sc=Gara}/u;`, ValueRegExp},
+		// cspell:ignore Beria
+		{`const r = /\p{Script=Beria_Erfe}/v;`, ValueRegExp},
+		{`const r = /\p{General_Category=Garay}/v;`, ValueNull},
 		{`const r = /(?<a>x)\k<b>/;`, ValueNull},
 		{`const r = /a/gg;`, ValueNull},
 		{`const r = /a/z;`, ValueNull},

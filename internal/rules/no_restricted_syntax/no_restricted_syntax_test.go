@@ -1857,7 +1857,7 @@ func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
 	}
 }
 
-// cspell:ignore FFFD blockstatement
+// cspell:ignore FFFD blockstatement Beria beria
 func TestNoRestrictedSyntaxAdversarialRegressions(t *testing.T) {
 	// Parser depth guard rejects deeply nested selectors cleanly without stack overflow.
 	deepNot := strings.Repeat(":not(", 200) + "Identifier" + strings.Repeat(")", 200)
@@ -1956,7 +1956,7 @@ func TestNoRestrictedSyntaxAdversarialRegressions(t *testing.T) {
 				Code:    `const x = 'a';`,
 				Options: []any{`:not(Literal[value=/[]/])`},
 			},
-			// Annex B legacy regex literals remain valid RegExp objects (not null).
+			// Annex B legacy regex literals and Unicode 16/17 script regexes remain valid RegExp objects (not null).
 			{
 				Code:    `const r = /\p{Letter}/;`,
 				Options: []any{`Literal[value=null]`},
@@ -1964,6 +1964,29 @@ func TestNoRestrictedSyntaxAdversarialRegressions(t *testing.T) {
 			{
 				Code:    `const r = /\01/;`,
 				Options: []any{`Literal[value=null]`},
+			},
+			{
+				Code:    `const garay = /\p{Script=Garay}/v;`,
+				Options: []any{`Literal[value=null]`},
+			},
+			{
+				Code:     `const garay = /\p{Script=Garay}/v;`,
+				FileName: "unicode-16-garay.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{`Literal[value=null]`},
+			},
+			{
+				Code:    `const beria = /\p{Script=Beria_Erfe}/v;`,
+				Options: []any{`Literal[value=null]`},
+			},
+			{
+				Code:    `type X = import((null)).Foo;`,
+				Options: []any{`TSImportType[source]`},
+			},
+			// Parenthesized LHS expressions are expressions, not destructuring patterns (matches @typescript-eslint/parser).
+			{
+				Code:    `(([a]) = x);`,
+				Options: []any{`ArrayPattern`},
 			},
 			// Signed zero / signed digits are not canonical array or string indices.
 			{
@@ -2234,6 +2257,27 @@ func TestNoRestrictedSyntaxAdversarialRegressions(t *testing.T) {
 				TSConfig: "tsconfig.allow-js.json",
 				Options:  []any{`ExpressionStatement[directive="use strict"]`},
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 14}},
+			},
+			// Parenthesized literal inside `import(...)` unwraps to TSImportType.source.
+			{
+				Code:    `type X = import(("./m")).Foo;`,
+				Options: []any{`Literal[value="./m"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 23}},
+			},
+			{
+				Code:    `type X = import((("./m"))).Foo;`,
+				Options: []any{`TSImportType[source.value="./m"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 31}},
+			},
+			{
+				Code:    `type X = import(("./m"), { with: { type: "json" } }).Foo;`,
+				Options: []any{`TSImportType[source.value="./m"][options]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 57}},
+			},
+			{
+				Code:    `(([a]) = x);`,
+				Options: []any{`ArrayExpression`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 3, EndLine: 1, EndColumn: 6}},
 			},
 			// Selector string preserves backslash before raw line terminators.
 			{
