@@ -12,16 +12,22 @@ export const root = resolve(import.meta.dirname, '../../../../..');
 export const enums = typeServiceCompilerData(ts);
 
 export class Host {
-  mailbox = new SharedArrayBuffer(16 << 20);
-  control = new Int32Array(this.mailbox, 0, 2);
+  mailbox: SharedArrayBuffer;
+  control: Int32Array;
   worker: Worker;
   private workerExited = false;
   private workerExitCode: number | null = null;
   private workerError: unknown = undefined;
-  private reportedFatalFailure = false;
+  private reportedWorkerFailure = false;
+  private reportedChildFailure = false;
   private closePromise: Promise<void> | null = null;
 
-  constructor(binary: string) {
+  constructor(binary: string, mailboxBytes = 16 << 20) {
+    if (!Number.isInteger(mailboxBytes) || mailboxBytes < 256) {
+      throw new RangeError('mailboxBytes must be an integer >= 256');
+    }
+    this.mailbox = new SharedArrayBuffer(mailboxBytes);
+    this.control = new Int32Array(this.mailbox, 0, 2);
     this.worker = new Worker(
       resolve(
         root,
@@ -41,11 +47,11 @@ export class Host {
 
   request(request: object): any {
     if (this.workerError !== undefined) {
-      this.reportedFatalFailure = true;
+      this.reportedWorkerFailure = true;
       throw this.workerError;
     }
     if (this.workerExited) {
-      this.reportedFatalFailure = true;
+      this.reportedWorkerFailure = true;
       throw new Error(
         `type service broker worker already exited with code ${String(this.workerExitCode)}`,
       );
@@ -55,11 +61,10 @@ export class Host {
       this.worker.postMessage(request);
     } catch (error) {
       Atomics.store(this.control, 0, 0);
-      this.reportedFatalFailure = true;
       throw error;
     }
     if (Atomics.wait(this.control, 0, 1, 60_000) === 'timed-out') {
-      this.reportedFatalFailure = true;
+      this.reportedChildFailure = true;
       throw new Error('type service host timed out');
     }
     const response = JSON.parse(
@@ -67,22 +72,23 @@ export class Host {
     ) as {
       result?: unknown;
       error?: string;
-      fatal?: boolean;
+      childFatal?: boolean;
       workerFatal?: boolean;
     };
     if (response.error) {
       if (response.workerFatal) {
         this.workerExited = true;
         this.workerExitCode ??= 1;
-      }
-      if (response.fatal || response.workerFatal) {
-        this.reportedFatalFailure = true;
-      }
-      if (response.workerFatal && this.workerError !== undefined) {
-        throw this.workerError;
+        this.reportedWorkerFailure = true;
+        if (this.workerError !== undefined) {
+          throw this.workerError;
+        }
+      } else if (response.childFatal) {
+        this.reportedChildFailure = true;
       }
       throw new Error(response.error);
     }
+    this.reportedChildFailure = false;
     return response.result;
   }
 
@@ -111,10 +117,11 @@ export class Host {
       return this.closePromise;
     }
     this.closePromise = (async () => {
-      // Only a fatal transport/worker/child failure already thrown out of
-      // `request()` has been surfaced to the caller; normal Go RPC errors or
-      // crashes/exits after the last request must still reject `close()`.
-      const hadReportedFailure = this.reportedFatalFailure;
+      // Track worker failures and Go child failures independently so a caught
+      // recoverable error (or even an earlier child failure) never suppresses
+      // an independent broker worker crash during teardown.
+      const hadReportedWorkerFailure = this.reportedWorkerFailure;
+      const hadReportedChildFailure = this.reportedChildFailure;
       // Flush any queued libuv worker `error`/`exit` events that occurred while
       // the main thread was blocked in synchronous work before `close()`.
       await new Promise<void>((resolve) => setImmediate(resolve));
@@ -122,22 +129,29 @@ export class Host {
         new Error(
           `type service broker worker exited unexpectedly with code ${String(code)}${phase}`,
         );
-      let closeError: unknown =
+      let workerCloseError: unknown =
         this.workerError ??
         (this.workerExited
           ? unexpectedExitError(this.workerExitCode)
           : undefined);
+      let childCloseError: unknown;
       if (
-        !hadReportedFailure &&
+        !hadReportedWorkerFailure &&
+        !hadReportedChildFailure &&
         !this.workerExited &&
         this.workerError === undefined
       ) {
         try {
           this.request({ method: 'close' });
         } catch (error) {
-          closeError ??= error;
+          if (this.workerError !== undefined || this.workerExited) {
+            workerCloseError ??=
+              this.workerError ?? unexpectedExitError(this.workerExitCode);
+          } else {
+            childCloseError ??= error;
+          }
         }
-        closeError ??=
+        workerCloseError ??=
           this.workerError ??
           (this.workerExited
             ? unexpectedExitError(this.workerExitCode)
@@ -159,21 +173,21 @@ export class Host {
             }) => {
               if (message?.stopped) {
                 if (message.error) {
-                  closeError ??= new Error(message.error);
+                  childCloseError ??= new Error(message.error);
                 }
-                closeError ??= this.workerError;
+                workerCloseError ??= this.workerError;
                 cleanup();
                 done();
               }
             };
             const onError = (error: unknown) => {
-              closeError ??=
+              workerCloseError ??=
                 error ?? new Error('type service broker worker error');
               cleanup();
               done();
             };
             const onFinish = (code: number) => {
-              closeError ??=
+              workerCloseError ??=
                 this.workerError ??
                 unexpectedExitError(code, ' before stopping child');
               cleanup();
@@ -183,7 +197,7 @@ export class Host {
             this.worker.once('error', onError);
             this.worker.once('exit', onFinish);
             if (this.workerExited || this.workerError !== undefined) {
-              closeError ??=
+              workerCloseError ??=
                 this.workerError ??
                 unexpectedExitError(
                   this.workerExitCode,
@@ -194,7 +208,7 @@ export class Host {
               return;
             }
             stopTimer = setTimeout(() => {
-              closeError ??= new Error(
+              workerCloseError ??= new Error(
                 'timed out waiting for type service broker worker to stop',
               );
               cleanup();
@@ -207,9 +221,16 @@ export class Host {
       } finally {
         await this.worker.terminate();
       }
-      closeError ??= this.workerError;
-      if (!hadReportedFailure && closeError !== undefined) {
-        throw closeError;
+      workerCloseError ??= this.workerError;
+      if (workerCloseError !== undefined && !hadReportedWorkerFailure) {
+        throw workerCloseError;
+      }
+      if (
+        childCloseError !== undefined &&
+        !hadReportedChildFailure &&
+        !hadReportedWorkerFailure
+      ) {
+        throw childCloseError;
       }
     })();
     return this.closePromise;
@@ -243,6 +264,6 @@ export function useTypeServiceHarness() {
     get temp() {
       return temp;
     },
-    createHost: () => new Host(binary),
+    createHost: (mailboxBytes?: number) => new Host(binary, mailboxBytes),
   };
 }

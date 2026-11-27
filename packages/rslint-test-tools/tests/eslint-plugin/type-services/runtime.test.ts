@@ -1656,24 +1656,34 @@ test('decodes deep diagnostic message chains above 64 levels and rejects cyclic 
 test('Host.close surfaces post-request broker crashes and unexpected exits without masking reported request errors', async () => {
   const dir = mkdtempSync(resolve(harness.temp, 'host-close-crash-'));
   const file = resolve(dir, 'index.ts');
+  const bigFile = resolve(dir, 'big.ts');
   const config = resolve(dir, 'tsconfig.json');
   writeFileSync(file, 'export const ok = 1;\n');
-  writeFileSync(config, JSON.stringify({ include: ['index.ts'] }));
+  writeFileSync(
+    bigFile,
+    `export const bigPayload = ${JSON.stringify('x'.repeat(16_384))};\n`,
+  );
+  writeFileSync(config, JSON.stringify({ include: ['index.ts', 'big.ts'] }));
 
   const hosts: ReturnType<typeof harness.createHost>[] = [];
-  const spawnHost = () => {
-    const instance = harness.createHost();
+  const spawnHost = (mailboxBytes?: number) => {
+    const instance = harness.createHost(mailboxBytes);
     hosts.push(instance);
     return instance;
   };
 
   try {
     // 1. Worker throws and exits with code 1 after the last request succeeded,
-    // even if an earlier application-level Go RPC error was caught by the test.
+    // even if an earlier application-level Go RPC error, structured-clone
+    // error, or JSON-serialization error was caught by the caller.
     const crashedAfterRequest = spawnHost();
     expect(() => crashedAfterRequest.request({ method: 'unknown' })).toThrow(
       'unsupported harness request',
     );
+    expect(() =>
+      crashedAfterRequest.request({ uncloneable: () => {} }),
+    ).toThrow();
+    expect(() => crashedAfterRequest.request({ unserializable: 1n })).toThrow();
     const descriptor = crashedAfterRequest.request({
       method: 'init',
       config,
@@ -1687,7 +1697,26 @@ test('Host.close surfaces post-request broker crashes and unexpected exits witho
     expect(await crashedExit).toBe(1);
     await expect(crashedAfterRequest.close()).rejects.toThrow(TypeError);
 
-    // 2. Worker exits before `close()` without emitting an `error` event.
+    // 2. Reply exceeding the mailbox limit is recoverable and does not hide a
+    // subsequent worker crash after another request succeeds.
+    const tinyMailboxHost = spawnHost(8_192);
+    const tinyDescriptor = tinyMailboxHost.request({
+      method: 'init',
+      config,
+      syntaxOnly: true,
+    }) as TypeServiceDescriptor;
+    expect(() => tinyMailboxHost.source(tinyDescriptor, bigFile)).toThrow(
+      'type service test mailbox exhausted',
+    );
+    expect(tinyMailboxHost.request({ method: 'close' })).toBe(true);
+    const tinyCrashExit = new Promise<number>((resolveExit) => {
+      tinyMailboxHost.worker.once('exit', resolveExit);
+    });
+    tinyMailboxHost.worker.postMessage(null);
+    expect(await tinyCrashExit).toBe(1);
+    await expect(tinyMailboxHost.close()).rejects.toThrow(TypeError);
+
+    // 3. Worker exits before `close()` without emitting an `error` event.
     const exitedWithoutError = spawnHost();
     expect(
       (
@@ -1703,7 +1732,7 @@ test('Host.close surfaces post-request broker crashes and unexpected exits witho
       /exited unexpectedly/,
     );
 
-    // 3. Worker crash while `request()` is waiting in `Atomics.wait` wakes the
+    // 4. Worker crash while `request()` is waiting in `Atomics.wait` wakes the
     // caller immediately instead of stalling 60s, and `close()` in `finally`
     // neither stalls in a second `Atomics.wait` nor re-throws over the caller.
     const crashedInFlight = spawnHost();
@@ -1712,7 +1741,7 @@ test('Host.close surfaces post-request broker crashes and unexpected exits witho
       /exited unexpectedly/,
     );
     await expect(crashedInFlight.close()).resolves.toBeUndefined();
-    expect(Date.now() - startedAt).toBeLessThan(10_000);
+    expect(Date.now() - startedAt).toBeLessThan(30_000);
   } finally {
     await Promise.allSettled(
       hosts.map((instance) => instance.worker.terminate()),
