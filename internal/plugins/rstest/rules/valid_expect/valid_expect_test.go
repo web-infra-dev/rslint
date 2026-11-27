@@ -162,6 +162,14 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `test("t", async () => { await Promise.reject(expect(p).resolves.toBe(1)).catch(async (e) => { await Promise.reject(e); }).catch((e) => e); });`},
 			{Code: `test("t", async () => { await Promise.reject(expect(p).resolves.toBe(1)).catch(async (e) => await Promise.reject(e)); });`},
 			{Code: `test("t", async () => { await Promise.reject(expect(p).resolves.toBe(1)).catch(async (e) => { return await Promise.reject(e); }); });`},
+			// Container aliases in `Promise.try` / `.catch`.
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const saved = [check]; return Promise.all(saved); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.reject(expect(p).resolves.toBe(1)).catch((err) => { const saved = [err]; return Promise.all(saved); }); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const saved: any[] = []; saved.push(check); return Promise.all(saved); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => Promise.resolve([check]).then((arr) => Promise.all(arr)), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try(function () { return arguments[0]; }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const saved = new Set([check]); return Promise.all(saved); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => Promise.resolve().then(() => { const a = check; return a; }), expect(p).resolves.toBe(1)); });`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// --- arg count ---
@@ -1411,6 +1419,67 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "asyncMustBeAwaited"},
 				},
 			},
+			// Getter/spread sibling autofix withholding and `Promise.resolve([p])` container false negatives.
+			{
+				Code: `test("t", async () => { let started = false; const setup = { get start() { started = true; return 1; } }; await Promise.resolve([expect(p).resolves.toBe(true), setup.start]); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.resolve([expect(p).resolves.toBe(true), ...items]); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.resolve([expect(p).resolves.toBe(true), { ...setup }]); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => Promise.resolve([check]), expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const saved = [check]; return Promise.resolve(saved); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => Promise.resolve([check]).then(() => 1), expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => new Set([check]), expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((...args: any[]) => { const copy = args; return copy[0]; }, ready, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => () => { return check; }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { let started = false; await Promise.resolve([expect(p).resolves.toBe(true), (globalThis as any)[(started = true, 'Promise')].resolve(1)]); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
 		},
 	)
 }
@@ -1445,6 +1514,29 @@ func TestValidExpectPromiseAllLinearScaling(t *testing.T) {
 	}
 	b3.WriteString("  ]);\n});\n")
 
+	const tryN = 1000
+	var b4 strings.Builder
+	b4.WriteString("test('many Promise.try assertion args with many setup statements', async () => {\n  await Promise.try((...checks: any[]) => {\n")
+	for i := range tryN {
+		fmt.Fprintf(&b4, "    const s%d = %d;\n", i, i)
+	}
+	b4.WriteString("    return Promise.all(checks);\n  }")
+	for i := range tryN {
+		fmt.Fprintf(&b4, ", expect(p).resolves.toBe(%d)", i)
+	}
+	b4.WriteString(");\n});\n")
+
+	var b5 strings.Builder
+	b5.WriteString("test('many Promise.try assertion args indexing checks[0] with many setup statements', async () => {\n  await Promise.try((...checks: any[]) => {\n")
+	for i := range tryN {
+		fmt.Fprintf(&b5, "    const s%d = %d;\n", i, i)
+	}
+	b5.WriteString("    return checks[0];\n  }")
+	for i := range tryN {
+		fmt.Fprintf(&b5, ", expect(p).resolves.toBe(%d)", i)
+	}
+	b5.WriteString(");\n});\n")
+
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 	for _, tc := range []struct {
 		name         string
@@ -1455,6 +1547,8 @@ func TestValidExpectPromiseAllLinearScaling(t *testing.T) {
 		{name: "promise-all.ts", code: b.String(), demand: rule.EditDemandNone, wantDiagSize: 0},
 		{name: "const-bound.ts", code: b2.String(), demand: rule.EditDemandNone, wantDiagSize: 0},
 		{name: "not-awaited-array-autofix.ts", code: b3.String(), demand: rule.EditDemandAutofix, wantDiagSize: n},
+		{name: "promise-try-rest-all.ts", code: b4.String(), demand: rule.EditDemandNone, wantDiagSize: 0},
+		{name: "promise-try-rest-index0.ts", code: b5.String(), demand: rule.EditDemandNone, wantDiagSize: tryN - 1},
 	} {
 		program, sourceFile, err := helper.CreateTestProgram(tc.code, tc.name, "tsconfig.json")
 		if err != nil {

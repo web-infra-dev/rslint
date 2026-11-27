@@ -164,6 +164,9 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `test("t", async () => { await Promise.reject(expect(p).resolves.toBe(1)).catch(async (e) => { await Promise.reject(e); }).catch((e) => e); });`},
 			{Code: `test("t", async () => { await Promise.reject(expect(p).resolves.toBe(1)).catch(async (e) => await Promise.reject(e)); });`},
 			{Code: `test("t", async () => { await Promise.reject(expect(p).resolves.toBe(1)).catch(async (e) => { return await Promise.reject(e); }); });`},
+			// Container aliases in `Promise.try` / `.catch`.
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const saved = [check]; return Promise.all(saved); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.reject(expect(p).resolves.toBe(1)).catch((err) => { const saved = [err]; return Promise.all(saved); }); });`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -1672,6 +1675,25 @@ func TestValidExpectRule(t *testing.T) {
 			},
 			{
 				Code: `const obj = { f(x) {} } as { f(x: Promise<void>): void }; test("t", () => { obj.f(expect(Promise.resolve(1)).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			// Getter/spread sibling autofix withholding and `Promise.resolve([p])` container false negatives.
+			{
+				Code: `test("t", async () => { let started = false; const setup = { get start() { started = true; return 1; } }; await Promise.resolve([expect(Promise.resolve(true)).resolves.toBe(true), setup.start]); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.resolve([expect(Promise.resolve(true)).resolves.toBe(true), ...items]); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => Promise.resolve([check]), expect(Promise.resolve(1)).resolves.toBe(1)); });`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "asyncMustBeAwaited"},
 				},

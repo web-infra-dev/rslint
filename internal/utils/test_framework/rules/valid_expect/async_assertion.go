@@ -53,8 +53,50 @@ type promiseTryCallIndex struct {
 }
 
 type inlineCallbackSummary struct {
-	usesArguments  bool
-	bodyCanConsume bool
+	usesArguments     bool
+	bodyCanConsume    bool
+	restWholeConsumed map[*ast.Node]bool
+}
+
+type scopeDepKind uint8
+
+const (
+	scopeDepVarDecl scopeDepKind = iota
+	scopeDepAssign
+	scopeDepContainerPush
+	scopeDepContainerIndexWrite
+)
+
+type scopeDepEdge struct {
+	kind   scopeDepKind
+	target *ast.Node
+	rhs    *ast.Node
+}
+
+type scopeConsumeKind uint8
+
+const (
+	scopeConsumeAwait scopeConsumeKind = iota
+	scopeConsumeReturn
+	scopeConsumeForAwait
+)
+
+type scopeConsumeSite struct {
+	kind scopeConsumeKind
+	node *ast.Node
+	expr *ast.Node
+}
+
+// scopeBodyIndex pre-indexes local alias/container edges and await/return/for-await
+// sites once per callback or catch block so per-argument queries only touch
+// statements referencing tracked bindings (O(S + A) instead of O(A * S)).
+type scopeBodyIndex struct {
+	deps           []scopeDepEdge
+	depsBySym      map[*ast.Symbol][]int
+	depsByName     map[string][]int
+	consumes       []scopeConsumeSite
+	consumesBySym  map[*ast.Symbol][]int
+	consumesByName map[string][]int
 }
 
 type arrayLiteralIndex struct {
@@ -88,7 +130,8 @@ type AsyncAssertionResolver struct {
 	blockExits            map[*ast.Node]blockExitSummary
 	bindingObserved       map[*ast.Symbol]bool
 	tryCallIndices        map[*ast.Node]*promiseTryCallIndex
-	callbackInfos         map[*ast.Node]inlineCallbackSummary
+	callbackInfos         map[*ast.Node]*inlineCallbackSummary
+	scopeBodyIndices      map[*ast.Node]*scopeBodyIndex
 	arrayElemIndices      map[*ast.Node]*arrayLiteralIndex
 	callArgIndices        map[*ast.Node]*callArgsIndex
 	exprMutates           map[*ast.Node]bool
@@ -504,19 +547,19 @@ func (r *AsyncAssertionResolver) getPromiseTryCallIndex(call *ast.Node) *promise
 	return idx
 }
 
-func (r *AsyncAssertionResolver) getInlineCallbackSummary(cb *ast.Node) inlineCallbackSummary {
+func (r *AsyncAssertionResolver) getInlineCallbackSummary(cb *ast.Node) *inlineCallbackSummary {
 	if r != nil && r.callbackInfos != nil {
 		if info, ok := r.callbackInfos[cb]; ok {
 			return info
 		}
 	}
-	info := inlineCallbackSummary{
+	info := &inlineCallbackSummary{
 		usesArguments:  cb != nil && cb.Kind == ast.KindFunctionExpression && functionBodyUsesArguments(cb),
 		bodyCanConsume: inlineCallbackBodyCanConsume(cb),
 	}
 	if r != nil {
 		if r.callbackInfos == nil {
-			r.callbackInfos = map[*ast.Node]inlineCallbackSummary{}
+			r.callbackInfos = map[*ast.Node]*inlineCallbackSummary{}
 		}
 		r.callbackInfos[cb] = info
 	}
@@ -707,54 +750,113 @@ func collectBindingIdentifiers(pattern *ast.Node) []*ast.Node {
 }
 
 type trackedBindings struct {
-	symbols        map[*ast.Symbol]bool
-	names          map[string]bool
-	restSymbols    map[*ast.Symbol]bool
-	restNames      map[string]bool
-	restOffset     int // >= 0 exact expected 0-based index into rest/`arguments`, -1 if unknown
-	trackArguments bool
+	symbols          map[*ast.Symbol]bool
+	names            map[string]bool
+	restSymbols      map[*ast.Symbol]bool
+	restNames        map[string]bool
+	containerSymbols map[*ast.Symbol]bool
+	containerNames   map[string]bool
+	restOffset       int // >= 0 exact expected 0-based index into rest/`arguments`, -1 if unknown
+	trackArguments   bool
 }
 
 func (tb *trackedBindings) isEmpty() bool {
 	return len(tb.symbols) == 0 && len(tb.names) == 0 &&
-		len(tb.restSymbols) == 0 && len(tb.restNames) == 0 && !tb.trackArguments
+		len(tb.restSymbols) == 0 && len(tb.restNames) == 0 &&
+		len(tb.containerSymbols) == 0 && len(tb.containerNames) == 0 &&
+		!tb.trackArguments
 }
 
-func (r *AsyncAssertionResolver) addTrackedIdent(tb *trackedBindings, ident *ast.Node, isRest bool) {
+type trackedBindingKind uint8
+
+const (
+	trackedBindingDirect trackedBindingKind = iota
+	trackedBindingRest
+	trackedBindingContainer
+)
+
+func (r *AsyncAssertionResolver) addTrackedIdentKind(
+	tb *trackedBindings,
+	ident *ast.Node,
+	kind trackedBindingKind,
+) (sym *ast.Symbol, name string, added bool) {
 	if ident == nil || ident.Kind != ast.KindIdentifier {
-		return
+		return nil, "", false
 	}
-	var sym *ast.Symbol
+	name = ident.AsIdentifier().Text
 	if ident.Parent != nil && ident.Parent.Symbol() != nil {
 		sym = ident.Parent.Symbol()
 	} else if r != nil {
 		sym = r.resolveSymbol(ident)
 	}
 	if r != nil && r.refs != nil && sym != nil {
-		if isRest {
+		switch kind {
+		case trackedBindingRest:
+			if tb.restSymbols[sym] {
+				return sym, name, false
+			}
 			if tb.restSymbols == nil {
 				tb.restSymbols = map[*ast.Symbol]bool{}
 			}
 			tb.restSymbols[sym] = true
-		} else {
+			return sym, name, true
+		case trackedBindingContainer:
+			if tb.containerSymbols[sym] {
+				return sym, name, false
+			}
+			if tb.containerSymbols == nil {
+				tb.containerSymbols = map[*ast.Symbol]bool{}
+			}
+			tb.containerSymbols[sym] = true
+			return sym, name, true
+		default:
+			if tb.symbols[sym] {
+				return sym, name, false
+			}
 			if tb.symbols == nil {
 				tb.symbols = map[*ast.Symbol]bool{}
 			}
 			tb.symbols[sym] = true
+			return sym, name, true
 		}
-		return
 	}
-	if isRest {
+	switch kind {
+	case trackedBindingRest:
+		if tb.restNames[name] {
+			return nil, name, false
+		}
 		if tb.restNames == nil {
 			tb.restNames = map[string]bool{}
 		}
-		tb.restNames[ident.AsIdentifier().Text] = true
-	} else {
+		tb.restNames[name] = true
+		return nil, name, true
+	case trackedBindingContainer:
+		if tb.containerNames[name] {
+			return nil, name, false
+		}
+		if tb.containerNames == nil {
+			tb.containerNames = map[string]bool{}
+		}
+		tb.containerNames[name] = true
+		return nil, name, true
+	default:
+		if tb.names[name] {
+			return nil, name, false
+		}
 		if tb.names == nil {
 			tb.names = map[string]bool{}
 		}
-		tb.names[ident.AsIdentifier().Text] = true
+		tb.names[name] = true
+		return nil, name, true
 	}
+}
+
+func (r *AsyncAssertionResolver) addTrackedIdent(tb *trackedBindings, ident *ast.Node, isRest bool) {
+	if isRest {
+		r.addTrackedIdentKind(tb, ident, trackedBindingRest)
+		return
+	}
+	r.addTrackedIdentKind(tb, ident, trackedBindingDirect)
 }
 
 func (r *AsyncAssertionResolver) matchesTrackedDirectIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) bool {
@@ -780,7 +882,12 @@ func (r *AsyncAssertionResolver) matchesTrackedRestIdent(node *ast.Node, tb *tra
 	}
 	name := node.AsIdentifier().Text
 	if tb.trackArguments && name == "arguments" && !shadowed["arguments"] {
-		return true
+		if r == nil || r.refs == nil {
+			return true
+		}
+		if sym := r.resolveSymbol(node); sym == nil || len(sym.Declarations) == 0 {
+			return true
+		}
 	}
 	if r != nil && r.refs != nil && len(tb.restSymbols) > 0 {
 		if sym := r.resolveSymbol(node); sym != nil {
@@ -794,8 +901,27 @@ func (r *AsyncAssertionResolver) matchesTrackedRestIdent(node *ast.Node, tb *tra
 	return tb.restNames[name] && !shadowed[name]
 }
 
+func (r *AsyncAssertionResolver) matchesTrackedContainerIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) bool {
+	if node == nil || node.Kind != ast.KindIdentifier || !isIdentifierValueReference(node) {
+		return false
+	}
+	name := node.AsIdentifier().Text
+	if r != nil && r.refs != nil && len(tb.containerSymbols) > 0 {
+		if sym := r.resolveSymbol(node); sym != nil {
+			return tb.containerSymbols[sym]
+		}
+		if len(tb.containerNames) > 0 && tb.containerNames[name] && !shadowed[name] {
+			return true
+		}
+		return false
+	}
+	return tb.containerNames[name] && !shadowed[name]
+}
+
 func (r *AsyncAssertionResolver) matchesTrackedIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) bool {
-	return r.matchesTrackedDirectIdent(node, tb, shadowed) || r.matchesTrackedRestIdent(node, tb, shadowed)
+	return r.matchesTrackedDirectIdent(node, tb, shadowed) ||
+		r.matchesTrackedRestIdent(node, tb, shadowed) ||
+		r.matchesTrackedContainerIdent(node, tb, shadowed)
 }
 
 func scopeShadowsNames(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) map[string]bool {
@@ -804,7 +930,7 @@ func scopeShadowsNames(node *ast.Node, tb *trackedBindings, shadowed map[string]
 	}
 	var added []string
 	checkName := func(n string) {
-		if (tb.names[n] || tb.restNames[n] || (tb.trackArguments && n == "arguments")) && !shadowed[n] {
+		if (tb.names[n] || tb.restNames[n] || tb.containerNames[n] || (tb.trackArguments && n == "arguments")) && !shadowed[n] {
 			added = append(added, n)
 		}
 	}
@@ -973,12 +1099,175 @@ func (r *AsyncAssertionResolver) exprEvaluatesToTrackedPromise(expr *ast.Node, t
 	return false
 }
 
+func (r *AsyncAssertionResolver) isContainerElementAccess(expr *ast.Node, tb *trackedBindings) bool {
+	if expr == nil || expr.Kind != ast.KindElementAccessExpression {
+		return false
+	}
+	recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(expr))
+	return r.matchesTrackedContainerIdent(recv, tb, nil)
+}
+
+func (r *AsyncAssertionResolver) exprCanBeTrackedContainer(expr *ast.Node, tb *trackedBindings) bool {
+	return r.exprCanBeTrackedContainerDepth(expr, tb, 0)
+}
+
+// exprCanBeTrackedContainerDepth reports whether `expr` evaluates to an array
+// or iterable holding a tracked Promise (e.g. `[p]`, `saved`, `...checks`,
+// `[...saved]`, `new Set([p])`) that `Promise.all`/`allSettled`/`race`/`any`
+// or `for await` awaits.
+func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, tb *trackedBindings, depth int) bool {
+	if depth > 6 {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	for expr != nil && internalUtils.IsCommaOperator(expr) {
+		expr = internalUtils.SkipAssertionsAndParens(expr.AsBinaryExpression().Right)
+	}
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindIdentifier:
+		return r.matchesTrackedRestIdent(expr, tb, nil) || r.matchesTrackedContainerIdent(expr, tb, nil)
+	case ast.KindArrayLiteralExpression:
+		arr := expr.AsArrayLiteralExpression()
+		if arr == nil || arr.Elements == nil {
+			return false
+		}
+		for _, el := range arr.Elements.Nodes {
+			if el == nil || el.Kind == ast.KindOmittedExpression {
+				continue
+			}
+			if el.Kind == ast.KindSpreadElement {
+				if r.exprCanBeTrackedContainerDepth(el.AsSpreadElement().Expression, tb, depth+1) {
+					return true
+				}
+				continue
+			}
+			if r.exprCanReturnTrackedPromiseDepth(el, tb, depth+1) {
+				return true
+			}
+		}
+		return false
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		if cond == nil {
+			return false
+		}
+		return r.exprCanBeTrackedContainerDepth(cond.WhenTrue, tb, depth+1) ||
+			r.exprCanBeTrackedContainerDepth(cond.WhenFalse, tb, depth+1)
+	case ast.KindBinaryExpression:
+		bin := expr.AsBinaryExpression()
+		if bin == nil || bin.OperatorToken == nil {
+			return false
+		}
+		switch bin.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken, ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+			return r.exprCanBeTrackedContainerDepth(bin.Right, tb, depth+1)
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken,
+			ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			return r.exprCanBeTrackedContainerDepth(bin.Left, tb, depth+1) ||
+				r.exprCanBeTrackedContainerDepth(bin.Right, tb, depth+1)
+		}
+		return false
+	case ast.KindCallExpression:
+		if isConsoleCall(expr) {
+			return false
+		}
+		if _, ok := r.promiseMethodName(expr); ok {
+			return false
+		}
+		callee := internalUtils.SkipAssertionsAndParens(expr.AsCallExpression().Expression)
+		if callee != nil && ast.IsAccessExpression(callee) {
+			if mName, ok := r.accessStaticNameThroughAssertions(callee); ok {
+				switch mName {
+				case "push", "unshift", "forEach", "includes", "indexOf", "lastIndexOf",
+					"join", "toString", "every", "some", "has", "add", "delete",
+					"then", "catch", "finally":
+					return false
+				}
+			}
+		}
+		return r.exprReferencesTracked(expr, tb, true)
+	case ast.KindNewExpression:
+		return r.exprReferencesTracked(expr, tb, true)
+	}
+	return false
+}
+
 // exprCanReturnTrackedPromise reports whether evaluating `expr` can produce a
 // Promise/thenable derived from a binding in `tb` (rejecting primitive-only
 // expressions such as `void p`, `!p`, `p ? 1 : 2`, `p.message`, `args.length`,
-// `console.log(p)`, uncalled closures `() => p`, array literals `[p]`, and
-// non-thenable objects `{ p }` / `{ ...p }`).
+// `console.log(p)`, uncalled closures `() => p`, array literals `[p]`,
+// `Promise.resolve([p])`, and non-thenable objects `{ p }` / `{ ...p }`).
 func (r *AsyncAssertionResolver) exprCanReturnTrackedPromise(expr *ast.Node, tb *trackedBindings) bool {
+	return r.exprCanReturnTrackedPromiseDepth(expr, tb, 0)
+}
+
+func cloneTrackedBindings(tb *trackedBindings, clearArguments bool) *trackedBindings {
+	if tb == nil {
+		return &trackedBindings{restOffset: -1}
+	}
+	out := &trackedBindings{
+		restOffset:     tb.restOffset,
+		trackArguments: tb.trackArguments && !clearArguments,
+	}
+	if len(tb.symbols) > 0 {
+		out.symbols = make(map[*ast.Symbol]bool, len(tb.symbols))
+		for k, v := range tb.symbols {
+			out.symbols[k] = v
+		}
+	}
+	if len(tb.names) > 0 {
+		out.names = make(map[string]bool, len(tb.names))
+		for k, v := range tb.names {
+			out.names[k] = v
+		}
+	}
+	if len(tb.restSymbols) > 0 {
+		out.restSymbols = make(map[*ast.Symbol]bool, len(tb.restSymbols))
+		for k, v := range tb.restSymbols {
+			out.restSymbols[k] = v
+		}
+	}
+	if len(tb.restNames) > 0 {
+		out.restNames = make(map[string]bool, len(tb.restNames))
+		for k, v := range tb.restNames {
+			out.restNames[k] = v
+		}
+	}
+	if len(tb.containerSymbols) > 0 {
+		out.containerSymbols = make(map[*ast.Symbol]bool, len(tb.containerSymbols))
+		for k, v := range tb.containerSymbols {
+			out.containerSymbols[k] = v
+		}
+	}
+	if len(tb.containerNames) > 0 {
+		out.containerNames = make(map[string]bool, len(tb.containerNames))
+		for k, v := range tb.containerNames {
+			out.containerNames[k] = v
+		}
+	}
+	return out
+}
+
+func (r *AsyncAssertionResolver) isBuiltinNonPromiseContainerCtor(expr *ast.Node) bool {
+	ctor := internalUtils.SkipAssertionsAndParens(expr)
+	if ctor == nil || ctor.Kind != ast.KindIdentifier {
+		return false
+	}
+	name := ctor.AsIdentifier().Text
+	switch name {
+	case "Set", "Map", "WeakSet", "WeakMap", "Array":
+		return !r.isLocallyValueShadowed(ctor, name)
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) exprCanReturnTrackedPromiseDepth(expr *ast.Node, tb *trackedBindings, depth int) bool {
+	if depth > 6 {
+		return false
+	}
 	expr = internalUtils.SkipAssertionsAndParens(expr)
 	for expr != nil && internalUtils.IsCommaOperator(expr) {
 		expr = internalUtils.SkipAssertionsAndParens(expr.AsBinaryExpression().Right)
@@ -990,14 +1279,14 @@ func (r *AsyncAssertionResolver) exprCanReturnTrackedPromise(expr *ast.Node, tb 
 	case ast.KindIdentifier:
 		return r.matchesTrackedDirectIdent(expr, tb, nil)
 	case ast.KindAwaitExpression:
-		return r.exprCanReturnTrackedPromise(expr.AsAwaitExpression().Expression, tb)
+		return r.exprCanReturnTrackedPromiseDepth(expr.AsAwaitExpression().Expression, tb, depth+1)
 	case ast.KindConditionalExpression:
 		cond := expr.AsConditionalExpression()
 		if cond == nil {
 			return false
 		}
-		return r.exprCanReturnTrackedPromise(cond.WhenTrue, tb) ||
-			r.exprCanReturnTrackedPromise(cond.WhenFalse, tb)
+		return r.exprCanReturnTrackedPromiseDepth(cond.WhenTrue, tb, depth+1) ||
+			r.exprCanReturnTrackedPromiseDepth(cond.WhenFalse, tb, depth+1)
 	case ast.KindBinaryExpression:
 		bin := expr.AsBinaryExpression()
 		if bin == nil || bin.OperatorToken == nil {
@@ -1005,24 +1294,120 @@ func (r *AsyncAssertionResolver) exprCanReturnTrackedPromise(expr *ast.Node, tb 
 		}
 		switch bin.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken, ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
-			return r.exprCanReturnTrackedPromise(bin.Right, tb)
+			return r.exprCanReturnTrackedPromiseDepth(bin.Right, tb, depth+1)
 		case ast.KindBarBarToken, ast.KindQuestionQuestionToken,
 			ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
-			return r.exprCanReturnTrackedPromise(bin.Left, tb) ||
-				r.exprCanReturnTrackedPromise(bin.Right, tb)
+			return r.exprCanReturnTrackedPromiseDepth(bin.Left, tb, depth+1) ||
+				r.exprCanReturnTrackedPromiseDepth(bin.Right, tb, depth+1)
 		}
 		return false
 	case ast.KindElementAccessExpression:
-		return r.isRestElementAccess(expr, tb)
+		return r.isRestElementAccess(expr, tb) || r.isContainerElementAccess(expr, tb)
 	case ast.KindCallExpression:
 		if isConsoleCall(expr) {
 			return false
 		}
-		if method, ok := r.promiseMethodName(expr); ok && method == "reject" {
+		if method, ok := r.promiseMethodName(expr); ok {
+			switch method {
+			case "reject", "withResolvers":
+				return false
+			case "resolve":
+				arg0, argOK := staticCallArgAt(expr, 0)
+				if !argOK {
+					return r.exprReferencesTracked(expr, tb, true)
+				}
+				return arg0 != nil && r.exprCanReturnTrackedPromiseDepth(arg0, tb, depth+1)
+			case "all", "allSettled", "race", "any":
+				arg0, argOK := staticCallArgAt(expr, 0)
+				if !argOK {
+					return r.exprReferencesTracked(expr, tb, true)
+				}
+				return arg0 != nil && r.exprCanBeTrackedContainerDepth(arg0, tb, depth+1)
+			}
+		}
+		callee := internalUtils.SkipAssertionsAndParens(expr.AsCallExpression().Expression)
+		if callee != nil && ast.IsAccessExpression(callee) {
+			if mName, ok := r.accessStaticNameThroughAssertions(callee); ok {
+				switch mName {
+				case "then", "catch", "finally":
+					recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+					if r.exprCanReturnTrackedPromiseDepth(recv, tb, depth+1) {
+						return true
+					}
+					// If the receiver is a non-tracked Promise (e.g. `Promise.resolve([p])`),
+					// only treat the chain as returning a tracked Promise when a handler
+					// consumes it (either by capturing `tb` or by unwrapping a resolved container).
+					if args := expr.AsCallExpression().Arguments; args != nil {
+						var resolvedContainer bool
+						if mName == "then" && recv != nil && recv.Kind == ast.KindCallExpression {
+							if pMethod, pOK := r.promiseMethodName(recv); pOK && pMethod == "resolve" {
+								if a0, aOK := staticCallArgAt(recv, 0); aOK && a0 != nil {
+									resolvedContainer = r.exprCanBeTrackedContainerDepth(a0, tb, depth+1)
+								}
+							}
+						}
+						for i, a := range args.Nodes {
+							if a == nil {
+								continue
+							}
+							h := internalUtils.SkipAssertionsAndParens(a)
+							if h == nil || r.isNonCallablePromiseHandler(h) {
+								continue
+							}
+							if h.Kind == ast.KindArrowFunction || h.Kind == ast.KindFunctionExpression {
+								if functionAsteriskToken(h) != nil {
+									continue
+								}
+								outerTB := cloneTrackedBindings(tb, h.Kind == ast.KindFunctionExpression)
+								if !outerTB.isEmpty() {
+									r.propagateLocalAliasesInScope(h.Body(), outerTB)
+									if r.scopeConsumesTracked(h.Body(), outerTB, true) {
+										return true
+									}
+								}
+								if i == 0 && resolvedContainer {
+									params := runtimeParameters(h)
+									if len(params) > 0 && params[0] != nil {
+										if p := params[0].AsParameterDeclaration(); p != nil && p.DotDotDotToken == nil &&
+											p.Name() != nil && p.Name().Kind == ast.KindIdentifier {
+											innerTB := &trackedBindings{restOffset: -1}
+											r.addTrackedIdentKind(innerTB, p.Name(), trackedBindingContainer)
+											r.propagateLocalAliasesInScope(h.Body(), innerTB)
+											if r.scopeConsumesTracked(h.Body(), innerTB, true) {
+												return true
+											}
+										}
+									}
+								}
+								continue
+							}
+							if r.exprReferencesTracked(h, tb, true) {
+								return true
+							}
+						}
+					}
+					return false
+				case "from", "of":
+					recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+					if recv != nil && recv.Kind == ast.KindIdentifier && recv.AsIdentifier().Text == "Array" &&
+						!r.isLocallyValueShadowed(recv, "Array") {
+						return false
+					}
+				case "push", "unshift", "forEach", "includes", "indexOf", "lastIndexOf",
+					"join", "toString", "slice", "concat", "filter", "map", "flat", "flatMap",
+					"splice", "reverse", "sort", "every", "some", "keys", "values", "entries",
+					"has", "add", "delete":
+					return false
+				}
+			}
+		}
+		return r.exprReferencesTracked(expr, tb, true)
+	case ast.KindNewExpression:
+		if r.isBuiltinNonPromiseContainerCtor(expr.AsNewExpression().Expression) {
 			return false
 		}
 		return r.exprReferencesTracked(expr, tb, true)
-	case ast.KindNewExpression, ast.KindTaggedTemplateExpression:
+	case ast.KindTaggedTemplateExpression:
 		return r.exprReferencesTracked(expr, tb, true)
 	case ast.KindObjectLiteralExpression:
 		// Plain objects (including `{ ...promise }`, since `Promise.prototype.then`
@@ -1194,78 +1579,31 @@ func (r *AsyncAssertionResolver) propagateParamDefaults(params []*ast.Node, star
 	}
 }
 
-func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb *trackedBindings) {
-	if root == nil || root.Kind != ast.KindBlock {
+func (r *AsyncAssertionResolver) indexExprValueRefs(
+	root *ast.Node,
+	enterNestedFunctions bool,
+	bySym map[*ast.Symbol][]int,
+	byName map[string][]int,
+	idx int,
+) {
+	if root == nil {
 		return
 	}
-	// Two passes handle short local alias chains (`const p = err; const q = p;`).
-	for range 2 {
-		var visit func(*ast.Node)
-		visit = func(node *ast.Node) {
-			if node == nil {
-				return
-			}
-			if node != root {
-				switch node.Kind {
-				case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-					ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor,
-					ast.KindClassStaticBlockDeclaration:
-					return
-				}
-			}
-			switch node.Kind {
-			case ast.KindVariableDeclaration:
-				vd := node.AsVariableDeclaration()
-				if vd != nil && vd.Initializer != nil && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier &&
-					r.exprCanReturnTrackedPromise(vd.Initializer, tb) {
-					r.addTrackedIdent(tb, vd.Name(), false)
-				}
-			case ast.KindBinaryExpression:
-				bin := node.AsBinaryExpression()
-				if bin != nil && bin.OperatorToken != nil {
-					switch bin.OperatorToken.Kind {
-					case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken,
-						ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
-						if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil &&
-							lhs.Kind == ast.KindIdentifier && r.exprCanReturnTrackedPromise(bin.Right, tb) {
-							r.addTrackedIdent(tb, lhs, false)
-						}
-					}
-				}
-			}
-			node.ForEachChild(func(child *ast.Node) bool {
-				visit(child)
-				return false
-			})
-		}
-		visit(root)
-	}
-}
-
-// scopeConsumesTracked reports whether `root` (a callback body or catch block)
-// awaits or returns a Promise derived from `tb` in its own synchronous scope.
-func (r *AsyncAssertionResolver) scopeConsumesTracked(root *ast.Node, tb *trackedBindings, allowReturn bool) bool {
-	if root == nil {
-		return false
-	}
-	if root.Kind != ast.KindBlock {
-		if allowReturn && r.exprCanReturnTrackedPromise(root, tb) {
-			return true
-		}
-	}
-	consumed := false
+	seenSym := map[*ast.Symbol]bool{}
+	seenName := map[string]bool{}
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
-		if node == nil || consumed {
+		if node == nil || ast.IsTypeNode(node) || ast.IsPartOfTypeQuery(node) {
 			return
 		}
 		if node != root {
 			switch node.Kind {
 			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
 				ast.KindClassStaticBlockDeclaration:
-				return
+				if !enterNestedFunctions {
+					return
+				}
 			case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
-				// Decorators and computed property keys evaluate in the enclosing scope.
 				if mods := node.Modifiers(); mods != nil {
 					for _, mod := range mods.Nodes {
 						if mod != nil && mod.Kind == ast.KindDecorator {
@@ -1276,36 +1614,362 @@ func (r *AsyncAssertionResolver) scopeConsumesTracked(root *ast.Node, tb *tracke
 				if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
 					visit(name)
 				}
-				return
-			}
-		}
-		switch node.Kind {
-		case ast.KindAwaitExpression:
-			if r.exprCanReturnTrackedPromise(node.AsAwaitExpression().Expression, tb) {
-				consumed = true
-				return
-			}
-		case ast.KindForOfStatement:
-			if forOf := node.AsForInOrOfStatement(); forOf != nil && forOf.AwaitModifier != nil &&
-				r.exprReferencesTracked(forOf.Expression, tb, false) {
-				consumed = true
-				return
-			}
-		case ast.KindReturnStatement:
-			if allowReturn {
-				if ret := node.AsReturnStatement(); ret != nil && ret.Expression != nil &&
-					r.exprCanReturnTrackedPromise(ret.Expression, tb) {
-					consumed = true
+				if !enterNestedFunctions {
 					return
 				}
 			}
 		}
+		if node.Kind == ast.KindIdentifier && isIdentifierValueReference(node) {
+			name := node.AsIdentifier().Text
+			if r != nil && r.refs != nil {
+				if sym := r.resolveSymbol(node); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
+					if !seenSym[sym] {
+						seenSym[sym] = true
+						bySym[sym] = append(bySym[sym], idx)
+					}
+					return
+				}
+			}
+			if !seenName[name] {
+				seenName[name] = true
+				byName[name] = append(byName[name], idx)
+			}
+			return
+		}
 		node.ForEachChild(func(child *ast.Node) bool {
 			visit(child)
-			return consumed
+			return false
 		})
 	}
 	visit(root)
+}
+
+func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyIndex {
+	if root == nil {
+		return nil
+	}
+	if r != nil && r.scopeBodyIndices != nil {
+		if idx, ok := r.scopeBodyIndices[root]; ok {
+			return idx
+		}
+	}
+	idx := &scopeBodyIndex{
+		depsBySym:      map[*ast.Symbol][]int{},
+		depsByName:     map[string][]int{},
+		consumesBySym:  map[*ast.Symbol][]int{},
+		consumesByName: map[string][]int{},
+	}
+	addDep := func(edge scopeDepEdge, exprToIndex *ast.Node) {
+		edgeIdx := len(idx.deps)
+		idx.deps = append(idx.deps, edge)
+		r.indexExprValueRefs(exprToIndex, true, idx.depsBySym, idx.depsByName, edgeIdx)
+	}
+	addConsume := func(site scopeConsumeSite, enterNested bool) {
+		siteIdx := len(idx.consumes)
+		idx.consumes = append(idx.consumes, site)
+		r.indexExprValueRefs(site.expr, enterNested, idx.consumesBySym, idx.consumesByName, siteIdx)
+	}
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		switch node.Kind {
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+			ast.KindClassStaticBlockDeclaration:
+			return
+		case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
+			if mods := node.Modifiers(); mods != nil {
+				for _, mod := range mods.Nodes {
+					if mod != nil && mod.Kind == ast.KindDecorator {
+						visit(mod)
+					}
+				}
+			}
+			if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
+				visit(name)
+			}
+			return
+		}
+		switch node.Kind {
+		case ast.KindVariableDeclaration:
+			vd := node.AsVariableDeclaration()
+			if vd != nil && vd.Initializer != nil && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+				addDep(scopeDepEdge{kind: scopeDepVarDecl, target: vd.Name(), rhs: vd.Initializer}, vd.Initializer)
+			}
+		case ast.KindBinaryExpression:
+			bin := node.AsBinaryExpression()
+			if bin != nil && bin.OperatorToken != nil {
+				switch bin.OperatorToken.Kind {
+				case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken,
+					ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+					lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
+					if lhs != nil && lhs.Kind == ast.KindIdentifier {
+						addDep(scopeDepEdge{kind: scopeDepAssign, target: lhs, rhs: bin.Right}, bin.Right)
+					} else if bin.OperatorToken.Kind == ast.KindEqualsToken &&
+						lhs != nil && lhs.Kind == ast.KindElementAccessExpression {
+						if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(lhs)); recv != nil &&
+							recv.Kind == ast.KindIdentifier {
+							addDep(scopeDepEdge{kind: scopeDepContainerIndexWrite, target: recv, rhs: bin.Right}, bin.Right)
+						}
+					}
+				}
+			}
+		case ast.KindCallExpression:
+			callee := internalUtils.SkipAssertionsAndParens(node.AsCallExpression().Expression)
+			if callee != nil && ast.IsAccessExpression(callee) {
+				if mName, ok := r.accessStaticNameThroughAssertions(callee); ok &&
+					(mName == "push" || mName == "unshift" || mName == "add") {
+					if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee)); recv != nil &&
+						recv.Kind == ast.KindIdentifier {
+						if args := node.AsCallExpression().Arguments; args != nil && len(args.Nodes) > 0 {
+							edgeIdx := len(idx.deps)
+							idx.deps = append(idx.deps, scopeDepEdge{kind: scopeDepContainerPush, target: recv, rhs: node})
+							for _, a := range args.Nodes {
+								r.indexExprValueRefs(a, true, idx.depsBySym, idx.depsByName, edgeIdx)
+							}
+						}
+					}
+				}
+			}
+		case ast.KindAwaitExpression:
+			addConsume(scopeConsumeSite{kind: scopeConsumeAwait, node: node, expr: node.AsAwaitExpression().Expression}, true)
+		case ast.KindForOfStatement:
+			if forOf := node.AsForInOrOfStatement(); forOf != nil && forOf.AwaitModifier != nil {
+				addConsume(scopeConsumeSite{kind: scopeConsumeForAwait, node: node, expr: forOf.Expression}, true)
+			}
+		case ast.KindReturnStatement:
+			if ret := node.AsReturnStatement(); ret != nil && ret.Expression != nil {
+				addConsume(scopeConsumeSite{kind: scopeConsumeReturn, node: node, expr: ret.Expression}, true)
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(root)
+	if r != nil {
+		if r.scopeBodyIndices == nil {
+			r.scopeBodyIndices = map[*ast.Node]*scopeBodyIndex{}
+		}
+		r.scopeBodyIndices[root] = idx
+	}
+	return idx
+}
+
+func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb *trackedBindings) {
+	if root == nil || root.Kind != ast.KindBlock || tb == nil || tb.isEmpty() {
+		return
+	}
+	idx := r.getScopeBodyIndex(root)
+	if idx == nil || len(idx.deps) == 0 {
+		return
+	}
+	type workItem struct {
+		sym  *ast.Symbol
+		name string
+		kind trackedBindingKind
+	}
+	var queue []workItem
+	queued := map[workItem]bool{}
+	enqueue := func(sym *ast.Symbol, name string, kind trackedBindingKind) {
+		if sym != nil {
+			w := workItem{sym: sym, kind: kind}
+			if !queued[w] {
+				queued[w] = true
+				queue = append(queue, w)
+			}
+		} else if name != "" {
+			w := workItem{name: name, kind: kind}
+			if !queued[w] {
+				queued[w] = true
+				queue = append(queue, w)
+			}
+		}
+	}
+	for sym := range tb.symbols {
+		enqueue(sym, "", trackedBindingDirect)
+	}
+	for sym := range tb.restSymbols {
+		enqueue(sym, "", trackedBindingRest)
+	}
+	for sym := range tb.containerSymbols {
+		enqueue(sym, "", trackedBindingContainer)
+	}
+	for name := range tb.names {
+		enqueue(nil, name, trackedBindingDirect)
+	}
+	for name := range tb.restNames {
+		enqueue(nil, name, trackedBindingRest)
+	}
+	for name := range tb.containerNames {
+		enqueue(nil, name, trackedBindingContainer)
+	}
+	if tb.trackArguments {
+		enqueue(nil, "arguments", trackedBindingRest)
+	}
+
+	const maxWorkSteps = 256
+	steps := 0
+	for len(queue) > 0 && steps < maxWorkSteps {
+		item := queue[0]
+		queue = queue[1:]
+		steps++
+		var edgeIndices []int
+		if item.sym != nil {
+			edgeIndices = idx.depsBySym[item.sym]
+		} else {
+			edgeIndices = idx.depsByName[item.name]
+		}
+		for _, edgeIdx := range edgeIndices {
+			edge := idx.deps[edgeIdx]
+			switch edge.kind {
+			case scopeDepVarDecl, scopeDepAssign:
+				rhsUnwrapped := internalUtils.SkipAssertionsAndParens(edge.rhs)
+				for rhsUnwrapped != nil && internalUtils.IsCommaOperator(rhsUnwrapped) {
+					rhsUnwrapped = internalUtils.SkipAssertionsAndParens(rhsUnwrapped.AsBinaryExpression().Right)
+				}
+				if r.matchesTrackedRestIdent(rhsUnwrapped, tb, nil) {
+					if sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingRest); added {
+						enqueue(sym, name, trackedBindingRest)
+					}
+					continue
+				}
+				if r.exprCanReturnTrackedPromise(edge.rhs, tb) {
+					if sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingDirect); added {
+						enqueue(sym, name, trackedBindingDirect)
+					}
+				}
+				if r.exprCanBeTrackedContainer(edge.rhs, tb) {
+					if sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingContainer); added {
+						enqueue(sym, name, trackedBindingContainer)
+					}
+				}
+			case scopeDepContainerPush:
+				if args := edge.rhs.AsCallExpression().Arguments; args != nil {
+					matched := false
+					for _, a := range args.Nodes {
+						if a == nil {
+							continue
+						}
+						if a.Kind == ast.KindSpreadElement {
+							if r.exprCanBeTrackedContainer(a.AsSpreadElement().Expression, tb) {
+								matched = true
+								break
+							}
+							continue
+						}
+						if r.exprCanReturnTrackedPromise(a, tb) {
+							matched = true
+							break
+						}
+					}
+					if matched {
+						if sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingContainer); added {
+							enqueue(sym, name, trackedBindingContainer)
+						}
+					}
+				}
+			case scopeDepContainerIndexWrite:
+				if r.exprCanReturnTrackedPromise(edge.rhs, tb) {
+					if sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingContainer); added {
+						enqueue(sym, name, trackedBindingContainer)
+					}
+				}
+			}
+		}
+	}
+}
+
+func (r *AsyncAssertionResolver) forEachTrackedConsumeSite(
+	idx *scopeBodyIndex,
+	tb *trackedBindings,
+	fn func(scopeConsumeSite) bool,
+) {
+	if idx == nil || len(idx.consumes) == 0 || tb == nil || tb.isEmpty() {
+		return
+	}
+	checked := map[int]bool{}
+	visitIndices := func(indices []int) bool {
+		for _, siteIdx := range indices {
+			if checked[siteIdx] {
+				continue
+			}
+			checked[siteIdx] = true
+			if fn(idx.consumes[siteIdx]) {
+				return true
+			}
+		}
+		return false
+	}
+	for sym := range tb.symbols {
+		if visitIndices(idx.consumesBySym[sym]) {
+			return
+		}
+	}
+	for sym := range tb.restSymbols {
+		if visitIndices(idx.consumesBySym[sym]) {
+			return
+		}
+	}
+	for sym := range tb.containerSymbols {
+		if visitIndices(idx.consumesBySym[sym]) {
+			return
+		}
+	}
+	for name := range tb.names {
+		if visitIndices(idx.consumesByName[name]) {
+			return
+		}
+	}
+	for name := range tb.restNames {
+		if visitIndices(idx.consumesByName[name]) {
+			return
+		}
+	}
+	for name := range tb.containerNames {
+		if visitIndices(idx.consumesByName[name]) {
+			return
+		}
+	}
+	if tb.trackArguments {
+		visitIndices(idx.consumesByName["arguments"])
+	}
+}
+
+// scopeConsumesTracked reports whether `root` (a callback body or catch block)
+// awaits or returns a Promise derived from `tb` in its own synchronous scope.
+func (r *AsyncAssertionResolver) scopeConsumesTracked(root *ast.Node, tb *trackedBindings, allowReturn bool) bool {
+	if root == nil || tb == nil || tb.isEmpty() {
+		return false
+	}
+	if root.Kind != ast.KindBlock {
+		if allowReturn && r.exprCanReturnTrackedPromise(root, tb) {
+			return true
+		}
+	}
+	consumed := false
+	r.forEachTrackedConsumeSite(r.getScopeBodyIndex(root), tb, func(site scopeConsumeSite) bool {
+		switch site.kind {
+		case scopeConsumeAwait:
+			if r.exprCanReturnTrackedPromise(site.expr, tb) {
+				consumed = true
+				return true
+			}
+		case scopeConsumeForAwait:
+			if r.exprCanBeTrackedContainer(site.expr, tb) {
+				consumed = true
+				return true
+			}
+		case scopeConsumeReturn:
+			if allowReturn && r.exprCanReturnTrackedPromise(site.expr, tb) {
+				consumed = true
+				return true
+			}
+		}
+		return false
+	})
 	return consumed
 }
 
@@ -1672,6 +2336,19 @@ func (r *AsyncAssertionResolver) inlineCallbackCanConsumePromiseArg(cb *ast.Node
 			continue
 		}
 		if p := param.AsParameterDeclaration(); p != nil && p.DotDotDotToken != nil && i < argIdx {
+			if p.Name() != nil && p.Name().Kind == ast.KindIdentifier {
+				whole, cached := summary.restWholeConsumed[param]
+				if !cached {
+					whole = r.isParamConsumedByCallback(cb, param, i, -1, nil, 1)
+					if summary.restWholeConsumed == nil {
+						summary.restWholeConsumed = map[*ast.Node]bool{}
+					}
+					summary.restWholeConsumed[param] = whole
+				}
+				if whole {
+					return true
+				}
+			}
 			return r.isParamConsumedByCallback(cb, param, i, argIdx-1-i, passedArgs, firstUnknownSpreadIdx)
 		}
 	}
@@ -2880,12 +3557,99 @@ func (r *AsyncAssertionResolver) isPureExpectOrPromiseWrapperCall(call *ast.Node
 	return false
 }
 
+func (r *AsyncAssertionResolver) isPurePrimitiveLiteral(node *ast.Node) bool {
+	node = internalUtils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindUndefinedKeyword:
+		return true
+	case ast.KindIdentifier:
+		return node.AsIdentifier().Text == "undefined" && !r.isLocallyValueShadowed(node, "undefined")
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) pureExpectOrPromiseCallMayMutate(call *ast.Node, compute func(*ast.Node) bool) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return true
+	}
+	if method, ok := r.promiseMethodName(call); ok && (method == "resolve" || method == "reject") {
+		callee := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
+		if callee != nil && callee.Kind == ast.KindElementAccessExpression {
+			argExpr := callee.AsElementAccessExpression().ArgumentExpression
+			if !r.isPurePrimitiveLiteral(argExpr) || compute(argExpr) {
+				return true
+			}
+		}
+		if callee != nil && ast.IsAccessExpression(callee) {
+			if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee)); recv != nil &&
+				recv.Kind == ast.KindElementAccessExpression {
+				recvArg := recv.AsElementAccessExpression().ArgumentExpression
+				if !r.isPurePrimitiveLiteral(recvArg) || compute(recvArg) {
+					return true
+				}
+			}
+		}
+		if args := call.AsCallExpression().Arguments; args != nil {
+			for i, arg := range args.Nodes {
+				if compute(arg) {
+					return true
+				}
+				// `Promise.resolve(x)` synchronously reads `x.then` on objects.
+				if method == "resolve" && i == 0 {
+					u := internalUtils.SkipAssertionsAndParens(arg)
+					if u != nil && !r.isPurePrimitiveLiteral(u) &&
+						u.Kind != ast.KindArrayLiteralExpression &&
+						u.Kind != ast.KindArrowFunction && u.Kind != ast.KindFunctionExpression &&
+						!r.isPureExpectOrPromiseWrapperCall(u) {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
+	cur := call
+	for cur != nil {
+		switch cur.Kind {
+		case ast.KindCallExpression:
+			if args := cur.AsCallExpression().Arguments; args != nil {
+				for _, arg := range args.Nodes {
+					if compute(arg) {
+						return true
+					}
+				}
+			}
+			cur = internalUtils.SkipAssertionsAndParens(cur.AsCallExpression().Expression)
+		case ast.KindPropertyAccessExpression:
+			cur = internalUtils.SkipAssertionsAndParens(cur.AsPropertyAccessExpression().Expression)
+		case ast.KindElementAccessExpression:
+			argExpr := cur.AsElementAccessExpression().ArgumentExpression
+			if !r.isPurePrimitiveLiteral(argExpr) || compute(argExpr) {
+				return true
+			}
+			cur = internalUtils.SkipAssertionsAndParens(cur.AsElementAccessExpression().Expression)
+		case ast.KindIdentifier:
+			return false
+		default:
+			return true
+		}
+	}
+	return true
+}
+
 // exprMayMutateState reports whether synchronously evaluating `root` may mutate
 // state or invoke arbitrary user code (calls other than pure `expect(...)` /
-// `Promise.resolve` / `Promise.reject` chains, constructors, tagged templates,
-// assignments, updates, `delete`, `yield`, `await`, class static blocks, or
-// method computed keys/decorators). Results are memoized per node in
-// `r.exprMutates` so nested expressions stay O(N) total.
+// `Promise.resolve` / `Promise.reject` chains, property/element reads that can
+// trigger getters or Proxy traps, non-array spreads/iterators, destructuring,
+// object coercions, constructors, tagged templates, assignments, updates,
+// `delete`, `yield`, `await`, class static blocks, or method computed
+// keys/decorators). Results are memoized per node in `r.exprMutates` so nested
+// expressions stay O(N) total.
 func (r *AsyncAssertionResolver) exprMayMutateState(root *ast.Node) bool {
 	if root == nil || ast.IsTypeNode(root) {
 		return false
@@ -2932,26 +3696,65 @@ func (r *AsyncAssertionResolver) exprMayMutateState(root *ast.Node) bool {
 			return mutates
 		}
 		mutates := false
+		skipChildren := false
 		switch node.Kind {
 		case ast.KindDeleteExpression, ast.KindYieldExpression, ast.KindAwaitExpression,
 			ast.KindPostfixUnaryExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression,
-			ast.KindThrowStatement:
+			ast.KindThrowStatement,
+			ast.KindPropertyAccessExpression, ast.KindElementAccessExpression,
+			ast.KindSpreadAssignment,
+			ast.KindObjectBindingPattern, ast.KindArrayBindingPattern,
+			ast.KindForOfStatement, ast.KindForInStatement, ast.KindWithStatement,
+			ast.KindClassStaticBlockDeclaration, ast.KindHeritageClause,
+			ast.KindTemplateExpression:
 			mutates = true
-		case ast.KindPrefixUnaryExpression:
-			if op := node.AsPrefixUnaryExpression().Operator; op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
+		case ast.KindSpreadElement:
+			spExpr := internalUtils.SkipAssertionsAndParens(node.AsSpreadElement().Expression)
+			if spExpr == nil || (spExpr.Kind != ast.KindArrayLiteralExpression &&
+				spExpr.Kind != ast.KindStringLiteral && spExpr.Kind != ast.KindNoSubstitutionTemplateLiteral) {
 				mutates = true
 			}
-		case ast.KindBinaryExpression:
-			if bin := node.AsBinaryExpression(); bin != nil && bin.OperatorToken != nil &&
-				ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
+		case ast.KindComputedPropertyName:
+			if !r.isPurePrimitiveLiteral(node.AsComputedPropertyName().Expression) {
 				mutates = true
+			}
+		case ast.KindPrefixUnaryExpression:
+			p := node.AsPrefixUnaryExpression()
+			switch p.Operator {
+			case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
+				mutates = true
+			case ast.KindPlusToken, ast.KindMinusToken, ast.KindTildeToken:
+				if !r.isPurePrimitiveLiteral(p.Operand) {
+					mutates = true
+				}
+			}
+		case ast.KindBinaryExpression:
+			if bin := node.AsBinaryExpression(); bin != nil && bin.OperatorToken != nil {
+				op := bin.OperatorToken.Kind
+				if ast.IsAssignmentOperator(op) {
+					mutates = true
+				} else {
+					switch op {
+					case ast.KindCommaToken, ast.KindAmpersandAmpersandToken, ast.KindBarBarToken,
+						ast.KindQuestionQuestionToken, ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+					case ast.KindInKeyword, ast.KindInstanceOfKeyword:
+						mutates = true
+					default:
+						if !r.isPurePrimitiveLiteral(bin.Left) || !r.isPurePrimitiveLiteral(bin.Right) {
+							mutates = true
+						}
+					}
+				}
 			}
 		case ast.KindCallExpression:
 			if !r.isPureExpectOrPromiseWrapperCall(node) {
 				mutates = true
+			} else {
+				mutates = r.pureExpectOrPromiseCallMayMutate(node, compute)
+				skipChildren = true
 			}
 		}
-		if !mutates {
+		if !mutates && !skipChildren {
 			node.ForEachChild(func(child *ast.Node) bool {
 				if compute(child) {
 					mutates = true
@@ -3927,55 +4730,26 @@ func (r *AsyncAssertionResolver) hasEnclosingAbruptFinally(start *ast.Node) bool
 }
 
 func (r *AsyncAssertionResolver) findTrackedConsumablesInScope(root *ast.Node, tb *trackedBindings) (awaits []*ast.Node, returns []*ast.Node, hasForAwaitOf bool) {
-	if root == nil {
+	if root == nil || tb == nil || tb.isEmpty() {
 		return nil, nil, false
 	}
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-		if node != root {
-			switch node.Kind {
-			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-				ast.KindClassStaticBlockDeclaration:
-				return
-			case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
-				if mods := node.Modifiers(); mods != nil {
-					for _, mod := range mods.Nodes {
-						if mod != nil && mod.Kind == ast.KindDecorator {
-							visit(mod)
-						}
-					}
-				}
-				if name := node.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
-					visit(name)
-				}
-				return
+	r.forEachTrackedConsumeSite(r.getScopeBodyIndex(root), tb, func(site scopeConsumeSite) bool {
+		switch site.kind {
+		case scopeConsumeAwait:
+			if r.exprCanReturnTrackedPromise(site.expr, tb) {
+				awaits = append(awaits, site.node)
 			}
-		}
-		switch node.Kind {
-		case ast.KindAwaitExpression:
-			if r.exprCanReturnTrackedPromise(node.AsAwaitExpression().Expression, tb) {
-				awaits = append(awaits, node)
-			}
-		case ast.KindForOfStatement:
-			if forOf := node.AsForInOrOfStatement(); forOf != nil && forOf.AwaitModifier != nil &&
-				r.exprReferencesTracked(forOf.Expression, tb, false) {
+		case scopeConsumeForAwait:
+			if r.exprCanBeTrackedContainer(site.expr, tb) {
 				hasForAwaitOf = true
 			}
-		case ast.KindReturnStatement:
-			if ret := node.AsReturnStatement(); ret != nil && ret.Expression != nil &&
-				r.exprCanReturnTrackedPromise(ret.Expression, tb) {
-				returns = append(returns, node)
+		case scopeConsumeReturn:
+			if r.exprCanReturnTrackedPromise(site.expr, tb) {
+				returns = append(returns, site.node)
 			}
 		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-	visit(root)
+		return false
+	})
 	return awaits, returns, hasForAwaitOf
 }
 
