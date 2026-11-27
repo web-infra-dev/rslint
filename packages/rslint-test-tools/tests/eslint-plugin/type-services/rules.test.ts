@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
@@ -14,6 +14,7 @@ import {
 import { lintFile } from '../../../../rslint/src/eslint-plugin/linter/ecma-language-plugin.js';
 import { decodeFrame } from '../../../../rslint/src/languages/js/frame.js';
 import type { ESTreeNode } from '../../../../rslint/src/languages/js/types.js';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 import { enums, Host, root, useTypeServiceHarness } from './harness.js';
 
 const harness = useTypeServiceHarness();
@@ -635,7 +636,7 @@ describe('original npm typed rules over Go type services', () => {
   afterAll(() => host.close());
 
   for (const c of cases)
-    test(c.name, () => {
+    test(c.name, async () => {
       // Keep fixtures below the workspace so both compilers resolve the exact
       // installed npm declarations, without copying or faking library types.
       const directory = mkdtempSync(
@@ -732,7 +733,7 @@ describe('original npm typed rules over Go type services', () => {
           client.close();
         }
       } finally {
-        rmSync(directory, { recursive: true, force: true });
+        await cleanupTempDir(directory);
       }
     });
 });
@@ -853,7 +854,10 @@ test('type and declaration identity survive closing one file', async () => {
       owner.close();
     }
   } finally {
-    await host.close();
-    rmSync(directory, { recursive: true, force: true });
+    try {
+      await host.close();
+    } finally {
+      await cleanupTempDir(directory);
+    }
   }
 });

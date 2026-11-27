@@ -527,7 +527,7 @@ describe('Gitignore: edge cases', () => {
       expect(fs.existsSync(marker)).toBe(true);
       expect(automatic.stdout).toContain('no-console');
 
-      fs.rmSync(marker);
+      await cleanupTempDir(marker);
 
       const explicit = await runRslint(
         [

@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 import { platformTuple } from '../../../rslint/src/native/platform-tuple.js';
+import { cleanupTempDir } from '../helpers/cleanup-temp-dir.js';
 
 /**
  * Packaged-layout isolation guard.
@@ -364,8 +365,8 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
     beforeAll(() => {
       tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-pkg-'));
     });
-    afterAll(() => {
-      if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
+    afterAll(async () => {
+      if (tmp) await cleanupTempDir(tmp);
     });
 
     test.each(

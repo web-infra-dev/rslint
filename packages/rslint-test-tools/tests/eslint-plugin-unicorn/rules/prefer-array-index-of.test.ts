@@ -8,6 +8,7 @@ import path from 'node:path';
 import { runInNewContext } from 'node:vm';
 
 import { lint, type Diagnostic } from '@rslint/core/internal';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 const ruleName = 'unicorn/prefer-array-index-of';
 const searches = [
@@ -559,7 +560,7 @@ beforeAll(async () => {
   );
 });
 afterAll(async () => {
-  if (root) await fs.rm(root, { recursive: true, force: true });
+  if (root) await cleanupTempDir(root);
 });
 
 function applyEdits(

@@ -23,6 +23,7 @@ import {
   task,
 } from './worker-pool-e2e-helpers.js';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
+import { cleanupTempDir } from '../helpers/cleanup-temp-dir.js';
 import {
   runPoolScenario,
   formatScenarioFailure,
@@ -112,7 +113,7 @@ console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDi
           expect(hostAfter).toBe(hostBefore);
           expect(workerCache).toBe(mode === 'inherited' ? hostBefore : null);
         } finally {
-          fs.rmSync(dir, { recursive: true, force: true });
+          await cleanupTempDir(dir);
         }
       },
     );
@@ -259,7 +260,7 @@ console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDi
         }
       } finally {
         await pool.shutdown();
-        fs.rmSync(dir, { recursive: true, force: true });
+        await cleanupTempDir(dir);
       }
     });
 
@@ -290,7 +291,7 @@ console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDi
         );
       } finally {
         await pool.shutdown();
-        fs.rmSync(dir, { recursive: true, force: true });
+        await cleanupTempDir(dir);
       }
     });
 

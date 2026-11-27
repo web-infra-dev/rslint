@@ -83,5 +83,24 @@ try {
   RSLintService.prototype.close = originalServiceClose;
   delete process.env.RSLINT_API_CLOSE_STARTED;
   delete process.env.RSLINT_API_CLOSE_RELEASE;
-  await rm(tmp, { recursive: true, force: true });
+  const retryableCodes = new Set([
+    'EBUSY',
+    'EPERM',
+    'ENOTEMPTY',
+    'EACCES',
+    'EMFILE',
+    'ENFILE',
+  ]);
+  const delays = [50, 100, 200, 500, ...Array.from({ length: 20 }, () => 1000)];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rm(tmp, { recursive: true, force: true });
+      break;
+    } catch (error) {
+      if (attempt >= delays.length || !retryableCodes.has(error?.code)) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    }
+  }
 }

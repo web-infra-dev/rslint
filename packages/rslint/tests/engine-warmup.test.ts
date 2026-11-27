@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { runEngine, type EngineRunOptions } from '../src/cli/engine.js';
 import { ConfigModuleHost } from '../src/config/config-loader.js';
 import { fingerprintConfigSource } from '../src/config/config-source.js';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 const FAKE_BIN = fileURLToPath(
   new URL('./fixtures/fake-worker-warmup.cjs', import.meta.url),
@@ -100,8 +101,8 @@ function fixture(singleThreaded: boolean) {
         ...options,
       });
     },
-    dispose() {
-      fs.rmSync(root, { recursive: true, force: true });
+    async dispose() {
+      await cleanupTempDir(root);
     },
   };
 }
@@ -192,7 +193,7 @@ describe.each([false, true])(
       } finally {
         build.resolve();
         await run;
-        peer.dispose();
+        await peer.dispose();
       }
     });
 
@@ -270,7 +271,7 @@ describe.each([false, true])(
         } finally {
           build.resolve();
           await run;
-          peer.dispose();
+          await peer.dispose();
         }
       },
     );
@@ -322,7 +323,7 @@ describe.each([false, true])(
         preparation.resolve();
         preparationStarted.resolve();
         await run;
-        peer.dispose();
+        await peer.dispose();
       }
     });
 
@@ -387,7 +388,7 @@ describe.each([false, true])(
         childExited.resolve();
         shutdown.resolve();
         await run;
-        peer.dispose();
+        await peer.dispose();
       }
     });
   },

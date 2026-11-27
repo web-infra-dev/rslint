@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 /** Build the test-only Go producer once per test run, never reuse a stale frame schema. */
-export default function setup() {
+export default async function setup() {
   const directory = mkdtempSync(resolve(tmpdir(), 'rslint-estree-test-'));
   const binary = resolve(
     directory,
@@ -25,12 +26,12 @@ export default function setup() {
       },
     );
   } catch (error) {
-    rmSync(directory, { recursive: true, force: true });
+    await cleanupTempDir(directory);
     throw error;
   }
   process.env.RSLINT_ESTREE_PROJECTOR = binary;
-  return () => {
+  return async () => {
     delete process.env.RSLINT_ESTREE_PROJECTOR;
-    rmSync(directory, { recursive: true, force: true });
+    await cleanupTempDir(directory);
   };
 }

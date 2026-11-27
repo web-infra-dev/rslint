@@ -44,6 +44,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { loadPluginsFromConfigs } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
+import { cleanupTempDir } from '../../cleanup-temp-dir.js';
 
 test.each([false, true])(
   'rule IDs use their parsed plugin namespace (reverse=%s)',
@@ -96,7 +97,7 @@ async function withTempDir<T>(
     }
     return await fn(dir);
   } finally {
-    await fs.rm(dir, { recursive: true, force: true });
+    await cleanupTempDir(dir);
   }
 }
 

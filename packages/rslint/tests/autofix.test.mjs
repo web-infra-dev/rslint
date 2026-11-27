@@ -1,8 +1,9 @@
 import { describe, test, expect } from 'rstack/test';
-import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 // Exercise the public API bundle, including its relative host/worker imports.
 const { Rslint } = await import(
@@ -116,7 +117,7 @@ function f(value) {
       );
     } finally {
       await Promise.all([rslint.close(), nativeFixer.close()]);
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -158,7 +159,7 @@ function f(value) {
       expect(result.messages).toEqual([]);
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -283,7 +284,7 @@ function f(value) {
       expect(result.output).toBeUndefined();
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -343,7 +344,7 @@ function f(value) {
       expect(result.output).toBeUndefined();
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -378,7 +379,7 @@ function f(value) {
     try {
       await symlink(realTarget, aliasTarget);
     } catch {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
       return;
     }
 
@@ -450,7 +451,7 @@ function f(value) {
         suggestionInspector.close(),
         fixer.close(),
       ]);
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 });

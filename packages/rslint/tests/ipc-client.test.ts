@@ -25,6 +25,7 @@ import type {
   WireMessage as IpcMessage,
   MemoryBatch,
 } from '../src/ipc/protocol.js';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 // Deliberately differs from Go's production layout. Node consumes peer values.
 const MEMORY_CONFIG: MemoryConfiguration = {
@@ -1144,9 +1145,9 @@ describe('real Go/Node arbitrary byte attachments', () => {
       { cwd: repoRoot },
     );
   }, 120_000);
-  afterAll(() => {
-    if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true });
-  });
+  afterAll(async () => {
+    if (fixtureRoot) await cleanupTempDir(fixtureRoot);
+  }, 35 * 60_000);
 
   test.each([true, false])(
     'preserves binary/text/empty attachments, shared memory: %s',

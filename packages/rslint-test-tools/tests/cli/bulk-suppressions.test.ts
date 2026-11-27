@@ -75,7 +75,7 @@ describe('CLI bulk suppressions', () => {
     });
 
     const directory = path.join(cwd, 'rslint-suppressions.json');
-    await fs.unlink(directory);
+    await cleanupTempDir(directory);
     await fs.mkdir(directory);
     expect((await check('--suppress-all')).exitCode).toBe(0);
     expect(await fs.readdir(directory)).toEqual([
@@ -114,7 +114,7 @@ describe('CLI bulk suppressions', () => {
     expect(await readBaseline(cwd)).toEqual({
       [selected]: { 'no-console': { count: 1 } },
     });
-    await fs.unlink(baseline);
+    await cleanupTempDir(baseline);
 
     const recorded = await check('--suppress-all', 'link/file.ts');
     expect(recorded.exitCode, recorded.stderr).toBe(0);

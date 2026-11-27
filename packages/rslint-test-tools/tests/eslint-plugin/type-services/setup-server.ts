@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 /** Build the test-only Go type-service server once per test run across split suites. */
-export default function setup() {
+export default async function setup() {
   const directory = mkdtempSync(resolve(tmpdir(), 'rslint-type-server-'));
   const binary = resolve(
     directory,
@@ -20,12 +21,12 @@ export default function setup() {
       },
     );
   } catch (error) {
-    rmSync(directory, { recursive: true, force: true });
+    await cleanupTempDir(directory);
     throw error;
   }
   process.env.RSLINT_TYPE_SERVICE_SERVER = binary;
-  return () => {
+  return async () => {
     delete process.env.RSLINT_TYPE_SERVICE_SERVER;
-    rmSync(directory, { recursive: true, force: true });
+    await cleanupTempDir(directory);
   };
 }

@@ -31,9 +31,7 @@ export async function createTempDir(
   return tempDir;
 }
 
-export async function cleanupTempDir(tempDir: string): Promise<void> {
-  await fs.rm(tempDir, { recursive: true, force: true });
-}
+export { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 export const TSCONFIG = JSON.stringify({
   compilerOptions: { strict: true, target: 'es2020', module: 'es2020' },

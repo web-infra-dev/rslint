@@ -11,7 +11,12 @@ const child = spawn(workerData.binary, [], {
   stdio: ['pipe', 'pipe', 'pipe'],
 });
 let pending = false,
+  childClosed = false,
+  exitReason = null,
   stderr = '';
+child.stdin.on('error', () => {});
+child.stdout.on('error', () => {});
+child.stderr.on('error', () => {});
 child.stderr.on('data', (chunk) => {
   stderr += chunk;
 });
@@ -29,18 +34,38 @@ createInterface({ input: child.stdout }).on('line', (line) =>
   reply(JSON.parse(line)),
 );
 child.on('error', (error) => {
+  exitReason ??= `type service host failed: ${error.message}`;
   if (pending) reply({ error: error.message });
 });
 child.on('close', (code) => {
-  if (pending) reply({ error: `type service host exited ${code}: ${stderr}` });
+  childClosed = true;
+  exitReason ??= `type service host exited ${code}: ${stderr}`;
+  if (pending) reply({ error: exitReason });
   parentPort.postMessage({ stopped: true });
 });
 parentPort.on('message', (request) => {
   if (request.method === 'stop') {
+    if (childClosed) {
+      parentPort.postMessage({ stopped: true });
+      return;
+    }
     child.stdin.end();
+    const forceKill = setTimeout(() => {
+      if (!childClosed) child.kill('SIGKILL');
+    }, 5_000);
+    forceKill.unref();
+    child.once('close', () => clearTimeout(forceKill));
+    return;
+  }
+  if (childClosed || exitReason !== null) {
+    reply({
+      error: exitReason ?? `type service host already exited: ${stderr}`,
+    });
     return;
   }
   pending = true;
   child.stdin.write(`${JSON.stringify(request)}\n`);
 });
-process.on('exit', () => child.kill());
+process.on('exit', () => {
+  if (!childClosed) child.kill();
+});

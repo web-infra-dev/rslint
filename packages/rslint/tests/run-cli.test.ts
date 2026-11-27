@@ -7,13 +7,14 @@ import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, test } from 'rstack/test';
 import { runCLI } from '../src/index.js';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 describe('runCLI', () => {
   test('is exported from the package root', () => {
     expect(typeof runCLI).toBe('function');
   });
 
-  test('releases its Go child when JavaScript exits during config loading', () => {
+  test('releases its Go child when JavaScript exits during config loading', async () => {
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-exit-'));
     try {
       fs.writeFileSync(path.join(cwd, 'input.ts'), 'debugger;\n');
@@ -35,9 +36,9 @@ describe('runCLI', () => {
       expect(result.stdout).toBe('');
       expect(result.stderr).toBe('');
     } finally {
-      fs.rmSync(cwd, { recursive: true, force: true });
+      await cleanupTempDir(cwd);
     }
-  }, 40_000);
+  }, 120_000);
 
   test.each<NodeJS.Signals>(
     process.platform === 'win32' ? ['SIGINT'] : ['SIGHUP', 'SIGINT', 'SIGTERM'],
@@ -94,9 +95,9 @@ describe('runCLI', () => {
           }
         }
       } finally {
-        fs.rmSync(cwd, { recursive: true, force: true });
+        await cleanupTempDir(cwd);
       }
     },
-    40_000,
+    120_000,
   );
 });

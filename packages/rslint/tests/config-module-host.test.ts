@@ -12,6 +12,8 @@ import {
   type LoadConfigsRequest,
 } from '../src/config/config-loader.js';
 
+import { cleanupTempDir } from './cleanup-temp-dir.js';
+
 interface Deferred<T> {
   promise: Promise<T>;
   resolve(value: T): void;
@@ -120,7 +122,7 @@ describe('ConfigModuleHost', () => {
         'loaded',
       ]);
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -168,7 +170,7 @@ describe('ConfigModuleHost', () => {
         host.loadConfigs(request('tx-serial', [], 'cached', false)),
       ).rejects.toThrow('cannot change singleThreaded mode');
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -214,7 +216,7 @@ describe('ConfigModuleHost', () => {
         ),
       ).toBe(true);
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -242,7 +244,7 @@ describe('ConfigModuleHost', () => {
         host.loadConfigs(request('tx-fresh', [], 'cached')),
       ).rejects.toThrow('cannot change loadMode');
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -263,7 +265,7 @@ describe('ConfigModuleHost', () => {
         entries: [{ rules: { 'no-console': 'error' } }],
       });
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -288,7 +290,7 @@ describe('ConfigModuleHost', () => {
         },
       });
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -388,7 +390,7 @@ describe('ConfigModuleHost', () => {
         ],
       });
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -408,7 +410,7 @@ describe('ConfigModuleHost', () => {
         }),
       ).rejects.toThrow('changed while it was being loaded');
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -437,7 +439,7 @@ describe('ConfigModuleHost', () => {
       expect(host.deleteSession('tx-prepare-race')).toBe(true);
       expect(host.deleteSession('tx-prepare-race')).toBe(false);
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -464,7 +466,7 @@ describe('ConfigModuleHost', () => {
         entries: [{ name: 'original' }],
       });
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -516,7 +518,7 @@ describe('ConfigModuleHost', () => {
         ).toEqual([root]);
       } finally {
         host.deleteSession('tx-aliases');
-        fs.rmSync(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     });
   }
@@ -548,7 +550,7 @@ describe('ConfigModuleHost', () => {
       expect(host.deleteSession('tx-known')).toBe(true);
       expect(host.deleteSession('tx-known')).toBe(false);
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 });

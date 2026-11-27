@@ -5,12 +5,12 @@ import {
   mkdtemp,
   readFile,
   realpath,
-  rm,
   writeFile,
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 const cliScript = path.resolve(import.meta.dirname, '../bin/rslint.js');
 const cliTimeoutMs = 30_000;
@@ -52,16 +52,53 @@ async function runCLI(cwd, args) {
     let timeoutTimer;
     let hardKillTimer;
 
+    let killDone = Promise.resolve();
+    const destroyPipes = () => {
+      child.stdout.destroy();
+      child.stderr.destroy();
+    };
     const terminateProcessTree = () => {
       if (child.pid === undefined) return;
+      if (child.exitCode !== null || child.signalCode !== null) {
+        destroyPipes();
+        return;
+      }
       if (process.platform === 'win32') {
-        const windowsTreeKill = spawn(
-          // cspell:disable-next-line
-          'taskkill',
-          ['/pid', String(child.pid), '/t', '/f'],
-          { stdio: 'ignore', windowsHide: true },
-        );
-        windowsTreeKill.once('error', () => child.kill('SIGKILL'));
+        killDone = new Promise((done) => {
+          try {
+            const windowsTreeKill = spawn(
+              // cspell:disable-next-line
+              'taskkill',
+              ['/pid', String(child.pid), '/t', '/f'],
+              { stdio: 'ignore', windowsHide: true },
+            );
+            windowsTreeKill.once('error', () => {
+              if (child.exitCode === null && child.signalCode === null) {
+                child.kill('SIGKILL');
+              }
+              done();
+            });
+            windowsTreeKill.once('close', (code) => {
+              if (
+                code !== 0 &&
+                child.exitCode === null &&
+                child.signalCode === null
+              ) {
+                child.kill('SIGKILL');
+              }
+              done();
+            });
+          } catch {
+            if (child.exitCode === null && child.signalCode === null) {
+              child.kill('SIGKILL');
+            }
+            done();
+          }
+        });
+        hardKillTimer = setTimeout(() => {
+          destroyPipes();
+        }, cliTerminationGraceMs);
+        hardKillTimer.unref();
         return;
       }
       try {
@@ -108,25 +145,28 @@ async function runCLI(cwd, args) {
       settled = true;
       clearTimeout(timeoutTimer);
       clearTimeout(hardKillTimer);
-      const stdout = Buffer.concat(stdoutChunks).toString('utf8');
-      const stderr = Buffer.concat(stderrChunks).toString('utf8');
-      if (failure !== undefined) {
-        reject(
-          new Error(
-            `${failure.message}\ncode=${String(code)} signal=${String(signal)}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
-          ),
-        );
-        return;
-      }
-      if (signal !== null || code === null) {
-        reject(
-          new Error(
-            `rslint CLI exited abnormally: code=${String(code)} signal=${String(signal)}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
-          ),
-        );
-        return;
-      }
-      resolve({ code, stdout, stderr });
+      const settle = () => {
+        const stdout = Buffer.concat(stdoutChunks).toString('utf8');
+        const stderr = Buffer.concat(stderrChunks).toString('utf8');
+        if (failure !== undefined) {
+          reject(
+            new Error(
+              `${failure.message}\ncode=${String(code)} signal=${String(signal)}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+            ),
+          );
+          return;
+        }
+        if (signal !== null || code === null) {
+          reject(
+            new Error(
+              `rslint CLI exited abnormally: code=${String(code)} signal=${String(signal)}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+            ),
+          );
+          return;
+        }
+        resolve({ code, stdout, stderr });
+      };
+      void killDone.then(settle, settle);
     });
 
     timeoutTimer = setTimeout(() => {
@@ -207,7 +247,7 @@ describe('CLI basePath product contract', () => {
       ]);
       expect(result.stderr).not.toContain('warning:');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -256,7 +296,7 @@ describe('CLI basePath product contract', () => {
       ]);
       expect(result.stderr).not.toContain('warning:');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -288,7 +328,7 @@ describe('CLI basePath product contract', () => {
       ).toEqual(expected);
       expect(result.stderr).not.toContain('warning:');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 });
@@ -336,7 +376,7 @@ describe('CLI lint target contracts', () => {
         'no-console',
       ]);
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -428,7 +468,7 @@ describe('CLI lint target contracts', () => {
         },
       ]);
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -491,7 +531,7 @@ describe('CLI lint target contracts', () => {
             .sort(),
         ).toEqual(['@typescript-eslint/no-for-in-array', 'no-console']);
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -548,7 +588,7 @@ describe('CLI lint target contracts', () => {
             : [path.join(root, 'packages', 'app', 'src', 'peer.ts')],
         );
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -587,7 +627,7 @@ describe('CLI lint target contracts', () => {
           );
         }
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -631,7 +671,7 @@ describe('CLI lint target contracts', () => {
           parseDiagnostics(result.stdout).map(({ ruleName }) => ruleName),
         ).toEqual(['no-debugger']);
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -695,7 +735,7 @@ describe('CLI lint target contracts', () => {
           ).toEqual(['no-debugger']);
         }
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -748,7 +788,7 @@ describe('CLI lint target contracts', () => {
         },
       ]);
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -843,7 +883,7 @@ describe('CLI lint target contracts', () => {
           normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
         ).toEqual(normalizedDiagnostics(root, expected));
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -940,7 +980,7 @@ describe('CLI lint target contracts', () => {
           normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
         ).toEqual(normalizedDiagnostics(root, expected));
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -1065,7 +1105,7 @@ describe('CLI lint target contracts', () => {
           ),
         );
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -1125,7 +1165,7 @@ describe('CLI lint target contracts', () => {
         expect(result.stderr).not.toContain('warning:');
       }
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -1173,7 +1213,7 @@ describe('CLI lint target contracts', () => {
       );
       expect(result.stderr).not.toContain('warning:');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -1223,7 +1263,7 @@ describe('CLI lint target contracts', () => {
       expect(result.stderr).not.toContain('outside-files.js');
       expect(result.stderr).not.toContain('linted.ts');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 });
