@@ -8,12 +8,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	tsparser "github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
 // Regression expectations were checked against ESLint 10.10.0, esquery 1.7.0,
-// and @typescript-eslint/parser 8.69.0. These cases exercise the tsgo facade.
+// and @typescript-eslint/parser 8.69.0.
 func TestNoRestrictedSyntaxStructureRegressions(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule,
 		[]rule_tester.ValidTestCase{
@@ -164,12 +166,12 @@ func TestNoRestrictedSyntaxStructureRegressions(t *testing.T) {
 				},
 			},
 			{
-				// dispatch virtual parent
+				// dispatch virtual parent (canonical visitor order: key before value)
 				Code:    "class C { m() {} }",
 				Options: []any{"[parent.type='MethodDefinition']"},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "restrictedSyntax", Line: 1, Column: 12, EndLine: 1, EndColumn: 17},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 12},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 12, EndLine: 1, EndColumn: 17},
 				},
 			},
 			{
@@ -181,12 +183,12 @@ func TestNoRestrictedSyntaxStructureRegressions(t *testing.T) {
 				},
 			},
 			{
-				// dispatch virtual parent class
+				// dispatch virtual parent class (canonical visitor order: id before body)
 				Code:    "class C {}",
 				Options: []any{"[parent.type='ClassDeclaration']"},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "restrictedSyntax", Line: 1, Column: 9, EndLine: 1, EndColumn: 11},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 7, EndLine: 1, EndColumn: 8},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 9, EndLine: 1, EndColumn: 11},
 				},
 			},
 			{
@@ -1392,10 +1394,11 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 				},
 			},
 			{
-				// Bare wildcard skips transparent ImportClause without emitting a phantom node.
+				// Bare wildcard visits Program plus every ESTree node in canonical order.
 				Code:    "import * as Lib from 'some-lib';\n",
 				Options: []any{"*"},
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 2, EndColumn: 1},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 33},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 16},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 13, EndLine: 1, EndColumn: 16},
@@ -1612,11 +1615,12 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 				},
 			},
 			{
-				// Shorthand ImportSpecifier (`{ x }`) has one physical Identifier
-				// node in tsgo (matching ShorthandPropertyAssignment and ExportSpecifier).
+				// Shorthand ImportSpecifier (`{ x }`) emits both `imported` and `local`
+				// Identifier nodes in ESTree, matching upstream ESLint.
 				Code:    defaultAndNamed,
 				Options: []any{"Identifier[parent.type='ImportSpecifier']"},
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 19},
 					{MessageId: "restrictedSyntax", Line: 1, Column: 23, EndLine: 1, EndColumn: 24},
@@ -1906,6 +1910,152 @@ func TestNoRestrictedSyntaxImportSpecifiers(t *testing.T) {
 		})
 }
 
+// Issue #2626 and full TSESTree node/attribute coverage: type keywords,
+// typeAnnotation filters (positive and negative), assertion parent fields,
+// declarations, generics, signatures, abstract properties, templates, regexes,
+// and graceful handling of unsupported syntax.
+func TestNoRestrictedSyntaxTypeScriptNodes(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			// Negative typeAnnotation filters must not false-positive when matching.
+			{Code: "declare const v: unknown;\nconst a = v as unknown;\n", Options: []any{`TSAsExpression[typeAnnotation.type!="TSUnknownKeyword"]`}},
+			{Code: "const a = { x: 1 } as const;\n", Options: []any{`TSAsExpression[typeAnnotation.typeName.name!="const"]`}},
+			{Code: "declare const v: string;\nconst a = v as string;\n", Options: []any{`TSAsExpression > TSAsExpression[typeAnnotation.type="TSUnknownKeyword"]`}},
+			// Parent attribute paths do not look through TS assertions.
+			{Code: "declare const v: unknown;\nconst a = v as string;\n", Options: []any{`VariableDeclarator[init.name="v"]`}},
+			{Code: "declare const o: { x?: { y: number } };\no.x!.y;\n", Options: []any{`MemberExpression[object.type="MemberExpression"]`}},
+			// Abstract property is TSAbstractPropertyDefinition, not PropertyDefinition.
+			{Code: "abstract class C { abstract x: number; }\n", Options: []any{`PropertyDefinition`}},
+			// Absent optional TS fields are undefined, not null.
+			{Code: "function f(x) {}\n", Options: []any{`FunctionDeclaration[returnType=null]`}},
+			{Code: "function f(x) {}\n", Options: []any{`Identifier[typeAnnotation=null]`}},
+			{Code: "class C { m() {} }\n", Options: []any{`MethodDefinition[accessibility=null]`}},
+			{Code: "foo();\n", Options: []any{`CallExpression[typeArguments=null]`}},
+			// Valid ES2024 /v regex literal is not null.
+			{Code: "const r = /[a-z]/v;\n", Options: []any{`Literal[value=null]`}},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Unsupported JSDoc nullable type authored in TS degrades locally
+			// without hiding surrounding declarations or statements.
+			{
+				Code:    "type Bad = ?number;\n",
+				Options: []any{`TSTypeAliasDeclaration`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 20}},
+			},
+			// Exact issue #2626 reproduction.
+			{
+				Code: "export const v: unknown = 1\nexport const a = v as string\nexport const b = v!\nexport const c = v satisfies unknown\nenum E { A }\nexport { E }\n",
+				Options: []any{
+					"TSAsExpression",
+					"TSNonNullExpression",
+					"TSSatisfiesExpression",
+					"TSUnknownKeyword",
+					"TSEnumDeclaration",
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "Using 'TSUnknownKeyword' is not allowed.", Line: 1, Column: 17, EndLine: 1, EndColumn: 24},
+					{MessageId: "restrictedSyntax", Message: "Using 'TSAsExpression' is not allowed.", Line: 2, Column: 18, EndLine: 2, EndColumn: 29},
+					{MessageId: "restrictedSyntax", Message: "Using 'TSNonNullExpression' is not allowed.", Line: 3, Column: 18, EndLine: 3, EndColumn: 20},
+					{MessageId: "restrictedSyntax", Message: "Using 'TSSatisfiesExpression' is not allowed.", Line: 4, Column: 18, EndLine: 4, EndColumn: 37},
+					{MessageId: "restrictedSyntax", Message: "Using 'TSUnknownKeyword' is not allowed.", Line: 4, Column: 30, EndLine: 4, EndColumn: 37},
+					{MessageId: "restrictedSyntax", Message: "Using 'TSEnumDeclaration' is not allowed.", Line: 5, Column: 1, EndLine: 5, EndColumn: 13},
+				},
+			},
+			// Issue #2626 double cast selector `as unknown as T`.
+			{
+				Code:    "declare const v: number;\nexport const a = v as unknown as string;\n",
+				Options: []any{`TSAsExpression > TSAsExpression[typeAnnotation.type="TSUnknownKeyword"]`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 18, EndLine: 2, EndColumn: 30},
+				},
+			},
+			// Disallow `as` except `as const`.
+			{
+				Code:    "const ok = { x: 1 } as const;\nconst bad = (1 as any);\n",
+				Options: []any{`TSAsExpression[typeAnnotation.typeName.name!="const"]`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 14, EndLine: 2, EndColumn: 22},
+				},
+			},
+			// Parent attribute and field class selectors see assertions directly.
+			{
+				Code:    "declare const v: unknown;\nconst a = v as string;\n",
+				Options: []any{`VariableDeclarator[init.type="TSAsExpression"]`, `VariableDeclarator > TSAsExpression.init`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 7, EndLine: 2, EndColumn: 22},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 11, EndLine: 2, EndColumn: 22},
+				},
+			},
+			// TSTypeAnnotation wrapper and exact parent-child topology.
+			{
+				Code:    "const v: unknown = 1;\n",
+				Options: []any{`Identifier > TSTypeAnnotation > TSUnknownKeyword`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 17},
+				},
+			},
+			// TS declarations, bodies, generics, instantiation, abstract properties, accessors, and module/export forms.
+			{
+				Code: "export interface I<T> { x: T; }\nexport type Alias<U> = U | number;\nnamespace N { export const x = 1; }\nconst inst = fn<string>;\nabstract class C { abstract p: number; accessor a = 1; }\n",
+				Options: []any{
+					"TSInterfaceDeclaration",
+					"TSTypeAliasDeclaration",
+					"TSTypeParameterDeclaration",
+					"TSUnionType",
+					"TSModuleDeclaration",
+					"TSInstantiationExpression",
+					"TSAbstractPropertyDefinition",
+					"AccessorProperty",
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 32},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 19, EndLine: 1, EndColumn: 22},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 8, EndLine: 2, EndColumn: 35},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 18, EndLine: 2, EndColumn: 21},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 24, EndLine: 2, EndColumn: 34},
+					{MessageId: "restrictedSyntax", Line: 3, Column: 1, EndLine: 3, EndColumn: 36},
+					{MessageId: "restrictedSyntax", Line: 4, Column: 14, EndLine: 4, EndColumn: 24},
+					{MessageId: "restrictedSyntax", Line: 5, Column: 20, EndLine: 5, EndColumn: 39},
+					{MessageId: "restrictedSyntax", Line: 5, Column: 40, EndLine: 5, EndColumn: 55},
+				},
+			},
+			// TemplateElement.value.{cooked,raw} and RegExp Literal.value (canonical sorted flags + properties).
+			{
+				Code:    "const s = `hello`;\nconst r = /abc/ig;\n",
+				Options: []any{`TemplateElement[value.raw="hello"]`, `Literal[value="/abc/gi"][value.ignoreCase=true]`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 18},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 11, EndLine: 2, EndColumn: 18},
+				},
+			},
+			// Sparse array holes preserve index and break adjacent `+` while allowing `~`.
+			{
+				Code:    "const a = [1, , 3];\n",
+				Options: []any{`Literal:nth-child(3)`, `Literal ~ Literal`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 17, EndLine: 1, EndColumn: 18},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 17, EndLine: 1, EndColumn: 18},
+				},
+			},
+			// Program.parent is null (not undefined).
+			{
+				Code:    "const x = 1;\n",
+				Options: []any{`Program[parent=null]`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 2, EndColumn: 1},
+				},
+			},
+			// Absent optional TS fields compare equal to undefined.
+			{
+				Code:    "function f(x) {}\n",
+				Options: []any{`FunctionDeclaration[returnType=undefined]`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 17},
+				},
+			},
+		})
+}
+
 func BenchmarkNoRestrictedSyntaxLargeSpecifierLists(b *testing.B) {
 	var names strings.Builder
 	for i := range 1000 {
@@ -1971,26 +2121,135 @@ func BenchmarkNoRestrictedSyntaxLargeSpecifierLists(b *testing.B) {
 			if err != nil {
 				b.Fatalf("parseSelector(%q): %v", tc.selector, err)
 			}
-			var targets []*ast.Node
-			var collect func(*ast.Node) bool
-			collect = func(n *ast.Node) bool {
-				if n.Kind == tc.kind {
-					targets = append(targets, n)
-				}
-				n.ForEachChild(collect)
-				return false
-			}
-			collect(sf.AsNode())
-			if len(targets) != tc.want {
-				b.Fatalf("expected %d targets, got %d", tc.want, len(targets))
+			var targetType estree.TypeID
+			switch tc.kind {
+			case ast.KindExportSpecifier:
+				targetType, _ = estree.TypeIDByName("ExportSpecifier")
+			case ast.KindImportSpecifier:
+				targetType, _ = estree.TypeIDByName("ImportSpecifier")
+			case ast.KindImportDeclaration:
+				targetType, _ = estree.TypeIDByName("ImportDeclaration")
 			}
 
+			var builder estree.Builder
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
-				mc := &matchContext{sf: sf}
-				for _, node := range targets {
-					matches(compiled, node, mc)
+				count := 0
+				if err := builder.WithTree(sf, estree.TreeOptions{SourceType: "module"}, func(tree *estree.Tree) {
+					var walk func(estree.NodeID)
+					walk = func(id estree.NodeID) {
+						if tree.Type(id) == targetType {
+							count++
+							matchesSelector(compiled, tree, id, estree.NoNode, nil)
+						}
+						tree.ForEachChild(id, func(child estree.NodeID) bool {
+							walk(child)
+							return false
+						})
+					}
+					walk(tree.Root())
+				}); err != nil {
+					b.Fatal(err)
+				}
+				if count != tc.want {
+					b.Fatalf("expected %d targets, got %d", tc.want, count)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkNoRestrictedSyntaxEndToEnd(b *testing.B) {
+	normalTS := strings.Repeat("export function f(a: number): number { return a + 1; }\n", 1000)
+	asCastTS := normalTS + "export const x = (1 as unknown as string);\n"
+	manyStmtsTS := "function big() {\n" + strings.Repeat("const a = 1;\n", 1000) + "return 1;\n}\n"
+
+	multi20 := []any{
+		`CallExpression[callee.name='eval']`,
+		`CallExpression[callee.name='Function']`,
+		`CallExpression[callee.name='setTimeout']`,
+		`CallExpression[callee.name='setInterval']`,
+		`CallExpression[callee.property.name='log']`,
+		`CallExpression[callee.property.name='warn']`,
+		`CallExpression[callee.property.name='error']`,
+		`CallExpression[callee.property.name='debug']`,
+		`MemberExpression[property.name='__proto__']`,
+		`MemberExpression[property.name='prototype']`,
+		`MemberExpression[property.name='constructor']`,
+		`MemberExpression[property.name='caller']`,
+		`Literal[value='lodash']`,
+		`Literal[value='moment']`,
+		`Literal[value='jquery']`,
+		`Literal[value='underscore']`,
+		`TSAsExpression > TSAsExpression[typeAnnotation.type='TSUnknownKeyword']`,
+		`TSAsExpression[typeAnnotation.type='TSAnyKeyword']`,
+		`WithStatement`,
+		`LabeledStatement`,
+	}
+
+	cases := []struct {
+		name    string
+		code    string
+		options []any
+		want    int
+	}{
+		{
+			name:    "LazySkip_TSAsExpression",
+			code:    normalTS,
+			options: []any{`TSAsExpression > TSAsExpression[typeAnnotation.type='TSUnknownKeyword']`},
+			want:    0,
+		},
+		{
+			name:    "Match_TSAsExpression_2626",
+			code:    asCastTS,
+			options: []any{`TSAsExpression > TSAsExpression[typeAnnotation.type='TSUnknownKeyword']`},
+			want:    1,
+		},
+		{
+			name:    "MultiSelector_20Rules_Dispatch",
+			code:    asCastTS,
+			options: multi20,
+			want:    1,
+		},
+		{
+			name:    "MemoizedSibling_1000Stmts",
+			code:    manyStmtsTS,
+			options: []any{`VariableDeclaration ~ ReturnStatement`},
+			want:    1,
+		},
+	}
+
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			sf := tsparser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/bench.ts",
+				Path:     "/bench.ts",
+			}, tc.code, core.ScriptKindTS)
+			b.ReportAllocs()
+			b.SetBytes(int64(len(tc.code)))
+			b.ResetTimer()
+			for b.Loop() {
+				reports := 0
+				ctx := rule.RuleContext{
+					SourceFile: sf,
+				}.WithReporter("no-restricted-syntax", rule.SeverityError, func(rule.RuleDiagnostic) {
+					reports++
+				})
+				listeners := NoRestrictedSyntaxRule.Run(ctx, tc.options)
+				if len(listeners) > 0 {
+					var visit func(*ast.Node) bool
+					visit = func(n *ast.Node) bool {
+						if fn := listeners[n.Kind]; fn != nil {
+							fn(n)
+						}
+						n.ForEachChild(visit)
+						return false
+					}
+					visit(sf.AsNode())
+				}
+				if reports != tc.want {
+					b.Fatalf("expected %d reports, got %d", tc.want, reports)
 				}
 			}
 		})

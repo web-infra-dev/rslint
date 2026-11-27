@@ -63,9 +63,7 @@ Entries can also be objects with a required `selector` and an optional `message`
 
 The custom message replaces the default `Using '<selector>' is not allowed.` diagnostic. String and object entries can be mixed in one configuration.
 
-Selectors can also target supported TypeScript syntax. For example, `TSEnumDeclaration[const=true]` selects const enums, while `TSEnumDeclaration` selects all enums. `[const]` only checks whether the attribute exists, so it matches ordinary enums as well.
-
-Type assertions are selectable as `TSAsExpression`, `TSSatisfiesExpression`, `TSNonNullExpression` and `TSTypeAssertion`. For example, `TSAsExpression > TSAsExpression` selects double casts such as `value as unknown as Foo`.
+Selectors can also target TypeScript syntax using standard [TSESTree](https://typescript-eslint.io/packages/ast-spec/) node names and attributes. For example, `TSEnumDeclaration[const=true]` selects const enums, `TSUnknownKeyword` selects `unknown` type keywords, and `TSAsExpression > TSAsExpression[typeAnnotation.type="TSUnknownKeyword"]` selects double casts such as `value as unknown as Foo`. `[const]` checks whether the attribute exists, so it matches ordinary enums as well.
 
 ## When Not To Use It
 
@@ -74,9 +72,9 @@ Leave this rule disabled if your project has no syntax restrictions.
 ## Differences from upstream
 
 - Malformed selectors are ignored instead of rejecting the rule configuration. For example, `["error", "[", "WithStatement"]` still restricts `WithStatement` in rslint; ESLint rejects the malformed `[` selector.
-- TypeScript selectors are limited to the supported AST node mappings. Type nodes such as `TSUnknownKeyword` or `TSTypeReference`, type annotations and type-parameter wrappers are not exposed. A positive filter on them never matches: `TSAsExpression[typeAnnotation.type="TSUnknownKeyword"]` does not report `v as unknown`. A negative filter can report too much: `TSAsExpression[typeAnnotation.type!="TSUnknownKeyword"]` reports `v as unknown`, which ESLint allows, because the missing field compares unequal.
-- Receiver and initializer attribute paths look through TypeScript assertions, such as `(console as any).log()`. For `const a = v as Foo`, `VariableDeclarator > TSAsExpression` matches, but `VariableDeclarator > TSAsExpression.init` does not, while ESLint reports both.
-- The bare `*` selector follows the underlying TypeScript AST traversal, starting at the program's children, and does not report additional ESTree wrappers. Named selectors such as `ClassBody` and `ChainExpression`, and other broad selectors, can match supported wrappers. Use `Program` or `Program:exit` to select the program itself.
+- Unsupported constructs (such as Closure/JSDoc nullable type syntax like `?number` authored in TypeScript code) and malformed error-recovery nodes degrade locally during tree projection so the rest of the file is still linted, rather than aborting the file with a parse error.
+- Node location metadata (`range` and `loc`) is not exposed in attribute selector paths (for example, `[loc.start.line=1]` evaluates to `undefined`).
+- Regular expression literal validation for `Literal.value` uses Unicode 17.0 script data (matching Go 1.27 and Node 24.16+), so scripts added in Unicode 17.0 (for example, `/\p{Script=Beria_Erfe}/v`) expose a `RegExp` value even when compared against older Node runtimes (such as Node 22 / Unicode 16.0) where `new RegExp` throws and ESLint's parser sets `Literal.value` to `null`.
 
 ## Original Documentation
 

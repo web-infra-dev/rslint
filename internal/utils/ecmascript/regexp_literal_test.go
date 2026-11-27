@@ -46,6 +46,38 @@ func TestIsValidRegexLiteral(t *testing.T) {
 		{name: "resolved backreference", literal: `/(a)\1/`, want: true},
 		{name: "resolved backreference under u", literal: `/(a)\1/u`, want: true},
 		{name: "missing named backreference under u", literal: `/\k<missing>/u`, want: false},
+		// Unicode 16.0 and 17.0 Script / Script_Extensions values (long names and ISO 15924 short codes).
+		// cspell:ignore Tulu Tigalari Beria Gukh Krai Onao Sunu Todr Tutg Berf Sidt Tayo Tols
+		{name: "unicode 16 script Garay under v", literal: `/\p{Script=Garay}/v`, want: true},
+		{name: "unicode 16 script short Gara under u", literal: `/\p{sc=Gara}/u`, want: true},
+		{name: "unicode 16 script short Gukh under u", literal: `/\p{sc=Gukh}/u`, want: true},
+		{name: "unicode 16 script short Krai under u", literal: `/\p{sc=Krai}/u`, want: true},
+		{name: "unicode 16 script short Onao under u", literal: `/\p{sc=Onao}/u`, want: true},
+		{name: "unicode 16 script short Sunu under u", literal: `/\p{sc=Sunu}/u`, want: true},
+		{name: "unicode 16 script short Todr under u", literal: `/\p{sc=Todr}/u`, want: true},
+		{name: "unicode 16 script short Tutg under u", literal: `/\p{sc=Tutg}/u`, want: true},
+		{name: "unicode 16 script extensions Tulu_Tigalari under v", literal: `/\P{Script_Extensions=Tulu_Tigalari}/v`, want: true},
+		{name: "unicode 17 script Beria_Erfe under v", literal: `/\p{Script=Beria_Erfe}/v`, want: true},
+		{name: "unicode 17 script short Berf under u", literal: `/\p{sc=Berf}/u`, want: true},
+		{name: "unicode 17 script short Sidt under u", literal: `/\p{sc=Sidt}/u`, want: true},
+		{name: "unicode 17 script short Tayo under u", literal: `/\p{sc=Tayo}/u`, want: true},
+		{name: "unicode 17 script short Tols under u", literal: `/\p{scx=Tols}/u`, want: true},
+		{name: "unicode 16 script in negated v class", literal: `/[^a\p{Script=Gara}]/v`, want: true},
+		{name: "unicode 16 script in v set subtraction", literal: `/[\p{Script=Garay}--a]/v`, want: true},
+		{name: "unicode 16 script in v set intersection", literal: `/[\p{Script=Garay}&&\p{ASCII}]/v`, want: true},
+		{name: "unicode 16 script nested v intersection", literal: `/[[\p{sc=Gara}]&&[a-z]]/v`, want: true},
+		{name: "unicode 16 script after escaped backslash", literal: `/\\\p{Script=Garay}/v`, want: true},
+		{name: "unicode 16 script with escaped p", literal: `/\\p{Script=Garay}/v`, want: false},
+		{name: "unicode 16 script case-sensitive property name", literal: `/\p{script=Garay}/u`, want: false},
+		{name: "unicode 16 script case-sensitive lowercase value", literal: `/\p{Script=garay}/u`, want: false},
+		{name: "unicode 16 script case-sensitive uppercase short", literal: `/\p{Script=GARA}/u`, want: false},
+		{name: "unicode 16 script rejected as General_Category", literal: `/\p{General_Category=Garay}/v`, want: false},
+		{name: "unicode 16 script rejected as gc", literal: `/\p{gc=Gara}/u`, want: false},
+		{name: "unicode 16 script rejected without Script= prefix", literal: `/\p{Garay}/v`, want: false},
+		{name: "unicode 16 script followed by invalid script", literal: `/\p{Script=Garay}\p{Script=NotAScript}/v`, want: false},
+		{name: "unicode 16 script trailing punctuation", literal: `/\p{Script=Garay!}/v`, want: false},
+		{name: "unicode 16 script empty value", literal: `/\p{Script=}/v`, want: false},
+		{name: "unicode 16 script missing closing brace", literal: `/\p{Script=Garay/v`, want: false},
 	}
 
 	for _, test := range tests {
@@ -73,6 +105,12 @@ func TestIsValidRegexLiteralForVersion(t *testing.T) {
 		{literal: `/(?i:foo)bar/`, version: 2025, want: true},
 		{literal: `/[(?i:)]/`, version: 2024, want: true},
 		{literal: `/\(\?i:/`, version: 2024, want: true},
+		{literal: `/\p{Script=Garay}/u`, version: 2022, want: false},
+		{literal: `/\p{Script=Garay}/u`, version: 2023, want: true},
+		{literal: `/\p{Script=Beria_Erfe}/u`, version: 2022, want: false},
+		{literal: `/\p{Script=Beria_Erfe}/u`, version: 2023, want: true},
+		{literal: `/\p{Script=Garay}/v`, version: 2023, want: false},
+		{literal: `/\p{Script=Garay}/v`, version: 2024, want: true},
 		{literal: ``, version: 2024, want: false},
 	}
 
@@ -102,6 +140,9 @@ func TestRegexLiteralCharacterEventCutoff(t *testing.T) {
 		// this semantic error must not truncate a rule's collected events.
 		{literal: `/\k<missing>\x1f/u`},
 		{literal: `/(?<a>a)\k<missing>\x1f/u`},
+		{literal: `/\p{Script=Garay}\x1f/v`},
+		{literal: `/\p{sc=Gara}\x1f/v`},
+		{literal: `/\p{Script=Garay}\p{Script=Bad}\x1f/v`, position: 27, hasError: true},
 	}
 	for _, test := range tests {
 		t.Run(test.literal, func(t *testing.T) {

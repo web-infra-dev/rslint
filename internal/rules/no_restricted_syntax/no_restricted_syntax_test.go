@@ -2,14 +2,17 @@ package no_restricted_syntax
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	tsparser "github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 const lazyMustBeWrappedSelector = `:matches(CallExpression[callee.object.name='React'][callee.property.name='lazy'], CallExpression[callee.name='lazy']):not([parent.callee.name='withSuspense'])`
@@ -1031,8 +1034,12 @@ func TestNoRestrictedSyntaxEsqueryParity(t *testing.T) {
 				Options: []interface{}{`Identifier[missing='value']`},
 			},
 			{
-				Code:    `foo;`,
-				Options: []interface{}{`Identifier[optional]`},
+				// On JS files Identifier has no `optional` property (in TS,
+				// @typescript-eslint/parser sets Identifier.optional = false).
+				Code:     `foo;`,
+				FileName: "identifier-optional.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []interface{}{`Identifier[optional]`},
 			},
 			{
 				Code:    `foo;`,
@@ -1076,6 +1083,12 @@ foo;`,
 				Code:    `const x = <Foo.Bar />;`,
 				Options: []interface{}{`MemberExpression`},
 				Tsx:     true,
+			},
+			{
+				// ESLint's SourceCodeTraverser dispatches top-level identifier selectors
+				// by exact case, so lowercase `identifier` matches nothing at top level.
+				Code:    `foo;`,
+				Options: []interface{}{`identifier[name='foo']`},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -1207,11 +1220,6 @@ foo;`,
 			},
 			{
 				Code:    `foo;`,
-				Options: []interface{}{`identifier[name='foo']`},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
-			},
-			{
-				Code:    `foo;`,
 				Options: []interface{}{`#Identifier[name='foo']`},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
 			},
@@ -1244,6 +1252,7 @@ foo;`,
 				Code:    `(foo);`,
 				Options: []interface{}{"*"},
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax"},
 					{MessageId: "restrictedSyntax"},
 					{MessageId: "restrictedSyntax"},
 				},
@@ -1697,25 +1706,55 @@ func TestNoRestrictedSyntaxDispatchPlanning(t *testing.T) {
 		buildEntryFromString(`BinaryExpression[operator='instanceof'][right.name='DragEvent']`),
 	}
 	binaryBucket := buildRuleBucket(binaryEntries)
-	if binaryBucket.dispatch == nil || len(binaryBucket.dispatch.path) != 1 || binaryBucket.dispatch.path[0] != "operator" {
+	if binaryBucket.dispatch == nil || len(binaryBucket.dispatch.path) != 1 || binaryBucket.dispatch.path[0].raw != "operator" {
 		t.Fatalf("binary dispatch path is %v, want operator", binaryBucket.dispatch)
+	}
+	if binaryBucket.dispatch.byValue != nil || binaryBucket.dispatch.singleValue != "instanceof" {
+		t.Fatalf("single-value dispatch = (%q, byValue=%v), want singleValue=instanceof", binaryBucket.dispatch.singleValue, binaryBucket.dispatch.byValue)
 	}
 
 	singleBucket := buildRuleBucket([]ruleEntry{
 		buildEntryFromString(`NewExpression[callee.object.name='Intl']`),
 	})
-	if singleBucket.dispatch == nil || len(singleBucket.dispatch.path) != 3 ||
-		singleBucket.dispatch.path[0] != "callee" ||
-		singleBucket.dispatch.path[1] != "object" ||
-		singleBucket.dispatch.path[2] != "name" {
-		t.Fatalf("single-selector dispatch path is %v, want callee.object.name", singleBucket.dispatch)
+	if singleBucket.dispatch != nil {
+		t.Fatalf("single-selector bucket unexpectedly built dispatch %v", singleBucket.dispatch)
+	}
+
+	multiBucket := buildRuleBucket([]ruleEntry{
+		buildEntryFromString(`NewExpression[callee.object.name='Intl']`),
+		buildEntryFromString(`NewExpression[callee.object.name='Date']`),
+	})
+	if multiBucket.dispatch == nil || len(multiBucket.dispatch.path) != 3 ||
+		multiBucket.dispatch.path[0].raw != "callee" ||
+		multiBucket.dispatch.path[1].raw != "object" ||
+		multiBucket.dispatch.path[2].raw != "name" {
+		t.Fatalf("multi-selector dispatch path is %v, want callee.object.name", multiBucket.dispatch)
+	}
+
+	valueBucket := buildRuleBucket([]ruleEntry{
+		buildEntryFromString(`Literal[value='text']`),
+		buildEntryFromString(`Literal[value='other']`),
+	})
+	if valueBucket.dispatch == nil || len(valueBucket.dispatch.path) != 1 || valueBucket.dispatch.path[0].raw != "value" {
+		t.Fatalf("Literal.value dispatch path is %v, want value", valueBucket.dispatch)
+	}
+
+	chainedBucket := buildRuleBucket([]ruleEntry{
+		buildEntryFromString(`CallExpression[callee.name='eval']`),
+		buildEntryFromString(`CallExpression[callee.name='Function']`),
+		buildEntryFromString(`CallExpression[callee.property.name='log']`),
+		buildEntryFromString(`CallExpression[callee.property.name='warn']`),
+	})
+	if chainedBucket.dispatch == nil || chainedBucket.dispatch.next == nil {
+		t.Fatalf("expected chained dispatch for mixed CallExpression paths, got %+v", chainedBucket.dispatch)
 	}
 
 	unsupportedBucket := buildRuleBucket([]ruleEntry{
-		buildEntryFromString(`Literal[value='text']`),
+		buildEntryFromString(`CallExpression[arguments.length='1']`),
+		buildEntryFromString(`CallExpression[arguments.length='2']`),
 	})
 	if unsupportedBucket.dispatch != nil {
-		t.Fatalf("unsupported single-selector path unexpectedly built dispatch %v", unsupportedBucket.dispatch)
+		t.Fatalf("unsupported path unexpectedly built dispatch %v", unsupportedBucket.dispatch)
 	}
 }
 
@@ -1728,6 +1767,10 @@ func TestNoRestrictedSyntaxDispatchMatchesFullMatcher(t *testing.T) {
 		`Identifier[name='foo'][name='bar']`,
 		`Identifier[name='foo'][type='Identifier']`,
 		`Identifier[missing='undefined']`,
+		`CallExpression[callee.name=undefined]`,
+		`CallExpression[callee.name='eval']`,
+		`FunctionExpression[id.name=null]`,
+		`FunctionExpression[id.name='named']`,
 	})
 	bucket := buildRuleBucket(entries)
 	if bucket.dispatch == nil {
@@ -1737,37 +1780,40 @@ func TestNoRestrictedSyntaxDispatchMatchesFullMatcher(t *testing.T) {
 	sourceFile := tsparser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/dispatch-attack.ts",
 		Path:     "/dispatch-attack.ts",
-	}, `foo; bar; function foo() {} object.foo;`, core.ScriptKindTS)
-	mc := &matchContext{sf: sourceFile}
+	}, `foo; bar; function foo() {} object.foo(); eval('x'); const f = function() {}; const g = function named() {};`, core.ScriptKindTS)
 
-	var attack func(*ast.Node) bool
-	attack = func(node *ast.Node) bool {
-		full := make([]bool, len(entries))
-		optimized := make([]bool, len(entries))
-		for index := range entries {
-			full[index] = matches(entries[index].compiled, node, mc)
-		}
+	var builder estree.Builder
+	if err := builder.WithTree(sourceFile, estree.TreeOptions{SourceType: "module"}, func(tree *estree.Tree) {
+		var attack func(estree.NodeID)
+		attack = func(id estree.NodeID) {
+			full := make([]bool, len(entries))
+			optimized := make([]bool, len(entries))
+			for index := range entries {
+				full[index] = matchesSelector(entries[index].compiled, tree, id, estree.NoNode, nil)
+			}
 
-		fallback, indexed, useAll := bucket.candidates(node, mc)
-		if useAll {
-			copy(optimized, full)
-		} else {
-			for _, index := range fallback {
-				optimized[index] = matches(entries[index].compiled, node, mc)
+			for cur := bucket.dispatch; cur != nil; cur = cur.next {
+				for _, index := range cur.lookup(tree, id) {
+					optimized[index] = matchesSelector(entries[index].compiled, tree, id, estree.NoNode, nil)
+				}
+				for _, index := range cur.fallback {
+					optimized[index] = matchesSelector(entries[index].compiled, tree, id, estree.NoNode, nil)
+				}
 			}
-			for _, index := range indexed {
-				optimized[index] = matches(bucket.dispatch.matched[index], node, mc)
+			for index := range entries {
+				if optimized[index] != full[index] {
+					t.Errorf("node %s selector %q: optimized=%v full=%v", tree.Type(id), entries[index].selector, optimized[index], full[index])
+				}
 			}
+			tree.ForEachChild(id, func(child estree.NodeID) bool {
+				attack(child)
+				return false
+			})
 		}
-		for index := range entries {
-			if optimized[index] != full[index] {
-				t.Errorf("node %s selector %q: optimized=%v full=%v", node.Kind, entries[index].selector, optimized[index], full[index])
-			}
-		}
-		node.ForEachChild(attack)
-		return false
+		attack(tree.Root())
+	}); err != nil {
+		t.Fatal(err)
 	}
-	attack(sourceFile.AsNode())
 }
 
 func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
@@ -1776,6 +1822,16 @@ func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
 		"Identifier[name='other']",
 	}
 	want := cachedRulePlan(options)
+
+	// In-place slice mutation must not return a stale cached plan.
+	mutated := []any{"UnknownNodeType"}
+	if p := cachedRulePlan(mutated); !p.empty {
+		t.Fatal("unknown node type should produce empty plan")
+	}
+	mutated[0] = "WithStatement"
+	if p := cachedRulePlan(mutated); p.empty {
+		t.Fatal("in-place mutated slice hit stale empty plan in cache")
+	}
 
 	var waitGroup sync.WaitGroup
 	for range 32 {
@@ -1787,14 +1843,8 @@ func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
 	}
 	waitGroup.Wait()
 
-	anchors := make([][]any, 0, maxCachedRulePlans+16)
 	for index := range maxCachedRulePlans + 16 {
-		entryOptions := []any{"Identifier[name='entry" + strconv.Itoa(index) + "']"}
-		anchors = append(anchors, entryOptions)
-		cachedRulePlan(entryOptions)
-	}
-	if len(anchors) != maxCachedRulePlans+16 {
-		t.Fatal("cache anchors were not retained")
+		cachedRulePlan([]any{"Identifier[name='entry" + strconv.Itoa(index) + "']"})
 	}
 
 	rulePlanCache.RLock()
@@ -1805,4 +1855,436 @@ func TestNoRestrictedSyntaxRulePlanCache(t *testing.T) {
 	if len(rulePlanCache.order) != len(rulePlanCache.entries) {
 		t.Fatalf("cache order has %d entries for %d plans", len(rulePlanCache.order), len(rulePlanCache.entries))
 	}
+}
+
+// cspell:ignore FFFD blockstatement Beria beria
+func TestNoRestrictedSyntaxAdversarialRegressions(t *testing.T) {
+	// Parser depth guard rejects deeply nested selectors cleanly without stack overflow.
+	deepNot := strings.Repeat(":not(", 200) + "Identifier" + strings.Repeat(")", 200)
+	if _, err := parseSelector(deepNot); err == nil {
+		t.Fatal("expected depth limit error for 200-deep nested :not()")
+	}
+
+	highSurrogate := ecmascript.StringFromCodeUnits([]uint16{0xD83D})
+	lowSurrogate := ecmascript.StringFromCodeUnits([]uint16{0xDE00})
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			// `.parent` is not a valid child field path in class selectors.
+			{
+				Code:    `const x = 1;`,
+				Options: []any{`VariableDeclaration.parent.body`},
+			},
+			// Regex negation with top-level alternation must not false-positive on second branch.
+			{
+				Code:    `bar;`,
+				Options: []any{`Identifier[name!=/^foo|bar/]`},
+			},
+			// Deeply nested `:has` completes instantly via memoization.
+			{
+				Code:    `;`,
+				Options: []any{`*` + strings.Repeat(`:has(`, 28) + `WithStatement` + strings.Repeat(`)`, 28)},
+			},
+			// ES2025 duplicate capture group name in separate alternatives is a valid RegExp (not null).
+			{
+				Code:    `const r = /(?<k>a)|(?<k>b)/;`,
+				Options: []any{`Literal[value=null]`},
+			},
+			// Indexing a supplementary character must yield its UTF-16 surrogate, never U+FFFD.
+			{
+				Code:    `const x = '😀';`,
+				Options: []any{"Literal[value.0=\"\uFFFD\"]"},
+			},
+			{
+				Code:    `const x = '😀';`,
+				Options: []any{"Literal[value.1=\"\uFFFD\"]"},
+			},
+			// Indexing a pre-existing lone surrogate yields 1 UTF-16 code unit, not 3 replacement bytes.
+			{
+				Code:    `const x = '\uD83D';`,
+				Options: []any{"Literal[value.0=\"\uFFFD\"]"},
+			},
+			{
+				Code:    `const x = '\uD83D';`,
+				Options: []any{`Literal[value.1]`},
+			},
+			// `import(Name)` and `import(null)` set TSImportType.source to undefined.
+			{
+				Code:    "type Name = 'pkg';\ntype T = import(Name);",
+				Options: []any{`TSImportType[source]`},
+			},
+			{
+				Code:    "type D = import(null);",
+				Options: []any{`TSImportType[source]`},
+			},
+			{
+				Code:    "type D = import(null);",
+				Options: []any{`Literal[value=null]`},
+			},
+			// Regex matching on WTF-8 lone surrogates must not decode them as U+FFFD.
+			{
+				Code:    `const x = '😀';`,
+				Options: []any{`Literal[value.0=/\uFFFD/]`},
+			},
+			{
+				Code:    `const x = '\uD83D';`,
+				Options: []any{`Literal[value=/\uFFFD/]`},
+			},
+			// Exact-case top-level selector dispatch and `#*` literal identifier (not wildcard).
+			{
+				Code:    `foo;`,
+				Options: []any{`identifier`},
+			},
+			{
+				Code:    `foo;`,
+				Options: []any{`#*`},
+			},
+			{
+				Code:    `foo;`,
+				Options: []any{`Identifier#*`},
+			},
+			// Invalid attribute syntax (`type(...)` with `<`/`>`, empty regex class `/[]/`) is rejected.
+			{
+				Code:    `const x = 1;`,
+				Options: []any{`:not([value > type(number)])`},
+			},
+			{
+				Code:    `const x = 'a';`,
+				Options: []any{`:not(Literal[value=/[]/])`},
+			},
+			// Annex B legacy regex literals and Unicode 16/17 script regexes remain valid RegExp objects (not null).
+			{
+				Code:    `const r = /\p{Letter}/;`,
+				Options: []any{`Literal[value=null]`},
+			},
+			{
+				Code:    `const r = /\01/;`,
+				Options: []any{`Literal[value=null]`},
+			},
+			{
+				Code:    `const garay = /\p{Script=Garay}/v;`,
+				Options: []any{`Literal[value=null]`},
+			},
+			{
+				Code:     `const garay = /\p{Script=Garay}/v;`,
+				FileName: "unicode-16-garay.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{`Literal[value=null]`},
+			},
+			{
+				Code:    `const beria = /\p{Script=Beria_Erfe}/v;`,
+				Options: []any{`Literal[value=null]`},
+			},
+			{
+				Code:    `type X = import((null)).Foo;`,
+				Options: []any{`TSImportType[source]`},
+			},
+			// Parenthesized LHS expressions are expressions, not destructuring patterns (matches @typescript-eslint/parser).
+			{
+				Code:    `(([a]) = x);`,
+				Options: []any{`ArrayPattern`},
+			},
+			// Signed zero / signed digits are not canonical array or string indices.
+			{
+				Code:    `const a = [10, 20];`,
+				Options: []any{`ArrayExpression[elements.-0]`},
+			},
+			{
+				Code:    `const a = [10, 20];`,
+				Options: []any{`ArrayExpression[elements.+0]`},
+			},
+			{
+				Code:    `const s = "xyz";`,
+				Options: []any{`Literal[value.-0="x"]`},
+			},
+			{
+				Code:    `const s = "xyz";`,
+				Options: []any{`Literal[value.-00="x"]`},
+			},
+			// Documented difference: `loc` and `range` are not projected on Tree nodes.
+			{
+				Code:    `foo;`,
+				Options: []any{`Identifier[loc.start.line=1]`},
+			},
+			{
+				Code:    `foo;`,
+				Options: []any{`Identifier[range.0=0]`},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Invalid-type `import(Name)` and unsupported JSDoc types must not hide later statements.
+			{
+				Code:    "type Name = 'pkg';\ntype T = import(Name);\ndebugger;",
+				Options: []any{`DebuggerStatement`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 3, Column: 1, EndLine: 3, EndColumn: 10}},
+			},
+			{
+				Code:    "type Name = 'pkg';\ntype T = import(Name);",
+				Options: []any{`TSImportType`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 2, Column: 10, EndLine: 2, EndColumn: 22}},
+			},
+			{
+				Code:    "type T = ?number;\ndebugger;",
+				Options: []any{`DebuggerStatement`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 10}},
+			},
+			// Reverse sibling subjects with class pseudo-selectors match ESLint 10 nodeTypes semantics.
+			{
+				Code:    "debugger;\nfunction f() {}",
+				Options: []any{`!DebuggerStatement ~ :declaration`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 10},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 16},
+				},
+			},
+			{
+				Code:    "debugger;\nfunction f() {}",
+				Options: []any{`DebuggerStatement + !:declaration`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 10},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 16},
+				},
+			},
+			{
+				Code:    "debugger;\nfunction f() {}",
+				Options: []any{`!DebuggerStatement ~ :statement`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 10},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 16},
+				},
+			},
+			{
+				// `:function` narrows nodeTypes to function nodes in ESLint 10, so only FunctionDeclaration matches.
+				Code:    "debugger;\nfunction f() {}",
+				Options: []any{`!DebuggerStatement ~ :function`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 16},
+				},
+			},
+			// ES2025 duplicate capture groups in separate alternatives expose RegExp properties.
+			{
+				Code:    `const r = /(?<k>a)|(?<k>b)/;`,
+				Options: []any{`Literal[value.source="(?<k>a)|(?<k>b)"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 28}},
+			},
+			// UTF-16 code-unit indexing preserves high/low surrogates and genuine U+FFFD.
+			{
+				Code:    `const x = '😀';`,
+				Options: []any{`Literal[value.0="` + highSurrogate + `"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 15}},
+			},
+			{
+				Code:    `const x = '😀';`,
+				Options: []any{`Literal[value.1="` + lowSurrogate + `"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 15}},
+			},
+			{
+				Code:    `const x = '\uD83D';`,
+				Options: []any{`Literal[value.0="` + highSurrogate + `"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 19}},
+			},
+			{
+				Code:    "const x = '\uFFFD';",
+				Options: []any{"Literal[value.0=\"\uFFFD\"]"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 14}},
+			},
+			// anchoredLiteralPrefix with optional quantifier and alternation.
+			{
+				Code:    `const u = "http://example.com";`,
+				Options: []any{`Literal[value=/^https?:\/\//]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 31}},
+			},
+			{
+				Code:    `useLayoutEffect(fn);`,
+				Options: []any{`CallExpression[callee.name=/^useEffect|useLayoutEffect/]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 20}},
+			},
+			{
+				Code:    `a;`,
+				Options: []any{`Identifier[name=/^ab?$/]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 2}},
+			},
+			// Compound atoms in arbitrary order.
+			{
+				Code:    `const x = 1;`,
+				Options: []any{`[kind="const"]VariableDeclaration`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 13}},
+			},
+			{
+				Code:    `a.b;`,
+				Options: []any{`:not([computed=true])MemberExpression`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 4}},
+			},
+			{
+				Code:    `foo();`,
+				Options: []any{`.callee#Identifier`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 4}},
+			},
+			// String code-unit indexing (`[name.0="_"]`).
+			{
+				Code:    `const _a = 1;`,
+				Options: []any{`Identifier[name.0="_"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 7, EndLine: 1, EndColumn: 9}},
+			},
+			// RegExp.lastIndex own property.
+			{
+				Code:    `const r = /foo/;`,
+				Options: []any{`Literal[value.lastIndex=0]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 16}},
+			},
+			// Invalid same-alternative duplicate capture group yields null value.
+			{
+				Code:    `const r = /(?<x>a)(?<x>b)/;`,
+				Options: []any{`Literal[value=null]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 27}},
+			},
+			// Multi-segment class selector `.body.declarations` (O(len(path))).
+			{
+				Code:    `const x = 1;`,
+				Options: []any{`VariableDeclarator.body.declarations`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 7, EndLine: 1, EndColumn: 12}},
+			},
+			// stringAttrDispatch with undefined / null coerced keys.
+			{
+				Code:    `obj.bar();`,
+				Options: []any{`CallExpression[callee.name=undefined]`, `CallExpression[callee.name='eval']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 10}},
+			},
+			{
+				Code:    `const f = function() {};`,
+				Options: []any{`FunctionExpression[id.name=null]`, `FunctionExpression[id.name='foo']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 24}},
+			},
+			// Regex matching on WTF-8 lone surrogates and valid astral characters.
+			{
+				Code:    `const x = '😀';`,
+				Options: []any{`Literal[value.0=/^.$/]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 15}},
+			},
+			{
+				Code:    `const x = '😀';`,
+				Options: []any{`Literal[value=/😀/]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 15}},
+			},
+			{
+				Code:    `const x = '\uD83D';`,
+				Options: []any{`Literal[value=/^\uD83D$/]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 19}},
+			},
+			// Case-insensitive matching still works in non-top-level positions & `:FUNCTION` does not narrow.
+			{
+				Code:    `function f() { return 1; }`,
+				Options: []any{`blockstatement > ReturnStatement`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 25}},
+			},
+			{
+				Code:    `foo;`,
+				Options: []any{`:not(:not(identifier))`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 4}},
+			},
+			{
+				Code:    "debugger;\nfunction f() {}",
+				Options: []any{`!DebuggerStatement ~ :FUNCTION`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 10},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 16},
+				},
+			},
+			// Unquoted slash values & ordering operators in attribute values (esquery 1.7.0).
+			{
+				Code:    `a / b;`,
+				Options: []any{`BinaryExpression[operator=/]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 6}},
+			},
+			{
+				Code:    `const x = "//";`,
+				Options: []any{`Literal[value=//]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 15}},
+			},
+			{
+				Code:    `const x = "/a/";`,
+				Options: []any{`Literal[value < /foo/]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 16}},
+			},
+			// `:first-child` adjacent to a type identifier without whitespace.
+			{
+				Code:    `foo;`,
+				Options: []any{`:first-childExpressionStatement`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 5}},
+			},
+			// JS JSDoc `@private` on constructor does not drop constructor key.
+			{
+				Code:     `class C { /** @private */ constructor() {} }`,
+				FileName: "jsdoc-ctor.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{`MethodDefinition[key.name='constructor']`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 27, EndLine: 1, EndColumn: 43}},
+			},
+			// TS template literal preserves CRLF in TemplateElement.value.raw.
+			{
+				Code:    "const s = `a\r\nb`;",
+				Options: []any{`TemplateElement[value.raw="a\r\nb"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 2, EndColumn: 3}},
+			},
+			// Empty `[]` inside a later attribute/branch backtracks regex parsing cleanly for `[operator=/]`.
+			{
+				Code:    `a / b; const s = "x] []";`,
+				Options: []any{`BinaryExpression[operator=/], Literal[value="x] []"]`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 6},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 25},
+				},
+			},
+			{
+				Code:    `"x] []" / b;`,
+				Options: []any{`BinaryExpression[operator=/][left.value="x] []"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 12}},
+			},
+			// Template-literal argument inside `import(...)` degrades locally without hiding later statements.
+			{
+				Code:    "type T = import(`a${string}b`);\ndebugger;",
+				Options: []any{`DebuggerStatement`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 10}},
+			},
+			// Leading JSDoc `@typedef` in JS does not cancel directive prologue on `"use strict"`.
+			{
+				Code:     "/** @typedef {number} T */\n\"use strict\";",
+				FileName: "jsdoc-directive.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{`ExpressionStatement[directive="use strict"]`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 14}},
+			},
+			// Parenthesized literal inside `import(...)` unwraps to TSImportType.source.
+			{
+				Code:    `type X = import(("./m")).Foo;`,
+				Options: []any{`Literal[value="./m"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 18, EndLine: 1, EndColumn: 23}},
+			},
+			{
+				Code:    `type X = import((("./m"))).Foo;`,
+				Options: []any{`TSImportType[source.value="./m"]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 31}},
+			},
+			{
+				Code:    `type X = import(("./m"), { with: { type: "json" } }).Foo;`,
+				Options: []any{`TSImportType[source.value="./m"][options]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 57}},
+			},
+			{
+				Code:    `(([a]) = x);`,
+				Options: []any{`ArrayExpression`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 3, EndLine: 1, EndColumn: 6}},
+			},
+			// Selector string preserves backslash before raw line terminators.
+			{
+				Code:    `const s = "a\\\nb";`,
+				Options: []any{"Literal[value=\"a\\\nb\"]"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 11, EndLine: 1, EndColumn: 19}},
+			},
+		},
+	)
 }

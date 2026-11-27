@@ -1266,7 +1266,7 @@ exports[`no-restricted-syntax > invalid 42`] = `
   "code": "console!.log('msg');",
   "diagnostics": [
     {
-      "message": "Using 'MemberExpression[object.name='console']' is not allowed.",
+      "message": "Using 'MemberExpression[object.type='TSNonNullExpression']' is not allowed.",
       "messageId": "restrictedSyntax",
       "range": {
         "end": {
@@ -1292,7 +1292,7 @@ exports[`no-restricted-syntax > invalid 43`] = `
   "code": "(console as any).log('msg');",
   "diagnostics": [
     {
-      "message": "Using 'MemberExpression[object.name='console']' is not allowed.",
+      "message": "Using 'MemberExpression[object.type='TSAsExpression']' is not allowed.",
       "messageId": "restrictedSyntax",
       "range": {
         "end": {
@@ -2738,6 +2738,62 @@ exports[`no-restricted-syntax > invalid 98`] = `
     },
   ],
   "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 99`] = `
+{
+  "code": "export const v: unknown = 1; export const a = v as unknown as string;",
+  "diagnostics": [
+    {
+      "message": "Using 'TSUnknownKeyword' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'TSAsExpression > TSAsExpression[typeAnnotation.type='TSUnknownKeyword']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'TSUnknownKeyword' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 3,
   "fileCount": 1,
   "ruleCount": 1,
 }

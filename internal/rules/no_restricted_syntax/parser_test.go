@@ -57,6 +57,17 @@ func TestParseSelector_Wellformed(t *testing.T) {
 		":is(Identifier[name='foo'], Identifier[name='bar'])",
 		"FunctionDeclaration[generator=true]",
 		"FunctionDeclaration[async=true]",
+		"BinaryExpression[name=/]",
+		"BinaryExpression[operator=/]",
+		`BinaryExpression[operator=/], Literal[value="x] []"]`,
+		`BinaryExpression[operator=/][left.value="x] []"]`,
+		"Identifier[name=//]",
+		"Literal[value=/foo]",
+		"Literal[value < /foo/]",
+		":first-childExpressionStatement",
+		":last-childExpressionStatement",
+		"#*",
+		"Identifier#*",
 	}
 	for _, c := range cases {
 		t.Run(c, func(t *testing.T) {
@@ -64,6 +75,18 @@ func TestParseSelector_Wellformed(t *testing.T) {
 				t.Fatalf("parseSelector(%q) returned %v", c, err)
 			}
 		})
+	}
+
+	// Backslash before ECMAScript line terminators is preserved verbatim in strings (esquery strUnescape).
+	for _, term := range []string{"\n", "\r", "\u2028", "\u2029"} {
+		sel, err := parseSelector(`Literal[value="a\` + term + `b"]`)
+		if err != nil {
+			t.Fatalf("parseSelector line terminator %q failed: %v", term, err)
+		}
+		attr, ok := sel.(attrSelector)
+		if !ok || attr.Value.Kind != attrValueString || attr.Value.Str != `a\`+term+`b` {
+			t.Fatalf("parsed attr = %#v, want literal %q", sel, `a\`+term+`b`)
+		}
 	}
 }
 
@@ -76,11 +99,14 @@ func TestParseSelector_Malformed(t *testing.T) {
 		"BinaryExpression[name",              // unterminated attribute
 		"BinaryExpression[name=",             // missing value
 		"BinaryExpression[name=']",           // unterminated string
-		"BinaryExpression[name=/]",           // unterminated regex (no closing /)
-		"Identifier[name=//]",                // empty regex
+		"Literal[value=/foo bar]",            // unterminated regex with space
+		"Literal[value=/[]/]",                // empty character class in regex
+		"Literal[value=/a/b]",                // trailing token after closed regex
 		"Identifier[name=/foo/g]",            // unsupported regex flag
 		"Identifier[name=/foo/ii]",           // duplicate regex flag
 		"Identifier[name=type()]",            // empty typeof operand
+		":not([value > type(number)])",       // type() only valid with = / !=
+		"Literal[value < type(string)]",      // type() only valid with = / !=
 		"Literal[value=5.]",                  // esquery requires a fractional digit
 		":nth-child",                         // missing arg
 		":nth-child(",                        // unterminated paren
@@ -236,12 +262,12 @@ func TestSelectorSpecificityMatchesESLint(t *testing.T) {
 	}
 }
 
-func TestCandidateKindsUniverseAbsorbsTypedBranches(t *testing.T) {
+func TestCandidateTypesAllAbsorbsTypedBranches(t *testing.T) {
 	parsed, err := parseSelector(`:matches(*, Identifier)`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kinds := candidateKinds(parsed); !kinds.universe {
-		t.Fatalf("candidate kinds = %#v, want universe", kinds)
+	if types := candidateTypes(parsed); !types.all {
+		t.Fatalf("candidate types = %#v, want all", types)
 	}
 }

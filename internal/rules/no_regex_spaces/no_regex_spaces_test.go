@@ -74,9 +74,8 @@ func TestNoRegexSpacesRule(t *testing.T) {
 			{Code: `RegExp("(?=(?<a>x))(?<a>y)  ", "u")`},
 			{Code: `RegExp("[^a\\q{bc}]  ", "v")`},
 			{Code: `RegExp("[^a-z\\q{bc}]  ", "v")`},
-			// The bundled TypeScript scanner does not yet recognize this newer
-			// Unicode script value, so shared pattern validation fails closed.
-			{Code: `RegExp("[^a\\p{Script=Gara}]  ", "v")`},
+			// Unrecognized Unicode script values still fail closed.
+			{Code: `RegExp("[^a\\p{Script=FutureScript}]  ", "v")`},
 
 			// ---- Flags cannot be determined ----
 			{Code: `new RegExp('  ', flags)`},
@@ -98,6 +97,10 @@ func TestNoRegexSpacesRule(t *testing.T) {
 			{
 				Code:   `var foo = /[^a\p{Letter}]  /v;`,
 				Output: []string{`var foo = /[^a\p{Letter}] {2}/v;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "multipleSpaces"}},
+			},
+			{
+				Code:   `RegExp("[^a\\p{Script=Gara}]  ", "v")`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "multipleSpaces"}},
 			},
 

@@ -29,10 +29,19 @@ func TestNoRestrictedSyntax_ProbeDeepEdges(t *testing.T) {
 				Code:    `(notConsole).log('msg');`,
 				Options: []interface{}{`MemberExpression[object.name='console']`},
 			},
-			// Probe: TS non-null assertion on the receiver should not
-			// upgrade non-console into console.
+			// Probe: TS assertions are real ESTree nodes (TSNonNullExpression /
+			// TSAsExpression), so MemberExpression[object.name='console'] does
+			// not look through them (matching ESLint + @typescript-eslint/parser).
 			{
 				Code:    `notConsole!.log('msg');`,
+				Options: []interface{}{`MemberExpression[object.name='console']`},
+			},
+			{
+				Code:    `console!.log('msg');`,
+				Options: []interface{}{`MemberExpression[object.name='console']`},
+			},
+			{
+				Code:    `(console as any).log('msg');`,
 				Options: []interface{}{`MemberExpression[object.name='console']`},
 			},
 			// Probe: import side-effect-only — shape: ImportDeclaration
@@ -95,25 +104,24 @@ func TestNoRestrictedSyntax_ProbeDeepEdges(t *testing.T) {
 					},
 				},
 			},
-			// Probe: TS non-null assertion on receiver
+			// Probe: TS non-null assertion and `as` cast are directly selectable on object.
 			{
 				Code:    `console!.log('msg');`,
-				Options: []interface{}{`MemberExpression[object.name='console']`},
+				Options: []interface{}{`MemberExpression[object.type='TSNonNullExpression']`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "restrictedSyntax",
-						Message:   `Using 'MemberExpression[object.name='console']' is not allowed.`,
+						Message:   `Using 'MemberExpression[object.type='TSNonNullExpression']' is not allowed.`,
 					},
 				},
 			},
-			// Probe: TS `as` cast on receiver
 			{
 				Code:    `(console as any).log('msg');`,
-				Options: []interface{}{`MemberExpression[object.name='console']`},
+				Options: []interface{}{`MemberExpression[object.type='TSAsExpression']`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "restrictedSyntax",
-						Message:   `Using 'MemberExpression[object.name='console']' is not allowed.`,
+						Message:   `Using 'MemberExpression[object.type='TSAsExpression']' is not allowed.`,
 					},
 				},
 			},
@@ -454,12 +462,13 @@ func TestNoRestrictedSyntax_ProbeDeepEdges(t *testing.T) {
 					{MessageId: "restrictedSyntax", Message: "Using 'ChainExpression' is not allowed."},
 				},
 			},
-			// Probe: Identifier whose parent is an ImportSpecifier (a
-			// real-world selector for "no-named-import-this-thing").
+			// Probe: shorthand ImportSpecifier emits both `imported` and `local`
+			// Identifier children in ESTree, matching upstream ESLint.
 			{
 				Code:    `import { foo } from 'bar';`,
 				Options: []interface{}{`ImportSpecifier > Identifier[name='foo']`},
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: `Using 'ImportSpecifier > Identifier[name='foo']' is not allowed.`},
 					{MessageId: "restrictedSyntax", Message: `Using 'ImportSpecifier > Identifier[name='foo']' is not allowed.`},
 				},
 			},

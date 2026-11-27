@@ -2,6 +2,7 @@ package ecmascript
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -51,6 +52,7 @@ func scanRegexLiteral(literal string, ignoreDeferredEventErrors bool, ecmaVersio
 	s := scanner.NewScanner()
 	result := regexLiteralScanResult{}
 	ignoredNamedReferenceStart := -1
+	ignoredUnicodePropertyStart := -1
 	s.SetScriptTarget(scriptTargetForECMAVersion(ecmaVersion))
 	s.SetOnError(func(message *diagnostics.Message, start int, length int, _ ...any) {
 		if ignoreDeferredEventErrors {
@@ -61,6 +63,16 @@ func scanRegexLiteral(literal string, ignoreDeferredEventErrors bool, ecmaVersio
 			if message == diagnostics.Did_you_mean_0 && start == ignoredNamedReferenceStart {
 				return
 			}
+		}
+		if message == diagnostics.Unknown_Unicode_property_value &&
+			(ecmaVersion == 0 || ecmaVersion >= 2023) &&
+			isKnownNewerUnicodeScript(literal, flags, start, length) {
+			ignoredUnicodePropertyStart = start
+			return
+		}
+		if message == diagnostics.Did_you_mean_0 && start == ignoredUnicodePropertyStart {
+			ignoredUnicodePropertyStart = -1
+			return
 		}
 		if !result.hasError &&
 			!isIgnorableRegexLiteralDiagnostic(message, flags) &&
@@ -257,4 +269,47 @@ func isIgnorableRegexLiteralDiagnostic(message *diagnostics.Message, flags strin
 	}
 	return message == diagnostics.This_backreference_refers_to_a_group_that_does_not_exist_There_are_only_0_capturing_groups_in_this_regular_expression ||
 		message == diagnostics.This_backreference_refers_to_a_group_that_does_not_exist_There_are_no_capturing_groups_in_this_regular_expression
+}
+
+// isKnownNewerUnicodeScript reports whether tsgo's Unknown_Unicode_property_value
+// diagnostic points at a Script/Script_Extensions value added after Unicode 15.1
+// (Go 1.27's unicode.Scripts covers Unicode 17.0, while tsgo's bundled scanner
+// table stops at Unicode 15.1).
+func isKnownNewerUnicodeScript(literal, flags string, start, length int) bool {
+	if !strings.ContainsAny(flags, "uv") || start <= 0 || length <= 0 || start+length > len(literal) || literal[start-1] != '=' {
+		return false
+	}
+	propEnd := start - 1
+	propStart := propEnd
+	for propStart > 0 && isASCIIWordByte(literal[propStart-1]) {
+		propStart--
+	}
+	if propStart < 3 || literal[propStart-1] != '{' ||
+		(literal[propStart-2] != 'p' && literal[propStart-2] != 'P') ||
+		literal[propStart-3] != '\\' || regexLiteralCharacterIsEscaped(literal, propStart-3) {
+		return false
+	}
+	switch literal[propStart:propEnd] {
+	case "Script", "sc", "Script_Extensions", "scx":
+	default:
+		return false
+	}
+	value := literal[start : start+length]
+	return unicode.Scripts[value] != nil || isNewerUnicodeScriptShortName(value)
+}
+
+func isASCIIWordByte(b byte) bool {
+	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9' || b == '_'
+}
+
+// ISO 15924 short aliases for Script values added after Unicode 15.1 (Unicode 16.0 and 17.0).
+// cspell:ignore Gukh Krai Onao Sunu Todr Tutg Berf Sidt Tayo Tols
+func isNewerUnicodeScriptShortName(value string) bool {
+	switch value {
+	case "Gara", "Gukh", "Krai", "Onao", "Sunu", "Todr", "Tutg", // Unicode 16.0
+		"Berf", "Sidt", "Tayo", "Tols": // Unicode 17.0
+		return true
+	default:
+		return false
+	}
 }

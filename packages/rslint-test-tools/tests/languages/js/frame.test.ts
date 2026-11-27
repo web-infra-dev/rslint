@@ -538,7 +538,7 @@ test('parenthesized constructor instantiation retains its own type arguments', (
   const node = ast.body[0].expression;
   const callee = node.callee as ESTreeNode;
   expect(callee.type).toBe('TSInstantiationExpression');
-  expect(node.typeArguments).toBeNull();
+  expect(node.typeArguments).toBeUndefined();
   expect((callee.typeArguments as ESTreeNode).type).toBe(
     'TSTypeParameterInstantiation',
   );
@@ -804,6 +804,81 @@ describe('decoded data ownership', () => {
     expect(canonical(decoded.ast)).toEqual(saved);
     expect([...decoded.tokenStarts]).toEqual(tokens);
     expect(decoded.comments[0].value).toBe(' hi');
+  });
+
+  test('handles import(null), parenthesized import() literals, strict non-literal import(), JS JSDoc skips, and TS vs JS template raw', () => {
+    const tsDecoded = projectSyntax(
+      'file.ts',
+      'type D = import(null); type P = import(("./m")).Foo; type PN = import((null)).Foo; type PO = import(("./m"), { with: { type: "json" } }).Foo;',
+    );
+    const tsBody = tsDecoded.ast.body as ESTreeNode[];
+    const importD = tsBody[0].typeAnnotation as ESTreeNode;
+    const importP = tsBody[1].typeAnnotation as ESTreeNode;
+    const importPN = tsBody[2].typeAnnotation as ESTreeNode;
+    const importPO = tsBody[3].typeAnnotation as ESTreeNode;
+    expect(importD.type).toBe('TSImportType');
+    expect(importD.source).toBeUndefined();
+    expect(importP.type).toBe('TSImportType');
+    expect((importP.source as ESTreeNode).value).toBe('./m');
+    expect(importPN.source).toBeUndefined();
+    expect((importPO.source as ESTreeNode).value).toBe('./m');
+    expect((importPO.options as ESTreeNode).type).toBe('ObjectExpression');
+
+    // Strict wire mode rejects non-LiteralType import() arguments and malformed
+    // empty options instead of corrupting token streams or emitting inverted spans.
+    expect(() =>
+      projectFrame('file.ts', "type Name = 'pkg'; type T = import(Name);"),
+    ).toThrow();
+    expect(() =>
+      projectFrame(
+        'file.ts',
+        "type Name = 'pkg'; type T = import((Name)).Foo;",
+      ),
+    ).toThrow();
+    expect(() =>
+      projectFrame(
+        'file.ts',
+        'type T = import(`a${string}b`); const after = 1; // comment',
+      ),
+    ).toThrow();
+    expect(() =>
+      projectFrame('file.ts', 'type T = import((`a${string}b`)).Foo;'),
+    ).toThrow();
+    expect(() =>
+      projectFrame('file.ts', 'type T = import(("./m"), { });'),
+    ).toThrow();
+
+    // Parenthesized LHS stays an expression (not a destructuring pattern).
+    const lhsDecoded = projectSyntax('file.ts', '(([a]) = x);');
+    const lhsExpr = (lhsDecoded.ast.body as ESTreeNode[])[0]
+      .expression as ESTreeNode;
+    expect((lhsExpr.left as ESTreeNode).type).toBe('ArrayExpression');
+
+    const jsDecoded = projectSyntax(
+      'file.js',
+      '/** @typedef {number} T */\n"use strict";\n/** @implements {Foo} */ class C { /** @private */ constructor() {} }',
+    );
+    const jsBody = jsDecoded.ast.body as ESTreeNode[];
+    expect(jsBody[0].directive).toBe('use strict');
+    const cls = jsBody[1];
+    const body = (cls.body as ESTreeNode).body as ESTreeNode[];
+    expect(cls.implements).toBeUndefined();
+    expect(body[0].type).toBe('MethodDefinition');
+    expect((body[0].key as ESTreeNode).name).toBe('constructor');
+
+    // TS preserves CRLF/CR in TemplateElement.value.raw; JS normalizes to LF.
+    const tplCode = 'const s = `a\r\n${x}b\rc`;';
+    const tsTpl = projectSyntax('file.ts', tplCode);
+    const jsTpl = projectSyntax('file.js', tplCode);
+    const getQuasiRaws = (ast: ESTreeNode): string[] => {
+      const decl = (ast.body as ESTreeNode[])[0];
+      const init = (decl.declarations as ESTreeNode[])[0].init as ESTreeNode;
+      return (init.quasis as ESTreeNode[]).map(
+        (q) => (q.value as { raw: string }).raw,
+      );
+    };
+    expect(getQuasiRaws(tsTpl.ast)).toEqual(['a\r\n', 'b\rc']);
+    expect(getQuasiRaws(jsTpl.ast)).toEqual(['a\n', 'b\nc']);
   });
 
   test('strips exactly one BOM and checks cancellation before reading an invalid lease', () => {
