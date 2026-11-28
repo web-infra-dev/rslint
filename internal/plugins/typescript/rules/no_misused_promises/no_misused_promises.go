@@ -3,7 +3,6 @@ package no_misused_promises
 import (
 	_ "embed"
 	"fmt"
-	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -31,6 +30,114 @@ func preferArgumentTypeCheck(arguments []*ast.Node) bool {
 		}
 	}
 	return true
+}
+
+// isContextIndependentExpression reports whether node's type does not depend on
+// its own contextual type and can be queried cheaply before computing that
+// contextual type. Context-sensitive or compound expressions (functions, calls,
+// object/array literals, template expressions, etc.) return false so callers
+// check the contextual type first.
+func isContextIndependentExpression(node *ast.Node) bool {
+	for node != nil {
+		node = ast.SkipParentheses(node)
+		switch node.Kind {
+		case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+			ast.KindNoSubstitutionTemplateLiteral, ast.KindTrueKeyword,
+			ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindRegularExpressionLiteral,
+			ast.KindIdentifier:
+			return true
+		case ast.KindVoidExpression:
+			// tsgo's checkVoidExpression defers checking its operand via
+			// checkNodeDeferred, so void does not need to recurse; typeof and delete
+			// eagerly check their operands and recurse below.
+			return true
+		case ast.KindNonNullExpression, ast.KindPropertyAccessExpression,
+			ast.KindTypeOfExpression, ast.KindDeleteExpression:
+			node = node.Expression()
+		case ast.KindPrefixUnaryExpression:
+			node = node.AsPrefixUnaryExpression().Operand
+		case ast.KindPostfixUnaryExpression:
+			node = node.AsPostfixUnaryExpression().Operand
+		case ast.KindElementAccessExpression:
+			expr := node.AsElementAccessExpression()
+			return isContextIndependentExpression(expr.Expression) &&
+				isContextIndependentExpression(expr.ArgumentExpression)
+		case ast.KindBinaryExpression:
+			expr := node.AsBinaryExpression()
+			return isContextIndependentExpression(expr.Left) &&
+				isContextIndependentExpression(expr.Right)
+		case ast.KindConditionalExpression:
+			expr := node.AsConditionalExpression()
+			return isContextIndependentExpression(expr.Condition) &&
+				isContextIndependentExpression(expr.WhenTrue) &&
+				isContextIndependentExpression(expr.WhenFalse)
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// isGuaranteedLiteralLike reports whether node is a primitive literal, regex,
+// or void expression whose type lookup avoids member/function signature
+// resolution and is cheaper than resolving a typed object property's contextual
+// type.
+func isGuaranteedLiteralLike(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	switch node.Kind {
+	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindNoSubstitutionTemplateLiteral, ast.KindTrueKeyword,
+		ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindRegularExpressionLiteral,
+		ast.KindVoidExpression:
+		return true
+	default:
+		return false
+	}
+}
+
+const primitiveLiteralSlotCount = 7
+
+// primitiveLiteralSlot maps bare (non-parenthesized) atomic literal and void
+// expressions to a per-file cache slot tracking whether their apparent global
+// type has call signatures. Parenthesized expressions (which may carry JSDoc
+// @type casts), JSDoc nodes, and nodes inside `with` statements return -1 so
+// they are always queried directly.
+func primitiveLiteralSlot(node *ast.Node) int {
+	if node == nil || node.Flags&(ast.NodeFlagsInWithStatement|ast.NodeFlagsJSDoc) != 0 {
+		return -1
+	}
+	switch node.Kind {
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+		return 0
+	case ast.KindNumericLiteral:
+		return 1
+	case ast.KindBigIntLiteral:
+		return 2
+	case ast.KindTrueKeyword, ast.KindFalseKeyword:
+		return 3
+	case ast.KindNullKeyword:
+		return 4
+	case ast.KindRegularExpressionLiteral:
+		return 5
+	case ast.KindVoidExpression:
+		return 6
+	default:
+		return -1
+	}
+}
+
+func unionTypeParts(t *checker.Type, buf *[1]*checker.Type) []*checker.Type {
+	if t == nil {
+		return nil
+	}
+	if utils.IsUnionType(t) {
+		return t.Types()
+	}
+	buf[0] = t
+	return buf[:]
 }
 
 func buildConditionalMessage() rule.RuleMessage {
@@ -162,21 +269,54 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
+		// Intrinsic flags whose reduced apparent type never carries call signatures
+		// (even under strictNullChecks: false, getApparentType(unknown) returns
+		// emptyObjectType, which has no call signatures).
+		const nonCallableTypeFlags = checker.TypeFlagsVoid | checker.TypeFlagsUndefined | checker.TypeFlagsNull | checker.TypeFlagsNever | checker.TypeFlagsAny | checker.TypeFlagsUnknown
 
 		anySignatureIsThenableType := func(
 			node *ast.Node,
 			t *checker.Type,
 		) bool {
+			if t.Flags()&nonCallableTypeFlags != 0 {
+				return false
+			}
 			return utils.Some(utils.GetCallSignatures(ctx.TypeChecker, t), func(sig *checker.Signature) bool {
 				return utils.IsThenableType(ctx.TypeChecker, node, checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, sig))
 			})
 		}
 
+		// Per-file cache for bare primitive/void literals whose apparent global
+		// type has zero call signatures.
+		var primitiveLiteralNonCallable [primitiveLiteralSlotCount]bool
+
 		returnsThenable := func(node *ast.Node) bool {
+			slot := primitiveLiteralSlot(node)
+			if slot >= 0 && primitiveLiteralNonCallable[slot] {
+				return false
+			}
 			t := checker.Checker_getApparentType(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(node))
-			return utils.Some(utils.UnionTypeParts(t), func(t *checker.Type) bool {
-				return anySignatureIsThenableType(node, t)
-			})
+			var singlePart [1]*checker.Type
+			hasCallable := false
+			for _, part := range unionTypeParts(t, &singlePart) {
+				if part.Flags()&nonCallableTypeFlags != 0 {
+					continue
+				}
+				sigs := utils.GetCallSignatures(ctx.TypeChecker, part)
+				if len(sigs) == 0 {
+					continue
+				}
+				hasCallable = true
+				for _, sig := range sigs {
+					if utils.IsThenableType(ctx.TypeChecker, node, checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, sig)) {
+						return true
+					}
+				}
+			}
+			if slot >= 0 && !hasCallable {
+				primitiveLiteralNonCallable[slot] = true
+			}
+			return false
 		}
 
 		checkArrayPredicates := func(node *ast.Node) {
@@ -328,9 +468,16 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			node *ast.Node,
 			t *checker.Type,
 		) bool {
+			if t == nil || t.Flags()&nonCallableTypeFlags != 0 {
+				return false
+			}
 			hadVoidReturn := false
-			for _, t := range utils.UnionTypeParts(t) {
-				for _, sig := range utils.GetCallSignatures(ctx.TypeChecker, t) {
+			var singlePart [1]*checker.Type
+			for _, part := range unionTypeParts(t, &singlePart) {
+				if part.Flags()&nonCallableTypeFlags != 0 {
+					continue
+				}
+				for _, sig := range utils.GetCallSignatures(ctx.TypeChecker, part) {
 					returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, sig)
 					// If a certain positional argument accepts both thenable and void returns,
 					// a promise-returning function is valid
@@ -370,14 +517,35 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			ctx.ReportNode(nodeMember, buildVoidReturnInheritedMethodMessage(ctx.TypeChecker.TypeToString(heritageType)))
 		}
 
+		// isVoidContextualThenable checks whether valueNode returns a thenable in a
+		// position whose contextual type expects a void-returning function. For
+		// context-independent expressions, checking returnsThenable first avoids
+		// contextual-type resolution while keeping TypeChecker authority (including
+		// global primitive prototype augmentation).
+		isVoidContextualThenable := func(
+			contextNode *ast.Node,
+			valueNode *ast.Node,
+		) bool {
+			if isContextIndependentExpression(valueNode) {
+				if !returnsThenable(valueNode) {
+					return false
+				}
+				contextualType := checker.Checker_getContextualType(ctx.TypeChecker, contextNode, checker.ContextFlagsNone)
+				return contextualType != nil && isVoidReturningFunctionType(contextNode, contextualType)
+			}
+			contextualType := checker.Checker_getContextualType(ctx.TypeChecker, contextNode, checker.ContextFlagsNone)
+			return contextualType != nil && isVoidReturningFunctionType(contextNode, contextualType) && returnsThenable(valueNode)
+		}
+
 		checkJSXAttribute := func(node *ast.JsxAttribute) {
 			if node.Initializer == nil || node.Initializer.Kind != ast.KindJsxExpression {
 				return
 			}
-			expressionContainer := node.Initializer.AsJsxExpression()
-			expression := expressionContainer.Expression
-			contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node.Initializer, checker.ContextFlagsNone)
-			if contextualType != nil && isVoidReturningFunctionType(node.Initializer, contextualType) && returnsThenable(expression) {
+			expression := node.Initializer.AsJsxExpression().Expression
+			if expression == nil {
+				return
+			}
+			if isVoidContextualThenable(node.Initializer, expression) {
 				ctx.ReportNode(node.Initializer, buildVoidReturnAttributeMessage())
 			}
 		}
@@ -392,45 +560,13 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			node *ast.Node,
 			t *checker.Type,
 		) bool {
-			return utils.Some(utils.UnionTypeParts(t), func(t *checker.Type) bool {
-				return anySignatureIsThenableType(node, t)
-			})
-		}
-
-		var checkThenableOrVoidArgument func(
-			node *ast.Expression,
-			t *checker.Type,
-			index int,
-			thenableReturnIndices *[]int,
-			voidReturnIndices *[]int,
-		)
-		checkThenableOrVoidArgument = func(
-			node *ast.Expression,
-			t *checker.Type,
-			index int,
-			thenableReturnIndices *[]int,
-			voidReturnIndices *[]int,
-		) {
-			if isThenableReturningFunctionType(node.Expression(), t) {
-				(*thenableReturnIndices) = append(*thenableReturnIndices, index)
-			} else if isVoidReturningFunctionType(node.Expression(), t) &&
-				// If a certain argument accepts both thenable and void returns,
-				// a promise-returning function is valid
-				!slices.Contains(*thenableReturnIndices, index) {
-
-				(*voidReturnIndices) = append(*voidReturnIndices, index)
+			var singlePart [1]*checker.Type
+			for _, part := range unionTypeParts(t, &singlePart) {
+				if anySignatureIsThenableType(node, part) {
+					return true
+				}
 			}
-			contextualType := checker.Checker_getContextualTypeForArgumentAtIndex(ctx.TypeChecker, node, index)
-
-			if contextualType != t {
-				checkThenableOrVoidArgument(
-					node,
-					contextualType,
-					index,
-					thenableReturnIndices,
-					voidReturnIndices,
-				)
-			}
+			return false
 		}
 
 		// Get the positions of arguments which are void functions (and not also
@@ -439,82 +575,138 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 		// If the function parameters end with a 'rest' parameter, then we consider
 		// the array type parameter (e.g. '...args:Array<SomeType>') when determining
 		// if trailing arguments are candidates.
+		// Precondition: len(args) > 0 (callers filter out zero-argument calls and
+		// argument-less `new` expressions beforehand).
 		voidFunctionArguments := func(
 			node *ast.Expression,
+			args []*ast.Node,
 		) []int {
-			// 'new' can be used without any arguments, as in 'let b = new Object;'
-			// In this case, there are no argument positions to check, so return early.
-			if node.Arguments() == nil {
-				return []int{}
+			argCount := len(args)
+
+			const (
+				argVisited uint8 = 1 << iota
+				argVoid
+				argThenable
+			)
+			var (
+				argStatesBuf [8]uint8
+				lastTypesBuf [8]*checker.Type
+				argStates    []uint8
+				lastTypes    []*checker.Type
+			)
+			if argCount <= len(argStatesBuf) {
+				argStates = argStatesBuf[:argCount]
+				lastTypes = lastTypesBuf[:argCount]
+			} else {
+				argStates = make([]uint8, argCount)
+				lastTypes = make([]*checker.Type, argCount)
 			}
-			thenableReturnIndices := []int{}
-			voidReturnIndices := []int{}
-			t := ctx.TypeChecker.GetTypeAtLocation(node.Expression())
+			callee := node.Expression()
+
+			checkArgType := func(t *checker.Type, index int) {
+				if argStates[index]&argThenable != 0 {
+					return
+				}
+				argStates[index] |= argVisited
+				if t == nil || t == lastTypes[index] {
+					return
+				}
+				lastTypes[index] = t
+				if isThenableReturningFunctionType(callee, t) {
+					argStates[index] |= argThenable
+				} else if isVoidReturningFunctionType(callee, t) {
+					argStates[index] |= argVoid
+				}
+			}
+
+			t := ctx.TypeChecker.GetTypeAtLocation(callee)
 
 			// We can't use checker.getResolvedSignature because it prefers an early '() => void' over a later '() => Promise<void>'
 			// See https://github.com/microsoft/TypeScript/issues/48077
 
+			isCall := ast.IsCallExpression(node)
 			for _, subType := range utils.UnionTypeParts(t) {
 				// Standard function calls and `new` have two different types of signatures
 				var signatures []*checker.Signature
-				if ast.IsCallExpression(node) {
+				if isCall {
 					signatures = utils.GetCallSignatures(ctx.TypeChecker, subType)
 				} else {
 					signatures = utils.GetConstructSignatures(ctx.TypeChecker, subType)
 				}
 				for _, signature := range signatures {
 					for index, parameter := range checker.Signature_parameters(signature) {
+						if index >= argCount {
+							break
+						}
 						decl := parameter.ValueDeclaration
-						t := ctx.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node.Expression())
-
 						// If this is a array 'rest' parameter, check all of the argument indices
 						// from the current argument to the end.
 						if decl != nil && utils.IsRestParameterDeclaration(decl) {
-							if checker.Checker_isArrayType(ctx.TypeChecker, t) {
+							hasUnresolved := false
+							for i := index; i < argCount; i++ {
+								if argStates[i]&argThenable == 0 {
+									hasUnresolved = true
+									break
+								}
+							}
+							if !hasUnresolved {
+								break
+							}
+							paramType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(parameter, callee)
+							if checker.Checker_isArrayType(ctx.TypeChecker, paramType) {
 								// Unwrap 'Array<MaybeVoidFunction>' to 'MaybeVoidFunction',
 								// so that we'll handle it in the same way as a non-rest
 								// 'param: MaybeVoidFunction'
-								t = checker.Checker_getTypeArguments(ctx.TypeChecker, t)[0]
-								for i := index; i < len(node.Arguments()); i++ {
-									checkThenableOrVoidArgument(
-										node,
-										t,
-										i,
-										&thenableReturnIndices,
-										&voidReturnIndices,
-									)
+								typeArgs := checker.Checker_getTypeArguments(ctx.TypeChecker, paramType)
+								if len(typeArgs) == 0 {
+									break
 								}
-							} else if checker.IsTupleType(t) {
+								elemType := typeArgs[0]
+								elemFlag := argVisited
+								if elemType != nil {
+									if isThenableReturningFunctionType(callee, elemType) {
+										elemFlag |= argThenable
+									} else if isVoidReturningFunctionType(callee, elemType) {
+										elemFlag |= argVoid
+									}
+								}
+								for i := index; i < argCount; i++ {
+									if argStates[i]&argThenable != 0 {
+										continue
+									}
+									argStates[i] |= elemFlag
+									lastTypes[i] = elemType
+								}
+							} else if checker.IsTupleType(paramType) {
 								// Check each type in the tuple - for example, [boolean, () => void] would
 								// add the index of the second tuple parameter to 'voidReturnIndices'
-								typeArgs := checker.Checker_getTypeArguments(ctx.TypeChecker, t)
-								for i := index; i < len(node.Arguments()) && i-index < len(typeArgs); i++ {
-									checkThenableOrVoidArgument(
-										node,
-										typeArgs[i-index],
-										i,
-										&thenableReturnIndices,
-										&voidReturnIndices,
-									)
+								typeArgs := checker.Checker_getTypeArguments(ctx.TypeChecker, paramType)
+								for i := index; i < argCount && i-index < len(typeArgs); i++ {
+									checkArgType(typeArgs[i-index], i)
 								}
 							}
-						} else {
-							checkThenableOrVoidArgument(
-								node,
-								t,
-								index,
-								&thenableReturnIndices,
-								&voidReturnIndices,
-							)
+							break
 						}
+						if argStates[index]&argThenable != 0 {
+							continue
+						}
+						paramType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(parameter, callee)
+						checkArgType(paramType, index)
 					}
 				}
 			}
 
-			for _, index := range thenableReturnIndices {
-				at := slices.Index(voidReturnIndices, index)
-				if at >= 0 {
-					voidReturnIndices = slices.Delete(voidReturnIndices, at, at+1)
+			// Query each visited, non-thenable argument's contextual type at most
+			// once (e.g. to pick up generic instantiations) instead of per overload.
+			var voidReturnIndices []int
+			for index := range argCount {
+				if argStates[index]&argVisited == 0 || argStates[index]&argThenable != 0 {
+					continue
+				}
+				contextualType := checker.Checker_getContextualTypeForArgumentAtIndex(ctx.TypeChecker, node, index)
+				checkArgType(contextualType, index)
+				if argStates[index]&argVoid != 0 && argStates[index]&argThenable == 0 {
+					voidReturnIndices = append(voidReturnIndices, index)
 				}
 			}
 
@@ -543,11 +735,15 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 		checkArguments := func(
 			node *ast.Expression,
 		) {
-			if preferArgumentTypeCheck(node.Arguments()) {
+			args := node.Arguments()
+			if len(args) == 0 {
+				return
+			}
+			if preferArgumentTypeCheck(args) {
 				// Literal forms are usually non-callable, but global primitive
 				// augmentation can add signatures. The checker remains authoritative.
 				possible := false
-				for _, argument := range node.Arguments() {
+				for _, argument := range args {
 					if returnsThenable(argument) {
 						possible = true
 						break
@@ -561,15 +757,9 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			voidArgs := voidFunctionArguments(node)
-			if len(voidArgs) == 0 {
-				return
-			}
-
-			for index, argument := range node.Arguments() {
-				if !slices.Contains(voidArgs, index) {
-					continue
-				}
+			voidArgs := voidFunctionArguments(node, args)
+			for _, index := range voidArgs {
+				argument := args[index]
 				if returnsThenable(argument) {
 					ctx.ReportNode(argument, buildVoidReturnArgumentMessage())
 				}
@@ -618,15 +808,297 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			}
 		}
 
+		// Active enclosing ArrayLiteralExpressions and multi-property
+		// ObjectLiteralExpressions whose contextual-type presence has already
+		// been determined, maintained in strict O(1) amortized LIFO order by
+		// lazily expiring exited ancestors (`End() <= curPos`) without
+		// registering per-array or per-object exit listeners.
+		type contextualCacheEntry struct {
+			node  *ast.Node
+			isNil bool
+		}
+		expireContextStack := func(stack *[]contextualCacheEntry, curPos int) {
+			s := *stack
+			for len(s) > 0 && s[len(s)-1].node.End() <= curPos {
+				s[len(s)-1] = contextualCacheEntry{}
+				s = s[:len(s)-1]
+			}
+			*stack = s
+		}
+
+		var arrayContextStack []contextualCacheEntry
+		lookupArrayContext := func(arr *ast.Node, curPos int) (isNil bool, known bool) {
+			if arr == nil {
+				return false, false
+			}
+			expireContextStack(&arrayContextStack, curPos)
+			if n := len(arrayContextStack); n > 0 && arrayContextStack[n-1].node == arr {
+				return arrayContextStack[n-1].isNil, true
+			}
+			return false, false
+		}
+		markArrayContext := func(arr *ast.Node, isNil bool, curPos int) {
+			if arr == nil || len(arr.Elements()) <= 1 {
+				return
+			}
+			expireContextStack(&arrayContextStack, curPos)
+			if n := len(arrayContextStack); n > 0 && arrayContextStack[n-1].node == arr {
+				return
+			}
+			arrayContextStack = append(arrayContextStack, contextualCacheEntry{node: arr, isNil: isNil})
+		}
+
+		var objectContextStack []contextualCacheEntry
+		lookupObjectContext := func(obj *ast.Node, curPos int) (isNil bool, known bool) {
+			if obj == nil {
+				return false, false
+			}
+			expireContextStack(&objectContextStack, curPos)
+			if n := len(objectContextStack); n > 0 && objectContextStack[n-1].node == obj {
+				return objectContextStack[n-1].isNil, true
+			}
+			return false, false
+		}
+		markObjectContext := func(obj *ast.Node, isNil bool, curPos int) {
+			if obj == nil || len(obj.Properties()) <= 1 {
+				return
+			}
+			expireContextStack(&objectContextStack, curPos)
+			if n := len(objectContextStack); n > 0 && objectContextStack[n-1].node == obj {
+				return
+			}
+			objectContextStack = append(objectContextStack, contextualCacheEntry{node: obj, isNil: isNil})
+		}
+
+		// enclosingContextParent walks past transparent wrappers (parentheses
+		// and `as const` / `<const>` assertions) that forward their parent's
+		// contextual type unchanged. In JS files, tsgo already reparses
+		// `/** @type {T} */ (...)` and `/** @satisfies {T} */ (...)` into
+		// synthetic AsExpression / SatisfiesExpression nodes inside the parens,
+		// so explicit JSDoc casts stop naturally before reaching the parens.
+		enclosingContextParent := func(node *ast.Node) *ast.Node {
+			parent := node.Parent
+			for parent != nil {
+				if parent.Kind == ast.KindParenthesizedExpression {
+					parent = parent.Parent
+					continue
+				}
+				if (parent.Kind == ast.KindAsExpression || parent.Kind == ast.KindTypeAssertionExpression) && ast.IsConstAssertion(parent) {
+					parent = parent.Parent
+					continue
+				}
+				break
+			}
+			return parent
+		}
+
+		// hasLikelyTypedContext is a purely syntactic hint used only to pick
+		// query order (property-first vs object-first) so typed objects and
+		// arrays avoid an extra Checker_getContextualType(obj) call while
+		// untyped multi-property objects avoid querying twice on a nil result.
+		hasLikelyTypedContext := func(obj *ast.Node, curPos int) bool {
+			node := obj
+			for depth := 0; depth < 4 && node != nil; depth++ {
+				parent := enclosingContextParent(node)
+				if parent == nil {
+					return false
+				}
+				if parent.Kind == ast.KindArrayLiteralExpression {
+					if isNil, known := lookupArrayContext(parent, curPos); known {
+						return !isNil
+					}
+					parent = enclosingContextParent(parent)
+					if parent == nil {
+						return false
+					}
+				}
+				switch parent.Kind {
+				case ast.KindVariableDeclaration, ast.KindParameter, ast.KindPropertyDeclaration:
+					return parent.Type() != nil
+				case ast.KindTypeAssertionExpression, ast.KindAsExpression:
+					return !ast.IsConstAssertion(parent)
+				case ast.KindSatisfiesExpression, ast.KindCallExpression, ast.KindNewExpression, ast.KindJsxExpression:
+					return true
+				case ast.KindPropertyAssignment:
+					if parent.Type() != nil {
+						return true
+					}
+					if isNil, known := lookupObjectContext(parent.Parent, curPos); known {
+						return !isNil
+					}
+					return false
+				case ast.KindArrowFunction:
+					if parent.Type() != nil {
+						return true
+					}
+					node = parent
+					continue
+				case ast.KindReturnStatement:
+					fn := parent.Parent
+					for fn != nil && !ast.IsFunctionLike(fn) {
+						if fn.Kind == ast.KindClassStaticBlockDeclaration {
+							return false
+						}
+						fn = fn.Parent
+					}
+					if fn == nil {
+						return false
+					}
+					if fn.Type() != nil {
+						return true
+					}
+					if fn.Kind == ast.KindArrowFunction || fn.Kind == ast.KindFunctionExpression {
+						node = fn
+						continue
+					}
+					return false
+				}
+				return false
+			}
+			return false
+		}
+
+		var lastObjectLiteral *ast.Node
+		var lastObjectLiteralContext *checker.Type
+		getObjectLiteralContext := func(obj *ast.Node, curPos int) *checker.Type {
+			if obj == lastObjectLiteral {
+				return lastObjectLiteralContext
+			}
+			parent := enclosingContextParent(obj)
+			if parent != nil {
+				switch parent.Kind {
+				case ast.KindArrayLiteralExpression:
+					if isNil, known := lookupArrayContext(parent, curPos); known && isNil {
+						lastObjectLiteral = obj
+						lastObjectLiteralContext = nil
+						return nil
+					}
+				case ast.KindPropertyAssignment:
+					if parent.Type() == nil {
+						if isNil, known := lookupObjectContext(parent.Parent, curPos); known && isNil {
+							lastObjectLiteral = obj
+							lastObjectLiteralContext = nil
+							return nil
+						}
+					}
+				}
+			}
+			t := checker.Checker_getContextualType(ctx.TypeChecker, obj, checker.ContextFlagsNone)
+			lastObjectLiteral = obj
+			lastObjectLiteralContext = t
+			if parent != nil && parent.Kind == ast.KindArrayLiteralExpression && len(parent.Elements()) > 1 {
+				// Only cache the array as untyped when the array itself has no
+				// contextual type (e.g. not a tuple or numeric-keyed object whose
+				// element at this index has no contextual type).
+				if _, known := lookupArrayContext(parent, curPos); !known {
+					if t == nil {
+						arrCtx := checker.Checker_getContextualType(ctx.TypeChecker, parent, checker.ContextFlagsNone)
+						markArrayContext(parent, arrCtx == nil, curPos)
+					} else {
+						markArrayContext(parent, false, curPos)
+					}
+				}
+			}
+			return t
+		}
+
+		// Mirrors tsgo's getContextualTypeForObjectLiteralElement: after a
+		// property without its own JSDoc @type (node.Type() == nil) observes a
+		// nil contextual type, inspect its enclosing multi-property object or
+		// multi-element array so subsequent siblings/elements skip redundant
+		// queries.
+		maybeMarkNilContext := func(node *ast.Node, checkRemainingSiblings bool, curPos int) {
+			if node.Type() != nil || node.Parent == nil || node.Parent.Kind != ast.KindObjectLiteralExpression {
+				return
+			}
+			obj := node.Parent
+			props := obj.Properties()
+			_, objKnown := lookupObjectContext(obj, curPos)
+			hasMultiProps := !objKnown && len(props) > 1 && (!checkRemainingSiblings || props[len(props)-1] != node)
+			parent := enclosingContextParent(obj)
+			hasMultiArray := parent != nil && parent.Kind == ast.KindArrayLiteralExpression && len(parent.Elements()) > 1
+			if hasMultiArray {
+				if _, arrKnown := lookupArrayContext(parent, curPos); arrKnown {
+					hasMultiArray = false
+				}
+			}
+			if !hasMultiProps && !hasMultiArray {
+				return
+			}
+			objCtx := getObjectLiteralContext(obj, curPos)
+			if hasMultiProps {
+				markObjectContext(obj, objCtx == nil, curPos)
+			}
+		}
+
 		checkProperty := func(node *ast.Node) {
+			curPos := node.Pos()
 			if ast.IsPropertyAssignment(node) {
 				property := node.AsPropertyAssignment()
+				if isGuaranteedLiteralLike(property.Initializer) {
+					if node.Type() == nil && node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
+						if isNil, known := lookupObjectContext(node.Parent, curPos); known && isNil {
+							return
+						}
+					}
+					if slot := primitiveLiteralSlot(property.Initializer); slot < 0 || !primitiveLiteralNonCallable[slot] {
+						// On a cold primitive literal inside an unannotated property,
+						// check the enclosing object's contextual type first so
+						// untyped literal tables avoid initializing global primitive
+						// interface call signatures on a fresh checker.
+						if node.Type() == nil && node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
+							objCtx := getObjectLiteralContext(node.Parent, curPos)
+							markObjectContext(node.Parent, objCtx == nil, curPos)
+							if objCtx == nil {
+								return
+							}
+						}
+					}
+					if !returnsThenable(property.Initializer) {
+						return
+					}
+					contextualType := checker.Checker_getContextualType(ctx.TypeChecker, property.Initializer, checker.ContextFlagsNone)
+					if contextualType == nil {
+						return
+					}
+					if isVoidReturningFunctionType(property.Initializer, contextualType) {
+						ctx.ReportNode(property.Initializer, buildVoidReturnPropertyMessage())
+					}
+					return
+				}
+				if node.Type() == nil && node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
+					obj := node.Parent
+					if isNil, known := lookupObjectContext(obj, curPos); known {
+						if isNil {
+							return
+						}
+					} else {
+						if parent := enclosingContextParent(obj); parent != nil && parent.Kind == ast.KindArrayLiteralExpression {
+							if isNil, arrKnown := lookupArrayContext(parent, curPos); arrKnown && isNil {
+								markObjectContext(obj, true, curPos)
+								return
+							}
+						}
+						props := obj.Properties()
+						if len(props) > 1 && props[len(props)-1] != node && !hasLikelyTypedContext(obj, curPos) {
+							objCtx := getObjectLiteralContext(obj, curPos)
+							markObjectContext(obj, objCtx == nil, curPos)
+							if objCtx == nil {
+								return
+							}
+						}
+					}
+				}
 				contextualType := checker.Checker_getContextualType(ctx.TypeChecker, property.Initializer, checker.ContextFlagsNone)
-
-				if contextualType != nil && isVoidReturningFunctionType(
-					property.Initializer,
-					contextualType,
-				) && returnsThenable(property.Initializer) {
+				if contextualType == nil {
+					maybeMarkNilContext(node, true, curPos)
+					return
+				}
+				if node.Type() == nil && node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
+					markObjectContext(node.Parent, false, curPos)
+				}
+				if isVoidReturningFunctionType(property.Initializer, contextualType) &&
+					returnsThenable(property.Initializer) {
 					if ast.IsFunctionLike(property.Initializer) {
 						returnType := property.Initializer.Type()
 						if returnType != nil {
@@ -642,9 +1114,41 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 					}
 				}
 			} else if ast.IsShorthandPropertyAssignment(node) {
+				if node.Type() == nil && node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
+					obj := node.Parent
+					if isNil, known := lookupObjectContext(obj, curPos); known {
+						if isNil {
+							return
+						}
+					} else {
+						if parent := enclosingContextParent(obj); parent != nil && parent.Kind == ast.KindArrayLiteralExpression {
+							if isNil, arrKnown := lookupArrayContext(parent, curPos); arrKnown && isNil {
+								markObjectContext(obj, true, curPos)
+								return
+							}
+						}
+						props := obj.Properties()
+						if len(props) > 1 && props[len(props)-1] != node && !hasLikelyTypedContext(obj, curPos) {
+							objCtx := getObjectLiteralContext(obj, curPos)
+							markObjectContext(obj, objCtx == nil, curPos)
+							if objCtx == nil {
+								return
+							}
+						}
+					}
+				}
+				// Keep contextual-type-first here: GetTypeAtLocation(node.Name()) enters
+				// checkShorthandPropertyAssignment -> checkExpressionForMutableLocation,
+				// which always queries getContextualType(node.Name()) internally.
 				contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node.Name(), checker.ContextFlagsNone)
-				if contextualType != nil &&
-					isVoidReturningFunctionType(node.Name(), contextualType) &&
+				if contextualType == nil {
+					maybeMarkNilContext(node, true, curPos)
+					return
+				}
+				if node.Type() == nil && node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
+					markObjectContext(node.Parent, false, curPos)
+				}
+				if isVoidReturningFunctionType(node.Name(), contextualType) &&
 					returnsThenable(node.Name()) {
 					ctx.ReportNode(node.Name(), buildVoidReturnPropertyMessage())
 				}
@@ -664,10 +1168,14 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
+				if isNil, known := lookupObjectContext(obj, curPos); known && isNil {
+					return
+				}
 				if !returnsThenable(node) {
 					return
 				}
-				objType := checker.Checker_getContextualType(ctx.TypeChecker, obj, checker.ContextFlagsNone)
+				objType := getObjectLiteralContext(obj, curPos)
+				markObjectContext(obj, objType == nil, curPos)
 				if objType == nil {
 					return
 				}
@@ -678,7 +1186,8 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 				// the property is missing from any branch.
 				memberName := node.Name().Text()
 				var propertySymbol *ast.Symbol
-				for _, part := range utils.UnionTypeParts(objType) {
+				var singlePart [1]*checker.Type
+				for _, part := range unionTypeParts(objType, &singlePart) {
 					if sym := checker.Checker_getPropertyOfType(ctx.TypeChecker, part, memberName); sym != nil {
 						propertySymbol = sym
 						break
@@ -774,13 +1283,16 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			}
 
 			// syntactically ignore some known-good cases to avoid touching type info
-			functionNode := (func() *ast.Node {
-				current := node.Parent
-				for current != nil && !ast.IsFunctionLike(current) {
-					current = current.Parent
+			crossedLiteralOrStaticBlock := false
+			current := node.Parent
+			for current != nil && !ast.IsFunctionLike(current) {
+				switch current.Kind {
+				case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression, ast.KindClassStaticBlockDeclaration:
+					crossedLiteralOrStaticBlock = true
 				}
-				return current
-			})()
+				current = current.Parent
+			}
+			functionNode := current
 
 			if functionNode == nil {
 				return
@@ -790,12 +1302,37 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
+			isUnannotatedObjectMethod := !crossedLiteralOrStaticBlock &&
+				ast.IsObjectLiteralMethod(functionNode) &&
+				functionNode.Type() == nil &&
+				functionNode.FunctionLikeData().FullSignature == nil
+			if isUnannotatedObjectMethod {
+				if isNil, known := lookupObjectContext(functionNode.Parent, node.Pos()); known && isNil {
+					return
+				}
+			}
+
+			if functionNode.Type() != nil || isGuaranteedLiteralLike(node.Expression) {
+				if isVoidContextualThenable(node.Expression, node.Expression) {
+					ctx.ReportNode(node.Expression, buildVoidReturnReturnValueMessage())
+				}
+				return
+			}
+
+			// Keep unannotated functions contextual-type-first for non-literal
+			// returns: getContextualReturnType returns nil immediately when no
+			// contextual type applies, avoiding value type lookup on non-literals.
 			contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node.Expression, checker.ContextFlagsNone)
-			if contextualType != nil &&
-				isVoidReturningFunctionType(
-					node.Expression,
-					contextualType,
-				) && returnsThenable(node.Expression) {
+			if contextualType == nil {
+				if isUnannotatedObjectMethod {
+					maybeMarkNilContext(functionNode, false, node.Pos())
+				}
+				return
+			}
+			if isVoidReturningFunctionType(
+				node.Expression,
+				contextualType,
+			) && returnsThenable(node.Expression) {
 				ctx.ReportNode(node.Expression, buildVoidReturnReturnValueMessage())
 			}
 		}
