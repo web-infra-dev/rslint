@@ -271,6 +271,26 @@ func TestParseJestFnCallChainBoundaries(t *testing.T) {
 		{`it.skip.failing.each([])("a", fn);`, []JestFnType{JestFnTypeTest, ""}},
 		{`xtest.failing.each([])("a", fn);`, []JestFnType{JestFnTypeTest, ""}},
 		{`test.concurrent.failing("a", fn);`, []JestFnType{JestFnTypeTest}},
+		// Non-identifier and broken-chain receivers must never collapse to a
+		// Jest global (issue #2630 and upstream parseJestFnCall tests).
+		{`/a/.test(text);`, []JestFnType{""}},
+		{`(/a/).test(text);`, []JestFnType{""}},
+		{`/a/["test"](text);`, []JestFnType{""}},
+		{`new RegExp("a").test(text);`, []JestFnType{""}},
+		{`"something".describe();`, []JestFnType{""}},
+		{`[].describe();`, []JestFnType{""}},
+		{"``.test();", []JestFnType{""}},
+		{`this.test();`, []JestFnType{""}},
+		{`({ test() {} }).test();`, []JestFnType{""}},
+		{`(a || b).test();`, []JestFnType{""}},
+		{`patterns[0].test(text);`, []JestFnType{""}},
+		{`map[getKey()].test(text);`, []JestFnType{"", ""}},
+		{`re!.test(text);`, []JestFnType{""}},
+		{`(re as RegExp).test(text);`, []JestFnType{""}},
+		{`this.expect(1).toBe(2);`, []JestFnType{"", ""}},
+		{`/a/.expect(1).toBe(2);`, []JestFnType{"", ""}},
+		{`this.beforeEach(fn);`, []JestFnType{""}},
+		{`this.jest.fn();`, []JestFnType{""}},
 	} {
 		t.Run(test.source, func(t *testing.T) {
 			file := parseJestAnalysisFixture(test.source)
@@ -288,6 +308,30 @@ func TestParseJestFnCallChainBoundaries(t *testing.T) {
 				}
 				if got != test.want[index] {
 					t.Errorf("call %d kind = %q, want %q", index, got, test.want[index])
+				}
+			}
+		})
+	}
+}
+
+func TestParseExpectCallWithReasonIgnoresNonIdentifierReceivers(t *testing.T) {
+	for _, source := range []string{
+		`this.expect(1);`,
+		`/a/.expect(1);`,
+		`this.expect(1).not;`,
+		`this.expect.each();`,
+		"/a/.expect`x`();",
+		`patterns[0].expect(1);`,
+		`(foo as any).expect(1);`,
+	} {
+		t.Run(source, func(t *testing.T) {
+			file := parseJestAnalysisFixture(source)
+			analysis := GetJestCallAnalysis(rule.RuleContext{
+				SourceFile: file,
+			}.WithFileCache(rule.NewFileCache()))
+			for _, call := range jestAnalysisCalls(file) {
+				if parsed, reason := analysis.ParseExpectCallWithReason(call); parsed != nil || reason != ExpectParseReasonNone {
+					t.Fatalf("ParseExpectCallWithReason(%s) = (%#v, %q), want (nil, \"\")", source, parsed, reason)
 				}
 			}
 		})

@@ -64,7 +64,7 @@ func deferredEditCases() []deferredEditCase {
 			code:     `test('case', () => { function inner() { return (expect(p).resolves.toBe(1)); } return expect(q).rejects.toThrow(); });`,
 			options:  []any{map[string]any{"alwaysAwait": true}},
 			messages: []string{"asyncMustBeAwaited", "asyncMustBeAwaited"},
-			output:   `test('case', async () => { async function inner() { await (expect(p).resolves.toBe(1)); } await expect(q).rejects.toThrow(); });`,
+			output:   `test('case', async () => { async function inner() { return await (expect(p).resolves.toBe(1)); } await expect(q).rejects.toThrow(); });`,
 		},
 		{
 			name:     "top level async assertion remains report only",

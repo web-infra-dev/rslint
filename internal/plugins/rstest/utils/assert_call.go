@@ -53,7 +53,7 @@ func (analysis *RstestCallAnalysis) resolveAssertCall(node *ast.Node) bool {
 	// `import.meta.rstest.assert.equal(1, 1)` has no identifier root, so it has
 	// to be recognized before the identifier path, the way the expect resolver
 	// recognizes `import.meta.rstest.expect`.
-	if isImportMetaRstestAssertCall(node) {
+	if isImportMetaRstestAssertCall(node, analysis) {
 		return true
 	}
 	entries := firstRstestExpectEntries(node.AsCallExpression().Expression)
@@ -78,7 +78,16 @@ func (analysis *RstestCallAnalysis) resolveAssertCall(node *ast.Node) bool {
 	case rstestExpectRootDirect:
 		return true
 	case rstestExpectRootReceiver:
-		return entries.count > 1 && entries.secondName == rstestAssertAPIName
+		if entries.firstInvoked || entries.count <= 1 {
+			return false
+		}
+		memberName, ok := resolveReceiverMemberName(
+			entries.secondNode,
+			entries.secondName,
+			entries.secondDynamic,
+			analysis,
+		)
+		return ok && memberName == rstestAssertAPIName
 	default:
 		return false
 	}
@@ -99,6 +108,20 @@ func classifyRstestAssertRoot(
 	analysis *RstestCallAnalysis,
 ) rstestExpectRootKind {
 	ctx := analysis.ctx
+	initializations := 0
+	for _, declaration := range symbol.Declarations {
+		switch declaration.Kind {
+		case ast.KindVariableDeclaration, ast.KindBindingElement:
+			if internalUtils.IsVariableWriteReference(declaration.Name()) {
+				initializations++
+			}
+		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration, ast.KindFunctionDeclaration, ast.KindClassDeclaration:
+			initializations++
+		}
+		if initializations > 1 {
+			return rstestExpectRootNone
+		}
+	}
 	if ctx.Refs != nil {
 		for _, reference := range ctx.Refs.References(symbol) {
 			if internalUtils.IsWriteReference(reference) {
@@ -134,11 +157,15 @@ func classifyRstestAssertRoot(
 // isImportMetaRstestAssertCall reports whether node calls through
 // `import.meta.rstest.assert`, the form that names the API without ever
 // binding it to an identifier.
-func isImportMetaRstestAssertCall(node *ast.Node) bool {
+func isImportMetaRstestAssertCall(node *ast.Node, analysis *RstestCallAnalysis) bool {
 	call := node.AsCallExpression()
 	if call == nil {
 		return false
 	}
-	_, parts, _, ok := parseImportMetaRstestChain(call.Expression)
-	return ok && len(parts) > 0 && parts[0].name == rstestAssertAPIName
+	return isImportMetaRstestMemberCall(
+		importMetaRstestMemberEntries(call.Expression, false),
+		rstestAssertAPIName,
+		false,
+		analysis,
+	)
 }

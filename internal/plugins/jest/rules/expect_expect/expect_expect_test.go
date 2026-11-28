@@ -18,6 +18,12 @@ func TestExpectExpectRule(t *testing.T) {
 			{Code: `it.todo("will test something eventually")`},
 			{Code: `test.todo("will test something eventually")`},
 			{Code: `['x']();`},
+			// Non-identifier and broken-chain receivers must not be treated as Jest tests (#2630).
+			{Code: `const re = /a/; const text = 'a'; /a/.test(text); re.test(text);`},
+			{Code: `new RegExp('a').test(text);`},
+			{Code: `patterns[0].test(text);`},
+			{Code: `re!.test(text);`},
+			{Code: `this.test(text);`},
 			{Code: `it("should pass", () => expect(true).toBeDefined())`},
 			{Code: `test("should pass", () => expect(true).toBeDefined())`},
 			{Code: `it("should pass", () => somePromise().then(() => expect(true).toBeDefined()))`},

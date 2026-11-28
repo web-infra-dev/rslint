@@ -168,28 +168,33 @@ func isRstestExpectCall(
 	if node == nil || node.Kind != ast.KindCallExpression || FindTopMostCallExpression(node) != node {
 		return false
 	}
-	if isImportMetaRstestExpectCall(node) {
-		return true
+	expression := findTopMostRstestExpectExpressionOptions(node, false)
+	entries := firstRstestExpectEntries(expression)
+	if entries.count > 0 && entries.first != nil && entries.first.Kind == ast.KindIdentifier {
+		return rstestExpectRootMatch(
+			entries.first,
+			entries.secondNode,
+			entries.secondName,
+			entries.count > 1,
+			entries.secondDynamic,
+			entries.firstInvoked,
+			analysis,
+		).ok
 	}
-	entries := firstRstestExpectEntries(node)
-	if entries.count == 0 || entries.first == nil || entries.first.Kind != ast.KindIdentifier {
-		return false
-	}
-	return rstestExpectRootMatch(
-		entries.first,
-		entries.secondName,
-		entries.count > 1,
-		analysis,
-	).ok
+	metaEntries := importMetaRstestMemberEntries(expression, false)
+	return isImportMetaRstestMemberCall(metaEntries, "expect", false, analysis)
 }
 
 type rstestExpectEntries struct {
-	first      *ast.Node
-	secondName string
-	count      uint8
+	first         *ast.Node
+	secondNode    *ast.Node
+	secondName    string
+	count         uint8
+	secondDynamic bool
+	firstInvoked  bool
 }
 
-func (entries *rstestExpectEntries) append(name string, node *ast.Node) {
+func (entries *rstestExpectEntries) append(name string, node *ast.Node, dynamic bool) {
 	if name == "" {
 		return
 	}
@@ -197,7 +202,9 @@ func (entries *rstestExpectEntries) append(name string, node *ast.Node) {
 	case 0:
 		entries.first = node
 	case 1:
+		entries.secondNode = node
 		entries.secondName = name
+		entries.secondDynamic = dynamic
 	}
 	if entries.count < 2 {
 		entries.count++
@@ -205,6 +212,9 @@ func (entries *rstestExpectEntries) append(name string, node *ast.Node) {
 }
 
 func firstRstestExpectEntries(node *ast.Node) rstestExpectEntries {
+	if node == nil {
+		return rstestExpectEntries{}
+	}
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return rstestExpectEntries{}
@@ -212,6 +222,9 @@ func firstRstestExpectEntries(node *ast.Node) rstestExpectEntries {
 
 	switch node.Kind {
 	case ast.KindIdentifier:
+		if node.AsIdentifier().Text == "" {
+			return rstestExpectEntries{}
+		}
 		return rstestExpectEntries{
 			first: node,
 			count: 1,
@@ -219,38 +232,66 @@ func firstRstestExpectEntries(node *ast.Node) rstestExpectEntries {
 	case ast.KindPropertyAccessExpression:
 		property := node.AsPropertyAccessExpression()
 		entries := firstRstestExpectEntries(property.Expression)
+		if entries.count == 0 {
+			return rstestExpectEntries{}
+		}
 		name := property.Name()
-		if name != nil {
-			switch name.Kind {
-			case ast.KindIdentifier:
-				entries.append(name.AsIdentifier().Text, name)
-			case ast.KindPrivateIdentifier:
-				entries.append(name.AsPrivateIdentifier().Text, name)
+		if name == nil {
+			return rstestExpectEntries{}
+		}
+		switch name.Kind {
+		case ast.KindIdentifier:
+			if text := name.AsIdentifier().Text; text != "" {
+				entries.append(text, name, false)
+				return entries
+			}
+		case ast.KindPrivateIdentifier:
+			if text := name.AsPrivateIdentifier().Text; text != "" {
+				entries.append(text, name, false)
+				return entries
 			}
 		}
-		return entries
+		return rstestExpectEntries{}
 	case ast.KindElementAccessExpression:
 		element := node.AsElementAccessExpression()
 		entries := firstRstestExpectEntries(element.Expression)
+		if entries.count == 0 || element.ArgumentExpression == nil {
+			return rstestExpectEntries{}
+		}
 		name := ast.SkipParentheses(element.ArgumentExpression)
 		if name == nil {
 			return rstestExpectEntries{}
 		}
 		switch name.Kind {
 		case ast.KindIdentifier:
-			entries.append(name.AsIdentifier().Text, name)
+			if text := name.AsIdentifier().Text; text != "" {
+				entries.append(text, name, true)
+				return entries
+			}
 		case ast.KindStringLiteral:
-			entries.append(name.AsStringLiteral().Text, name)
+			if text := name.AsStringLiteral().Text; text != "" {
+				entries.append(text, name, false)
+				return entries
+			}
 		case ast.KindNoSubstitutionTemplateLiteral:
-			entries.append(name.AsNoSubstitutionTemplateLiteral().Text, name)
-		default:
-			return rstestExpectEntries{}
+			if text := name.AsNoSubstitutionTemplateLiteral().Text; text != "" {
+				entries.append(text, name, false)
+				return entries
+			}
+		}
+		return rstestExpectEntries{}
+	case ast.KindCallExpression:
+		entries := firstRstestExpectEntries(node.AsCallExpression().Expression)
+		if entries.count == 1 {
+			entries.firstInvoked = true
 		}
 		return entries
-	case ast.KindCallExpression:
-		return firstRstestExpectEntries(node.AsCallExpression().Expression)
 	case ast.KindTaggedTemplateExpression:
-		return firstRstestExpectEntries(node.AsTaggedTemplateExpression().Tag)
+		entries := firstRstestExpectEntries(node.AsTaggedTemplateExpression().Tag)
+		if entries.count == 1 {
+			entries.firstInvoked = true
+		}
+		return entries
 	default:
 		return rstestExpectEntries{}
 	}
@@ -279,15 +320,23 @@ func parseRstestExpectCallOptions(
 		return nil
 	}
 	expression := findTopMostRstestExpectExpressionOptions(node, throughTransparentExpressions)
-	entries := testFramework.GetMemberEntries(expression)
+	var entries []testFramework.MemberEntry
 	if throughTransparentExpressions {
 		entries = testFramework.GetMemberEntriesThroughTransparentExpressions(expression)
+	} else {
+		entries = testFramework.GetMemberEntries(expression)
 	}
-	match := rstestExpectMemberMatch(node, entries, analysis, throughTransparentExpressions)
+	var match rstestExpectMatch
+	if len(entries) > 0 {
+		match = rstestExpectMemberMatch(entries, analysis, throughTransparentExpressions)
+	} else if metaEntries := importMetaRstestMemberEntries(expression, throughTransparentExpressions); isImportMetaRstestMemberCall(metaEntries, "expect", throughTransparentExpressions, analysis) {
+		entries = metaEntries
+		match = rstestExpectMatch{index: 1, ok: true}
+	}
 	if !match.ok {
 		return nil
 	}
-	return classifyRstestExpectCall(expression, entries, match)
+	return classifyRstestExpectCall(expression, entries, match, throughTransparentExpressions)
 }
 
 // IsStaticRstestExpectCall reports calls of a single static member on the
@@ -354,7 +403,8 @@ func findTopMostCallExpression(node *ast.Node, throughTransparentExpressions boo
 					return top
 				}
 			case ast.KindElementAccessExpression:
-				if parent.AsElementAccessExpression().Expression != current {
+				elem := parent.AsElementAccessExpression()
+				if elem.Expression != current || !isSupportedRstestExpectElementKey(elem.ArgumentExpression, throughTransparentExpressions) {
 					return top
 				}
 			default:
@@ -384,7 +434,8 @@ func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTransparent
 				}
 				top = parent
 			case ast.KindElementAccessExpression:
-				if parent.AsElementAccessExpression().Expression != current {
+				elem := parent.AsElementAccessExpression()
+				if elem.Expression != current || !isSupportedRstestExpectElementKey(elem.ArgumentExpression, throughTransparentExpressions) {
 					return top
 				}
 				top = parent
@@ -395,6 +446,31 @@ func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTransparent
 		current, parent = parent, parent.Parent
 	}
 	return top
+}
+
+func isSupportedRstestExpectElementKey(arg *ast.Node, throughTransparentExpressions bool) bool {
+	if arg == nil {
+		return false
+	}
+	var key *ast.Node
+	if throughTransparentExpressions {
+		key = internalUtils.SkipAssertionsAndParens(arg)
+	} else {
+		key = ast.SkipParentheses(arg)
+	}
+	if key == nil {
+		return false
+	}
+	switch key.Kind {
+	case ast.KindIdentifier:
+		return key.AsIdentifier().Text != ""
+	case ast.KindStringLiteral:
+		return key.AsStringLiteral().Text != ""
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return key.AsNoSubstitutionTemplateLiteral().Text != ""
+	default:
+		return false
+	}
 }
 
 // rstestExpectMatch locates the expect member inside an assertion chain.
@@ -413,42 +489,171 @@ type rstestExpectMatch struct {
 	fromTestContext bool
 }
 
-// rstestExpectMemberMatch resolves whether node is an expect call and where the
-// expect member sits in entries.
-func rstestExpectMemberMatch(
+// importMetaRstestMemberEntries extracts a call/member chain rooted at
+// `import.meta.rstest` with the same accessor and transparent-wrapper rules as
+// identifier-rooted chains.
+func importMetaRstestMemberEntries(
 	node *ast.Node,
+	throughTransparentExpressions bool,
+) []testFramework.MemberEntry {
+	return testFramework.GetMemberEntriesFromRoot(
+		node,
+		throughTransparentExpressions,
+		func(candidate *ast.Node) (testFramework.MemberEntry, bool) {
+			return importMetaRstestRootEntryOptions(candidate, throughTransparentExpressions)
+		},
+	)
+}
+
+// resolveReceiverMemberName returns the runtime property name selected by a
+// member access on an Rstest receiver (namespace import, require binding,
+// test context, or `import.meta.rstest`). Static dot/string/template access
+// returns its text directly; a computed identifier key (such as `r[key]`) is
+// folded through the file's static string evaluator so `const key = 'expect'`
+// resolves to `"expect"` while `const expect = 'test'` resolves to `"test"`.
+func resolveReceiverMemberName(
+	memberNode *ast.Node,
+	defaultName string,
+	dynamic bool,
+	analysis *RstestCallAnalysis,
+) (string, bool) {
+	if !dynamic {
+		return defaultName, defaultName != ""
+	}
+	if memberNode == nil || analysis == nil {
+		return "", false
+	}
+	return analysis.staticStringEvaluator().EvalToString(memberNode)
+}
+
+func isImportMetaRstestMemberCall(
+	entries []testFramework.MemberEntry,
+	memberName string,
+	throughTransparentExpressions bool,
+	analysis *RstestCallAnalysis,
+) bool {
+	if len(entries) <= 1 || isReceiverEntryInvoked(entries, throughTransparentExpressions) {
+		return false
+	}
+	resolvedName, ok := resolveReceiverMemberName(
+		entries[1].Node,
+		entries[1].Name,
+		isComputedDynamicMemberName(entries[1].Node),
+		analysis,
+	)
+	return ok && resolvedName == memberName
+}
+
+func isReceiverEntryInvoked(
+	entries []testFramework.MemberEntry,
+	throughTransparentExpressions bool,
+) bool {
+	if len(entries) < 2 {
+		return false
+	}
+	if entries[0].Call != nil {
+		return true
+	}
+	receiver, _ := testFramework.AccessorReceiverAndParent(&entries[1])
+	for receiver != nil {
+		receiver = ast.SkipParentheses(receiver)
+		if receiver == nil {
+			return false
+		}
+		if throughTransparentExpressions {
+			if expr, ok := internalUtils.TransparentExpression(receiver); ok {
+				receiver = expr
+				continue
+			}
+		}
+		return receiver.Kind == ast.KindCallExpression ||
+			receiver.Kind == ast.KindTaggedTemplateExpression
+	}
+	return false
+}
+
+func importMetaRstestRootEntryOptions(
+	node *ast.Node,
+	throughTransparentExpressions bool,
+) (testFramework.MemberEntry, bool) {
+	// `@rstest/core` types `import.meta.rstest` as optional for in-source
+	// testing, so TypeScript assertions on the `import.meta.rstest` receiver
+	// itself (such as `import.meta.rstest!` or `(import.meta.rstest as ...)`)
+	// are erased at runtime and still name the Rstest namespace. Unwrap them
+	// here while keeping later wrapper boundaries in the assertion chain
+	// controlled by `throughTransparentExpressions`.
+	node = internalUtils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return testFramework.MemberEntry{}, false
+	}
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		property := node.AsPropertyAccessExpression()
+		nameNode := property.Name()
+		if nameNode == nil || nameNode.Text() != "rstest" ||
+			!isImportMetaOptions(property.Expression, throughTransparentExpressions) {
+			return testFramework.MemberEntry{}, false
+		}
+		return testFramework.MemberEntry{
+			Name: "rstest",
+			Node: nameNode,
+		}, true
+	case ast.KindElementAccessExpression:
+		element := node.AsElementAccessExpression()
+		if element.ArgumentExpression == nil {
+			return testFramework.MemberEntry{}, false
+		}
+		nameNode := ast.SkipParentheses(element.ArgumentExpression)
+		name, ok := internalUtils.GetStaticStringLiteralValue(nameNode)
+		if !ok || name != "rstest" ||
+			!isImportMetaOptions(element.Expression, throughTransparentExpressions) {
+			return testFramework.MemberEntry{}, false
+		}
+		return testFramework.MemberEntry{
+			Name: name,
+			Node: nameNode,
+		}, true
+	default:
+		return testFramework.MemberEntry{}, false
+	}
+}
+
+// rstestExpectMemberMatch resolves whether an identifier-rooted chain is an
+// expect call and where the expect member sits in entries.
+func rstestExpectMemberMatch(
 	entries []testFramework.MemberEntry,
 	analysis *RstestCallAnalysis,
 	throughTransparentExpressions bool,
 ) rstestExpectMatch {
-	if isImportMetaRstestExpectCallOptions(node, throughTransparentExpressions) {
-		// GetMemberEntries cannot represent the import.meta prefix and starts
-		// the chain at the rstest property, so expect sits at index 1.
-		if len(entries) > 1 && entries[1].Name == "expect" {
-			return rstestExpectMatch{index: 1, ok: true}
-		}
-		return rstestExpectMatch{}
-	}
-
 	if len(entries) == 0 || entries[0].Node == nil || entries[0].Node.Kind != ast.KindIdentifier {
 		return rstestExpectMatch{}
 	}
+	var secondNode *ast.Node
 	secondName := ""
+	secondDynamic := false
 	if len(entries) > 1 {
+		secondNode = entries[1].Node
 		secondName = entries[1].Name
+		secondDynamic = isComputedDynamicMemberName(entries[1].Node)
 	}
 	return rstestExpectRootMatch(
 		entries[0].Node,
+		secondNode,
 		secondName,
 		len(entries) > 1,
+		secondDynamic,
+		isReceiverEntryInvoked(entries, throughTransparentExpressions),
 		analysis,
 	)
 }
 
 func rstestExpectRootMatch(
 	root *ast.Node,
+	secondNode *ast.Node,
 	secondName string,
 	hasSecond bool,
+	secondDynamic bool,
+	firstInvoked bool,
 	analysis *RstestCallAnalysis,
 ) rstestExpectMatch {
 	if root == nil || root.Kind != ast.KindIdentifier {
@@ -476,9 +681,13 @@ func rstestExpectRootMatch(
 	case rstestExpectRootDirect:
 		return rstestExpectMatch{ok: true, fromTestContext: rootInfo.FromTestContext}
 	case rstestExpectRootReceiver:
+		if firstInvoked || !hasSecond {
+			return rstestExpectMatch{}
+		}
+		memberName, ok := resolveReceiverMemberName(secondNode, secondName, secondDynamic, analysis)
 		return rstestExpectMatch{
 			index:           1,
-			ok:              hasSecond && secondName == "expect",
+			ok:              ok && memberName == "expect",
 			fromTestContext: rootInfo.FromTestContext,
 		}
 	default:
@@ -490,14 +699,19 @@ func classifyRstestExpectCall(
 	expression *ast.Node,
 	entries []testFramework.MemberEntry,
 	match rstestExpectMatch,
+	throughTransparentExpressions bool,
 ) *ParsedRstestExpectCall {
 	expectEntry := entries[match.index]
+	expectCall := testFramework.DirectMemberCall(&expectEntry)
+	if expectCall == nil {
+		expectCall = expectEntry.Call
+	}
 	rest := entries[match.index+1:]
 	parsed := &ParsedRstestExpectCall{
 		Expression:      expression,
 		Entry:           RstestExpectEntryCall,
-		Head:            expectEntry.Call,
-		rootInvoked:     expectEntry.Call != nil,
+		Head:            expectCall,
+		rootInvoked:     expectCall != nil,
 		trailingMembers: len(rest),
 		FromTestContext: match.fromTestContext,
 	}
@@ -518,12 +732,18 @@ func classifyRstestExpectCall(
 			// has trailing members. Defensive only.
 			return nil
 		}
-		if entry, ok := rstestExpectFactoryEntries[rest[0].Name]; ok && rest[0].Call != nil {
+		factoryCall := testFramework.DirectMemberCall(&rest[0])
+		if factoryCall == nil {
+			factoryCall = rest[0].Call
+		}
+		if entry, ok := rstestExpectFactoryEntries[rest[0].Name]; ok &&
+			!isComputedDynamicMemberName(rest[0].Node) &&
+			factoryCall != nil {
 			// expect.soft(x) / expect.poll(fn) / expect.element(loc): the factory
 			// call replaces expect(x) as the assertion head and the chain resumes
 			// after it.
 			parsed.Entry = entry
-			parsed.Head = rest[0].Call
+			parsed.Head = factoryCall
 			chain = rest[1:]
 		} else {
 			// Static member access on the expect object. The chain keeps the
@@ -538,11 +758,34 @@ func classifyRstestExpectCall(
 		!parsed.rootInvoked && parsed.Head == nil,
 	)
 	parsed.Reason = reason
-	if reason == RstestExpectParseReasonMatcherNotFound &&
-		len(chain) > 0 &&
-		isMemberAccessNode(expression) &&
-		!hasComputedDynamicRstestExpectMember(chain) {
-		parsed.Reason = RstestExpectParseReasonMatcherNotCalled
+	if reason == RstestExpectParseReasonMatcherNotFound {
+		// If chain ascent stopped before an unsupported computed element
+		// access that IS immediately invoked (such as `expect(1)['to' + 'Be'](1)`
+		// or `expect(p).resolves[getMatcher()](1)`), treat that call as a
+		// dynamic matcher call — unless the preceding chain already ended on an
+		// unknown member (such as `expect(1).foo['to' + 'Be'](1)`), which is an
+		// unknown modifier.
+		if elemCall, elemArg := directTrailingDynamicMatcherCall(expression, throughTransparentExpressions); elemCall != nil {
+			if endsWithUnknownChainMember(chain) {
+				parsed.Reason = RstestExpectParseReasonModifierUnknown
+				parsed.Expression = elemCall
+			} else {
+				parsed.Reason = RstestExpectParseReasonNone
+				parsed.Expression = elemCall
+				matchers = []ParsedRstestExpectMatcher{{
+					Name: "",
+					Entry: ParsedRstestFnMemberEntry{
+						Node: elemArg,
+						Call: elemCall,
+					},
+					Kind: RstestExpectMatcherCall,
+				}}
+			}
+		} else if len(chain) > 0 &&
+			isMemberAccessNode(expression) &&
+			!hasComputedDynamicRstestExpectMember(chain) {
+			parsed.Reason = RstestExpectParseReasonMatcherNotCalled
+		}
 	}
 	if len(matchers) > 0 {
 		parsed.Matchers = matchers
@@ -557,6 +800,65 @@ func classifyRstestExpectCall(
 		}
 	}
 	return parsed
+}
+
+func endsWithUnknownChainMember(chain []testFramework.MemberEntry) bool {
+	if len(chain) == 0 {
+		return false
+	}
+	last := chain[len(chain)-1]
+	if last.Node == nil || isComputedDynamicMemberName(last.Node) {
+		return true
+	}
+	return classifyRstestExpectChainEntry(last, false).Kind == rstestExpectChainUnknown
+}
+
+func directTrailingDynamicMatcherCall(expression *ast.Node, throughTransparentExpressions bool) (*ast.Node, *ast.Node) {
+	outer := expression
+	for outer != nil && outer.Parent != nil {
+		parent := outer.Parent
+		if parent.Kind == ast.KindParenthesizedExpression {
+			outer = parent
+			continue
+		}
+		if throughTransparentExpressions {
+			if expr, ok := internalUtils.TransparentExpression(parent); ok && expr == outer {
+				outer = parent
+				continue
+			}
+		}
+		break
+	}
+	if outer == nil || outer.Parent == nil || outer.Parent.Kind != ast.KindElementAccessExpression {
+		return nil, nil
+	}
+	elem := outer.Parent
+	if elem.AsElementAccessExpression().Expression != outer {
+		return nil, nil
+	}
+	cur := elem
+	for cur.Parent != nil {
+		parent := cur.Parent
+		if parent.Kind == ast.KindParenthesizedExpression {
+			cur = parent
+			continue
+		}
+		if throughTransparentExpressions {
+			if expr, ok := internalUtils.TransparentExpression(parent); ok && expr == cur {
+				cur = parent
+				continue
+			}
+		}
+		if parent.Kind == ast.KindCallExpression && parent.AsCallExpression().Expression == cur {
+			arg := elem.AsElementAccessExpression().ArgumentExpression
+			if arg != nil {
+				arg = ast.SkipParentheses(arg)
+			}
+			return parent, arg
+		}
+		return nil, nil
+	}
+	return nil, nil
 }
 
 func hasComputedDynamicRstestExpectMember(entries []testFramework.MemberEntry) bool {
@@ -670,7 +972,7 @@ func findRstestExpectModifiersAndMatchers(
 	}
 
 	if matcherIndex == -1 {
-		return nil, nil, RstestExpectParseReasonMatcherNotFound
+		return modifiers, nil, RstestExpectParseReasonMatcherNotFound
 	}
 
 	matchers := make([]ParsedRstestExpectMatcher, 0, len(chains)-matcherIndex)
@@ -762,20 +1064,11 @@ func classifyRstestExpectChainEntry(
 }
 
 // isComputedDynamicMemberName reports member name nodes that came from a
-// computed element access with an identifier key, e.g. expect(x)[matcherName].
-// GetMemberEntries records the identifier's text as the member name, but the
-// runtime value is unknowable statically. String literal keys are fine.
+// computed element access with an identifier key, e.g. expect(x)[matcherName]
+// or expect(x)[matcherName as any]. GetMemberEntries records the identifier's
+// text as the member name, but the runtime value is unknowable statically.
 func isComputedDynamicMemberName(node *ast.Node) bool {
-	if node.Kind != ast.KindIdentifier {
-		return false
-	}
-	parent := node.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
-	}
-	return parent != nil &&
-		parent.Kind == ast.KindElementAccessExpression &&
-		parent.AsElementAccessExpression().Expression != node
+	return testFramework.IsComputedIdentifierAccessor(node)
 }
 
 func isMemberAccessNode(node *ast.Node) bool {
@@ -818,7 +1111,7 @@ func classifyRstestExpectRoot(
 			if internalUtils.IsVariableWriteReference(declaration.Name()) {
 				initializations++
 			}
-		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindFunctionDeclaration:
+		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration, ast.KindFunctionDeclaration, ast.KindClassDeclaration:
 			initializations++
 		}
 		if initializations > 1 {
@@ -865,19 +1158,6 @@ func classifyRstestExpectRoot(
 	return rstestExpectRoot{Kind: rstestExpectRootNone}
 }
 
-func isImportMetaRstestExpectCall(node *ast.Node) bool {
-	return isImportMetaRstestExpectCallOptions(node, false)
-}
-
-func isImportMetaRstestExpectCallOptions(node *ast.Node, throughTransparentExpressions bool) bool {
-	call := node.AsCallExpression()
-	if call == nil {
-		return false
-	}
-	_, parts, _, ok := parseImportMetaRstestChainOptions(call.Expression, throughTransparentExpressions)
-	return ok && len(parts) > 0 && parts[0].name == "expect"
-}
-
 func isImportMetaRstestObjectAlias(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
@@ -886,7 +1166,7 @@ func isImportMetaRstestObjectAlias(symbol *ast.Symbol) bool {
 		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 			continue
 		}
-		initializer := declaration.AsVariableDeclaration().Initializer
+		initializer := internalUtils.SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
 		if isImportMetaRstest(initializer) {
 			return true
 		}

@@ -54,6 +54,26 @@ func OutermostParenthesizedExpression(node *ast.Node) *ast.Node {
 	return current
 }
 
+// OutermostTransparentExpression walks up through parentheses and erased
+// TypeScript expression wrappers (as, satisfies, !, <T>) to return the
+// outermost transparent wrapper node, or node itself when unwrapped.
+func OutermostTransparentExpression(node *ast.Node) *ast.Node {
+	current := node
+	for current != nil && current.Parent != nil {
+		parent := current.Parent
+		if parent.Kind == ast.KindParenthesizedExpression {
+			current = parent
+			continue
+		}
+		if expr, ok := TransparentExpression(parent); ok && expr == current {
+			current = parent
+			continue
+		}
+		break
+	}
+	return current
+}
+
 // IsPlainClassMember reports whether a tsgo class member maps to ESTree's
 // MethodDefinition or PropertyDefinition. Abstract members and auto-accessors
 // use TypeScript-specific ESTree node kinds instead.

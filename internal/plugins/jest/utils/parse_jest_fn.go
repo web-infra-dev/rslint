@@ -35,7 +35,7 @@ func parseJestFnCallWithReason(node *ast.Node, ctx rule.RuleContext) jestCallPar
 	}
 
 	memberEntries := GetJestFnMemberEntries(node)
-	if len(memberEntries) == 0 {
+	if len(memberEntries) == 0 || memberEntries[0].Node == nil || memberEntries[0].Node.Kind != ast.KindIdentifier {
 		return jestCallParseResult{}
 	}
 
@@ -55,8 +55,8 @@ func parseJestFnCallWithReason(node *ast.Node, ctx rule.RuleContext) jestCallPar
 		return jestCallParseResult{}
 	}
 
-	localNode := resolveHeadLocalNode(callExpr)
-	name, originalNode, headType := resolveJestFunctionReference(node, localName, localNode, ctx)
+	localNode := memberEntries[0].Node
+	name, originalNode, headType := resolveJestFunctionIdentifierReference(localName, localNode, ctx)
 	if name == "" {
 		return jestCallParseResult{}
 	}
@@ -123,7 +123,7 @@ func rejectedExpectParseReason(
 	memberEntries []ParsedJestFnMemberEntry,
 	ctx rule.RuleContext,
 ) string {
-	name, _, _ := resolveJestFunctionReference(node, localName, nil, ctx)
+	name, _, _ := resolveJestFunctionIdentifierReference(localName, memberEntries[0].Node, ctx)
 	if ApplyGlobalJestAlias(name, ctx.Settings) != "expect" {
 		return ExpectParseReasonNone
 	}
@@ -246,8 +246,18 @@ func findExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 	return nil, nil, ExpectParseReasonMatcherNotFound
 }
 
-func resolveJestFunctionReference(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
-	return ResolveFunctionReferenceForModule(node, localName, localNode, ctx, JestGlobalsModule)
+func resolveJestFunctionIdentifierReference(
+	localName string,
+	identifier *ast.Node,
+	ctx rule.RuleContext,
+) (string, *ast.Node, JestImportMode) {
+	return testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
+		localName,
+		identifier,
+		ctx.Refs.Resolve(identifier),
+		ctx.SourceFile,
+		JestGlobalsModule,
+	)
 }
 
 // ResolveFunctionReferenceForModule is the Jest-facing adapter for shared
@@ -260,11 +270,11 @@ func ResolveFunctionReferenceForModule(
 	importModule string,
 ) (string, *ast.Node, JestImportMode) {
 	if node == nil || node.Kind != ast.KindCallExpression {
-		return localName, localNode, JEST_GLOBAL_MODE
+		return "", nil, JEST_GLOBAL_MODE
 	}
 	identifier := ResolveFirstIdentifier(node.AsCallExpression().Expression)
-	if identifier == nil {
-		return localName, localNode, JEST_GLOBAL_MODE
+	if identifier == nil || identifier.Kind != ast.KindIdentifier {
+		return "", nil, JEST_GLOBAL_MODE
 	}
 	return testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
 		localName,
@@ -273,13 +283,6 @@ func ResolveFunctionReferenceForModule(
 		ctx.SourceFile,
 		importModule,
 	)
-}
-
-func resolveHeadLocalNode(callExpr *ast.CallExpression) *ast.Node {
-	if callExpr == nil {
-		return nil
-	}
-	return ResolveFirstIdentifier(callExpr.Expression)
 }
 
 // ResolveFirstIdentifier walks the left side of a call/member chain and returns

@@ -8,6 +8,7 @@ import (
 
 type RstestTestCallbacks struct {
 	Functions          map[*ast.Node]bool
+	ContextParameters  map[*ast.Node]bool
 	ContextReceivers   map[*ast.Symbol]bool
 	ContextExpectNames map[*ast.Symbol]bool
 }
@@ -36,6 +37,7 @@ type rstestFunctionEntry struct {
 func newRstestTestCallbacks() RstestTestCallbacks {
 	return RstestTestCallbacks{
 		Functions:          map[*ast.Node]bool{},
+		ContextParameters:  map[*ast.Node]bool{},
 		ContextReceivers:   map[*ast.Symbol]bool{},
 		ContextExpectNames: map[*ast.Symbol]bool{},
 	}
@@ -296,10 +298,12 @@ func recordRstestTestCallback(
 	if contextIndex >= len(parameters) {
 		return
 	}
-	parameter := parameters[contextIndex].AsParameterDeclaration()
+	paramNode := parameters[contextIndex]
+	parameter := paramNode.AsParameterDeclaration()
 	if parameter == nil || parameter.Name() == nil {
 		return
 	}
+	result.ContextParameters[paramNode] = true
 	name := parameter.Name()
 	switch name.Kind {
 	case ast.KindIdentifier:

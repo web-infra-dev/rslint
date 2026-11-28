@@ -79,6 +79,10 @@ test("case", () => { check(value).toBe(1); });`},
     import.meta.rstest.expect(value).toBe(1);
   });
 }`},
+			{Code: `test("value matches", () => { import.meta.rstest!.expect(1).toBe(1); });`},
+			{Code: `test("value matches", () => { import.meta.rstest!.assert.equal(1, 1); });`},
+			{Code: `test("value matches", () => { (import.meta.rstest as typeof import("@rstest/core")).expect(1).toBe(1); });`},
+			{Code: `import * as r from "@rstest/core"; const expect = "expect"; r.test("value matches", () => { r[expect](1).toBe(1); });`},
 
 			// Custom test / parameterized.
 			{Code: `const appTest = test.extend({ user: async ({}, use) => use({}) });

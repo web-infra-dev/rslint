@@ -10,6 +10,7 @@ import (
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 	sharedValidExpect "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/valid_expect"
 )
 
@@ -170,23 +171,13 @@ func readIntOption(options map[string]interface{}, key string, defaultValue int)
 
 func reportAsyncDescriptor(
 	ctx rule.RuleContext,
+	resolver *sharedValidExpect.AsyncAssertionResolver,
 	descriptor asyncDescriptor,
 	alwaysAwait bool,
-	asyncInserted map[*ast.Node]bool,
+	fnFixable map[*ast.Node]bool,
 ) {
 	msg := buildAsyncDescriptorMessage(descriptor, alwaysAwait)
-
-	ctx.ReportNodeWithDeferredFixes(descriptor.node, msg, func() []rule.RuleFix {
-		var fixes []rule.RuleFix
-		if fn := ast.GetContainingFunction(descriptor.node); fn != nil {
-			if !ast.IsAsyncFunction(fn) && !asyncInserted[fn] {
-				fixes = append(fixes, sharedValidExpect.AsyncInsertFix(ctx.SourceFile, fn))
-				asyncInserted[fn] = true
-			}
-			fixes = append(fixes, sharedValidExpect.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait))
-		}
-		return fixes
-	})
+	resolver.ReportAsyncDescriptor(ctx, descriptor.node, msg, alwaysAwait, fnFixable)
 }
 
 // expectFactoryOpenParenRange locates the `(` of the assertion factory call so
@@ -241,6 +232,112 @@ func shouldBeAwaited(parsed *rstestUtils.ParsedRstestExpectCall, asyncMatchers [
 	return rstestUtils.ShouldRstestExpectBeAwaited(parsed, asyncMatchers)
 }
 
+func memberEntryIndex(entries []rstestUtils.ParsedRstestFnMemberEntry, node *ast.Node) int {
+	for i := range entries {
+		if entries[i].Node == node {
+			return i
+		}
+	}
+	return -1
+}
+
+func directMatcherExpression(entry *rstestUtils.ParsedRstestFnMemberEntry) *ast.Node {
+	if entry == nil {
+		return nil
+	}
+	if call := testFramework.DirectMemberCall(entry); call != nil {
+		return call
+	}
+	if entry.Call != nil {
+		return entry.Call
+	}
+	if _, accessor := testFramework.AccessorReceiverAndParent(entry); accessor != nil {
+		return accessor
+	}
+	return nil
+}
+
+// asyncAssertionExpression returns the outermost matcher expression of an
+// async assertion without trailing method calls chained onto the returned
+// Promise (such as `.then()`, `.toString()`, `.hasOwnProperty()`, or `.foo()`).
+// Multi-matcher Chai chains (separated by at least one Chai connector such as
+// `.that` or `.and`) continue through the final matcher; Promise `.then`/`.catch`/
+// `.finally` chains are left for `ResolveAsyncAssertionReportNode` to walk.
+func asyncAssertionExpression(parsed *rstestUtils.ParsedRstestExpectCall) *ast.Node {
+	var lastExpr *ast.Node
+	prevMemberIdx := -1
+	for i := range parsed.Matchers {
+		m := &parsed.Matchers[i]
+		idx := memberEntryIndex(parsed.MemberEntries, m.Entry.Node)
+		if lastExpr != nil {
+			// A method chained directly onto a matcher with no Chai connector
+			// in between is a call on the assertion's returned Promise, not
+			// another Chai assertion.
+			if prevMemberIdx >= 0 && idx == prevMemberIdx+1 {
+				return lastExpr
+			}
+		}
+		if expr := directMatcherExpression(&m.Entry); expr != nil {
+			lastExpr = expr
+		}
+		prevMemberIdx = idx
+	}
+	if lastExpr != nil {
+		return lastExpr
+	}
+	return parsed.Expression
+}
+
+func trailingUncalledMemberAccess(expr *ast.Node) *ast.Node {
+	var topMember *ast.Node
+	cur := expr
+	for cur != nil {
+		outer := internalUtils.OutermostTransparentExpression(cur)
+		if outer == nil || outer.Parent == nil ||
+			!ast.IsAccessExpression(outer.Parent) ||
+			outer.Parent.Expression() != outer {
+			break
+		}
+		topMember = outer.Parent
+		cur = topMember
+	}
+	if topMember == nil {
+		return nil
+	}
+	topOuter := internalUtils.OutermostTransparentExpression(topMember)
+	if topOuter != nil && topOuter.Parent != nil &&
+		topOuter.Parent.Kind == ast.KindCallExpression &&
+		topOuter.Parent.AsCallExpression().Expression == topOuter {
+		return nil
+	}
+	return topMember
+}
+
+func reportTrailingUncalledMemberAccess(ctx rule.RuleContext, topMember *ast.Node) {
+	var propNode *ast.Node
+	var propName string
+	if topMember != nil && topMember.Kind == ast.KindElementAccessExpression {
+		arg := internalUtils.SkipAssertionsAndParens(topMember.AsElementAccessExpression().ArgumentExpression)
+		if arg != nil {
+			propNode = arg
+			if staticName, ok := internalUtils.GetStaticStringLiteralValue(arg); ok {
+				propName = staticName
+			}
+		}
+	} else {
+		propNode, propName = testFramework.AccessorPropertyAndName(topMember)
+	}
+	if propNode == nil {
+		ctx.ReportNode(topMember, buildErrorMatcherNotCalledMessage())
+		return
+	}
+	if propName != "" && !testFramework.IsComputedIdentifierAccessor(propNode) && rstestUtils.RSTEST_EXPECT_MODIFIER_NAMES[propName] {
+		ctx.ReportNode(propNode, buildErrorMatcherNotFoundMessage())
+		return
+	}
+	ctx.ReportNode(propNode, buildErrorMatcherNotCalledMessage())
+}
+
 // reportBrokenChain reports a chain that the parser resolved without a matcher.
 // The reason comes directly from the shared analysis, so unlike jest this rule
 // does not re-derive it. matcher-not-called points at the trailing member; the
@@ -248,8 +345,19 @@ func shouldBeAwaited(parsed *rstestUtils.ParsedRstestExpectCall, asyncMatchers [
 func reportBrokenChain(ctx rule.RuleContext, parsed *rstestUtils.ParsedRstestExpectCall) {
 	switch parsed.Reason {
 	case rstestUtils.RstestExpectParseReasonMatcherNotFound:
+		// If the parser stopped before an uncalled unsupported trailing member
+		// access chain such as `expect(1)[0]`, `(expect(1) as any)[0]`,
+		// `expect(1)[0].foo`, or `expect(1)[0].not`, report on the topmost key.
+		if topMember := trailingUncalledMemberAccess(parsed.Expression); topMember != nil {
+			reportTrailingUncalledMemberAccess(ctx, topMember)
+			return
+		}
 		ctx.ReportNode(parsed.Expression, buildErrorMatcherNotFoundMessage())
 	case rstestUtils.RstestExpectParseReasonMatcherNotCalled:
+		if topMember := trailingUncalledMemberAccess(parsed.Expression); topMember != nil {
+			reportTrailingUncalledMemberAccess(ctx, topMember)
+			return
+		}
 		if len(parsed.MemberEntries) == 0 {
 			ctx.ReportNode(parsed.Expression, buildErrorMatcherNotCalledMessage())
 			return
@@ -257,7 +365,7 @@ func reportBrokenChain(ctx rule.RuleContext, parsed *rstestUtils.ParsedRstestExp
 		last := parsed.MemberEntries[len(parsed.MemberEntries)-1]
 		// A trailing modifier that was never followed by a matcher is a missing
 		// matcher, not an uncalled one, matching jest/vitest.
-		if rstestUtils.RSTEST_EXPECT_MODIFIER_NAMES[last.Name] {
+		if !testFramework.IsComputedIdentifierAccessor(last.Node) && rstestUtils.RSTEST_EXPECT_MODIFIER_NAMES[last.Name] {
 			ctx.ReportNode(last.Node, buildErrorMatcherNotFoundMessage())
 			return
 		}
@@ -273,13 +381,15 @@ var ValidExpectRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+		asyncResolver := sharedValidExpect.NewAsyncAssertionResolver(ctx)
+		asyncResolver.DisableBuiltinToResolveReject()
 		arrayExceptions := map[string]bool{}
-		asyncInserted := map[*ast.Node]bool{}
+		fnFixable := map[*ast.Node]bool{}
 		var descriptors []asyncDescriptor
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := analysis.ParseExpectCall(node)
+				parsed := analysis.ParseExpectCallThroughTransparentExpressions(node)
 				if parsed == nil {
 					return
 				}
@@ -317,8 +427,8 @@ var ValidExpectRule = rule.Rule{
 					return
 				}
 
-				reportNode, promiseWrapped, insideAssertionArray, shouldReport := sharedValidExpect.ResolveAsyncAssertionReportNode(
-					parsed.Expression,
+				reportNode, promiseWrapped, insideAssertionArray, shouldReport := asyncResolver.ResolveAsyncAssertionReportNode(
+					asyncAssertionExpression(parsed),
 					opts.AlwaysAwait,
 				)
 				if reportNode == nil {
@@ -327,6 +437,7 @@ var ValidExpectRule = rule.Rule{
 
 				reportNodeKey := sharedValidExpect.PromiseArrayExceptionKey(ctx.SourceFile, reportNode)
 				if shouldReport && !arrayExceptions[reportNodeKey] {
+					arrayExceptions[reportNodeKey] = true
 					descriptors = append(descriptors, asyncDescriptor{
 						node:           reportNode,
 						promiseWrapped: promiseWrapped,
@@ -340,7 +451,7 @@ var ValidExpectRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindEndOfFile): func(node *ast.Node) {
 				_ = node
 				for _, descriptor := range descriptors {
-					reportAsyncDescriptor(ctx, descriptor, opts.AlwaysAwait, asyncInserted)
+					reportAsyncDescriptor(ctx, asyncResolver, descriptor, opts.AlwaysAwait, fnFixable)
 				}
 			},
 		}

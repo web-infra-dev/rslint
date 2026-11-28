@@ -75,9 +75,9 @@ func jasmineRootCallChain(callee *ast.Node) (chain string, jasmineObj *ast.Node,
 		return "", nil, "", 0, false
 	}
 
-	// GetJestFnMemberEntries silently drops unsupported bracket accessors (e.g.
-	// numeric indices). Confirm the parsed chain depth matches the AST so
-	// jasmine[1].any() does not collapse to jasmine.any.
+	// GetJestFnMemberEntries unwraps intermediate calls, tagged templates, and
+	// parenthesized links. Confirm the parsed chain depth matches the direct
+	// access chain so forms like jasmine.foo().any() do not match.
 	expected := len(entries)
 	actual := 1
 	for n := callee; ; {

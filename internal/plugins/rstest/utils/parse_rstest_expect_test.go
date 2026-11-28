@@ -240,6 +240,10 @@ func TestParseRstestExpectCallEntries(t *testing.T) {
 				Errors: parsedExpectError("entry=soft head=true modifiers=[] matcher=toBe reason=none static=false"),
 			},
 			{
+				Code:   `const soft = 'toBe'; expect[soft](x).toBe(1);`,
+				Errors: parsedExpectError("entry=static head=false modifiers=[] matcher= reason=modifier-unknown static=false"),
+			},
+			{
 				Code:   `expect.poll(fn).toBe(1);`,
 				Errors: parsedExpectError("entry=poll head=true modifiers=[] matcher=toBe reason=none static=false"),
 			},
@@ -829,6 +833,117 @@ func TestParseRstestExpectCallSources(t *testing.T) {
 				),
 			},
 			{
+				Code: `import.meta["rstest"]["expect"](1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `(import.meta.rstest).expect(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `import.meta.rstest!.expect(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `(import.meta.rstest as typeof import('@rstest/core')).expect(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `(import.meta.rstest satisfies unknown).expect(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `const r = import.meta.rstest!; r.expect(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `const { expect: check } = import.meta.rstest!; check(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `const { expect: check } = (import.meta.rstest as typeof import('@rstest/core')); check(1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(1).toBe(1)[0];`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `expect(1)[0];`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher= reason=matcher-not-found static=false",
+				),
+			},
+			// Non-null assertion on `import.meta.rstest!` is unwrapped, while a
+			// non-null assertion after `expect(1)` still stops ordinary
+			// `ParseExpectCall` matcher parsing (matching `expect(1)!.toBe(1)`).
+			{
+				Code: `import.meta.rstest!.expect(1)!.toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher= reason=matcher-not-found static=false",
+				),
+			},
+			{
+				Code: `import.meta["rstest"]!["expect"](1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `import r = require('@rstest/core'); r['expect'](1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `import * as r from '@rstest/core'; const expect = 'expect'; r[expect](1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `import * as r from '@rstest/core'; const key = 'expect'; r[key](1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `const key = 'expect'; import.meta.rstest[key](1).toBe(1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
+				Code: `import.meta.rstest.expect(1)[matcherName](1);`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher= reason=matcher-not-found static=false",
+				),
+			},
+			{
+				Code: `import.meta.rstest.expect(1).toBe(1)[key]();`,
+				Errors: parsedExpectError(
+					"entry=expect head=true modifiers=[] matcher=toBe reason=none static=false",
+				),
+			},
+			{
 				Code: `test("t", ({ expect }) => { expect(1).to.be.ok; });`,
 				Errors: parsedExpectError(
 					"entry=expect head=true modifiers=[] matcher=ok reason=none static=false",
@@ -853,6 +968,35 @@ func TestParseRstestExpectCallIgnoresForeignExpect(t *testing.T) {
 			{Code: `Math.max(1, 2);`},
 			{Code: `import { expect } from 'vitest'; expect(1).to.be.ok;`},
 			{Code: `import { expect } from '@jest/globals'; expect(1).to.equal(1);`},
+			{Code: `this.expect(1).toBe(1);`},
+			{Code: `/a/.expect(1).toBe(1);`},
+			{Code: `new Foo().expect(1).toBe(1);`},
+			{Code: `({ expect() {} }).expect(1).toBe(1);`},
+			{Code: `[x][0].expect(1).toBe(1);`},
+			{Code: `expect[0].expect(1).toBe(1);`},
+			{Code: `(foo as any).expect(1).toBe(1);`},
+			{Code: `import.meta.foo.rstest.expect(1).toBe(1);`},
+			{Code: `import.meta.rstest().expect(1).toBe(1);`},
+			{Code: "import.meta.rstest`tag`.expect(1).toBe(1);"},
+			{Code: `import * as rstest from '@rstest/core'; rstest().expect;`},
+			{Code: "import * as rstest from '@rstest/core'; rstest`tag`.expect(1).toBe(1);"},
+			{Code: `import.meta.rstest[expect](1).toBe(1);`},
+			{Code: `import r = require('@rstest/core'); const expect = 'test'; r[expect]('works', () => {});`},
+			{Code: `import * as r from '@rstest/core'; const expect = 'test'; r[expect](1).toBe(1);`},
+			{Code: `import * as r from '@rstest/core'; let expect = 'expect'; expect = 'test'; r[expect](1).toBe(1);`},
+			{Code: `import * as r from '@rstest/core'; const config = { name: 'expect' }; function selectSuite(x: any) { x.name = 'test'; } selectSuite(config); const key = config.name; r[key]('registers a test', () => {});`},
+			{Code: `test('t', (ctx) => { const expect = 'skip'; ctx[expect](); });`},
+			{Code: `(import.meta.rstest as any)().expect(1).toBe(1);`},
+			{Code: `(import.meta.rstest() as any).expect(1).toBe(1);`},
+			{Code: `import.meta.rstest()!.expect(1).toBe(1);`},
+			{Code: `(import.meta.rstest!)().expect(1).toBe(1);`},
+			{Code: "(import.meta.rstest!)`tag`.expect(1).toBe(1);"},
+			{Code: `(0, import.meta.rstest.expect)(1).toBe(1);`},
+			{Code: `(import.meta as any).rstest.expect(1).toBe(1);`},
+			{Code: `const { ...expect } = import.meta.rstest; expect(1).toBe(1);`},
+			{Code: `const { other: { expect } } = import.meta.rstest; expect(1).toBe(1);`},
+			{Code: `const [expect] = import.meta.rstest!; expect(1).toBe(1);`},
+			{Code: `import * as core from '@rstest/core'; const expect = 'other'; core[expect as any](1);`},
 		},
 		[]rule_tester.InvalidTestCase{},
 	)
@@ -899,12 +1043,154 @@ func TestIsRstestExpectCallRecognizesChaiPropertyStyleOnce(t *testing.T) {
 	expectCall := []rule_tester.InvalidTestCaseError{{MessageId: "expectCall", Message: "expect=true"}}
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(), "tsconfig.json", t, &expectIdentityProbe,
-		[]rule_tester.ValidTestCase{},
+		[]rule_tester.ValidTestCase{
+			{Code: `this.expect(1).toBe(1);`},
+			{Code: `/a/.expect(1).toBe(1);`},
+			{Code: `new Foo().expect(1).toBe(1);`},
+			{Code: `({ expect() {} }).expect(1).toBe(1);`},
+			{Code: `[x][0].expect(1).toBe(1);`},
+			{Code: `expect[0].expect(1).toBe(1);`},
+			{Code: `(foo as any).expect(1).toBe(1);`},
+			{Code: `import.meta.rstest[expect](1).toBe(1);`},
+			{Code: `import.meta.rstest().expect(1).toBe(1);`},
+			{Code: "import.meta.rstest`tag`.expect(1).toBe(1);"},
+			{Code: `import * as rstest from '@rstest/core'; rstest().expect;`},
+			{Code: "import * as rstest from '@rstest/core'; rstest`tag`.expect(1).toBe(1);"},
+			{Code: `import r = require('@rstest/core'); const expect = 'test'; r[expect]('works', () => {});`},
+			{Code: `import * as r from '@rstest/core'; const expect = 'test'; r[expect](1).toBe(1);`},
+			{Code: `import * as r from '@rstest/core'; let expect = 'expect'; expect = 'test'; r[expect](1).toBe(1);`},
+			{Code: `import * as r from '@rstest/core'; const config = { name: 'expect' }; function selectSuite(x: any) { x.name = 'test'; } selectSuite(config); const key = config.name; r[key]('registers a test', () => {});`},
+			{Code: `test('t', (ctx) => { const expect = 'skip'; ctx[expect](); });`},
+			{Code: `(import.meta.rstest as any)().expect(1).toBe(1);`},
+			{Code: `(import.meta.rstest() as any).expect(1).toBe(1);`},
+			{Code: `import.meta.rstest()!.expect(1).toBe(1);`},
+			{Code: `(import.meta.rstest!)().expect(1).toBe(1);`},
+			{Code: "(import.meta.rstest!)`tag`.expect(1).toBe(1);"},
+			{Code: `(0, import.meta.rstest.expect)(1).toBe(1);`},
+			{Code: `(import.meta as any).rstest.expect(1).toBe(1);`},
+		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `expect(value).to.be.ok;`, Errors: expectCall},
 			{Code: `expect(spy).to.have.been.calledOnce;`, Errors: expectCall},
 			{Code: `expect(value).to.equal(expected);`, Errors: expectCall},
+			{Code: `expect(1).toBe(1)[0];`, Errors: expectCall},
+			{Code: `expect(1)[0];`, Errors: expectCall},
+			{Code: `import.meta.rstest!.expect(1).toBe(1);`, Errors: expectCall},
+			{Code: `(import.meta.rstest as typeof import('@rstest/core')).expect(1).toBe(1);`, Errors: expectCall},
+			{Code: `import * as r from '@rstest/core'; const expect = 'expect'; r[expect](1).toBe(1);`, Errors: expectCall},
+			{Code: `import * as r from '@rstest/core'; const key = 'expect'; r[key](1).toBe(1);`, Errors: expectCall},
+			{Code: `import.meta.rstest!.expect(1)!.toBe(1);`, Errors: expectCall},
+			{Code: `import.meta.rstest.expect(1)[matcherName](1);`, Errors: expectCall},
+			{Code: `import.meta.rstest.expect(1).toBe(1)[key]();`, Errors: expectCall},
 		},
+	)
+}
+
+var expectTransparentProbe = rule.Rule{
+	Name:             "rstest/expect-transparent-probe",
+	RequiresTypeInfo: true,
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				parsed := analysis.ParseExpectCallThroughTransparentExpressions(node)
+				if parsed == nil {
+					return
+				}
+				ctx.ReportNode(node, probeMessage("parsedExpect", describeParsedExpect(parsed)))
+			},
+		}
+	},
+}
+
+func TestParseRstestExpectCallThroughTransparentExpressionsImportMeta(t *testing.T) {
+	want := parsedExpectError("entry=expect head=true modifiers=[resolves] matcher=toBe reason=none static=false")
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &expectTransparentProbe,
+		[]rule_tester.ValidTestCase{
+			{Code: `(this as any).expect(1).resolves.toBe(1);`},
+			{Code: `(/a/ as any).expect(1).resolves.toBe(1);`},
+			{Code: "(import.meta.rstest`tag` as any).expect(1).resolves.toBe(1);"},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: `(import.meta.rstest as any).expect(1).resolves.toBe(1);`, Errors: want},
+			{Code: `(import.meta as any).rstest.expect(1).resolves.toBe(1);`, Errors: want},
+			{Code: `((import.meta!)["rstest"] as any).expect(1).resolves.toBe(1);`, Errors: want},
+		},
+	)
+}
+
+var assertIdentityProbe = rule.Rule{
+	Name:             "rstest/assert-identity-probe",
+	RequiresTypeInfo: true,
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				if analysis.IsAssertCall(node) {
+					ctx.ReportNode(node, probeMessage("assertCall", "assert=true"))
+				}
+			},
+		}
+	},
+}
+
+func TestIsRstestAssertCallIgnoresNonIdentifierReceivers(t *testing.T) {
+	assertCall := []rule_tester.InvalidTestCaseError{{MessageId: "assertCall", Message: "assert=true"}}
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &assertIdentityProbe,
+		[]rule_tester.ValidTestCase{
+			{Code: `this.assert(1);`},
+			{Code: `this.assert.equal(1, 1);`},
+			{Code: `/a/.assert(1);`},
+			{Code: `new Foo().assert(1);`},
+			{Code: `[x][0].assert(1);`},
+			{Code: `assert[0].assert(1);`},
+			{Code: `(foo as any).assert(1);`},
+			{Code: `import.meta.foo.rstest.assert(1);`},
+			{Code: `import.meta.rstest().assert(1);`},
+			{Code: "import.meta.rstest`tag`.assert(1);"},
+			{Code: `import * as rstest from '@rstest/core'; rstest().assert(1);`},
+			{Code: "import * as rstest from '@rstest/core'; rstest`tag`.assert(1);"},
+			{Code: `import r = require('@rstest/core'); const assert = 'test'; r[assert]('works', () => {});`},
+			{Code: `var r = require('@rstest/core'); var r = other; r.assert(1);`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: `assert(1);`, Errors: assertCall},
+			{Code: `assert.equal(1, 1);`, Errors: assertCall},
+			{Code: `import.meta.rstest.assert.equal(1, 1);`, Errors: assertCall},
+			{Code: `import.meta.rstest!.assert.equal(1, 1);`, Errors: assertCall},
+			{Code: `(import.meta.rstest as typeof import('@rstest/core')).assert.equal(1, 1);`, Errors: assertCall},
+			{Code: `const r = (import.meta.rstest as typeof import('@rstest/core')); r.assert.equal(1, 1);`, Errors: assertCall},
+			{Code: `import r = require('@rstest/core'); r['assert'](1);`, Errors: assertCall},
+			{Code: `import r = require('@rstest/core'); const key = 'assert'; r[key](1);`, Errors: assertCall},
+			{Code: `const key = 'assert'; import.meta.rstest[key](1);`, Errors: assertCall},
+		},
+	)
+}
+
+func TestParseRstestFnCallIgnoresMutableRequireNamespace(t *testing.T) {
+	probe := rule.Rule{
+		Name:             "rstest/fn-parse-probe",
+		RequiresTypeInfo: true,
+		Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+			analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+			return rule.RuleListeners{
+				ast.KindCallExpression: func(node *ast.Node) {
+					if analysis.ParseFnCall(node) != nil {
+						ctx.ReportNode(node, probeMessage("fnCall", "fn=true"))
+					}
+				},
+			}
+		},
+	}
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &probe,
+		[]rule_tester.ValidTestCase{
+			{Code: `let r = require('@rstest/core'); r = customRunner; r.test.only('case', () => {});`},
+			{Code: `var r = require('@rstest/core'); r = customRunner; r.test('case', () => {});`},
+		},
+		[]rule_tester.InvalidTestCase{},
 	)
 }
 

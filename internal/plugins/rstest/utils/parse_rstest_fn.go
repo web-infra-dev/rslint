@@ -248,13 +248,6 @@ func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool)
 }
 
 func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool) {
-	return parseImportMetaRstestChainOptions(node, false)
-}
-
-func parseImportMetaRstestChainOptions(
-	node *ast.Node,
-	throughTransparentExpressions bool,
-) (*ast.Node, []rstestChainPart, bool, bool) {
 	if node == nil {
 		return nil, nil, false, false
 	}
@@ -265,16 +258,11 @@ func parseImportMetaRstestChainOptions(
 	if isImportMetaRstest(node) {
 		return node, nil, false, true
 	}
-	if throughTransparentExpressions {
-		if expression, ok := internalUtils.TransparentExpression(node); ok {
-			return parseImportMetaRstestChainOptions(expression, true)
-		}
-	}
 
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		property := node.AsPropertyAccessExpression()
-		root, parts, rootInvoked, ok := parseImportMetaRstestChainOptions(property.Expression, throughTransparentExpressions)
+		root, parts, rootInvoked, ok := parseImportMetaRstestChain(property.Expression)
 		if !ok {
 			return nil, nil, false, false
 		}
@@ -288,7 +276,7 @@ func parseImportMetaRstestChainOptions(
 		}), rootInvoked, true
 	case ast.KindElementAccessExpression:
 		element := node.AsElementAccessExpression()
-		root, parts, rootInvoked, ok := parseImportMetaRstestChainOptions(element.Expression, throughTransparentExpressions)
+		root, parts, rootInvoked, ok := parseImportMetaRstestChain(element.Expression)
 		if !ok {
 			return nil, nil, false, false
 		}
@@ -303,7 +291,7 @@ func parseImportMetaRstestChainOptions(
 		}), rootInvoked, true
 	case ast.KindCallExpression:
 		call := node.AsCallExpression()
-		root, parts, rootInvoked, ok := parseImportMetaRstestChainOptions(call.Expression, throughTransparentExpressions)
+		root, parts, rootInvoked, ok := parseImportMetaRstestChain(call.Expression)
 		if !ok {
 			return nil, nil, false, false
 		}
@@ -317,7 +305,7 @@ func parseImportMetaRstestChainOptions(
 		return root, parts, rootInvoked, true
 	case ast.KindTaggedTemplateExpression:
 		tagged := node.AsTaggedTemplateExpression()
-		root, parts, rootInvoked, ok := parseImportMetaRstestChainOptions(tagged.Tag, throughTransparentExpressions)
+		root, parts, rootInvoked, ok := parseImportMetaRstestChain(tagged.Tag)
 		if !ok || len(parts) == 0 || parts[len(parts)-1].invocation != rstestNotInvoked {
 			return nil, nil, false, false
 		}
@@ -327,7 +315,7 @@ func parseImportMetaRstestChainOptions(
 		if !internalUtils.IsCommaOperator(node) {
 			return nil, nil, false, false
 		}
-		return parseImportMetaRstestChainOptions(node.AsBinaryExpression().Right, throughTransparentExpressions)
+		return parseImportMetaRstestChain(node.AsBinaryExpression().Right)
 	default:
 		return nil, nil, false, false
 	}
@@ -488,11 +476,18 @@ func resolveImportMetaRstestBinding(symbol *ast.Symbol) (string, *ast.Node, bool
 		if declaration == nil || declaration.Kind != ast.KindBindingElement {
 			continue
 		}
-		variable := internalUtils.EnclosingVariableDeclarationOfBindingElement(declaration)
-		if variable == nil || !isImportMetaRstest(variable.AsVariableDeclaration().Initializer) {
+		binding := declaration.AsBindingElement()
+		if binding == nil || binding.DotDotDotToken != nil {
 			continue
 		}
-		binding := declaration.AsBindingElement()
+		variable := internalUtils.EnclosingVariableDeclarationOfBindingElement(declaration)
+		if variable == nil ||
+			declaration.Parent == nil ||
+			declaration.Parent.Kind != ast.KindObjectBindingPattern ||
+			declaration.Parent != variable.Name() ||
+			!isImportMetaRstest(variable.AsVariableDeclaration().Initializer) {
+			continue
+		}
 		if binding.PropertyName != nil {
 			// The property names the API; the local name only names the
 			// binding. Falling through to the local name when the key cannot
@@ -681,12 +676,10 @@ func profileImportModules(profile rstestAPIProfile) []string {
 var rstestAllProfiles = [...]rstestAPIProfile{rstestProfileCore, rstestProfilePlaywright}
 
 func isImportMetaRstest(node *ast.Node) bool {
-	// SkipParentheses dereferences its argument, so the nil check has to come
-	// first: callers pass initializers, which are nil for a bare `let x;`.
-	if node == nil {
-		return false
-	}
-	node = ast.SkipParentheses(node)
+	// SkipAssertionsAndParens handles nil safely and unwraps erased TypeScript
+	// assertions (`import.meta.rstest!`, `import.meta.rstest as ...`) so
+	// destructuring and aliases of optional `import.meta.rstest` resolve cleanly.
+	node = internalUtils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
 	}
@@ -706,11 +699,23 @@ func isImportMetaRstest(node *ast.Node) bool {
 }
 
 func isImportMeta(node *ast.Node) bool {
+	return isImportMetaOptions(node, false)
+}
+
+func isImportMetaOptions(node *ast.Node, throughTransparentExpressions bool) bool {
 	if node == nil {
 		return false
 	}
 	node = ast.SkipParentheses(node)
-	if node == nil || node.Kind != ast.KindMetaProperty {
+	if node == nil {
+		return false
+	}
+	if throughTransparentExpressions {
+		if expression, ok := internalUtils.TransparentExpression(node); ok {
+			return isImportMetaOptions(expression, true)
+		}
+	}
+	if node.Kind != ast.KindMetaProperty {
 		return false
 	}
 	meta := node.AsMetaProperty()

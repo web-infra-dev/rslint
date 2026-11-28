@@ -70,6 +70,12 @@ func TestNoDisabledTestsRule(t *testing.T) {
 					test('something');
 				`,
 			},
+			// Non-identifier and broken-chain receivers must not be treated as Jest tests (#2630).
+			{Code: `const re = /a/; const text = 'a'; /a/.test(text); re.test(text);`},
+			{Code: `new RegExp('a').test(text);`},
+			{Code: `patterns[0].test(text);`},
+			{Code: `re!.test(text);`},
+			{Code: `this.test(text);`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

@@ -50,6 +50,7 @@ func TestUnboundMethodExtras(t *testing.T) {
 		`expect(service.method)['toBeDefined']();`,
 		`import { expect as check } from '@rstest/core'; check(service.method).toBeDefined();`,
 		`import * as core from '@rstest/core'; core.expect(service.method).toBeDefined();`,
+		`import * as core from '@rstest/core'; export const { test, describe } = core; core.expect(service.method).toBeDefined();`,
 		`const { expect: check } = require('@rstest/core'); check(service.method).toBeDefined();`,
 		`import.meta.rstest.expect(service.method).toBeDefined();`,
 		`test('case', ({ expect: check }) => { check(service.method).toBeDefined(); });`,
@@ -84,6 +85,8 @@ func TestUnboundMethodExtras(t *testing.T) {
 		`import { expect as foreign } from 'vitest'; const check = foreign; check.extend({ toBeDefined() {} }); expect(service.method).toBeDefined();`,
 		`function configure(expect: any) { const check = expect; check.extend({ toBeDefined() {} }); } expect(service.method).toBeDefined();`,
 		`const check = expect; { const check = other; check.extend({ toBeDefined() {} }); } expect(service.method).toBeDefined();`,
+		`import { expect } from '@rstest/core'; const { ...mock } = expect; mock.extend = () => {}; mock.extend({ toBeDefined() {} }); expect(service.method).toBeDefined();`,
+		`function mockRequire(require: any) { require('@rstest/core').expect.extend({ toBeDefined() {} }); } expect(service.method).toBeDefined();`,
 		`rs?.mocked(service.method);`,
 		`rs.mocked?.(service.method);`,
 		`(rs.mocked)(service.method);`,
@@ -101,6 +104,7 @@ func TestUnboundMethodExtras(t *testing.T) {
 		rule_tester.ValidTestCase{Code: `const service = { method(this: void) {} }; expect(service.method).toThrow();`},
 		rule_tester.ValidTestCase{Code: `class Service { static method() {} } expect(Service.method).toThrow();`, Options: map[string]any{"ignoreStatic": true}},
 		rule_tester.ValidTestCase{Code: `class Service { bound = () => {} } expect(new Service().bound).toThrow();`},
+		rule_tester.ValidTestCase{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, log(message: string) { return message.length; }, get prepare() { this.log('ready'); return 1; } }; register({ toBeDefined() {} }); class Service { method() { return this; } } const service = new Service(); r.expect(service.method).toBeDefined();`},
 	)
 	var invalid []rule_tester.InvalidTestCase
 	for _, code := range []string{
