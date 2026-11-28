@@ -48,9 +48,12 @@ type ProjectBuildRequest struct {
 // built for one load pass. Its compiler backing and config associations are
 // private assembly details; consumers use Programs after loading or binding.
 type ProjectSet struct {
-	compilerPrograms      []*compiler.Program
-	programs              []*lintprogram.Program
-	configOrders          []configOrders
+	compilerPrograms []*compiler.Program
+	programs         []*lintprogram.Program
+	configOrders     []configOrders
+	// planIndexes records each retained Program's index in projectPlan.specs.
+	// Nil means identity order (every spec retained at its own index).
+	planIndexes           []int
 	programRootIdentities []string
 	targetBinding         *projectTargetBinding
 	// Missing entries use ordinary owner declarations. Present entries are an

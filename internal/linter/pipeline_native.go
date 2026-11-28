@@ -34,7 +34,7 @@ type nativeObservationWork struct {
 }
 
 func (work *nativeObservationWork) close() {
-	if work.execution != nil {
+	if work != nil && work.execution != nil {
 		work.execution.close()
 	}
 }
@@ -48,20 +48,24 @@ func prepareNativeObservation(
 	programExecution ProgramExecution,
 ) (*nativeObservationWork, error) {
 	native := generation.Native
-	options := RunLinterOptions{
-		LintPlan:       plan,
-		SingleThreaded: native.SingleThreaded,
-		Cwd:            native.Cwd,
-		TypeCheck:      native.TypeCheck,
-		Timing:         native.Timing,
-		Consumer:       rule.DiagnosticConsumer{Demand: demand},
-	}
-	if plan == nil {
-		options.TypeCheckOnlyPrograms = native.Programs
-	}
-	execution, err := prepareLintExecution(options, programExecution, !preserveSourceIdentity)
-	if err != nil {
-		return nil, err
+	var execution *lintExecution
+	if len(native.Programs) > 0 {
+		options := RunLinterOptions{
+			LintPlan:       plan,
+			SingleThreaded: native.SingleThreaded,
+			Cwd:            native.Cwd,
+			TypeCheck:      native.TypeCheck,
+			Timing:         native.Timing,
+			Consumer:       rule.DiagnosticConsumer{Demand: demand},
+		}
+		if plan == nil {
+			options.TypeCheckOnlyPrograms = native.Programs
+		}
+		var err error
+		execution, err = prepareLintExecution(options, programExecution, !preserveSourceIdentity)
+		if err != nil {
+			return nil, err
+		}
 	}
 	work := &nativeObservationWork{
 		execution:              execution,
@@ -91,6 +95,15 @@ func runNativeObservation(ctx context.Context, work *nativeObservationWork) (nat
 	}
 	syntacticDiagnostics := work.diagnostics
 	work.diagnostics = nil
+	if work.execution == nil {
+		// Empty coupled fallback loads carry zero Programs; skip diagnostic
+		// channel allocation and worker execution while preserving any metadata.
+		return nativeObservationUnit{
+			syntacticDiagnostics:  syntacticDiagnostics,
+			files:                 work.files,
+			hasTargetSyntaxErrors: work.hasTargetSyntaxErrors,
+		}, ctx.Err()
+	}
 	var diagnostics []rule.RuleDiagnostic
 	consumer := rule.DiagnosticConsumer{Demand: work.demand}
 	var diagnosticsWait sync.WaitGroup

@@ -108,7 +108,9 @@ func prepareObservation(
 	if err != nil {
 		return preparedObservation{}, err
 	}
-	nativeWork.execution.options.reservation = reservation
+	if nativeWork.execution != nil {
+		nativeWork.execution.options.reservation = reservation
+	}
 	for index := range pluginWork.inputs {
 		input := &pluginWork.inputs[index]
 		if input.SourceFile != nil {
