@@ -10,5 +10,6 @@
     "${configDir}/**/fixtures/**",
     "${configDir}/src/eslint-plugin/**",
     "${configDir}/src/languages/**"
-  ]
+  ],
+  "files": ["${configDir}/src/languages/js/type-service-protocol.ts"]
 }

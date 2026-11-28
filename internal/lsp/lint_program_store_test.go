@@ -33,6 +33,128 @@ type lintProgramStoreFixture struct {
 	watchCalls int
 }
 
+func TestDelayedProgramFinalizerPreservesNewSelection(t *testing.T) {
+	fixture := newLintProgramStoreFixture(t, "export const value = 1;")
+	key := lintProgramKey("/project/tsconfig.json")
+	old, current := &lintProgramState{}, &lintProgramState{}
+	fixture.store.programs[key] = current
+	fixture.store.documentPrograms[fixture.sourceURI] = key
+	request := &lintProgramRequest{store: fixture.store, storeGeneration: fixture.store.generation, uri: fixture.sourceURI, usedKey: key, usedState: old}
+	request.finalize()
+	if fixture.store.programs[key] != current || fixture.store.documentPrograms[fixture.sourceURI] != key || fixture.watchCalls != 0 {
+		t.Fatal("old finalizer changed the replacement generation or its watcher coverage")
+	}
+}
+
+func TestClosedFirstBorrowFinalizerDoesNotInvalidateOrWatch(t *testing.T) {
+	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+	// Start the first request for sourceURI while documentPrograms[sourceURI] is empty,
+	// borrow the Program, record an uncovered discoveryFS probe, then close before finalize().
+	request := fixture.store.request(
+		context.Background(),
+		fixture.sourceURI,
+		lspConfigTarget(fixture.sourcePath, fixture.server.cwd, fixture.server.fs),
+	)
+	meta, _, err := request.loadMetadata(fixture.configPath)
+	if err != nil {
+		t.Fatalf("loadMetadata failed: %v", err)
+	}
+	if _, source, err := request.load(meta); err != nil || source == nil {
+		t.Fatalf("initial load failed: %v", err)
+	}
+	// Record a missing-config probe on discoveryFS so finalize() would register a watcher
+	// and invalidate the store if updateOwner did not check document openness.
+	uncoveredProbe := tspath.ResolvePath(fixture.server.cwd, "uncovered-tsconfig.json")
+	request.discoveryFS.FileExists(uncoveredProbe)
+
+	watchCallsBefore := fixture.watchCalls
+	generationBefore := fixture.store.generation
+	delete(fixture.server.documents, fixture.sourceURI)
+	fixture.store.DidClose(fixture.sourceURI)
+
+	request.finalize()
+
+	if fixture.store.generation != generationBefore {
+		t.Fatalf("closed first-borrow finalizer invalidated store: gen %d -> %d", generationBefore, fixture.store.generation)
+	}
+	if fixture.watchCalls != watchCallsBefore {
+		t.Fatalf("closed first-borrow finalizer registered watchers: %d -> %d", watchCallsBefore, fixture.watchCalls)
+	}
+	if _, owned := fixture.store.documentPrograms[fixture.sourceURI]; owned {
+		t.Fatal("closed first-borrow finalizer claimed document ownership")
+	}
+	if len(fixture.store.programs) != 0 {
+		t.Fatalf("closed first-borrow finalizer retained %d program(s)", len(fixture.store.programs))
+	}
+}
+
+func TestStaleGenerationFinalizerDoesNotClaimOwner(t *testing.T) {
+	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+	fixture.load(t)
+	ownerKey := fixture.store.documentPrograms[fixture.sourceURI]
+	if ownerKey == "" {
+		t.Fatal("expected initial Program owner")
+	}
+	// Start r1 observing previousOwner == ownerKey, then invalidate the store and
+	// re-establish ownerKey with a replacement request.
+	r1 := fixture.store.request(
+		context.Background(),
+		fixture.sourceURI,
+		lspConfigTarget(fixture.sourcePath, fixture.server.cwd, fixture.server.fs),
+	)
+	r1.prepareOverlay()
+	r1.discoveryFS.FileExists(tspath.ResolvePath(fixture.server.cwd, "stale-probe.json"))
+
+	fixture.store.Invalidate()
+	replacement := fixture.load(t)
+	if fixture.store.documentPrograms[fixture.sourceURI] != ownerKey {
+		t.Fatal("replacement request did not re-establish ownerKey")
+	}
+	watchCallsBefore := fixture.watchCalls
+
+	// Without the storeGeneration guard, r1 would see documentPrograms[uri] == previousOwner,
+	// delete the replacement owner, and register watchers for its stale discoveryFS probe.
+	r1.finalize()
+
+	if fixture.watchCalls != watchCallsBefore {
+		t.Fatalf("stale-generation finalizer registered watchers: %d -> %d", watchCallsBefore, fixture.watchCalls)
+	}
+	if fixture.store.documentPrograms[fixture.sourceURI] != ownerKey {
+		t.Fatal("stale-generation finalizer deleted replacement document ownership")
+	}
+	if state := fixture.store.programs[ownerKey]; state == nil || state.program != replacement {
+		t.Fatal("stale-generation finalizer pruned replacement Program")
+	}
+}
+
+func TestLintProgramStoreFinalizesOwnerTransitions(t *testing.T) {
+	fixture := newLintProgramStoreFixture(t, "export const value = 1;")
+	fixture.load(t)
+	previous := fixture.store.documentPrograms[fixture.sourceURI]
+	if previous == "" {
+		t.Fatal("initial document has no resident Program owner")
+	}
+	configPath := tspath.NormalizePath(filepath.Join(fixture.server.cwd, "other.json"))
+	if err := os.WriteFile(configPath, []byte(`{"compilerOptions":{"noLib":true},"include":["src/**/*.ts"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	load, _, finalize := fixture.request(fixture.sourceURI)
+	if _, source, err := load(configPath); err != nil || source == nil {
+		t.Fatalf("select replacement Program: %v", err)
+	}
+	finalize()
+	replacement := lintProgramLexicalPathID(configPath, fixture.server.fs)
+	if fixture.store.documentPrograms[fixture.sourceURI] != replacement || fixture.store.programs[previous] != nil {
+		t.Fatal("replacement request did not transfer Program ownership")
+	}
+	// A request that falls back to source-only has no used key.
+	_, _, finalize = fixture.request(fixture.sourceURI)
+	finalize()
+	if fixture.store.documentPrograms[fixture.sourceURI] != "" || fixture.store.programs[replacement] != nil {
+		t.Fatal("source-only request retained its previous Program owner")
+	}
+}
+
 func newLintProgramStoreFixture(t *testing.T, source string) *lintProgramStoreFixture {
 	t.Helper()
 
@@ -144,6 +266,136 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 		if state.sources.CanonicalSourceFile(fixture.sourcePath) != sourceFile {
 			t.Fatal("canonical source lookup retained an old source generation")
 		}
+	}
+}
+
+func TestLintProgramStorePreservesBorrowedDocumentSnapshot(t *testing.T) {
+	fixture := newLintProgramStoreFixture(t, "export const first = 1;\n")
+	otherPath := tspath.NormalizePath(filepath.Join(filepath.Dir(fixture.sourcePath), "other.ts"))
+	otherURI := documentURIFromPath(otherPath)
+	const initial = "export const value: string = 'first';\n"
+	if err := os.WriteFile(otherPath, []byte(initial), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fixture.server.documents[otherURI] = initial
+	first := fixture.load(t)
+	key := lintProgramLexicalPathID(fixture.configPath, fixture.server.fs)
+	oldState := fixture.store.programs[key]
+	loadFirst, _, finalizeFirst := fixture.request(fixture.sourceURI)
+	borrowed, _, err := loadFirst(fixture.configPath)
+	if err != nil || borrowed != first || oldState.borrowers != 1 {
+		t.Fatalf("could not borrow resident Program: %v", err)
+	}
+	oldTracker := oldState.tracker.FS
+	oldView := oldState.tracker.Inner
+	loadUnchanged, _, finalizeUnchanged := fixture.request(otherURI)
+	unchanged, _, err := loadUnchanged(fixture.configPath)
+	if err != nil || unchanged != first || oldState.borrowers != 2 {
+		t.Fatalf("unchanged document did not share the borrowed Program: %v", err)
+	}
+	finalizeUnchanged()
+	if oldState.tracker.FS != oldTracker || oldState.tracker.Inner != oldView || oldState.borrowers != 1 {
+		t.Fatal("unchanged document load or finalization replaced the borrowed filesystem view")
+	}
+
+	const changed = "export const value: number = 42;\n"
+	fixture.server.documents[otherURI] = changed
+	fixture.store.DidChange(otherURI, changed)
+	loadOther, _, finalizeOther := fixture.request(otherURI)
+	current, _, err := loadOther(fixture.configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current == first || current.Host() == first.Host() {
+		t.Fatal("a second document reused a borrowed Program or compiler host")
+	}
+	if oldState.tracker.FS != oldTracker {
+		t.Fatal("a second document replaced the borrowed filesystem tracker")
+	}
+	for _, check := range []struct {
+		program *compiler.Program
+		text    string
+	}{{first, initial}, {current, changed}} {
+		text, ok := check.program.Host().FS().ReadFile(otherPath)
+		if !ok || text != check.text || check.program.GetSourceFile(otherPath).Text() != check.text {
+			t.Fatal("a document observed another generation's source snapshot")
+		}
+	}
+	if current.GetSourceFile(fixture.sourcePath) != first.GetSourceFile(fixture.sourcePath) {
+		t.Fatal("rebuilding the host discarded safe unchanged-AST sharing")
+	}
+	finalizeOther()
+	finalizeFirst()
+	if oldState.borrowers != 0 || fixture.store.programs[key].borrowers != 0 || fixture.store.programs[key].program != current {
+		t.Fatal("a delayed finalizer retained a borrow or replaced the new Program")
+	}
+	loadAgain, _, finalizeAgain := fixture.request(otherURI)
+	again, _, err := loadAgain(fixture.configPath)
+	if err != nil || again != current {
+		t.Fatalf("an unborrowed Program did not resume warm reuse: %v", err)
+	}
+	loadFirst, _, finalizeFirst = fixture.request(fixture.sourceURI)
+	if borrowed, _, err := loadFirst(fixture.configPath); err != nil || borrowed != current {
+		t.Fatalf("first document did not share the new Program: %v", err)
+	}
+	finalizeAgain()
+	state := fixture.store.programs[key]
+	if state == nil || state.program != current {
+		t.Fatal("the remaining borrower lost its Program before close")
+	}
+	tracker := state.tracker.FS
+	delete(fixture.server.documents, fixture.sourceURI)
+	fixture.store.DidClose(fixture.sourceURI)
+	finalizeFirst()
+	if state.tracker.FS == tracker || state.borrowers != 0 || fixture.store.programs[key] != state || fixture.store.documentPrograms[otherURI] != key {
+		t.Fatal("closing the last borrower did not cover the remaining document's Program")
+	}
+}
+
+func TestLintProgramStorePruneRetainsPendingOwner(t *testing.T) {
+	const sourceText = "export const value = 1;\n"
+	fixture := newLintProgramStoreFixture(t, sourceText)
+	otherPath := tspath.NormalizePath(filepath.Join(fixture.server.cwd, "other.ts"))
+	otherConfig := tspath.NormalizePath(filepath.Join(fixture.server.cwd, "other.json"))
+	if err := os.WriteFile(otherPath, []byte(sourceText), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(otherConfig, []byte(`{"compilerOptions":{"noLib":true},"files":["other.ts"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	otherURI := documentURIFromPath(otherPath)
+	fixture.server.documents[otherURI] = sourceText
+	loadFirst, _, finalizeFirst := fixture.request(fixture.sourceURI)
+	if _, source, err := loadFirst(fixture.configPath); err != nil || source == nil {
+		t.Fatalf("load first Program: %v", err)
+	}
+	loadOther, _, finalizeOther := fixture.request(otherURI)
+	other, source, err := loadOther(otherConfig)
+	if err != nil || source == nil {
+		t.Fatalf("load other Program: %v", err)
+	}
+	key := lintProgramLexicalPathID(otherConfig, fixture.server.fs)
+	state := fixture.store.programs[key]
+	finalizeFirst()
+	if state == nil || state.program != other || fixture.store.programs[key] != state || state.borrowers != 1 {
+		t.Fatal("first finalizer pruned a Program with a pending borrower")
+	}
+	finalizeOther()
+	if fixture.store.documentPrograms[otherURI] != key || state.borrowers != 0 {
+		t.Fatal("pending borrower did not finalize its Program owner")
+	}
+	loadOther, _, finalizeOther = fixture.request(otherURI)
+	if borrowed, _, err := loadOther(otherConfig); err != nil || borrowed != other {
+		t.Fatalf("borrow resident Program before close: %v", err)
+	}
+	delete(fixture.server.documents, otherURI)
+	fixture.store.DidClose(otherURI)
+	if fixture.store.programs[key] != state || state.borrowers != 1 {
+		t.Fatal("closing the document dropped its active borrow")
+	}
+	finalizeOther()
+	if fixture.store.programs[key] != nil || state.borrowers != 0 {
+		t.Fatal("stale finalizer retained a Program after the last borrower and owner left")
 	}
 }
 

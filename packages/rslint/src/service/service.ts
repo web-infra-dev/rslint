@@ -12,6 +12,10 @@ import {
   API_REVERSE_CONFIG_LOAD_CAPABILITY,
   API_REVERSE_PLUGIN_LINT_CAPABILITY,
 } from './protocol.js';
+import type {
+  TypeServiceHostRequest,
+  TypeServiceHostResponse,
+} from '../service/plugin-type-service-protocol.js';
 
 const EXIT_REQUEST_TIMEOUT_MS = 1_000;
 
@@ -32,6 +36,20 @@ export class RSLintService {
     this.service.setInboundHandler?.((message) =>
       this.handleInboundRequest(message),
     );
+  }
+
+  /** Serve reads inside an active reverse plugin batch without queueing them
+   * behind the lint request that is waiting for that very batch. */
+  async queryPluginTypes(
+    request: TypeServiceHostRequest,
+  ): Promise<TypeServiceHostResponse> {
+    if (
+      this.closeRequested ||
+      !this.activeLintHandlers?.pluginLint ||
+      !this.service.queryPluginTypes
+    )
+      throw new Error('rslint service has no active plugin type session');
+    return this.service.queryPluginTypes(request);
   }
 
   /**

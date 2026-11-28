@@ -172,6 +172,10 @@ type TargetProjection struct {
 type PluginGeneration struct {
 	ConfigForFile EslintPluginFileConfigResolver
 	WirePath      func(sourcePath string) string
+	// ReleaseOnOwner queues a delayed finalizer on an integration's owner loop.
+	// Only the last detached typed borrower uses it; ordinary joined/native
+	// finalization remains synchronous. It must take ownership and return promptly.
+	ReleaseOnOwner func(ReleaseFunc)
 }
 
 // ArtifactDemand states which optional observation artifacts producers must
@@ -206,8 +210,9 @@ const (
 	// PluginConcurrentJoined starts plugin work before native lint and joins it
 	// before releasing the generation. CLI and API use this mode.
 	PluginConcurrentJoined PluginExecution = iota
-	// PluginAfterNativeJoined detaches plugin work, runs native lint, releases
-	// the generation, and then joins plugin work. LSP fix-all uses this mode.
+	// PluginAfterNativeJoined detaches plugin work, runs native lint, ends native
+	// ownership and joins plugin work. Typed work retains its narrow semantic
+	// borrow until completion. LSP fix-all uses this mode.
 	PluginAfterNativeJoined
 	// pluginProgressiveAfterNative is selected only by
 	// NewProgressiveLintRequest. Integrations cannot opt an ordinary lint/fix
@@ -263,20 +268,22 @@ type ObservationPolicy struct {
 }
 
 // DeferredPluginRun is a single-use, generation-detached enrichment task. It
-// retains frozen wire/config/text only; the executor injects its own transport
-// under its own timeout and cancellation lifecycle.
-type DeferredPluginRun func(
-	ctx context.Context,
-	dispatcher EslintPluginDispatcher,
-) (EslintPluginDispatchOutcome, error)
+// retains frozen wire/config/text and an optional opaque typed session. The
+// executor injects transport under its own timeout and cancellation lifecycle.
+type DeferredPluginRun interface {
+	Run(ctx context.Context, dispatcher EslintPluginDispatcher) (EslintPluginDispatchOutcome, error)
+	// Close discards unstarted work and releases any typed generation borrow.
+	// Run consumes and closes the handle automatically.
+	Close()
+}
 
 // ProgressiveDiagnostics binds baseline presentation and asynchronous
 // enrichment admission to one request-scoped identity. RunPipeline hands off
-// the baseline synchronously only after releasing the generation, then
-// conditionally submits enrichment. Submit takes ownership synchronously and
+// the baseline after releasing native ownership; typed enrichment alone retains
+// a narrow generation borrow. It then conditionally submits enrichment. Submit takes ownership synchronously and
 // returns promptly without running the task inline. Presentation may be staged
 // until inputs are validated; obsolete, unstarted enrichment can be discarded
-// because it owns only detached data. Admitted enrichment runs exactly once.
+// by closing its handle. Admitted enrichment runs exactly once.
 // Timeout, cancellation, transport injection, admission, and presentation belong
 // to the implementation.
 type ProgressiveDiagnostics interface {

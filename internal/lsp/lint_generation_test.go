@@ -3,14 +3,18 @@ package lsp
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/go-json-experiment/json"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/jsonrpc"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
@@ -20,7 +24,165 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/estree"
+	"github.com/web-infra-dev/rslint/internal/typeservice"
 )
+
+type pluginTypeRequestReader struct{ messages chan *lsproto.Message }
+
+func (r pluginTypeRequestReader) Read() (*lsproto.Message, error) {
+	message, ok := <-r.messages
+	if !ok {
+		return nil, io.EOF
+	}
+	return message, nil
+}
+
+func TestLSPTypedEnrichmentReadsItsLeasedGeneration(t *testing.T) {
+	directory, file, raw, fsys := programOver(t, "export const value = 1;\n")
+	generation := newLintGeneration(raw, sourceFileForPath(raw, file, fsys), lspConfigTarget(file, directory, fsys), directory, true,
+		[]rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}, &linter.EslintPluginFileConfig{TypeServices: true}, nil)
+	released := 0
+	presentation := &capturedProgressiveDiagnostics{}
+	_, err := linter.RunPipeline(t.Context(), linter.NewProgressiveLintRequest(linter.GenerationProviderFunc(func(context.Context, linter.SourceSnapshot) (linter.Generation, linter.ReleaseFunc, error) {
+		return generation, func() { released++ }, nil
+	}), linter.ArtifactDemand{}, presentation))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if released != 0 || presentation.run == nil {
+		t.Fatalf("typed enrichment lost lease: %d", released)
+	}
+	reader := pluginTypeRequestReader{messages: make(chan *lsproto.Message, 1)}
+	server := &Server{outgoingQueue: make(chan *lsproto.Message, 1), requestQueue: make(chan *lsproto.RequestMessage, 1), initializeParams: &lsproto.InitializeParams{}, r: reader}
+	readCtx, cancelRead := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancelRead()
+	readDone := make(chan error, 1)
+	go func() { readDone <- server.readLoop(readCtx) }()
+	defer func() { close(reader.messages); <-readDone }()
+	var request *lsproto.RequestMessage
+	outcome, err := presentation.run.Run(t.Context(), linter.EslintPluginDispatchFunc(func(ctx context.Context, input linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		if len(input.Files) == 0 {
+			return &linter.EslintPluginLintResult{}, nil
+		}
+		service := input.Files[0].TypeServices
+		if service == nil {
+			t.Fatal("missing typed document binding")
+		}
+		request = &lsproto.RequestMessage{ID: jsonrpc.NewIDString("typed"), Method: methodTypeService, Params: linter.EslintPluginTypeRequest{Session: service.Session, Generation: service.Binding.Generation, Source: &file}}
+		// No document dispatcher drains requestQueue: a blocking fix-all is
+		// waiting for its reverse plugin request at this exact boundary.
+		reader.messages <- request.Message()
+		var response *lsproto.Message
+		select {
+		case response = <-server.outgoingQueue:
+		case <-readCtx.Done():
+			t.Fatal("nested typed read was blocked behind serialized document work")
+		}
+		if response.Kind != jsonrpc.MessageKindResponse {
+			t.Fatal("type service did not answer on the document connection")
+		}
+		result, ok := response.AsResponse().Result.(*linter.EslintPluginTypeResult)
+		if !ok || result.Source == nil || result.Source.FileName != file || len(result.Source.Tree) == 0 {
+			t.Fatal("wrong source generation reply")
+		}
+		return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{FilePath: input.Files[0].Path}}}, nil
+	}))
+	if err != nil || outcome.DispatchError != nil {
+		t.Fatalf("typed enrichment: %v/%v", err, outcome.DispatchError)
+	}
+	if released != 1 {
+		t.Fatalf("producer release count %d", released)
+	}
+	reader.messages <- request.Message()
+	var reply *lsproto.Message
+	select {
+	case reply = <-server.outgoingQueue:
+	case <-readCtx.Done():
+		t.Fatal("retired session did not answer")
+	}
+	status := reply.AsResponse().Result.(*linter.EslintPluginTypeResult)
+	if status.Status != "closed" {
+		t.Fatal("retired document generation accepted a type query")
+	}
+}
+
+func TestCancelTypedEnrichmentFinalizesBeforeNextSelection(t *testing.T) {
+	directory, file, raw, fsys := programOver(t, "export const value = 1;")
+	started := make(chan struct{})
+	server := &Server{generationReleaseReady: make(chan struct{}, 1), inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle), pluginResultCh: make(chan pluginLintResult, 1)}
+	server.eslintPluginDispatch = func(ctx context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		if len(request.Files) == 0 {
+			return &linter.EslintPluginLintResult{}, nil
+		}
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	generation := newLintGeneration(raw, sourceFileForPath(raw, file, fsys), lspConfigTarget(file, directory, fsys), directory, true,
+		[]rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}, &linter.EslintPluginFileConfig{TypeServices: true}, nil)
+	generation.Plugin.ReleaseOnOwner = server.queueGenerationRelease
+	finalized := 0
+	presentation := &capturedProgressiveDiagnostics{}
+	_, err := linter.RunPipeline(t.Context(), linter.NewProgressiveLintRequest(linter.GenerationProviderFunc(func(context.Context, linter.SourceSnapshot) (linter.Generation, linter.ReleaseFunc, error) {
+		return generation, func() { finalized++ }, nil
+	}), linter.ArtifactDemand{}, presentation))
+	if err != nil {
+		t.Fatal(err)
+	}
+	uri := documentURIFromPath(file)
+	server.startDiagnosticEnrichment(t.Context(), uri, 1, "config", presentation.run)
+	<-started
+	if finalized != 0 {
+		t.Fatal("typed generation finalized while a worker could still query")
+	}
+	server.cancelInflightPluginDispatch(uri)
+	if finalized != 1 {
+		t.Fatal("cancel/join did not finalize old generation before the next selection")
+	}
+	// The next selection must not inherit a pending callback for its old owner.
+	server.drainGenerationReleases()
+	if finalized != 1 {
+		t.Fatal("old generation finalized twice")
+	}
+}
+
+func TestLSPSourceOnlyFallbackDoesNotAdmitPluginTypeServices(t *testing.T) {
+	directory, file, raw, fsys := programOver(t, "export const value = 1;")
+	config := &linter.EslintPluginFileConfig{TypeServices: true}
+	generation := newLintGeneration(raw, sourceFileForPath(raw, file, fsys), lspConfigTarget(file, directory, fsys), directory, false,
+		[]rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}, config, nil)
+	if !config.TypeServices {
+		t.Fatal("generation mutated the frozen effective config")
+	}
+	_, err := linter.RunPipeline(t.Context(), linter.NewLintRequest(linter.GenerationProviderFunc(func(context.Context, linter.SourceSnapshot) (linter.Generation, linter.ReleaseFunc, error) {
+		return generation, nil, nil
+	}), linter.ObservationPolicy{}, linter.EslintPluginDispatchFunc(func(ctx context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		if len(request.Files) != 1 || request.Files[0].TypeServices == nil || !request.Files[0].TypeServices.SyntaxOnly {
+			t.Fatal("source-only fallback borrowed a checker from its compiler container")
+		}
+		service := request.Files[0].TypeServices
+		opened, err := linter.QueryEslintPluginTypes(ctx, linter.EslintPluginTypeRequest{
+			Session:    service.Session,
+			Generation: service.Binding.Generation,
+			Open:       true,
+			Projection: &service.Binding.SourceFileName,
+		})
+		if err != nil || opened.Descriptor == nil || !opened.Descriptor.SyntaxOnly {
+			t.Fatalf("source-only fallback did not expose syntax-only descriptor: %v", err)
+		}
+		if _, err := linter.QueryEslintPluginTypes(ctx, linter.EslintPluginTypeRequest{
+			Session:    service.Session,
+			Generation: service.Binding.Generation,
+			Queries:    []typeservice.Query{{Scope: service.Binding.Scope, Request: &typeservice.CheckerRequest{Op: "void"}}},
+		}); err == nil {
+			t.Fatal("source-only fallback allowed a semantic checker query")
+		}
+		return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{FilePath: request.Files[0].Path}}}, nil
+	})))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func runLSPGenerationForTest(
 	ctx context.Context,
@@ -150,7 +312,7 @@ func TestLSPGenerationReleaseLifecycle(t *testing.T) {
 			t.Fatalf("release/plugin run = %d/%v, want 1/non-nil", releases, presentation.run != nil)
 		}
 		var request linter.EslintPluginLintRequest
-		outcome, err := presentation.run(context.Background(), linter.EslintPluginDispatchFunc(func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		outcome, err := presentation.run.Run(context.Background(), linter.EslintPluginDispatchFunc(func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 			request = got
 			return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{FilePath: got.Files[0].Path}}}, nil
 		}))
@@ -305,4 +467,30 @@ func TestLSPProjectConfigErrorClassification(t *testing.T) {
 			t.Fatalf("error/loads/releases = %v/%d/%d, want unclassified loader error/1/1", err, loads, releases)
 		}
 	})
+}
+
+func TestLSPTypeServiceJSONv2OmitsZeroFields(t *testing.T) {
+	raw, err := json.Marshal(&linter.EslintPluginTypeResult{
+		Descriptor: &typeservice.Descriptor{
+			Generation:       1,
+			CurrentDirectory: "/repo",
+			Sources: []typeservice.Source{{
+				FileName: "/repo/a.ts",
+				Path:     "/repo/a.ts",
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := string(raw)
+	if strings.Contains(encoded, "impliedNodeFormat") {
+		t.Fatalf("JSON v2 marshaled zero ImpliedNodeFormat: %s", encoded)
+	}
+	if strings.Contains(encoded, "syntaxOnly") {
+		t.Fatalf("JSON v2 marshaled false SyntaxOnly: %s", encoded)
+	}
+	if !isBlockingMethod(lsproto.MethodShutdown) {
+		t.Fatal("shutdown must run serially on dispatchLoop")
+	}
 }

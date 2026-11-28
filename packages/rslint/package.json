@@ -33,8 +33,9 @@
   "scripts": {
     "build:bin": "node ../../scripts/place-host-build.mjs bin",
     "build:debug": "node ../../scripts/place-host-build.mjs bin --debug",
-    "build:js": "rs lib",
-    "dev": "rs lib --watch",
+    "gen:enums": "node ../../scripts/gen-type-service-enums.mjs",
+    "build:js": "pnpm gen:enums && rs lib",
+    "dev": "pnpm gen:enums && rs lib --watch",
     "build": "pnpm build:bin && pnpm build:js",
     "test": "rs test",
     "test:update": "rs test -u"

@@ -107,7 +107,7 @@ The directory map below folds the high-level module relationships into the packa
 | `cmd/rslint/`                        | Main Go binary entry point with CLI, API, and LSP modes                                                                        | Owns mode selection and process stdio/exit-code composition. The default CLI prepares config, targets, Program-generation and final disk-projection adapters for `internal/linter.RunPipeline`; `--api` delegates concrete requests to `internal/api/server`; `--lsp` delegates to `internal/lsp`                                                                                                                                                                     |
 | `internal/output/`                   | Report model, lifecycle/status text, colors, and stdout formatters                                                             | Consumes a completed presentation-only `Report` assembled by the CLI and renders `default`, `jsonline`, `github`, or `gitlab`. Its diagnostics contain only message, location, severity, and optional immutable source-text projections; origin has already been reduced into report counts. The package imports no linter, rule, config, Program, AST, VFS, or compiler-core contracts                                                                               |
 | `cmd/tsgo/`                          | ts-go semantic inspection/export tool                                                                                          | Talks directly to `typescript-go` and bypasses the lint framework; consumed by `packages/tsgo` and `crates/tsgo-client`                                                                                                                                                                                                                                                                                                                                               |
-| `internal/ipc/`                      | Generic framed requests and text/binary attachment transport                                                                   | Owns request matching, shared-memory publication, acknowledgements and private platform backends. Application message structures and decoding belong to their consumers; IPC imports no linter or plugin implementation. Node uses `packages/rslint/src/ipc`, and Rust provides byte access through `memory_transport`                                                                                                                                                |
+| `internal/ipc/`                      | Generic framed requests, attachment transport, and bidirectional shared-memory RPC                                             | Owns request matching, shared-memory publication, acknowledgements, bidirectional RPC slot serving, and private platform backends. Application message structures and decoding belong to their consumers; IPC imports no linter or plugin implementation. Node uses `packages/rslint/src/ipc`, and Rust provides byte access and worker RPC transport through `memory_transport` and `rpc_transport`                                                                  |
 | `internal/api/`                      | stdio IPC protocol, wire types, and generic bidirectional service for JS/WASM integration                                      | Defines the stable request/response boundary used by `packages/rslint`, `packages/rslint-wasm`, and `internal/api/server`; it does not import concrete lint, config, Program-loader, or command implementations                                                                                                                                                                                                                                                       |
 | `internal/api/server/`               | Concrete rslint API request handlers                                                                                           | Implements lint and AST-inspection requests over `internal/api`, owns API-specific paths, request-overlay generation adapters, reverse config adapters, and structured response projection; it delegates lint planning, execution, and in-memory fix application to `internal/linter`                                                                                                                                                                                 |
 | `internal/api/plugin/`               | Reverse plugin RPC adapter shared by CLI and API hosts                                                                         | Connects the linter batch interface to API requests and channel-owned output bytes. CLI and API handlers compose it directly; language projection and generic IPC import none of its plugin policy.                                                                                                                                                                                                                                                                   |
@@ -1704,8 +1704,11 @@ data, including invalid UTF-8 and NUL. Storage, publication and lifetime do not
 depend on file paths, source code, plugin rules or an application message kind.
 Inline binary attachments use base64; negotiated shared memory avoids that
 encoding and carries only attachment ranges in the control frame.
-Shared-memory acceleration currently covers Go-to-Node request attachments;
-Node-to-Go attachments use the same text/binary contract inline.
+Shared-memory acceleration covers Go-to-Node request and response attachments;
+Node-to-Go attachments use the same text/binary contract inline. An inbound Go
+handler returns `ResponseWithAttachments` with independently owned values. Node
+copies response attachments before resolving the request, so callers receive
+owned bytes without managing a native lease.
 
 One logical request can use multiple memory slots. The channel packs complete
 attachments into the available storage, including attachments that span slots,
@@ -1855,6 +1858,88 @@ queries observe the public arrays. These views retain no transport capability
 or original frame buffer. Token value/range/location construction remains in
 languages/js, while caching and ESLint query behavior belong to SourceCode.
 
+Production CLI, API and LSP admit typed parser services only when the effective
+per-file config selects `parserOptions.project` or `projectService` and the
+already bound Program represents the selected project and can supply its checker.
+LSP also gates this on the selector's `hasTypeInfo` result: its source-only fallback
+compiler container is never eligible. Files without typed eligibility receive a
+syntax-only session backed by frozen value metadata and source text, so they
+never retain a Program or compiler AST. The linter registers one semantic
+session per typed Program, with an opaque random connection/session identity and a
+numeric generation. Each streamed binding creates its sessions within the
+existing checker-count reservation. Native and typed work share that Program
+until both finish. When a binding owns typed plugin sessions, its plugin
+dispatch follows the native pass so exclusive checker leases and declaration
+diagnostics never contend with native shard workers; source-only plugins and
+independent bindings retain their parallel scheduling.
+An eligible file arrives with its ordinary ESTree frame, a leased binding and
+the parser services flags. A rule can inspect the Program facade and map
+availability during creation or traversal. A Program method or map operation
+opens the descriptor and worker client on demand. Go constructs compiler syntax
+and exact origin tables only when the rule needs the mappings. Origin projection
+reuses the ESTree converter's node IDs and skips token scanning and frame encoding.
+Detached optional chain prefixes retain reverse aliases to their original
+frame expressions.
+
+The host retains the descriptor and a bounded main-thread packet cache after the
+first open. A worker reuses its Program facade and semantic client (with a
+bounded 8 MiB per-worker fact cache) across files in the same session. Each
+worker lazily opens one persistent `HostTypeBridge` (`MessagePort` plus a
+12-byte `SharedArrayBuffer` wake/cancel control block) on its first synchronous
+read and reuses it across files. On CLI and native API sessions where Go
+advertises shared-memory RPC support, semantic checker queries bypass the main
+thread entirely via a direct binary shared-memory RPC slot (`Worker ↔ Go`), with
+per-slot supplemental-record deduplication on the Go `Session` (tracking
+deliveries per `(slot, workerEpoch)` so worker respawns always receive fresh
+records) and automatic fallback to `HostTypeBridge` for `ProgramRequest`,
+`suggestionDiagnostics`, oversized requests, or unavailable channels. Fallback
+and editor (LSP) reads flow through `HostTypeBridge` and the asynchronous
+`typeService` request on the native connection (or `rslint/typeService` on the
+editor connection). The LSP read loop routes only this leased-session request
+directly to its existing asynchronous dispatcher, retaining cancellation
+registration while serialized fix-all waits for a plugin reply. Document and
+config requests keep their FIFO queue. Shared service protocol types contain no
+worker or native capabilities. Native fallback replies use generic binary
+response attachments and are copied/released before the promise resolves; LSP
+serializes those binary records as base64. Failures, unsupported facade methods
+and stale identities remain errors. The host splits shallow supplemental facts
+into canonical query keys before caching them in its bounded per-session packet
+map (up to 8 MiB per session within a 32 MiB host cap, allocated lazily on
+demand); cache hits answer subsequent fallback workers without a Go IPC
+round-trip. No native mapping lease survives a query response.
+
+Typed progressive work retains a reference-counted borrow of the original
+producer after the native baseline completes. Its detached task holds only an
+opaque session lease, and its closable `DeferredPluginRun` transfers ownership to
+the executor. Dropping an unstarted stale presentation calls `Close`; execution,
+cancellation, worker failure and host shutdown cancel outstanding reads and close
+the session before releasing that producer borrow. Host retirement runs under its own bounded deadline without contending for
+file-lint dispatch slots, including after the LSP
+fix-all lint budget expires. A cleanup failure produces a protocol notice and
+preserves completed diagnostics.
+LSP queues the last detached borrower's finalizer on its existing
+dispatch loop, drains it after cancellation joins and before new selection, and
+rejects finalization callbacks whose resident owner was replaced. A successful resident
+request borrows its immutable Program until finalization. Another document in
+the same unchanged project can share that Program and frozen filesystem. A
+changed project uses a fresh tracker and host while the older snapshot is still
+borrowed. The last borrower drains the tracker for watcher coverage, and active
+borrows keep their Programs resident while requests establish document ownership.
+The same-document cancel/join path releases its previous borrow before selection.
+Watcher coverage and owner maps stay on the dispatch loop. Source-only detached
+work releases the producer before
+baseline publication. An explicit `retiredTypeServices` plugin request ends host
+and worker caches after all of a session's windows finish. No semantic fact is
+reused across edited, autofix or reconfigured Program generations. The separate
+editor client forwards nested reads through its existing Go connection.
+
+The worker imports a checked-in generated TypeScript enum/metadata table
+(`scripts/gen-type-service-enums.mjs` ->
+`packages/rslint/src/languages/js/type-service-compiler-data.generated.ts`)
+verified by unit tests against the pinned `typescript` devDependency, so
+packaged bundles carry no custom build plugin and no runtime `typescript`
+dependency.
+
 The listener dispatcher preserves one specificity-sorted order for simple and
 complex selectors. Only complex ESQuery matches prepare an ancestor array,
 shared within the current enter or exit phase. Simple listeners do not copy
@@ -1867,10 +1952,12 @@ and forwards configuration keys; workers own configuration lookup. Neither the
 plugin adapter nor Node IPC performs a separate canonical base64 validation
 pass. Native mapping bounds, publication generations and exact release
 acknowledgements remain transport invariants. API protocol 5.0.0 requires
-matching peers, with no old text-input negotiation or parser fallback. Detached
-LSP continuations contain owned frames, diagnostic text and cloned JSON
-metadata, with no SourceFile, checker, mutable observer or native rule graph.
-The generation lease ends before worker execution. Joined CLI/API tasks finish
+matching peers, with no old text-input negotiation or parser fallback.
+Source-only detached LSP continuations contain owned frames, diagnostic text and
+cloned JSON metadata, with no SourceFile, checker, mutable observer or native
+rule graph, and release their generation lease before worker execution (typed
+detached continuations retain a reference-counted producer borrow until
+completion or cancellation as described above). Joined CLI/API tasks finish
 within the original generation lease. There is no new transport package, AST
 cache, plugin scheduler or Program authority.
 
@@ -1934,8 +2021,11 @@ If native readers outlive a handler, the result returns immediately without an
 acknowledgement. `IpcClient` retains only a release function and request ID and
 polls pending leases with one unreferenced 25 ms timer. When a lease becomes
 reusable, a payload-free `transportRelease` frame carries its original request
-ID and exact ordered batch set. Go retains that publication until the ACK or
-channel close; the control frame never resolves an application request. Both
+ID and exact ordered batch set. Response attachments use the same release frame
+with `transport.response: true`, distinguishing them from an opposite-direction
+request with the same numeric ID. Node releases even an orphan response's
+attachments; no native capability escapes a response. Go retains each publication
+until the ACK or channel close; the control frame never resolves an application request. Both
 queues are bounded by occupied slots. Closing the session cancels the timer and
 discards pending reclamation; outstanding native readers still pin their mapping.
 The shared plugin host resolves file attachment indices before worker dispatch.
@@ -1962,6 +2052,25 @@ not slot capacity. A reader pins both views for every batch. The generic `readBy
 chunks directly into one independent, Node-owned Buffer. JavaScript writes
 cannot mutate a published snapshot, and Buffer lifetime does not delay slot
 reuse. Rust contains no parser, ESTree schema, filename, BOM or plugin policy.
+
+When Go registers a synchronous batch handler on an IPC channel, `transportConfig`
+also advertises an optional bidirectional shared-memory RPC layout (`rpc`: 16
+slots × 64 KiB payload plus 128-byte cache-line-isolated slot headers). Unix
+`spawnIpcProcess` reserves anonymous inherited descriptors at stdio 4 (shared
+memory) and 5 (a Unix socket pair doorbell) with zero backing pages committed until
+activation; Windows allocates nothing before activation and duplicates anonymous
+section and event handles (plus a `SYNCHRONIZE` process handle for peer-death
+detection) lazily. Activation runs via `transportRpcOpen` only when a plugin
+host is constructed (`IpcClient.ensureRpcOpen()`), handing `WorkerPool` a pure
+`RpcHostChannel` slot-lease interface so the plugin host never imports native
+bindings. Each worker receives plain integer slot credentials (`channelId`,
+`slot`, `epoch`, `slotSize`) via `workerData` and invokes stateless
+`rpc_call_sync` with `SeqCst` Dekker sleep/wake handshakes, chunked streaming
+for replies exceeding one slot, and CAS slot abandonment/quarantine on
+cancellation; responses copy into Node-owned `Buffer`s with zero worker-isolate
+finalization hooks. Go's scanner executes ready slot batches inline on its scanner
+goroutine (offloading only rare >64 KiB chunked replies) so concurrent workers
+coalesce naturally into one checker lease without per-query goroutine churn.
 
 JavaScript language data lives in `packages/rslint/src/languages/js`:
 ESTree types, the frame schema/decoder, source positions, visitor keys, token
@@ -2272,9 +2381,9 @@ Plugin execution has two paths:
 
 String plugin declarations select bundled Go plugin namespaces. Live third-party plugin objects require a JS/TS module config. The repository currently ships Go implementations for TypeScript ESLint, Import, Jest, JSX accessibility, Node.js (`node`), Promise, React, React Hooks, Rstest, and Unicorn rule namespaces.
 
-Only direct callers of the ESLint rule runner (`lintFile`) can supply a factory
-for `sourceCode.parserServices`. Syntax-only sessions map between ESTree and
-TypeScript nodes, expose `program: null`, and preserve the file's decorator and
+The ESLint rule runner (`lintFile`) receives `sourceCode.parserServices` through
+a per-file factory. Syntax-only sessions map between ESTree and TypeScript
+nodes, expose `program: null`, and preserve the file's decorator and
 `isolatedDeclarations` flags. Typed sessions also expose a read-only `Program`
 (including the diagnostic methods used by `ts.getPreEmitDiagnostics`, source
 file queries, and compiler options) and the rule-facing `TypeChecker` subset
@@ -2287,11 +2396,10 @@ methods are intentionally omitted.
 
 `internal/typeservice` runs queries against the existing Go `Program` (leasing
 the pool's persistent checker via `CheckerLifetimeAPI` on project/LSP pools, and
-requiring CLI callers to run typed JS sessions outside native checker-shard
-leases). A follow-up bridge PR will connect the worker transport to the CLI/LSP
-host; until then, `TypeServiceClient` runs standalone over a synchronous
-`QueryTransport`. Node maps belong to one file, while the client preserves type,
-symbol and signature identities across files in its Program generation.
+running CLI typed JS plugin sessions after native lint work so native
+checker-shard leases and non-exclusive declaration emit checks never race with
+`Session` queries). Node maps belong to one file, while the client preserves
+type, symbol and signature identities across files in its Program generation.
 
 ### Rule Extension Points
 

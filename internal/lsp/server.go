@@ -60,6 +60,7 @@ func NewServer(opts *ServerOptions) *Server {
 		documents:              make(map[lsproto.DocumentUri]string),
 		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		refreshCh:              make(chan struct{}, 1),
+		generationReleaseReady: make(chan struct{}, 1),
 		pluginResultCh:         make(chan pluginLintResult, 16),
 		docGeneration:          make(map[lsproto.DocumentUri]uint64),
 		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
@@ -142,12 +143,14 @@ type Server struct {
 	defaultLibraryPath string
 
 	backgroundCtx    context.Context
+	dispatchCtx      context.Context
 	initializeParams *lsproto.InitializeParams
 	positionEncoding lsproto.PositionEncodingKind
 	watchEnabled     bool
 	watchers         collections.SyncSet[project.WatcherID]
 
 	initialized  bool
+	shuttingDown atomic.Bool
 	lintPrograms *lintProgramStore
 
 	// rslint config
@@ -206,7 +209,10 @@ type Server struct {
 
 	// refreshCh coalesces project and configuration changes on the dispatch
 	// loop, which owns document and Program state.
-	refreshCh chan struct{}
+	refreshCh              chan struct{}
+	generationReleaseReady chan struct{}
+	generationReleaseMu    sync.Mutex
+	generationReleases     []linter.ReleaseFunc
 
 	lintSchedule            diagnosticScheduler
 	pendingDiagnosticResult *documentProgressiveDiagnostics
@@ -224,6 +230,7 @@ type Server struct {
 	// on a serialized config transaction and is captured before dispatching work
 	// to a goroutine.
 	eslintPluginConfigGeneration string
+	activePluginGeneration       atomic.Pointer[string]
 	// speculativeGeneration, when non-nil, overrides speculative generation
 	// acquisition. Production leaves it nil and builds Programs from one captured
 	// editor environment; tests may inject generations while execution remains in
@@ -422,6 +429,13 @@ func (s *Server) readLoop(ctx context.Context) error {
 				if req.ID != nil {
 					s.registerClientRequest(ctx, req)
 				}
+				if req.Method == methodTypeService {
+					// A serialized fix-all may be waiting for this nested read.
+					// It owns only a leased semantic session and touches no document
+					// or configuration maps, so use the existing async dispatcher.
+					s.dispatchRequest(ctx, req, func() {})
+					continue
+				}
 				s.requestQueue <- req
 			}
 		}
@@ -481,6 +495,10 @@ func (s *Server) read() (*lsproto.Message, error) {
 
 func (s *Server) dispatchLoop(ctx context.Context) (err error) {
 	ctx, lspExit := context.WithCancel(ctx)
+	s.dispatchCtx = ctx
+	// Cancel ctx before draining releases so teardown callbacks do not issue
+	// fresh watcher registrations while the dispatch loop is shutting down.
+	defer s.finishGenerationReleases()
 	defer lspExit()
 	// Scheduled native work runs outside a request handler, but must retain
 	// the same fatal-panic boundary as blocking document notifications.
@@ -494,6 +512,7 @@ func (s *Server) dispatchLoop(ctx context.Context) (err error) {
 	defer timer.Stop()
 	var pluginResult *pluginLintResult
 	for {
+		s.drainGenerationReleases()
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -543,6 +562,7 @@ func (s *Server) dispatchLoop(ctx context.Context) (err error) {
 			s.dispatchRequest(ctx, req, lspExit)
 		case <-s.refreshCh:
 			s.queueOpenDocumentDiagnostics()
+		case <-s.generationReleaseReady:
 		case result := <-s.pluginResultCh:
 			pluginResult = &result
 		case <-timerCh:
@@ -728,6 +748,25 @@ var handlers = sync.OnceValue(func() handlerMap {
 	registerNotificationHandler(handlers, lsproto.WorkspaceDidChangeWatchedFilesInfo, (*Server).handleDidChangeWatchedFiles)
 	registerNotificationHandler(handlers, lsproto.SetTraceInfo, (*Server).handleSetTrace)
 	registerRequestHandler(handlers, lsproto.TextDocumentCodeActionInfo, (*Server).handleCodeAction)
+	handlers[methodTypeService] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
+		if req.ID == nil {
+			return fmt.Errorf("%w: rslint/typeService must be a request", lsproto.ErrorCodeInvalidRequest)
+		}
+		params, err := decodeParams[linter.EslintPluginTypeRequest](req)
+		if err != nil {
+			return err
+		}
+		result, err := linter.QueryEslintPluginTypes(ctx, params)
+		if err != nil {
+			if status := linter.PluginTypeFailure(err); status != nil {
+				s.sendResult(req.ID, status)
+				return nil
+			}
+			return err
+		}
+		s.sendResult(req.ID, result)
+		return nil
+	}
 
 	handlers[methodConfigRefresh] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
 		if req.ID == nil {
@@ -797,7 +836,10 @@ func decodeParams[Req any](req *lsproto.RequestMessage) (Req, error) {
 }
 
 func (s *Server) handleShutdown(ctx context.Context, params lsproto.NoParams) (lsproto.ShutdownResponse, error) {
+	s.shuttingDown.Store(true)
 	s.initialized = false
+	s.invalidateOpenDocumentDiagnostics()
+	s.finishGenerationReleases()
 	s.invalidateLintProjectCaches()
 	return lsproto.ShutdownResponse{}, nil
 }
@@ -826,6 +868,7 @@ func isBlockingMethod(method lsproto.Method) bool {
 	switch method {
 	case lsproto.MethodInitialize,
 		lsproto.MethodInitialized,
+		lsproto.MethodShutdown,
 		lsproto.MethodTextDocumentDidOpen,
 		lsproto.MethodTextDocumentDidChange,
 		lsproto.MethodTextDocumentDidSave,

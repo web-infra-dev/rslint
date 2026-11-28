@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 )
@@ -40,27 +41,214 @@ var (
 //     must run in its own phase outside native shards.
 //
 // Locking order: lifeMu (RLock for active operations, Lock for Close) is always
-// acquired before checkMu (serializing exclusive checker access and handle maps).
+// acquired before checkMu (serializing exclusive checker access and handle maps),
+// which may acquire leaf locks recordMu or sentMu (never nested with each other).
 type Session struct {
-	lifeMu       sync.RWMutex
-	checkMu      sync.Mutex
-	extraMu      sync.RWMutex
-	poisoned     atomic.Bool
-	program      *program.Program
-	syntaxOnly   bool
-	anchor       *ast.SourceFile
-	eligible     map[*ast.SourceFile]bool
-	extraSources map[string]*ast.SourceFile
-	checker      *checker.Checker
-	generation   uint32
-	types        map[uint32]*checker.Type
-	symbols      map[uint32]*ast.Symbol
-	signatures   map[uint32]*checker.Signature
-	indexInfoIDs map[*checker.IndexInfo]uint32
+	lifeMu           sync.RWMutex
+	checkMu          sync.Mutex
+	extraMu          sync.RWMutex
+	recordMu         sync.RWMutex
+	sentMu           sync.Mutex
+	poisoned         atomic.Bool
+	closed           bool
+	program          *program.Program
+	sourceFiles      []*ast.SourceFile
+	syntaxOnly       bool
+	hasJSFiles       bool
+	syntax           *syntaxSessionData
+	anchor           *ast.SourceFile
+	eligible         map[*ast.SourceFile]bool
+	extraSources     map[string]*ast.SourceFile
+	checker          *checker.Checker
+	generation       uint32
+	types            map[uint32]*checker.Type
+	symbols          map[uint32]*ast.Symbol
+	signatures       map[uint32]*checker.Signature
+	indexInfoIDs     map[*checker.IndexInfo]uint32
+	recordCache      map[recordCacheKey]cachedRecord
+	recordCachePrev  map[recordCacheKey]cachedRecord
+	recordCacheBytes int
+	// Per-SHM-slot supplemental record deduplication, guarded by leaf lock sentMu.
+	// Bit i (0..maxSentMaskSlots-1) tracks cacheable supplemental records
+	// already delivered to slot i at slotEpoch[i]. Two-generation rotation keeps
+	// tracked entries well below each worker's 8 MiB fact LRU.
+	sentMask     map[recordCacheKey]uint64
+	sentMaskPrev map[recordCacheKey]uint64
+	slotEpoch    [maxSentMaskSlots]uint32
+}
+
+const (
+	// Two-generation rotating cache (8 MiB active + up to 8 MiB previous = 16 MiB
+	// total cap) so large sessions keep evicting cold entries without freezing.
+	maxRecordCacheGenBytes = 8 << 20
+	maxSentMaskSlots       = 64
+	maxSentMaskGenEntries  = 16384
+)
+
+type recordCacheKey struct {
+	tag uint8
+	id  uint32
+}
+
+type cachedRecord struct {
+	packet     []byte
+	subSymbols []uint32
+}
+
+// isContextSensitiveSignatureDecl conservatively identifies declaration kinds
+// whose SignatureFact fields (typeParameters, thisParameter) may be populated
+// lazily during contextual checking or late-bound accessor merging.
+func isContextSensitiveSignatureDecl(decl *ast.Node) bool {
+	if decl == nil {
+		return false
+	}
+	switch decl.Kind {
+	case ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return true
+	default:
+		return false
+	}
+}
+
+// isCacheableSignature checks whether a SignatureFact is safe to memoize for
+// the rest of the Session. Must be called while holding checkMu.
+// In programs with JS files, a JSDoc @type tag on a context-sensitive function
+// can attach FullSignature pointing to an existing call signature whose
+// typeParameters/thisParameter are mutated in place during contextual checking.
+func (s *Session) isCacheableSignature(sig *checker.Signature) bool {
+	if sig == nil || isContextSensitiveSignatureDecl(sig.Declaration()) {
+		return false
+	}
+	if s.hasJSFiles && sig.Flags()&checker.SignatureFlagsConstruct == 0 &&
+		(len(sig.TypeParameters()) == 0 || sig.ThisParameter() == nil) {
+		return false
+	}
+	return true
+}
+
+// isCacheableRecord is the single authority on per-record fact immutability
+// across both Go and downstream JS caches. Must be called while holding checkMu.
+func (s *Session) isCacheableRecord(tag uint8, id uint32) bool {
+	switch tag {
+	case recordTagType:
+		return s.types[id] != nil
+	case recordTagSymbol:
+		sym := s.symbols[id]
+		return sym != nil && sym.Flags&ast.SymbolFlagsTransient == 0
+	case recordTagSignature:
+		return s.isCacheableSignature(s.signatures[id])
+	default:
+		return false
+	}
+}
+
+func (s *Session) getCachedRecord(tag uint8, id uint32) (cachedRecord, bool) {
+	if tag == 0 || id == 0 {
+		return cachedRecord{}, false
+	}
+	key := recordCacheKey{tag: tag, id: id}
+	s.recordMu.RLock()
+	entry, ok := s.recordCache[key]
+	if !ok && s.recordCachePrev != nil {
+		entry, ok = s.recordCachePrev[key]
+	}
+	s.recordMu.RUnlock()
+	return entry, ok
+}
+
+// putCachedRecord stores an immutable encoded record. Callers must hold lifeMu.RLock.
+func (s *Session) putCachedRecord(tag uint8, id uint32, packet []byte, subSymbols []uint32) {
+	if tag == 0 || id == 0 || len(packet) == 0 {
+		return
+	}
+	cost := len(packet) + len(subSymbols)*4 + 64
+	if cost > maxRecordCacheGenBytes {
+		return
+	}
+	s.recordMu.Lock()
+	defer s.recordMu.Unlock()
+	key := recordCacheKey{tag: tag, id: id}
+	if _, exists := s.recordCache[key]; exists {
+		return
+	}
+	if s.recordCacheBytes+cost > maxRecordCacheGenBytes {
+		s.recordCachePrev = s.recordCache
+		s.recordCache = make(map[recordCacheKey]cachedRecord)
+		s.recordCacheBytes = 0
+	}
+	if s.recordCache == nil {
+		s.recordCache = make(map[recordCacheKey]cachedRecord)
+	}
+	s.recordCache[key] = cachedRecord{packet: packet, subSymbols: subSymbols}
+	s.recordCacheBytes += cost
+}
+
+func directRecordCacheKey(req Request) (uint8, uint32, bool) {
+	tag := recordTag(req.operation())
+	if tag == 0 {
+		return 0, 0, false
+	}
+	switch r := req.(type) {
+	case *TypeRequest:
+		return tag, r.ID, true
+	case *SymbolRequest:
+		return tag, r.ID, true
+	case *SignatureRequest:
+		return tag, r.ID, true
+	default:
+		return 0, 0, false
+	}
+}
+
+// syntaxSessionData stores only detached value metadata and source text so
+// syntax-only sessions never retain a Program or compiler SourceFile, while
+// lazily caching each parsed AST across queries until Session.Close.
+type syntaxSessionData struct {
+	currentDirectory string
+	compilerOptions  json.RawMessage
+	caseSensitive    bool
+	order            []string
+	files            map[string]*syntaxSourceEntry
+	byKey            map[string]string
+}
+
+type syntaxSourceEntry struct {
+	fileName     string
+	path         tspath.Path
+	text         string
+	parseOptions ast.SourceFileParseOptions
+	scriptKind   core.ScriptKind
+	desc         Source
+
+	parseOnce sync.Once
+	parsed    *ast.SourceFile
+}
+
+func (e *syntaxSourceEntry) sourceFile() *ast.SourceFile {
+	e.parseOnce.Do(func() {
+		e.parsed = parser.ParseSourceFile(e.parseOptions, e.text, e.scriptKind)
+	})
+	return e.parsed
+}
+
+func (d *syntaxSessionData) lookup(name string) *syntaxSourceEntry {
+	if d == nil {
+		return nil
+	}
+	if entry := d.files[name]; entry != nil {
+		return entry
+	}
+	if canonical, ok := d.byKey[tspath.NormalizePath(name)]; ok {
+		return d.files[canonical]
+	}
+	if canonical, ok := d.byKey[string(tspath.ToPath(name, d.currentDirectory, d.caseSensitive))]; ok {
+		return d.files[canonical]
+	}
+	return nil
 }
 
 type Descriptor struct {
-	SyntaxOnly        bool            `json:"syntaxOnly,omitempty"`
+	SyntaxOnly        bool            `json:"syntaxOnly,omitempty,omitzero"`
 	Generation        uint32          `json:"generation"`
 	CurrentDirectory  string          `json:"currentDirectory"`
 	CompilerOptions   json.RawMessage `json:"compilerOptions"`
@@ -69,7 +257,7 @@ type Descriptor struct {
 }
 
 type Source struct {
-	ImpliedNodeFormat core.ResolutionMode `json:"impliedNodeFormat,omitempty"`
+	ImpliedNodeFormat core.ResolutionMode `json:"impliedNodeFormat,omitempty,omitzero"`
 	CheckJSDirective  *checkJSDirective   `json:"checkJsDirective,omitempty"`
 	FileName          string              `json:"fileName"`
 	Path              string              `json:"path"`
@@ -108,23 +296,80 @@ func newSession(ctx context.Context, p *program.Program, eligible []*ast.SourceF
 	if !p.IsValid() || len(eligible) == 0 {
 		return nil, errors.New("type services require a bound Program and explicitly eligible sources")
 	}
+	if syntaxOnly {
+		options := json.RawMessage("{}")
+		if opts := p.Options(); opts != nil {
+			var err error
+			options, err = json.Marshal(compilerOptions(opts))
+			if err != nil {
+				return nil, err
+			}
+		}
+		currentDir := p.CurrentDirectory()
+		caseSensitive := p.FS() != nil && p.FS().UseCaseSensitiveFileNames()
+		data := &syntaxSessionData{
+			currentDirectory: currentDir,
+			compilerOptions:  options,
+			caseSensitive:    caseSensitive,
+			order:            make([]string, 0, len(eligible)),
+			files:            make(map[string]*syntaxSourceEntry, len(eligible)),
+			byKey:            make(map[string]string, len(eligible)*3),
+		}
+		for _, f := range eligible {
+			if !p.OwnsSourceFile(f) {
+				return nil, errors.New("ineligible or foreign type service source")
+			}
+			fileName := f.FileName()
+			if _, exists := data.files[fileName]; exists {
+				continue
+			}
+			entry := &syntaxSourceEntry{
+				fileName:     fileName,
+				path:         f.Path(),
+				text:         f.Text(),
+				parseOptions: f.ParseOptions(),
+				scriptKind:   f.ScriptKind,
+				desc:         syntaxSource(f),
+			}
+			data.order = append(data.order, fileName)
+			data.files[fileName] = entry
+			data.byKey[tspath.NormalizePath(fileName)] = fileName
+			if pathKey := string(f.Path()); pathKey != "" {
+				data.byKey[pathKey] = fileName
+			}
+			data.byKey[string(tspath.ToPath(fileName, currentDir, caseSensitive))] = fileName
+		}
+		slices.Sort(data.order)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return &Session{
+			syntaxOnly: true,
+			syntax:     data,
+			generation: nextGeneration.Add(1),
+		}, nil
+	}
 	s := &Session{
-		program:    p,
-		syntaxOnly: syntaxOnly,
-		anchor:     eligible[0],
-		eligible:   make(map[*ast.SourceFile]bool, len(eligible)),
-		generation: nextGeneration.Add(1),
+		program:     p,
+		sourceFiles: slices.Clone(p.SourceFiles()),
+		anchor:      eligible[0],
+		eligible:    make(map[*ast.SourceFile]bool, len(eligible)),
+		generation:  nextGeneration.Add(1),
 	}
 	for _, f := range eligible {
-		if !p.OwnsSourceFile(f) || (!syntaxOnly && !p.CanProvideTypeChecker(f)) {
+		if !p.OwnsSourceFile(f) || !p.CanProvideTypeChecker(f) {
 			return nil, errors.New("ineligible or foreign type service source")
 		}
 		s.eligible[f] = true
 	}
-	if !syntaxOnly {
-		if q := p.CompilerQueries(); q != nil {
-			s.recordExtraSource(q.ConfigSourceFile())
+	for _, f := range s.sourceFiles {
+		if ast.IsSourceFileJS(f) {
+			s.hasJSFiles = true
+			break
 		}
+	}
+	if q := p.CompilerQueries(); q != nil {
+		s.recordExtraSource(q.ConfigSourceFile())
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -163,13 +408,16 @@ func (s *Session) extraSource(name string) *ast.SourceFile {
 }
 
 func (s *Session) sourceFile(name string) *ast.SourceFile {
+	if s.syntaxOnly {
+		if entry := s.syntax.lookup(name); entry != nil {
+			return entry.sourceFile()
+		}
+		return nil
+	}
 	if f := s.program.GetSourceFile(name); f != nil {
 		return f
 	}
-	if !s.syntaxOnly {
-		return s.extraSource(name)
-	}
-	return nil
+	return s.extraSource(name)
 }
 
 func (s *Session) diagnosticSources() []Source {
@@ -200,7 +448,10 @@ func (s *Session) diagnosticSources() []Source {
 func (s *Session) Close() {
 	s.lifeMu.Lock()
 	defer s.lifeMu.Unlock()
+	s.closed = true
 	s.program = nil
+	s.sourceFiles = nil
+	s.syntax = nil
 	s.anchor = nil
 	s.checker = nil
 	s.eligible = nil
@@ -211,13 +462,43 @@ func (s *Session) Close() {
 	s.symbols = nil
 	s.signatures = nil
 	s.indexInfoIDs = nil
+	s.sentMu.Lock()
+	s.sentMask = nil
+	s.sentMaskPrev = nil
+	s.slotEpoch = [maxSentMaskSlots]uint32{}
+	s.sentMu.Unlock()
+	s.recordMu.Lock()
+	s.recordCache = nil
+	s.recordCachePrev = nil
+	s.recordCacheBytes = 0
+	s.recordMu.Unlock()
+}
+
+func (s *Session) isClosed() bool {
+	if s.closed {
+		return true
+	}
+	if s.syntaxOnly {
+		return s.syntax == nil
+	}
+	return s.program == nil
 }
 
 func (s *Session) BindTarget(file *ast.SourceFile) (Binding, error) {
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
-	if s.program == nil {
+	if s.isClosed() {
 		return Binding{}, ErrClosed
+	}
+	if s.syntaxOnly {
+		if file == nil {
+			return Binding{}, errors.New("source is not eligible for typed rules")
+		}
+		entry := s.syntax.files[file.FileName()]
+		if entry == nil || entry.path != file.Path() {
+			return Binding{}, errors.New("source is not eligible for typed rules")
+		}
+		return Binding{Scope{Generation: s.generation}, entry.fileName}, nil
 	}
 	if !s.eligible[file] {
 		return Binding{}, errors.New("source is not eligible for typed rules")
@@ -229,14 +510,14 @@ func (s *Session) BindTarget(file *ast.SourceFile) (Binding, error) {
 func (s *Session) Source(generation uint32, name string) (*ast.SourceFile, error) {
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
-	if s.program == nil {
+	if s.isClosed() {
 		return nil, ErrClosed
 	}
 	if generation != s.generation {
 		return nil, errors.New("stale type service generation")
 	}
 	file := s.sourceFile(name)
-	if s.syntaxOnly && !s.eligible[file] {
+	if s.syntaxOnly && file == nil {
 		return nil, errors.New("foreign syntax service source")
 	}
 	return file, nil //nolint:nilnil // A missing Program source is a legitimate result.
@@ -246,35 +527,48 @@ func (s *Session) Source(generation uint32, name string) (*ast.SourceFile, error
 func (s *Session) SyntaxDescriptor(file *ast.SourceFile) (Descriptor, error) {
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
-	if s.program == nil {
+	if s.isClosed() {
 		return Descriptor{}, ErrClosed
 	}
-	if !s.syntaxOnly || !s.eligible[file] {
+	if !s.syntaxOnly || file == nil {
 		return Descriptor{}, errors.New("foreign syntax projection target")
 	}
-	d, err := s.syntaxDescriptor()
-	if err != nil {
-		return Descriptor{}, err
+	entry := s.syntax.files[file.FileName()]
+	if entry == nil || entry.path != file.Path() {
+		return Descriptor{}, errors.New("foreign syntax projection target")
 	}
-	d.Sources = []Source{syntaxSource(file)}
+	d := s.syntaxDescriptor()
+	d.Sources = []Source{entry.desc}
 	return d, nil
 }
 
-func (s *Session) syntaxDescriptor() (Descriptor, error) {
-	options := json.RawMessage("{}")
-	if opts := s.program.Options(); opts != nil {
-		var err error
-		options, err = json.Marshal(compilerOptions(opts))
-		if err != nil {
-			return Descriptor{}, err
-		}
+// SyntaxDescriptorForFile opens only the requested target file name for a
+// syntax-only session without requiring the caller to retain an *ast.SourceFile.
+func (s *Session) SyntaxDescriptorForFile(fileName string) (Descriptor, error) {
+	s.lifeMu.RLock()
+	defer s.lifeMu.RUnlock()
+	if s.isClosed() {
+		return Descriptor{}, ErrClosed
 	}
+	if !s.syntaxOnly {
+		return Descriptor{}, errors.New("foreign syntax projection target")
+	}
+	entry := s.syntax.files[fileName]
+	if entry == nil {
+		return Descriptor{}, errors.New("foreign syntax projection target")
+	}
+	d := s.syntaxDescriptor()
+	d.Sources = []Source{entry.desc}
+	return d, nil
+}
+
+func (s *Session) syntaxDescriptor() Descriptor {
 	return Descriptor{
 		SyntaxOnly:       true,
 		Generation:       s.generation,
-		CurrentDirectory: s.program.CurrentDirectory(),
-		CompilerOptions:  options,
-	}, nil
+		CurrentDirectory: s.syntax.currentDirectory,
+		CompilerOptions:  s.syntax.compilerOptions,
+	}
 }
 
 func syntaxSource(f *ast.SourceFile) Source {
@@ -297,18 +591,14 @@ func syntaxSource(f *ast.SourceFile) Source {
 func (s *Session) Descriptor() (Descriptor, error) {
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
-	if s.program == nil {
+	if s.isClosed() {
 		return Descriptor{}, ErrClosed
 	}
 	if s.syntaxOnly {
-		d, err := s.syntaxDescriptor()
-		if err != nil {
-			return Descriptor{}, err
-		}
-		for _, file := range s.program.SourceFiles() {
-			if s.eligible[file] {
-				d.Sources = append(d.Sources, syntaxSource(file))
-			}
+		d := s.syntaxDescriptor()
+		d.Sources = make([]Source, 0, len(s.syntax.order))
+		for _, fileName := range s.syntax.order {
+			d.Sources = append(d.Sources, s.syntax.files[fileName].desc)
 		}
 		return d, nil
 	}
@@ -320,10 +610,10 @@ func (s *Session) Descriptor() (Descriptor, error) {
 		Generation:        s.generation,
 		CurrentDirectory:  s.program.CurrentDirectory(),
 		CompilerOptions:   options,
-		Sources:           make([]Source, 0, len(s.program.SourceFiles())),
+		Sources:           make([]Source, 0, len(s.sourceFiles)),
 		DiagnosticSources: s.diagnosticSources(),
 	}
-	for _, f := range s.program.SourceFiles() {
+	for _, f := range s.sourceFiles {
 		d.Sources = append(d.Sources, s.source(f))
 	}
 	return d, nil
@@ -376,6 +666,8 @@ func (s *Session) source(f *ast.SourceFile) Source {
 }
 
 // Query returns one authoritative answer, with shallow facts for its direct handles.
+// Returned packet slices may alias immutable session cache entries and must be
+// treated as read-only by callers.
 func (s *Session) Query(ctx context.Context, q Query) ([]byte, error) {
 	packets, err := s.QueryBatch(ctx, []Query{q})
 	if err != nil {
@@ -384,8 +676,18 @@ func (s *Session) Query(ctx context.Context, q Query) ([]byte, error) {
 	return packets[0], nil
 }
 
+func isNodeRecordRequest(req Request) (*NodeRequest, bool) {
+	if req.operation() != "nodeRecord" {
+		return nil, false
+	}
+	r, ok := req.(*NodeRequest)
+	return r, ok
+}
+
 // QueryBatch resolves syntax before acquiring a short exclusive checker lease.
 // Concurrent calls to QueryBatch and Close are synchronized via lifeMu.
+// Returned packet slices may alias immutable session cache entries and must be
+// treated as read-only by callers.
 func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]byte, err error) {
 	defer func() {
 		if value := recover(); value != nil {
@@ -416,11 +718,10 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	if s.poisoned.Load() {
 		return nil, ErrPoisoned
 	}
-	if s.program == nil {
+	if s.isClosed() {
 		return nil, ErrClosed
 	}
 	p := s.program
-	eligible := s.eligible
 	for _, q := range queries {
 		if q.Generation != s.generation {
 			return nil, errors.New("stale or foreign type service handle")
@@ -428,15 +729,17 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 		if q.Request == nil {
 			return nil, errors.New("missing type service request")
 		}
-		if s.syntaxOnly && q.Request.operation() != "nodeRecord" {
-			return nil, errors.New("semantic queries require a typed project")
+		if s.syntaxOnly {
+			if _, ok := isNodeRecordRequest(q.Request); !ok {
+				return nil, errors.New("semantic queries require a typed project")
+			}
 		}
 	}
 	natives := make([]*ast.Node, len(queries))
 	for i, q := range queries {
 		if ref := requestNode(q.Request); ref != nil {
 			f := s.sourceFile(ref.File)
-			if s.syntaxOnly && !eligible[f] {
+			if s.syntaxOnly && f == nil {
 				return nil, errors.New("foreign syntax service source")
 			}
 			natives[i], err = resolveNode(f, *ref)
@@ -447,11 +750,31 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	}
 	results := make([]Result, len(queries))
 	records := make([][]Record, len(queries))
+	topCacheable := make([]bool, len(queries))
+	packets = make([][]byte, len(queries))
+	// Pre-fill syntax-only nodeRecord queries and cached direct-record hits in a
+	// single pass so interleaved hits never fracture checkBatch into multiple
+	// exclusive checker leases.
+	for i, q := range queries {
+		if r, ok := isNodeRecordRequest(q.Request); ok {
+			results[i] = nodeFacts(s.sourceFile(r.Node.File), natives[i])
+			continue
+		}
+		if tag, id, isRec := directRecordCacheKey(q.Request); isRec {
+			if cached, ok := s.getCachedRecord(tag, id); ok {
+				packets[i] = cached.packet
+			}
+		}
+	}
 	// Program diagnostics may acquire multiple checker shards; run them outside
 	// the single-file exclusive checker lease while preserving request order.
 	for start := 0; start < len(queries); {
 		if s.poisoned.Load() {
 			return nil, ErrPoisoned
+		}
+		if packets[start] != nil || results[start] != nil {
+			start++
+			continue
 		}
 		if r, ok := queries[start].Request.(*ProgramRequest); ok {
 			results[start], err = programQuery(ctx, s, p, r, natives[start])
@@ -461,20 +784,14 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 			start++
 			continue
 		}
-		if queries[start].Request.operation() == "nodeRecord" {
-			ref := requestNode(queries[start].Request)
-			results[start] = nodeFacts(s.sourceFile(ref.File), natives[start])
-			start++
-			continue
-		}
 		end := start + 1
 		for end < len(queries) {
-			if _, ok := queries[end].Request.(*ProgramRequest); ok || queries[end].Request.operation() == "nodeRecord" {
+			if _, ok := queries[end].Request.(*ProgramRequest); ok {
 				break
 			}
 			end++
 		}
-		if err = s.checkBatch(ctx, queries[start:end], natives[start:end], results[start:end], records[start:end]); err != nil {
+		if err = s.checkBatch(ctx, queries[start:end], natives[start:end], packets[start:end], results[start:end], records[start:end], topCacheable[start:end]); err != nil {
 			return nil, err
 		}
 		start = end
@@ -482,24 +799,85 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	if s.poisoned.Load() {
 		return nil, ErrPoisoned
 	}
-	packets = make([][]byte, len(queries))
 	for i, result := range results {
 		if s.poisoned.Load() {
 			return nil, ErrPoisoned
 		}
-		materializeReferences(p, result)
-		for _, record := range records[i] {
-			materializeReferences(p, record.Fact)
+		if packets[i] != nil {
+			continue
+		}
+		if p != nil {
+			materializeReferences(p, result)
+			for j := range records[i] {
+				if records[i][j].packet == nil {
+					materializeReferences(p, records[i][j].Fact)
+				}
+			}
 		}
 		if err := ctx.Err(); err != nil {
 			return nil, err
+		}
+		for j := range records[i] {
+			if records[i][j].packet != nil {
+				continue
+			}
+			encoded, encErr := EncodePacket(records[i][j].Fact)
+			if encErr != nil {
+				return nil, encErr
+			}
+			if records[i][j].cacheable {
+				s.putCachedRecord(recordTag(records[i][j].Op), records[i][j].ID, encoded, recordSubSymbols(records[i][j].Fact))
+			} else {
+				markPacketNonCacheable(encoded)
+			}
+			records[i][j].packet = encoded
 		}
 		packets[i], err = EncodeReply(result, records[i])
 		if err != nil {
 			return nil, err
 		}
+		if tag, id, isRec := directRecordCacheKey(queries[i].Request); isRec && len(records[i]) == 0 {
+			if topCacheable[i] {
+				s.putCachedRecord(tag, id, packets[i], recordSubSymbols(result))
+			} else {
+				markPacketNonCacheable(packets[i])
+			}
+		}
 	}
 	return packets, nil
+}
+
+func recordSubSymbols(fact Result) []uint32 {
+	switch value := fact.(type) {
+	case *TypeFact:
+		if value == nil {
+			return nil
+		}
+		var sub []uint32
+		if value.Symbol != 0 {
+			sub = append(sub, value.Symbol)
+		}
+		if value.AliasSymbol != 0 {
+			sub = append(sub, value.AliasSymbol)
+		}
+		return sub
+	case *SignatureFact:
+		if value == nil || (len(value.Parameters) == 0 && value.ThisParameter == 0) {
+			return nil
+		}
+		sub := make([]uint32, 0, len(value.Parameters)+1)
+		for _, parameter := range value.Parameters {
+			if parameter != 0 {
+				sub = append(sub, parameter)
+			}
+		}
+		if value.ThisParameter != 0 {
+			sub = append(sub, value.ThisParameter)
+		}
+		return sub
+	default:
+		return nil
+	}
 }
 
 func materializeReferences(p *program.Program, result Result) {
@@ -546,7 +924,7 @@ func materializeReferences(p *program.Program, result Result) {
 	}
 }
 
-func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*ast.Node, results []Result, records [][]Record) error {
+func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*ast.Node, packets [][]byte, results []Result, records [][]Record, topCacheable []bool) error {
 	s.checkMu.Lock()
 	defer s.checkMu.Unlock()
 	if s.poisoned.Load() {
@@ -581,6 +959,9 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 		return errors.New("type service checker identity changed")
 	}
 	for i, q := range queries {
+		if packets[i] != nil || results[i] != nil {
+			continue
+		}
 		if s.poisoned.Load() {
 			return ErrPoisoned
 		}
@@ -591,6 +972,9 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 		results[i], err = s.execute(ctx, c, q.Request, natives[i])
 		if err != nil {
 			return err
+		}
+		if tag, id, isRec := directRecordCacheKey(q.Request); isRec {
+			topCacheable[i] = s.isCacheableRecord(tag, id)
 		}
 		if !q.SkipRecords {
 			records[i], err = s.directRecords(ctx, c, q.Request.operation(), results[i])

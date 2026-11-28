@@ -36,6 +36,7 @@ func (resolver eslintPluginConfigResolver) resolve(filePath string) linter.Eslin
 		ConfigKey:       configKey,
 		LanguageOptions: languageOptions,
 		Settings:        settings,
+		TypeServices:    rslintconfig.PluginTypeServicesEnabled(resolved.MergedConfig),
 	}
 }
 
@@ -50,6 +51,10 @@ func writeEslintPluginDispatchOutcome(w io.Writer, outcome linter.EslintPluginDi
 			fmt.Fprintf(w, "rslint: plugin-lint returned no result for %q\n", notice.FilePath)
 		case linter.EslintPluginUnconfiguredDiagnostic:
 			fmt.Fprintf(w, "rslint: plugin diagnostic for unconfigured rule %q in %q\n", notice.RuleName, notice.FilePath)
+		case linter.EslintPluginTypeServiceRetirementFailed:
+			if !errors.Is(notice.Err, context.Canceled) && !errors.Is(outcome.DispatchError, context.Canceled) {
+				fmt.Fprintf(w, "rslint: retire plugin type services: %v\n", notice.Err)
+			}
 		}
 	}
 	if outcome.DispatchError != nil && !errors.Is(outcome.DispatchError, context.Canceled) {

@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 
@@ -23,6 +25,7 @@ import (
 // and return the diagnostics. It is the LSP equivalent of the CLI's
 // `pluginLint` IPC request.
 const methodPluginLint = lsproto.Method("rslint/pluginLint")
+const methodTypeService = lsproto.Method("rslint/typeService")
 
 // deriveLSPRuleCatalog preserves the LSP's established generation gate: an
 // empty object-form plugin rule name is not resolvable in Go, even though the
@@ -97,7 +100,7 @@ func (s *Server) startDiagnosticEnrichment(
 	if run == nil {
 		return
 	}
-	dispatch := s.pluginDispatchForGeneration(pluginGeneration)
+	baseDispatch := s.pluginDispatchForGeneration(pluginGeneration)
 
 	// Bound the reverse request as a backstop: even with supersede-cancel, a
 	// client that neither answers nor is ever superseded (the user stops typing)
@@ -107,6 +110,12 @@ func (s *Server) startDiagnosticEnrichment(
 		timeout = defaultPluginReverseTimeout
 	}
 	ctx, cancel := context.WithTimeout(parentCtx, timeout)
+	dispatch := linter.EslintPluginDispatchFunc(func(callCtx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		if len(req.RetiredTypeServices) != 0 && len(req.Files) == 0 {
+			return s.retirePluginTypeServices(parentCtx, ctx, callCtx, pluginGeneration, baseDispatch, req)
+		}
+		return baseDispatch(callCtx, req)
+	})
 
 	// Register so a later supersede or close can cancel the request. sendRequest
 	// forwards that context cancellation to the client.
@@ -119,7 +128,7 @@ func (s *Server) startDiagnosticEnrichment(
 		defer close(handle.done)
 		defer cancel()
 		defer s.clearInflightPluginDispatch(uri, handle)
-		outcome, runErr := run(ctx, dispatch)
+		outcome, runErr := run.Run(ctx, dispatch)
 		reportLSPPluginProtocolNotices(outcome.Notices)
 		err := errors.Join(runErr, outcome.DispatchError)
 		// Categorize like the fixAll sibling: a superseded
@@ -165,6 +174,10 @@ func writeLSPPluginProtocolNotices(w io.Writer, notices []linter.EslintPluginPro
 			fmt.Fprintf(w, "rslint: plugin-lint returned no result for %q\n", notice.FilePath)
 		case linter.EslintPluginUnconfiguredDiagnostic:
 			fmt.Fprintf(w, "rslint: plugin diagnostic for unconfigured rule %q in %q\n", notice.RuleName, notice.FilePath)
+		case linter.EslintPluginTypeServiceRetirementFailed:
+			if !errors.Is(notice.Err, context.Canceled) {
+				fmt.Fprintf(w, "rslint: retire plugin type services: %v\n", notice.Err)
+			}
 		}
 	}
 }
@@ -173,6 +186,7 @@ func writeLSPPluginProtocolNotices(w io.Writer, notices []linter.EslintPluginPro
 // background plugin dispatch for uri, if any. Called when a newer prepared
 // document generation supersedes it or the document closes (handleDidClose).
 func (s *Server) cancelInflightPluginDispatch(uri lsproto.DocumentUri) {
+	defer s.drainGenerationReleases()
 	s.inflightPluginDispatchMu.Lock()
 	handle, ok := s.inflightPluginDispatch[uri]
 	if ok {
@@ -186,6 +200,48 @@ func (s *Server) cancelInflightPluginDispatch(uri lsproto.DocumentUri) {
 	if handle.done != nil {
 		<-handle.done
 	}
+}
+
+// The dispatch loop owns resident Program finalization and watcher coverage.
+// A completed typed borrow only queues that existing finalizer; cancel/join
+// never waits for the loop it is currently running on.
+func (s *Server) queueGenerationRelease(release linter.ReleaseFunc) {
+	s.generationReleaseMu.Lock()
+	s.generationReleases = append(s.generationReleases, release)
+	s.generationReleaseMu.Unlock()
+	select {
+	case s.generationReleaseReady <- struct{}{}:
+	default:
+	}
+}
+
+func (s *Server) drainGenerationReleases() {
+	s.generationReleaseMu.Lock()
+	releases := s.generationReleases
+	s.generationReleases = nil
+	s.generationReleaseMu.Unlock()
+	for _, release := range releases {
+		release()
+	}
+}
+
+func (s *Server) finishGenerationReleases() {
+	s.shuttingDown.Store(true)
+	s.pendingDiagnosticResult.close()
+	s.pendingDiagnosticResult = nil
+	s.inflightPluginDispatchMu.Lock()
+	handles := make([]*pluginDispatchHandle, 0, len(s.inflightPluginDispatch))
+	for _, handle := range s.inflightPluginDispatch {
+		handles = append(handles, handle)
+		handle.cancel()
+	}
+	s.inflightPluginDispatchMu.Unlock()
+	for _, handle := range handles {
+		if handle.done != nil {
+			<-handle.done
+		}
+	}
+	s.drainGenerationReleases()
 }
 
 // clearInflightPluginDispatch removes handle from the registry once its
@@ -242,6 +298,93 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 	}
 }
 
+func (s *Server) pluginRetirementAllowed(parentCtx context.Context, generation string) bool {
+	if s.shuttingDown.Load() {
+		return false
+	}
+	if parentCtx != nil && parentCtx.Err() != nil {
+		return false
+	}
+	if s.backgroundCtx != nil && s.backgroundCtx.Err() != nil {
+		return false
+	}
+	if active := s.activePluginGeneration.Load(); active != nil && *active != generation {
+		return false
+	}
+	return true
+}
+
+func (s *Server) retirePluginTypeServices(
+	parentCtx context.Context,
+	budgetCtx context.Context,
+	runCtx context.Context,
+	generation string,
+	dispatch linter.EslintPluginDispatchFunc,
+	req linter.EslintPluginLintRequest,
+) (*linter.EslintPluginLintResult, error) {
+	if !s.pluginRetirementAllowed(parentCtx, generation) {
+		return &linter.EslintPluginLintResult{}, nil
+	}
+	retireParent := parentCtx
+	if retireParent == nil {
+		retireParent = context.Background()
+	}
+	retireTimeout := 2 * time.Second
+	if runCtx != nil {
+		if dl, ok := runCtx.Deadline(); ok {
+			if rem := time.Until(dl); rem < retireTimeout {
+				retireTimeout = max(rem, 0)
+			}
+		}
+	}
+	var budgetDone <-chan struct{}
+	if budgetCtx != nil {
+		budgetDone = budgetCtx.Done()
+	}
+	var runDone <-chan struct{}
+	if runCtx != nil {
+		runDone = runCtx.Done()
+	}
+	if budgetCtx != nil && budgetCtx.Err() == nil && runCtx != nil && runCtx.Err() != nil {
+		return nil, runCtx.Err()
+	}
+	// Run the bounded retirement RPC off-thread so superseding or canceling
+	// enrichment / budget expiration immediately unblocks the caller while
+	// letting cleanup finish best-effort.
+	done := make(chan error, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if cause, ok := r.(error); ok {
+					done <- fmt.Errorf("eslint-plugin dispatch panicked: %w", cause)
+				} else {
+					done <- fmt.Errorf("eslint-plugin dispatch panicked: %v", r)
+				}
+			}
+		}()
+		retireCtx, cancelRetire := context.WithTimeout(retireParent, retireTimeout)
+		defer cancelRetire()
+		_, err := dispatch(retireCtx, req)
+		done <- err
+	}()
+	select {
+	case <-budgetDone:
+		return &linter.EslintPluginLintResult{}, nil
+	default:
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			return nil, err
+		}
+		return &linter.EslintPluginLintResult{}, nil
+	case <-budgetDone:
+		return &linter.EslintPluginLintResult{}, nil
+	case <-runDone:
+		return nil, runCtx.Err()
+	}
+}
+
 func (s *Server) pluginDispatchForGeneration(generation string) linter.EslintPluginDispatchFunc {
 	dispatch := s.installEslintPluginDispatch()
 	return func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
@@ -252,8 +395,9 @@ func (s *Server) pluginDispatchForGeneration(generation string) linter.EslintPlu
 
 // pluginDispatchWithinBudget adapts the LSP reverse transport to one
 // operation-wide budget. Each call is also canceled when its individual lint
-// observation ends, while expiration prevents later observations from sending
-// another request.
+// observation ends. Expiration blocks later lint requests, while retirement of
+// already-dispatched sessions runs best-effort on its own bounded cleanup
+// context without stalling the caller once the budget has ended.
 func (s *Server) pluginDispatchWithinBudget(
 	parent context.Context,
 	generation string,
@@ -264,10 +408,39 @@ func (s *Server) pluginDispatchWithinBudget(
 	}
 	budgetCtx, cancelBudget := context.WithTimeout(parent, timeout)
 	dispatch := s.pluginDispatchForGeneration(generation)
+	var sentMu sync.Mutex
+	sentSessions := make(map[string]struct{})
 	return func(runCtx context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		if len(request.RetiredTypeServices) != 0 && len(request.Files) == 0 {
+			sentMu.Lock()
+			var toRetire []string
+			for _, id := range request.RetiredTypeServices {
+				if _, ok := sentSessions[id]; ok {
+					delete(sentSessions, id)
+					toRetire = append(toRetire, id)
+				}
+			}
+			sentMu.Unlock()
+			if len(toRetire) == 0 {
+				return &linter.EslintPluginLintResult{}, nil
+			}
+			retireReq := request
+			retireReq.RetiredTypeServices = toRetire
+			return s.retirePluginTypeServices(s.backgroundCtx, budgetCtx, runCtx, generation, dispatch, retireReq)
+		}
 		if err := budgetCtx.Err(); err != nil {
 			return nil, err
 		}
+		if err := runCtx.Err(); err != nil {
+			return nil, err
+		}
+		sentMu.Lock()
+		for _, f := range request.Files {
+			if f.TypeServices != nil && !f.TypeServices.SyntaxOnly && f.TypeServices.Session != "" {
+				sentSessions[f.TypeServices.Session] = struct{}{}
+			}
+		}
+		sentMu.Unlock()
 		callCtx, cancelCall := context.WithCancel(budgetCtx)
 		stop := context.AfterFunc(runCtx, cancelCall)
 		defer func() {

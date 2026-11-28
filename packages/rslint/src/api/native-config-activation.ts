@@ -6,13 +6,15 @@ import {
   type ActivateConfigsRequest,
   type ActivateConfigsResponse,
 } from '../config/config-loader.js';
-import type { IpcAttachment } from '../ipc/protocol.js';
+import type { IpcAttachment, RpcHostChannel } from '../ipc/index.js';
+import type { TypeServiceHostTransport } from '../service/plugin-type-service-protocol.js';
 
 export interface PluginLintHost {
   lint(
     request: unknown,
     signal?: AbortSignal,
     attachments?: readonly IpcAttachment[],
+    typeServices?: TypeServiceHostTransport,
   ): Promise<unknown>;
   shutdown(): Promise<void>;
 }
@@ -20,15 +22,18 @@ export interface PluginLintHost {
 type CreatePluginLintHost = (
   configs: PluginConfigDescriptor[],
   onLog?: (record: { level: string; source: string; text: string }) => void,
+  singleThreaded?: boolean,
+  rpcChannel?: RpcHostChannel | (() => Promise<RpcHostChannel | undefined>),
 ) => Promise<PluginLintHost>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isPluginHostFactoryModule(
-  value: unknown,
-): value is { createPluginLintHost: CreatePluginLintHost } {
+function isPluginHostFactoryModule(value: unknown): value is {
+  createPluginLintHost: CreatePluginLintHost;
+  createPluginLintHostWithRpc?: CreatePluginLintHost;
+} {
   return isRecord(value) && typeof value.createPluginLintHost === 'function';
 }
 
@@ -57,7 +62,7 @@ export async function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
         'rslint ESLint-plugin entry does not export createPluginLintHost',
       );
     }
-    return module.createPluginLintHost;
+    return module.createPluginLintHostWithRpc ?? module.createPluginLintHost;
   })();
   const factory = await pluginHostFactoryPromise;
   return factory;
@@ -126,6 +131,7 @@ export async function stageNativeConfigActivation(
   onLog: (record: { level: string; source: string; text: string }) => void,
   isClosing: () => boolean,
   lifecycle?: PluginHostLifecycle,
+  getRpcChannel?: () => Promise<RpcHostChannel | undefined>,
 ): Promise<{
   activation: ActivateConfigsResponse;
   pluginHost: PluginLintHost | null;
@@ -140,11 +146,18 @@ export async function stageNativeConfigActivation(
         if (isClosing()) throw new Error('rslint service is closing');
         const createPluginLintHost = await getPluginHostFactory();
         if (isClosing()) throw new Error('rslint service is closing');
+        const rpcOpener = getRpcChannel
+          ? async () => (isClosing() ? undefined : getRpcChannel())
+          : undefined;
         const build = (async () => {
-          const host = await createPluginLintHost(
-            candidate.pluginConfigs,
-            onLog,
-          );
+          const host = rpcOpener
+            ? await createPluginLintHost(
+                candidate.pluginConfigs,
+                onLog,
+                undefined,
+                rpcOpener,
+              )
+            : await createPluginLintHost(candidate.pluginConfigs, onLog);
           lifecycle?.stage(host);
           return host;
         })();

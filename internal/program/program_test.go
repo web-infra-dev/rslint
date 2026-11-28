@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
@@ -321,4 +322,198 @@ type typedNilFSCompilerHost struct {
 func (*typedNilFSCompilerHost) FS() vfs.FS {
 	var fs *typedNilFS
 	return fs
+}
+
+type singleSlotExternalCheckerPool struct {
+	program *compiler.Program
+	sem     chan struct{}
+	once    sync.Once
+	checker *checker.Checker
+}
+
+func (p *singleSlotExternalCheckerPool) GetChecker(ctx context.Context, _ *ast.SourceFile) (*checker.Checker, func()) {
+	p.once.Do(func() {
+		p.checker, _ = checker.NewChecker(p.program, nil)
+	})
+	select {
+	case p.sem <- struct{}{}:
+	case <-ctx.Done():
+		panic("deadlock waiting for single-slot external checker pool")
+	}
+	return p.checker, sync.OnceFunc(func() { <-p.sem })
+}
+
+func (p *singleSlotExternalCheckerPool) GetGlobalDiagnostics() []*ast.Diagnostic {
+	return nil
+}
+
+type requestIDCheckingPool struct {
+	program        *compiler.Program
+	sem            chan struct{}
+	once           sync.Once
+	checker        *checker.Checker
+	mu             sync.Mutex
+	nonEmptyReqIDs []string
+}
+
+func (p *requestIDCheckingPool) GetChecker(ctx context.Context, _ *ast.SourceFile) (*checker.Checker, func()) {
+	if id := core.GetRequestID(ctx); id != "" {
+		p.mu.Lock()
+		p.nonEmptyReqIDs = append(p.nonEmptyReqIDs, id)
+		p.mu.Unlock()
+	}
+	p.once.Do(func() {
+		p.checker, _ = checker.NewChecker(p.program, nil)
+	})
+	select {
+	case p.sem <- struct{}{}:
+	case <-ctx.Done():
+		panic("deadlock waiting for external checker pool")
+	}
+	return p.checker, sync.OnceFunc(func() { <-p.sem })
+}
+
+func TestCompilerQueriesDeclarationDiagnosticsDoesNotDeadlockWithSingleSlotPool(t *testing.T) {
+	const root = "/program-decl-pool-test"
+	fileA := tspath.ResolvePath(root, "a.ts")
+	fileB := tspath.ResolvePath(root, "b.ts")
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		fileA: "export const answer = 42;\n",
+		fileB: "import { answer } from './a';\nexport const doubled = answer * 2;\n",
+	})
+	host := utils.CreateCompilerHost(root, fs)
+	base, err := utils.CreateProgramFromOptions(true, &core.CompilerOptions{
+		Declaration: core.TSTrue,
+		NoLib:       core.TSTrue,
+	}, []string{fileA, fileB}, host)
+	if err != nil {
+		t.Fatalf("CreateProgramFromOptions: %v", err)
+	}
+
+	t.Run("default compiler checker pool", func(t *testing.T) {
+		p := lintprogram.NewFromCompiler(base)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		file := p.GetSourceFile(fileA)
+		if file == nil {
+			t.Fatal("missing source file")
+		}
+		// Must not self-deadlock against EmitResolver's internal checker mutex.
+		_ = p.CompilerQueries().Diagnostics(ctx, lintprogram.DeclarationDiagnostics, file)
+		_ = p.CompilerQueries().Diagnostics(ctx, lintprogram.DeclarationDiagnostics, nil)
+
+		// Non-program files (JSON and TS) must return nil without panicking on
+		// either DeclarationDiagnostics or SemanticDiagnostics.
+		foreignJSON := parser.ParseSourceFile(ast.SourceFileParseOptions{
+			FileName: tspath.ResolvePath(root, "tsconfig.json"),
+			Path:     tspath.Path(tspath.ResolvePath(root, "tsconfig.json")),
+		}, "{}", core.ScriptKindJSON)
+		if diags := p.CompilerQueries().Diagnostics(ctx, lintprogram.DeclarationDiagnostics, foreignJSON); len(diags) != 0 {
+			t.Fatalf("expected nil declaration diagnostics for non-program JSON file, got %d", len(diags))
+		}
+		foreignTS := parser.ParseSourceFile(ast.SourceFileParseOptions{
+			FileName: tspath.ResolvePath(root, "foreign.ts"),
+			Path:     tspath.Path(tspath.ResolvePath(root, "foreign.ts")),
+		}, "export const x = 1;\n", core.ScriptKindTS)
+		if diags := p.CompilerQueries().Diagnostics(ctx, lintprogram.SemanticDiagnostics, foreignTS); len(diags) != 0 {
+			t.Fatalf("expected nil semantic diagnostics for non-program TS file, got %d", len(diags))
+		}
+	})
+
+	t.Run("isolatedDeclarations concurrent checker and declaration diagnostics", func(t *testing.T) {
+		// Multi-threaded program with isolatedDeclarations exercises tsgo's
+		// unlocked EmitResolver.*Unsafe paths (function property assignments +
+		// inference fallbacks) concurrently with exclusive checker queries under -race.
+		isoRoot := "/program-isolated-decl-test"
+		isoFiles := map[string]string{}
+		var isoNames []string
+		for i := range 6 {
+			name := tspath.ResolvePath(isoRoot, fmt.Sprintf("f%d.ts", i))
+			isoNames = append(isoNames, name)
+			isoFiles[name] = fmt.Sprintf(
+				"export function foo%d() {}\nfoo%d.bar = 1;\nexport function f%d(x = 1 + 2) { return x; }\n",
+				i, i, i,
+			)
+		}
+		isoFS := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), isoFiles)
+		isoHost := utils.CreateCompilerHost(isoRoot, isoFS)
+		isoRaw, err := utils.CreateProgramFromOptions(false, &core.CompilerOptions{
+			Declaration:          core.TSTrue,
+			IsolatedDeclarations: core.TSTrue,
+			NoLib:                core.TSTrue,
+		}, isoNames, isoHost)
+		if err != nil {
+			t.Fatalf("CreateProgramFromOptions(isolatedDeclarations): %v", err)
+		}
+		p := lintprogram.NewFromCompiler(isoRaw)
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		defer cancel()
+		firstFile := p.GetSourceFile(isoNames[0])
+		if firstFile == nil {
+			t.Fatal("missing isolatedDeclarations source file")
+		}
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for _, sf := range p.SourceFiles() {
+				c, release := p.TypeCheckerForFileExclusive(ctx, sf)
+				for _, stmt := range sf.Statements.Nodes {
+					_ = c.GetTypeAtLocation(stmt)
+				}
+				release()
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			// Uncached program-wide declaration diagnostics concurrently with
+			// active TypeCheckerForFileExclusive queries.
+			_ = p.CompilerQueries().Diagnostics(ctx, lintprogram.DeclarationDiagnostics, nil)
+		}()
+		wg.Wait()
+	})
+
+	t.Run("single-slot external pool", func(t *testing.T) {
+		raw := compiler.NewProgram(compiler.ProgramOptions{
+			Config: base.CommandLine(),
+			Host:   host,
+			CreateCheckerPool: func(prog *compiler.Program) compiler.CheckerPool {
+				return &singleSlotExternalCheckerPool{program: prog, sem: make(chan struct{}, 1)}
+			},
+		})
+		p := lintprogram.NewFromCompiler(raw)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		file := p.GetSourceFile(fileA)
+		if file == nil {
+			t.Fatal("missing source file")
+		}
+		// Must not self-deadlock on single-slot external CheckerPool that also
+		// implements GetGlobalDiagnostics (mirroring tsgo's project.CheckerPool).
+		_ = p.CompilerQueries().Diagnostics(ctx, lintprogram.DeclarationDiagnostics, file)
+		_ = p.CompilerQueries().Diagnostics(ctx, lintprogram.DeclarationDiagnostics, nil)
+	})
+
+	t.Run("program-wide diagnostics clear request affinity", func(t *testing.T) {
+		var pool *requestIDCheckingPool
+		raw := compiler.NewProgram(compiler.ProgramOptions{
+			Config: base.CommandLine(),
+			Host:   host,
+			CreateCheckerPool: func(prog *compiler.Program) compiler.CheckerPool {
+				pool = &requestIDCheckingPool{program: prog, sem: make(chan struct{}, 1)}
+				return pool
+			},
+		})
+		p := lintprogram.NewFromCompiler(raw)
+		ctx, cancel := context.WithTimeout(core.WithRequestID(t.Context(), "lsp-req-1"), 5*time.Second)
+		defer cancel()
+		_ = p.CompilerQueries().Diagnostics(ctx, lintprogram.SemanticDiagnostics, nil)
+		_ = p.CompilerQueries().Diagnostics(ctx, lintprogram.DeclarationDiagnostics, nil)
+		pool.mu.Lock()
+		got := append([]string(nil), pool.nonEmptyReqIDs...)
+		pool.mu.Unlock()
+		if len(got) != 0 {
+			t.Fatalf("program-wide diagnostics leaked RequestID into parallel pool borrows: %v", got)
+		}
+	})
 }

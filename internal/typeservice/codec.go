@@ -75,6 +75,37 @@ const (
 	packetOptionalIndexInfos
 )
 
+const (
+	recordTagType      uint8 = 1
+	recordTagSymbol    uint8 = 2
+	recordTagSignature uint8 = 3
+
+	// packetNonCacheableBit marks an RTS5 packet whose underlying checker fact
+	// may mutate later in the same Session (e.g. transient merged symbols or
+	// context-sensitive signatures). Downstream JS caches must not retain it.
+	packetNonCacheableBit uint32 = 1 << 31
+)
+
+func recordTag(op Operation) uint8 {
+	switch op {
+	case "typeRecord":
+		return recordTagType
+	case "symbolRecord":
+		return recordTagSymbol
+	case "signatureRecord":
+		return recordTagSignature
+	default:
+		return 0
+	}
+}
+
+func markPacketNonCacheable(packet []byte) {
+	if len(packet) >= 8 && string(packet[:4]) == "RTS5" {
+		kind := binary.LittleEndian.Uint32(packet[4:8])
+		binary.LittleEndian.PutUint32(packet[4:8], kind|packetNonCacheableBit)
+	}
+}
+
 // EncodePacket has a finite record layout: header/kind, fixed fields, then
 // offset-addressed lists and an interned UTF-16 string pool. No arbitrary map,
 // recursive value graph, reflection, or Go pointer enters a packet.
@@ -478,23 +509,20 @@ func EncodeReply(result Result, records []Record) ([]byte, error) {
 	binary.LittleEndian.PutUint32(data[8:], uint32(len(records)))
 	data = append(data, packet...)
 	for i, record := range records {
-		encoded, err := EncodePacket(record.Fact)
-		if err != nil {
-			return nil, err
+		encoded := record.packet
+		if encoded == nil {
+			var err error
+			encoded, err = EncodePacket(record.Fact)
+			if err != nil {
+				return nil, err
+			}
 		}
 		at := 12 + i*16
-		var kind uint32
-		switch record.Op {
-		case "typeRecord":
-			kind = 1
-		case "symbolRecord":
-			kind = 2
-		case "signatureRecord":
-			kind = 3
-		default:
+		tag := recordTag(record.Op)
+		if tag == 0 {
 			return nil, errors.New("invalid supplemental fact")
 		}
-		binary.LittleEndian.PutUint32(data[at:], kind)
+		binary.LittleEndian.PutUint32(data[at:], uint32(tag))
 		binary.LittleEndian.PutUint32(data[at+4:], record.ID)
 		binary.LittleEndian.PutUint32(data[at+8:], uint32(len(data)))
 		binary.LittleEndian.PutUint32(data[at+12:], uint32(len(encoded)))

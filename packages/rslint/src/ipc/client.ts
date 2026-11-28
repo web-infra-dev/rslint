@@ -38,10 +38,13 @@
 import type { Readable, Writable } from 'node:stream';
 import { constants as bufferConstants } from 'node:buffer';
 import {
+  readAttachmentBytes,
   receiveAttachments,
   type ReceivedAttachments,
   type MemoryTransport,
 } from './memory-transport.js';
+import { parseRpcConfiguration, type RpcTransport } from './rpc-transport.js';
+import type { RpcConfiguration, RpcHostChannel } from '../native/types.js';
 import type {
   IpcMessage,
   MessageKind,
@@ -62,6 +65,7 @@ const MAX_FRAME_BYTES = Math.min(
 const RESPONSE_KIND = 'response';
 const ERROR_KIND = 'error';
 const TRANSPORT_CONFIG_KIND = 'transportConfig';
+const TRANSPORT_RPC_OPEN_KIND = 'transportRpcOpen';
 const TRANSPORT_RELEASE_KIND = 'transportRelease';
 const RELEASE_POLL_MS = 25;
 
@@ -78,6 +82,14 @@ export interface IpcClientOptions {
   readonly memoryTransport?: MemoryTransport;
   /** Child stdio index chosen by spawnIpcProcess for the prepared Unix fd. */
   readonly inheritedMemoryFd?: number;
+  /** Optional bidirectional shared-memory RPC transport, lazily activated. */
+  readonly rpcTransport?: RpcTransport;
+  /** Child stdio index for the RPC shared-memory Unix fd. */
+  readonly inheritedRpcFd?: number;
+  /** Child stdio index for the RPC doorbell socket pair Unix fd. */
+  readonly inheritedRpcDoorbellFd?: number;
+  /** Spawned peer process ID (used on Windows for peer-death synchronization). */
+  readonly peerPid?: number;
   /**
    * Initial buffer size for the read accumulator. Frames larger than this
    * will simply grow the buffer; this is just a starting hint for typical
@@ -99,8 +111,8 @@ export class IpcClient {
   // Only lease release functions are retained, never handler payloads/results.
   // Each owns at least one slot, bounding this queue by the negotiated arena.
   private readonly pendingReleases = new Map<
-    number,
-    ReceivedAttachments['release']
+    string,
+    { id: number; response: boolean; release: ReceivedAttachments['release'] }
   >();
   private releaseTimer: NodeJS.Timeout | undefined;
   private readonly notificationHandlers = new Map<
@@ -122,6 +134,12 @@ export class IpcClient {
   private started = false;
   private memory: MemoryTransport | undefined;
   private readonly inheritedMemoryFd: number | undefined;
+  private rpc: RpcTransport | undefined;
+  private readonly inheritedRpcFd: number | undefined;
+  private readonly inheritedRpcDoorbellFd: number | undefined;
+  private readonly peerPid: number | undefined;
+  private rpcConfig: RpcConfiguration | undefined;
+  private rpcOpenPromise: Promise<RpcHostChannel | undefined> | undefined;
   private bootstrapPromise: Promise<void> | undefined;
   private mappingSent = false;
   private preparingFirstRequest: Promise<void> | undefined;
@@ -137,6 +155,10 @@ export class IpcClient {
     this.output = output;
     this.memory = opts.memoryTransport;
     this.inheritedMemoryFd = opts.inheritedMemoryFd;
+    this.rpc = opts.rpcTransport;
+    this.inheritedRpcFd = opts.inheritedRpcFd;
+    this.inheritedRpcDoorbellFd = opts.inheritedRpcDoorbellFd;
+    this.peerPid = opts.peerPid;
   }
 
   get isClosed(): boolean {
@@ -220,8 +242,20 @@ export class IpcClient {
     clearTimeout(this.releaseTimer);
     this.releaseTimer = undefined;
     this.pendingReleases.clear();
+    this.closeRpc();
     this.closeMemory();
     this.finishClose(error);
+  }
+
+  private closeRpc(): void {
+    const rpc = this.rpc;
+    this.rpc = undefined;
+    this.rpcConfig = undefined;
+    try {
+      rpc?.close();
+    } catch {
+      // Teardown must complete silently and never mask the primary close reason.
+    }
   }
 
   private closeMemory(): void {
@@ -256,8 +290,8 @@ export class IpcClient {
     data: TIn,
     attachments?: readonly (string | Uint8Array)[],
   ): Promise<IpcMessage<TOut>> {
-    if (kind === TRANSPORT_CONFIG_KIND) {
-      throw new Error('IpcClient: transportConfig is an internal request');
+    if (kind === TRANSPORT_CONFIG_KIND || kind === TRANSPORT_RPC_OPEN_KIND) {
+      throw new Error(`IpcClient: ${kind} is an internal request`);
     }
     if (this.closed) {
       throw new Error('IpcClient: cannot sendRequest on closed client');
@@ -301,7 +335,22 @@ export class IpcClient {
         );
         if (this.closed) throw await this.done;
         memory.configure(response.data);
+        if (
+          this.rpc &&
+          response.data !== null &&
+          typeof response.data === 'object' &&
+          !Array.isArray(response.data) &&
+          'rpc' in response.data
+        ) {
+          this.rpcConfig = parseRpcConfiguration(
+            (response.data as Record<string, unknown>).rpc,
+          );
+        }
+        if (!this.rpcConfig) {
+          this.closeRpc();
+        }
       } catch {
+        this.closeRpc();
         this.closeMemory();
         if (this.closed) throw await this.done;
         // Unsupported peers, invalid layouts and allocation failures all keep
@@ -309,6 +358,53 @@ export class IpcClient {
       }
     });
     return this.bootstrapPromise;
+  }
+
+  /**
+   * Lazily activate the bidirectional shared-memory RPC channel when a typed
+   * plugin task is first dispatched. Cached per IpcClient across multiple lint
+   * calls; silently degrades to `undefined` on unsupported peers or restricted
+   * hosts so callers transparently stay on the standard JSON-RPC bridge.
+   */
+  async ensureRpcOpen(): Promise<RpcHostChannel | undefined> {
+    if (this.closed) return undefined;
+    try {
+      if (this.memory && !this.mappingSent) {
+        await this.configureMemory();
+      } else if (this.bootstrapPromise) {
+        await this.bootstrapPromise;
+      }
+    } catch {
+      return undefined;
+    }
+    if (this.closed || !this.rpc || !this.rpcConfig) return undefined;
+    this.rpcOpenPromise ??= (async (): Promise<RpcHostChannel | undefined> => {
+      const rpc = this.rpc;
+      const config = this.rpcConfig;
+      if (!rpc || !config || this.closed) return undefined;
+      try {
+        const { mapping, hostChannel } = rpc.configure(
+          config,
+          this.inheritedRpcFd,
+          this.inheritedRpcDoorbellFd,
+          this.peerPid,
+        );
+        if (this.closed) {
+          this.closeRpc();
+          return undefined;
+        }
+        await this.writeRequest(TRANSPORT_RPC_OPEN_KIND, mapping);
+        if (this.closed) {
+          this.closeRpc();
+          return undefined;
+        }
+        return hostChannel;
+      } catch {
+        this.closeRpc();
+        return undefined;
+      }
+    })();
+    return this.rpcOpenPromise;
   }
 
   private async writeRequest<TIn = unknown, TOut = unknown>(
@@ -381,6 +477,7 @@ export class IpcClient {
     id: number,
     data: unknown,
     released?: MemoryBatch[],
+    response = false,
   ): void {
     if (this.closed) return;
     this.writeFrameNow(
@@ -388,7 +485,9 @@ export class IpcClient {
         kind,
         id,
         data,
-        transport: released ? { released } : undefined,
+        transport: released
+          ? { released, ...(response ? { response: true } : {}) }
+          : undefined,
       }),
     );
   }
@@ -401,16 +500,49 @@ export class IpcClient {
     this.releaseTimer = setTimeout(this.pollReleases, RELEASE_POLL_MS).unref();
   }
 
+  private releaseAttachments(
+    id: number,
+    received: ReceivedAttachments | undefined,
+    response = false,
+  ): MemoryBatch[] | undefined {
+    const batches = received?.release();
+    if (batches !== false) return batches;
+    if (received && !this.closed) {
+      const key = `${response ? 'response' : 'request'}:${id}`;
+      if (this.pendingReleases.has(key)) {
+        this.close(
+          new Error(
+            `duplicate pending shared memory ${response ? 'response' : 'request'}`,
+          ),
+        );
+      } else {
+        this.pendingReleases.set(key, {
+          id,
+          response,
+          release: received.release.bind(received),
+        });
+        this.scheduleReleases();
+      }
+    }
+    return undefined;
+  }
+
   private readonly pollReleases = (): void => {
     this.releaseTimer = undefined;
     try {
-      for (const [id, release] of this.pendingReleases) {
+      for (const [key, { id, response, release }] of this.pendingReleases) {
         if (this.closed) return;
         const batches = release();
         if (batches === false) continue;
-        this.pendingReleases.delete(id);
+        this.pendingReleases.delete(key);
         if (batches)
-          this.writeResponse(TRANSPORT_RELEASE_KIND, id, undefined, batches);
+          this.writeResponse(
+            TRANSPORT_RELEASE_KIND,
+            id,
+            undefined,
+            batches,
+            response,
+          );
       }
     } catch (error) {
       this.close(
@@ -641,12 +773,15 @@ export class IpcClient {
       this.routeResponse(msg);
       return;
     }
-    if (msg.kind === TRANSPORT_CONFIG_KIND) {
-      // Only Go provides the layout. Never expose this control kind to handlers.
+    if (
+      msg.kind === TRANSPORT_CONFIG_KIND ||
+      msg.kind === TRANSPORT_RPC_OPEN_KIND
+    ) {
+      // Only Go handles transport control frames. Never expose them to handlers.
       if (msg.id !== 0) {
         this.sendErrorResponse(
           msg.id,
-          'transport configuration is provided by Go',
+          'transport control requests are handled by Go',
         );
       }
       return;
@@ -660,16 +795,77 @@ export class IpcClient {
 
   private routeResponse(msg: WireMessage): void {
     const p = this.pending.get(msg.id);
-    if (!p) {
-      process.stderr.write(
-        `rslint: orphan response id=${msg.id} kind=${msg.kind}\n`,
+    this.pending.delete(msg.id);
+    let received: ReceivedAttachments | undefined;
+    let result: IpcMessage | undefined;
+    let failure: Error | undefined;
+    let closedBeforeAck = false;
+    try {
+      if (msg.id <= 0) {
+        throw new Error('invalid IPC response id');
+      }
+      if (
+        msg.transport !== undefined &&
+        (msg.transport === null ||
+          typeof msg.transport !== 'object' ||
+          Array.isArray(msg.transport) ||
+          msg.transport.mapping !== undefined ||
+          msg.transport.released !== undefined ||
+          msg.transport.response !== undefined)
+      ) {
+        throw new Error('invalid IPC response transport metadata');
+      }
+      received = receiveAttachments(
+        msg.attachments,
+        msg.transport?.batches,
+        this.memory,
       );
+      if (p && msg.kind === RESPONSE_KIND) {
+        result = this.handlerMessage(msg, received);
+        // Responses have no handler borrow. Copy before resolving the caller;
+        // no shared capability escapes into its asynchronous lifetime.
+        if (received.values !== undefined)
+          result.attachments = received.values.map((value) =>
+            typeof value === 'string' ? value : readAttachmentBytes(value),
+          );
+      }
+    } catch (error) {
+      failure =
+        error instanceof Error ? error : new Error(safeErrorMessage(error));
+    } finally {
+      try {
+        const released = this.releaseAttachments(msg.id, received, true);
+        closedBeforeAck = this.closed;
+        if (released)
+          this.writeResponse(
+            TRANSPORT_RELEASE_KIND,
+            msg.id,
+            undefined,
+            released,
+            true,
+          );
+      } catch (error) {
+        failure ??=
+          error instanceof Error ? error : new Error(safeErrorMessage(error));
+      }
+    }
+    if (!p) {
+      if (failure !== undefined)
+        this.close(
+          new Error(`invalid orphan response: ${safeErrorMessage(failure)}`),
+        );
+      else
+        process.stderr.write(
+          `rslint: orphan response id=${msg.id} kind=${msg.kind}\n`,
+        );
       return;
     }
-    this.pending.delete(msg.id);
-    if (msg.kind === ERROR_KIND) {
-      const data = msg.data as ErrorResponseData | undefined;
-      const message = data?.message;
+    if (closedBeforeAck) {
+      void this.done.then(p.reject);
+    } else if (failure !== undefined) {
+      p.reject(failure);
+    } else if (msg.kind === ERROR_KIND) {
+      const message = (msg.data as ErrorResponseData | undefined)?.message;
       p.reject(
         new Error(
           typeof message === 'string' && message.length > 0
@@ -677,18 +873,8 @@ export class IpcClient {
             : 'request failed',
         ),
       );
-      return;
-    }
-    try {
-      // This endpoint only writes inline attachments. Shared response ownership
-      // would need a separate caller lifetime, so reject it before admitting a lease.
-      if (msg.transport?.batches !== undefined) {
-        throw new Error('unexpected shared IPC response attachments');
-      }
-      const received = receiveAttachments(msg.attachments, undefined);
-      p.resolve(this.handlerMessage(msg, received));
-    } catch (error) {
-      p.reject(error instanceof Error ? error : new Error(String(error)));
+    } else {
+      p.resolve(result!);
     }
   }
 
@@ -732,7 +918,8 @@ export class IpcClient {
             typeof msg.transport !== 'object' ||
             Array.isArray(msg.transport) ||
             msg.transport.mapping !== undefined ||
-            msg.transport.released !== undefined)
+            msg.transport.released !== undefined ||
+            msg.transport.response !== undefined)
         ) {
           throw new Error('invalid inbound IPC transport metadata');
         }
@@ -753,17 +940,7 @@ export class IpcClient {
         };
       } finally {
         try {
-          const batches = received?.release();
-          if (batches === false && received && !this.closed) {
-            if (this.pendingReleases.has(msg.id)) {
-              this.close(new Error('duplicate pending shared memory request'));
-            } else {
-              this.pendingReleases.set(msg.id, received.release.bind(received));
-              this.scheduleReleases();
-            }
-          } else if (batches !== false) {
-            released = batches;
-          }
+          released = this.releaseAttachments(msg.id, received);
         } catch (error) {
           kind = ERROR_KIND;
           result = {

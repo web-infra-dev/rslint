@@ -44,6 +44,12 @@ import type {
   LintFileResult,
 } from './linter/ecma-language-plugin.js';
 import type { ConfigDescriptor } from './types.js';
+import type { OpenTypeServiceBridge } from './plugin/type-service-protocol.js';
+import type { RpcHostChannel, WorkerRpcDescriptor } from '../native/types.js';
+import {
+  HostTypeBridge,
+  type WorkerTypeTransport,
+} from './type-service-bridge.js';
 
 // ─── Configuration ─────────────────────────────────────────────────────
 
@@ -109,6 +115,11 @@ interface WorkerSlot {
   inflight: Map<number, PendingTask>;
   /** How many times this worker has crashed and been respawned. */
   crashCount: number;
+  typeSessions: Set<string>;
+  /** Persistent synchronous type-service channel owned by this worker. */
+  typeBridge?: HostTypeBridge;
+  /** Optional leased shared-memory RPC slot for direct Worker↔Go queries. */
+  rpc?: WorkerRpcDescriptor;
 }
 
 interface PendingTask {
@@ -135,6 +146,9 @@ interface PendingTask {
   reject: (err: Error, kind?: 'crash' | 'shutdown') => void;
   /** Per-task timeout handle. */
   timer: NodeJS.Timeout;
+  cancelled: boolean;
+  typeServices?: WorkerTypeTransport;
+  typeSession?: string;
 }
 
 // ─── Implementation ────────────────────────────────────────────────────
@@ -217,11 +231,47 @@ interface QueuedTask {
   taskId: number;
   cancelSlot: number;
   resolve: (r: LintFileResult) => void;
+  typeServices?: WorkerTypeTransport;
   /** Set by `cancelTask` when the task is cancelled while still in
    *  the queue (not yet dispatched). `kickQueue` skips cancelled
    *  entries and resolves them as cancelled without ever posting to
    *  a worker. */
   cancelled: boolean;
+}
+
+const workerPoolRpcChannels = new WeakMap<WorkerPool, RpcHostChannel>();
+const workerPoolRpcAttachHooks = new WeakMap<WorkerPool, () => void>();
+
+/**
+ * Internal helper that attaches an optional `RpcHostChannel` before or after
+ * `init()` without altering the public `WorkerPool` / `WorkerPoolOptions`
+ * `.d.ts` contract or bypassing module spies on `new WorkerPool(...)`.
+ */
+export function attachWorkerPoolRpc(
+  pool: WorkerPool,
+  rpcChannel?: RpcHostChannel,
+): void {
+  if (!rpcChannel) return;
+  if (workerPoolRpcChannels.get(pool) === rpcChannel) return;
+  workerPoolRpcChannels.set(pool, rpcChannel);
+  workerPoolRpcAttachHooks.get(pool)?.();
+}
+
+function getRpcChannel(pool: WorkerPool): RpcHostChannel | undefined {
+  return workerPoolRpcChannels.get(pool);
+}
+
+function abortSlotRpc(pool: WorkerPool, slot: WorkerSlot): void {
+  if (slot.rpc) {
+    getRpcChannel(pool)?.abortSlot(slot.rpc.slot);
+  }
+}
+
+function releaseSlotRpc(pool: WorkerPool, slot: WorkerSlot): void {
+  const rpc = slot.rpc;
+  if (!rpc) return;
+  slot.rpc = undefined;
+  getRpcChannel(pool)?.releaseSlot(rpc.slot);
 }
 
 export class WorkerPool {
@@ -298,6 +348,47 @@ export class WorkerPool {
     // backing SharedArrayBuffer on demand up to MAX_CAPACITY, so it
     // scales to arbitrarily large batches without an explicit size hint.
     this.cancelPool = new CancelFlagPool();
+    workerPoolRpcAttachHooks.set(this, () => {
+      this.attachRpcToExistingWorkers();
+    });
+  }
+
+  private attachSlotRpc(slot: WorkerSlot): void {
+    if (this.closed || slot.exited || slot.rpc) return;
+    const channel = getRpcChannel(this);
+    if (!channel) return;
+    const rpc = channel.acquireSlot();
+    if (!rpc) return;
+    slot.rpc = rpc;
+    try {
+      slot.worker.postMessage({ kind: 'attach-rpc', rpc });
+    } catch {
+      releaseSlotRpc(this, slot);
+    }
+  }
+
+  private attachRpcToExistingWorkers(): void {
+    if (this.closed) return;
+    for (const slot of this.workers) {
+      this.attachSlotRpc(slot);
+    }
+  }
+
+  private allocateTaskId(): number {
+    const id = this.nextTaskId;
+    // Stay within positive signed 31-bit ints so SAB Int32 cancellation slots
+    // never suffer signed truncation or collide with initial zero.
+    this.nextTaskId = id >= 0x7fff_ffff ? 1 : id + 1;
+    return id;
+  }
+
+  private closeSlotTypeBridge(slot: WorkerSlot): void {
+    const bridge = slot.typeBridge;
+    if (bridge) {
+      slot.typeBridge = undefined;
+      bridge.close();
+    }
+    abortSlotRpc(this, slot);
   }
 
   /**
@@ -370,6 +461,7 @@ export class WorkerPool {
   async lintBatch(
     tasks: LintTask[],
     onTaskDispatched?: (taskId: number) => void,
+    typeServices?: WorkerTypeTransport,
   ): Promise<LintFileResult[]> {
     if (this.closed) throw new Error('WorkerPool: closed');
     if (this.opts.workerCount === 0) {
@@ -410,7 +502,7 @@ export class WorkerPool {
             });
             return;
           }
-          const taskId = this.nextTaskId++;
+          const taskId = this.allocateTaskId();
           const cancelSlot = this.cancelPool.acquire();
           const q: QueuedTask = {
             task,
@@ -418,6 +510,7 @@ export class WorkerPool {
             cancelSlot,
             resolve,
             cancelled: false,
+            typeServices,
           };
           this.pendingQueue.push(q);
           onTaskDispatched?.(taskId);
@@ -563,9 +656,9 @@ export class WorkerPool {
    *
    *   - In-flight (already on a worker): set the SAB cancel flag —
    *     worker bails at the next per-node visit.
-   *   - Queued (not yet dispatched): set `cancelled = true` so
-   *     `kickQueue` resolves it as cancelled and never posts to a
-   *     worker.
+   *   - Queued (not yet dispatched): remove from `pendingQueue`,
+   *     release its cancel slot, and resolve immediately as cancelled
+   *     without posting to a worker.
    *   - Otherwise (already completed / never existed): no-op, returns
    *     false.
    *
@@ -577,21 +670,75 @@ export class WorkerPool {
    * is no longer read. The returned result is itself correct/complete;
    * callers that need to drop a cancelled task's output must key off
    * each result's own `cancelled` field, not this method's return. */
+  private resolveCancelledQueued(q: QueuedTask): void {
+    this.cancelPool.release(q.cancelSlot);
+    q.resolve({
+      filePath: q.task.filePath,
+      diagnostics: [],
+      fixes: [],
+      suggestionsCount: 0,
+      cancelled: true,
+    });
+  }
+
   cancelTask(taskId: number): boolean {
     for (const w of this.workers) {
       const p = w.inflight.get(taskId);
       if (p) {
         this.cancelPool.cancel(p.cancelSlot);
+        p.cancelled = true;
+        w.typeBridge?.cancelTask(p.taskId);
+        abortSlotRpc(this, w);
         return true;
       }
     }
-    for (const q of this.pendingQueue) {
-      if (q.taskId === taskId) {
-        q.cancelled = true;
-        return true;
-      }
+    const idx = this.pendingQueue.findIndex((q) => q.taskId === taskId);
+    if (idx >= 0) {
+      const [q] = this.pendingQueue.splice(idx, 1);
+      q.cancelled = true;
+      this.resolveCancelledQueued(q);
+      return true;
     }
     return false;
+  }
+
+  retireTypeServices(sessions: readonly string[]): void {
+    const retired = new Set(sessions);
+    if (this.pendingQueue.length > 0) {
+      const kept: QueuedTask[] = [];
+      const cancelled: QueuedTask[] = [];
+      for (const queued of this.pendingQueue) {
+        if (
+          queued.task.typeServices &&
+          retired.has(queued.task.typeServices.session)
+        ) {
+          queued.cancelled = true;
+          cancelled.push(queued);
+        } else {
+          kept.push(queued);
+        }
+      }
+      this.pendingQueue = kept;
+      for (const q of cancelled) {
+        this.resolveCancelledQueued(q);
+      }
+    }
+    for (const slot of this.workers) {
+      for (const pending of slot.inflight.values()) {
+        if (pending.typeSession && retired.has(pending.typeSession))
+          this.cancelTask(pending.taskId);
+      }
+      const known = sessions.filter((session) =>
+        slot.typeSessions.delete(session),
+      );
+      if (known.length && !slot.exited) {
+        try {
+          slot.worker.postMessage({ kind: 'retire-types', sessions: known });
+        } catch {
+          /* The exit handler owns a worker that stopped during retirement. */
+        }
+      }
+    }
   }
 
   /** Graceful shutdown — message all workers, wait for exit. */
@@ -616,17 +763,20 @@ export class WorkerPool {
     for (const w of this.workers) {
       for (const [, p] of w.inflight) {
         clearTimeout(p.timer);
-        // Release the slot BEFORE inflight.clear() — `w.inflight` is
-        // about to be wiped, and the eventual 'exit' handler's
-        // release loop iterates an empty Map and runs zero times.
-        // The other cleanup paths (exit / result / timeout /
-        // postMessage-fail / pendingQueue drain) all release here
-        // too; without it, every shutdown-with-in-flight slowly
-        // consumes the SAB slot pool until cancel becomes a no-op.
-        this.cancelPool.release(p.cancelSlot);
+        // Each slot is released here or by its worker's exit listener before
+        // inflight.clear() drops the task bookkeeping.
+        if (p.typeSession && !w.exited) {
+          // The synchronous query waiter must observe cancellation until its
+          // worker exits. No slot can be reused after this pool is closed.
+          this.cancelPool.cancel(p.cancelSlot);
+          w.worker.once('exit', () => {
+            this.cancelPool.release(p.cancelSlot);
+          });
+        } else this.cancelPool.release(p.cancelSlot);
         p.reject(reason, 'shutdown');
       }
       w.inflight.clear();
+      this.closeSlotTypeBridge(w);
     }
     // Drain the backlog the same way: each queued task resolves with
     // `parseError: 'shutdown'` so callers awaiting `lintBatch` get a
@@ -722,10 +872,12 @@ export class WorkerPool {
    */
   private async spawnWorker(id: number): Promise<WorkerSlot> {
     return new Promise((resolveOk, reject) => {
+      const rpc = getRpcChannel(this)?.acquireSlot();
       const workerOptions: WorkerOptions = {
         workerData: {
           cancelSab: this.cancelPool.sharedBuffer,
           configs: this.opts.configs,
+          ...(rpc ? { rpc } : {}),
         },
         // Capture worker stdout/stderr instead of letting them inherit
         // the parent's. Native console behavior inside plugin code is
@@ -739,17 +891,14 @@ export class WorkerPool {
         stdout: true,
         stderr: true,
       };
-      const worker = new Worker(resolveWorkerFile(), workerOptions);
-      const exited = new Promise<void>((resolve) => {
-        worker.once('exit', () => {
-          this.initializingWorkers.delete(worker);
-          resolve();
-        });
-      });
-      this.initializingWorkers.add(worker);
-      this.workerExits.add(exited);
-      void exited.then(() => this.workerExits.delete(exited));
-
+      let worker: Worker;
+      try {
+        worker = new Worker(resolveWorkerFile(), workerOptions);
+      } catch (err) {
+        if (rpc) getRpcChannel(this)?.releaseSlot(rpc.slot);
+        reject(err instanceof Error ? err : new Error(String(err)));
+        return;
+      }
       const slot: WorkerSlot = {
         id,
         worker,
@@ -758,7 +907,19 @@ export class WorkerPool {
         respawning: false,
         inflight: new Map(),
         crashCount: 0,
+        typeSessions: new Set(),
+        rpc,
       };
+      const exited = new Promise<void>((resolve) => {
+        worker.once('exit', () => {
+          this.initializingWorkers.delete(worker);
+          releaseSlotRpc(this, slot);
+          resolve();
+        });
+      });
+      this.initializingWorkers.add(worker);
+      this.workerExits.add(exited);
+      void exited.then(() => this.workerExits.delete(exited));
 
       // Forward worker stdout / stderr to the host's `onLog`. Plugin
       // code (and any runner-internal `console.*` calls inside the
@@ -855,6 +1016,7 @@ export class WorkerPool {
           worker.off('exit', onExit);
           worker.off('error', onError);
           this.attachOngoingHandlers(slot);
+          this.attachSlotRpc(slot);
           resolveOk(slot);
         } else if (msg.kind === 'init-error') {
           clearTimeout(initTimer);
@@ -913,6 +1075,10 @@ export class WorkerPool {
    */
   private attachOngoingHandlers(slot: WorkerSlot): void {
     slot.worker.on('message', (msg: { kind: string; [k: string]: unknown }) => {
+      if (msg.kind === 'type-bridge') {
+        this.attachTypeBridge(slot, msg as unknown as OpenTypeServiceBridge);
+        return;
+      }
       // Note: the previous `kind: 'log'` branch is gone — plugin /
       // runner-internal `console.*` output now flows through the
       // worker's stdout/stderr streams (wired in `spawnWorker`), not
@@ -930,8 +1096,10 @@ export class WorkerPool {
         if (!p) return;
         slot.inflight.delete(taskId);
         clearTimeout(p.timer);
+        slot.typeBridge?.resetCancelledTask();
         this.cancelPool.release(p.cancelSlot);
-        p.resolve(msg.result as LintFileResult);
+        const result = msg.result as LintFileResult;
+        p.resolve(result);
         // Worker is now idle — pull the next queued task onto it.
         // Without this kick a 100-task batch on 8 workers would never
         // progress past the first 8 tasks: each worker dispatches once
@@ -957,6 +1125,8 @@ export class WorkerPool {
         p.reject(new Error(`worker exited with code ${code}`));
       }
       slot.inflight.clear();
+      this.closeSlotTypeBridge(slot);
+      releaseSlotRpc(this, slot);
       slot.ready = false;
       slot.exited = true;
 
@@ -1071,6 +1241,27 @@ export class WorkerPool {
     });
   }
 
+  private attachTypeBridge(slot: WorkerSlot, msg: OpenTypeServiceBridge): void {
+    if (this.closed || slot.exited || !slot.ready || slot.typeBridge) {
+      HostTypeBridge.reject(msg);
+      return;
+    }
+    const bridge = HostTypeBridge.attach(
+      msg,
+      (taskId) => (this.closed ? undefined : slot.inflight.get(taskId)),
+      (failed) => {
+        if (slot.typeBridge === failed) slot.typeBridge = undefined;
+      },
+    );
+    if (!bridge) return;
+    slot.typeBridge = bridge;
+    for (const p of slot.inflight.values()) {
+      if (p.cancelled) {
+        bridge.cancelTask(p.taskId);
+      }
+    }
+  }
+
   /**
    * Last-chance drain for the "every worker exhausted its respawn
    * cap" terminal state. Iterates `pendingQueue`, releases each
@@ -1124,12 +1315,23 @@ export class WorkerPool {
     const { task, taskId, cancelSlot, resolve: resolveOk } = q;
 
     const timer = setTimeout(() => {
+      // Signal cooperative cancellation BEFORE closing bridge / aborting SHM
+      // slot, and defer releasing cancelSlot until the worker exits so a live
+      // synchronous worker call never observes a recycled slot.
+      this.cancelPool.cancel(cancelSlot);
+      this.closeSlotTypeBridge(slot);
       // Per-task timeout fired: terminate the worker (its exit
       // handler triggers respawn) and fail just this task. Under the
       // queue model each worker has concurrency cap = 1, so there
       // are no sibling inflight tasks on this worker to reject.
       slot.inflight.delete(taskId);
-      this.cancelPool.release(cancelSlot);
+      if (slot.exited) {
+        this.cancelPool.release(cancelSlot);
+      } else {
+        slot.worker.once('exit', () => {
+          this.cancelPool.release(cancelSlot);
+        });
+      }
       // Mark the slot not-ready SYNCHRONOUSLY before yielding. The
       // exit handler (which sets ready=false during real cleanup)
       // runs async on the worker's 'exit' event — until that fires,
@@ -1179,6 +1381,9 @@ export class WorkerPool {
     const pending: PendingTask = {
       taskId,
       cancelSlot,
+      cancelled: false,
+      typeServices: q.typeServices,
+      typeSession: task.typeServices?.session,
       resolve: resolveOk,
       reject: (err, kind = 'crash') => {
         // Unify rejection shape with timeout: prefer a result-shaped
@@ -1224,6 +1429,8 @@ export class WorkerPool {
         cancelSlot,
         request: task,
       });
+      if (pending.typeSession && !task.typeServices?.syntaxOnly)
+        slot.typeSessions.add(pending.typeSession);
     } catch (err) {
       clearTimeout(timer);
       slot.inflight.delete(taskId);

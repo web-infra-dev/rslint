@@ -4,6 +4,7 @@
 import type { LintTask } from '../worker-pool.js';
 import type { LintFileResult } from '../linter/ecma-language-plugin.js';
 import type { SharedBytes } from '../../native/types.js';
+import type { PluginFileTypeServices } from './type-service-protocol.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Inputs
@@ -19,6 +20,7 @@ import type { SharedBytes } from '../../native/types.js';
 export interface EslintPluginLintRequest {
   /** LSP config/worker generation. Omitted by the CLI's single-host path. */
   generation?: string;
+  retiredTypeServices?: readonly string[];
   files: ReadonlyArray<
     {
       path: string;
@@ -29,6 +31,7 @@ export interface EslintPluginLintRequest {
        */
       languageOptions?: unknown;
       settings?: Record<string, unknown>;
+      typeServices?: PluginFileTypeServices;
       /**
        * The owning config's absolute filesystem directory in the same form the
        * host used as its `ConfigDescriptor.configDirectory`.
@@ -100,6 +103,7 @@ export function buildPluginLintTasks(
     filePath: f.path,
     frame: f.frame,
     languageOptions: f.languageOptions as never,
+    typeServices: f.typeServices,
     settings: f.settings,
     rules: sharedRules,
     collectFixes,

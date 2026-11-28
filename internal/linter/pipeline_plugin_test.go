@@ -5,6 +5,7 @@ package linter
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
@@ -21,7 +22,320 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/typeservice"
 )
+
+func typedPluginTestGeneration(t *testing.T, options string) Generation {
+	t.Helper()
+	raw, paths := createTestProgramWithFilesAndCompilerOptions(t,
+		map[string]string{"value.ts": "export const value = { count: 1 };"}, options)
+	return Generation{
+		Native: NativeGeneration{Programs: wrapTestPrograms(raw), TargetsByProgram: [][]string{{paths["value.ts"]}}, Cwd: raw.GetCurrentDirectory(), RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}
+		}},
+		Target: TargetProjection{ReadText: func(_ string, source ast.SourceFileLike) (string, error) { return source.Text(), nil }},
+		Plugin: &PluginGeneration{ConfigForFile: func(string) EslintPluginFileConfig { return EslintPluginFileConfig{TypeServices: true} }},
+	}
+}
+
+func TestEligiblePluginDoesNotSendUnusedTypeServices(t *testing.T) {
+	generation := typedPluginTestGeneration(t, `{"noLib":true}`)
+	dispatch := EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		wire, err := json.Marshal(request)
+		if err != nil {
+			return nil, err
+		}
+		if bytes.Contains(wire, []byte(`"sources":`)) || bytes.Contains(wire, []byte(`"origins":`)) {
+			return nil, errors.New("plugin dispatch sent Program metadata or origins before a type service request")
+		}
+		_, frames := request.WithFrameAttachments()
+		if len(frames) != len(request.Files) {
+			return nil, errors.New("plugin dispatch sent extra compiler syntax")
+		}
+		result := &EslintPluginLintResult{}
+		for _, file := range request.Files {
+			if file.TypeServices == nil {
+				return nil, errors.New("plugin cannot discover available type services")
+			}
+			result.Results = append(result.Results, EslintPluginFileResult{FilePath: file.Path})
+		}
+		return result, nil
+	})
+	result, err := RunPipeline(t.Context(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, dispatch))
+	outcome, _ := result.Observation.JoinedPluginOutcome()
+	if err := errors.Join(err, outcome.DispatchError); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestProgressiveTypedPluginOwnsGenerationUntilRunOrDiscard(t *testing.T) {
+	for _, discard := range []bool{false, true} {
+		t.Run(fmt.Sprintf("discard=%v", discard), func(t *testing.T) {
+			generation := typedPluginTestGeneration(t, `{"noLib":true}`)
+			var released atomic.Int32
+			presentation := &pipelineProgressiveDiagnostics{}
+			_, err := RunPipeline(t.Context(), NewProgressiveLintRequest(pipelineTestProvider(generation, func() { released.Add(1) }), ArtifactDemand{}, presentation))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if presentation.run == nil || released.Load() != 0 {
+				t.Fatalf("typed generation released before enrichment: %d", released.Load())
+			}
+			if discard {
+				presentation.run.Close()
+				presentation.run.Close()
+			} else {
+				var request EslintPluginTypeRequest
+				outcome, err := presentation.run.Run(t.Context(), EslintPluginDispatchFunc(func(ctx context.Context, got EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+					if len(got.Files) == 0 {
+						return &EslintPluginLintResult{}, nil
+					}
+					if released.Load() != 0 {
+						t.Fatal("typed producer released during query")
+					}
+					service := got.Files[0].TypeServices
+					if service == nil {
+						t.Fatal("type service binding missing")
+					}
+					opened, openErr := QueryEslintPluginTypes(ctx, EslintPluginTypeRequest{Session: service.Session, Generation: service.Binding.Generation, Open: true, Projection: &service.Binding.SourceFileName})
+					if openErr != nil || opened.Descriptor == nil || opened.Projection == nil || len(opened.Projection.Tree) == 0 || len(opened.Projection.Origins) == 0 {
+						t.Fatalf("on-demand syntax projection missing: %v", openErr)
+					}
+					request = EslintPluginTypeRequest{Session: service.Session, Generation: service.Binding.Generation, Queries: []typeservice.Query{{Scope: service.Binding.Scope, Request: &typeservice.CheckerRequest{Op: "void"}}}}
+					result, err := QueryEslintPluginTypes(ctx, request)
+					if err != nil || len(result.Packets) != 1 {
+						t.Fatalf("leased query failed: %v", err)
+					}
+					cancelled, cancel := context.WithCancel(ctx)
+					cancel()
+					if _, err := QueryEslintPluginTypes(cancelled, request); !errors.Is(err, context.Canceled) {
+						t.Fatalf("cancelled query = %v", err)
+					}
+					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: got.Files[0].Path}}}, nil
+				}))
+				if err != nil || outcome.DispatchError != nil {
+					t.Fatalf("typed work = %v / %v", err, outcome.DispatchError)
+				}
+				if _, err := QueryEslintPluginTypes(t.Context(), request); err == nil {
+					t.Fatal("retired session accepted a query")
+				}
+			}
+			if released.Load() != 1 {
+				t.Fatalf("release calls = %d", released.Load())
+			}
+		})
+	}
+}
+
+func TestProgressiveTypedPluginReleasesDeferredSessionOnSiblingPanic(t *testing.T) {
+	previous := runtime.GOMAXPROCS(1)
+	defer runtime.GOMAXPROCS(previous)
+	generation := typedPluginTestGeneration(t, `{"noLib":true}`)
+	var releases atomic.Int32
+	panicked := errors.New("second load failed")
+	provider := pipelinePlanProvider{plan: GenerationPlan{Loads: []GenerationLoad{
+		{CheckerCount: 4, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+			return generation, func() { releases.Add(1) }, nil
+		}},
+		{CheckerCount: 4, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+			panic(panicked)
+		}},
+	}}}
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Errorf("panic = <nil>, want %v", panicked)
+		} else if err, ok := recovered.(error); !ok || !errors.Is(err, panicked) {
+			t.Errorf("panic = %v, want %v", recovered, panicked)
+		}
+		if releases.Load() != 1 {
+			t.Errorf("completed unit released %d times, want 1", releases.Load())
+		}
+	}()
+	_, _ = RunPipeline(t.Context(), NewProgressiveLintRequest(provider, ArtifactDemand{}, &pipelineProgressiveDiagnostics{}))
+}
+
+func TestTypedPluginWaitsForNativeLint(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		options   string
+		typeCheck bool
+	}{
+		{name: "declaration-diagnostics", options: `{"declaration":true,"checkers":1}`, typeCheck: true},
+		{name: "plain-typed", options: `{"noLib":true,"checkers":1}`, typeCheck: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			generation := typedPluginTestGeneration(t, tc.options)
+			generation.Native.TypeCheck = tc.typeCheck
+			synctest.Test(t, func(t *testing.T) {
+				nativeStarted := make(chan struct{})
+				resume := make(chan struct{})
+				unblock := sync.OnceFunc(func() { close(resume) })
+				defer unblock()
+				pluginRules := generation.Native.RulesForFile
+				generation.Native.RulesForFile = func(file *ast.SourceFile) []rule.ConfiguredRule {
+					return append(pluginRules(file), rule.ConfiguredRule{Name: "native/block", Run: func(rule.RuleContext) rule.RuleListeners {
+						close(nativeStarted)
+						<-resume
+						return nil
+					}})
+				}
+				var calls atomic.Int32
+				dispatch := EslintPluginDispatchFunc(func(ctx context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+					calls.Add(1)
+					if len(request.Files) == 0 {
+						return &EslintPluginLintResult{}, nil
+					}
+					file := request.Files[0]
+					service := file.TypeServices
+					if service == nil {
+						return nil, errors.New("typed plugin lost its service")
+					}
+					_, err := QueryEslintPluginTypes(ctx, EslintPluginTypeRequest{Session: service.Session, Generation: service.Binding.Generation, Queries: []typeservice.Query{{Scope: service.Binding.Scope, Request: &typeservice.CheckerRequest{Op: "void"}}}})
+					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: file.Path}}}, err
+				})
+				done := make(chan error, 1)
+				go func() {
+					result, err := RunPipeline(t.Context(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, dispatch))
+					outcome, _ := result.Observation.JoinedPluginOutcome()
+					done <- errors.Join(err, outcome.DispatchError)
+				}()
+				select {
+				case <-nativeStarted:
+				case err := <-done:
+					t.Fatalf("native lint did not start: %v", err)
+				}
+				synctest.Wait()
+				if calls.Load() != 0 {
+					t.Error("typed plugin dispatched before the binding's native lint pass")
+				}
+				unblock()
+				if err := <-done; err != nil || calls.Load() != 2 {
+					t.Fatalf("typed observation returned %v with %d requests", err, calls.Load())
+				}
+			})
+		})
+	}
+}
+
+func TestTypedRetirementBypassesFileSlotsAndPreservesBatchOrder(t *testing.T) {
+	resources := &pluginDispatchResources{slots: make(chan struct{}, 1)}
+	firstGroupError := errors.New("first configuration failed in second unit")
+	laterGroupError := errors.New("later configuration failed in first unit")
+	closed := false
+	lease := &pluginTypeLease{
+		ids:     []string{"session"},
+		release: func() { closed = true },
+	}
+	dispatch := EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		if len(request.Files) > 0 && len(resources.slots) != 1 {
+			t.Error("file request did not use the observation's dispatch slot")
+		}
+		if len(request.RetiredTypeServices) > 0 {
+			if len(resources.slots) != 0 {
+				t.Error("retirement request contended for a file dispatch slot")
+			}
+			if !closed {
+				t.Error("semantic lease retained while waiting for host retirement")
+			}
+		}
+		if len(request.Files) > 0 {
+			switch request.Files[0].Path {
+			case "/repo/b.ts":
+				return nil, laterGroupError
+			case "/repo/a2.ts":
+				return nil, firstGroupError
+			}
+		}
+		return &EslintPluginLintResult{}, nil
+	})
+	first := pluginTask{resources: resources, types: []*pluginTypeLease{lease}, inputs: []EslintPluginFileInput{
+		{Path: "/repo/a.ts", ConfigKey: "a", Frame: []byte{1}, TypeServices: &EslintPluginFileTypeServices{Session: "session"}},
+		{Path: "/repo/b.ts", ConfigKey: "b", Frame: []byte{1}},
+	}}
+	second := pluginTask{resources: resources, inputs: []EslintPluginFileInput{{Path: "/repo/a2.ts", ConfigKey: "a", Frame: []byte{1}}}}
+	outcome := mergePluginOutcomes([]EslintPluginDispatchOutcome{first.runRaw(t.Context(), dispatch), second.runRaw(t.Context(), dispatch)})
+	if !errors.Is(outcome.DispatchError, firstGroupError) || len(resources.slots) != 0 {
+		t.Fatalf("dispatch error = %v, remaining slots = %d", outcome.DispatchError, len(resources.slots))
+	}
+	t.Run("retirement failure preserves the completed diagnostic", func(t *testing.T) {
+		cause := errors.New("host retirement failed")
+		const name = "plugin/check"
+		text := "const x = 1;"
+		task := pluginTask{resources: resources, types: []*pluginTypeLease{{ids: lease.ids}}, inputs: []EslintPluginFileInput{
+			{Path: "/repo/a.ts", Text: &text, Frame: []byte{1}, Rules: []rule.ConfiguredRule{{Name: name}}, TypeServices: &EslintPluginFileTypeServices{Session: "session"}},
+		}}
+		result := task.runRaw(t.Context(), EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			if len(request.RetiredTypeServices) != 0 {
+				return nil, cause
+			}
+			if len(request.Files) == 0 {
+				return &EslintPluginLintResult{}, nil
+			}
+			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: request.Files[0].Path, Diagnostics: []EslintPluginDiagnostic{{RuleName: name, Message: "completed"}}}}}, nil
+		}))
+		outcome := applyPluginFailure(mergePluginOutcomes([]EslintPluginDispatchOutcome{result}), PluginDiscardOnFailure)
+		if outcome.DispatchError != nil || len(outcome.Diagnostics) != 1 || outcome.Diagnostics[0].RuleName != name {
+			t.Fatalf("retirement changed the completed lint outcome: %+v", outcome)
+		}
+		if len(outcome.Notices) != 1 || outcome.Notices[0].Kind != EslintPluginTypeServiceRetirementFailed || !errors.Is(outcome.Notices[0].Err, cause) {
+			t.Fatalf("retirement notice = %+v", outcome.Notices)
+		}
+		fileFailure := pluginTask{resources: resources, inputs: []EslintPluginFileInput{{Path: "/repo/b.ts", ConfigKey: "b", Frame: []byte{1}}}}
+		fileResult := fileFailure.runRaw(t.Context(), dispatch)
+		merged := mergePluginOutcomes([]EslintPluginDispatchOutcome{result, fileResult})
+		if !errors.Is(merged.DispatchError, laterGroupError) || len(merged.Notices) != 1 {
+			t.Fatalf("cleanup notice changed a later dispatch error: %+v", merged)
+		}
+	})
+	t.Run("failed retirement releases partial output", func(t *testing.T) {
+		cause := errors.New("retirement open failed")
+		released := 0
+		provider := testPluginBatchProvider(func(context.Context) (*EslintPluginBatch, error) {
+			return &EslintPluginBatch{Release: func() { released++ }}, cause
+		})
+		err := dispatchTypeRetirement(t.Context(), provider, lease.ids)
+		if !errors.Is(err, cause) || released != 1 || len(resources.slots) != 0 {
+			t.Fatalf("dispatch error = %v, released = %d, remaining slots = %d", err, released, len(resources.slots))
+		}
+	})
+	t.Run("panic during file dispatch still retires the session", func(t *testing.T) {
+		cause := errors.New("file output release failed")
+		opened, retired := 0, 0
+		provider := testPluginBatchProvider(func(context.Context) (*EslintPluginBatch, error) {
+			opened++
+			fileBatch := opened == 1
+			return &EslintPluginBatch{
+				Dispatch: func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+					retired += len(request.RetiredTypeServices)
+					return &EslintPluginLintResult{}, nil
+				},
+				Release: func() {
+					if fileBatch {
+						panic(cause)
+					}
+				},
+			}, nil
+		})
+		task := pluginTask{resources: resources, types: []*pluginTypeLease{{ids: lease.ids}}, inputs: []EslintPluginFileInput{{Path: "/repo/a.ts", Frame: []byte{1}, TypeServices: &EslintPluginFileTypeServices{Session: "session"}}}}
+		result := task.runRaw(t.Context(), provider)
+		if !errors.Is(result.DispatchError, cause) || retired != 1 || len(resources.slots) != 0 {
+			t.Fatalf("dispatch error = %v, retired = %d, remaining slots = %d", result.DispatchError, retired, len(resources.slots))
+		}
+	})
+	t.Run("undispatched session skips retirement RPC", func(t *testing.T) {
+		canceled, cancel := context.WithCancel(t.Context())
+		cancel()
+		var called atomic.Int32
+		task := pluginTask{resources: resources, types: []*pluginTypeLease{{ids: lease.ids}}, inputs: []EslintPluginFileInput{{Path: "/repo/a.ts", Frame: []byte{1}, TypeServices: &EslintPluginFileTypeServices{Session: "session"}}}}
+		result := task.runRaw(canceled, EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			called.Add(1)
+			return &EslintPluginLintResult{}, nil
+		}))
+		if !errors.Is(result.DispatchError, context.Canceled) || called.Load() != 0 {
+			t.Fatalf("dispatch error = %v, calls = %d", result.DispatchError, called.Load())
+		}
+	})
+}
 
 func pluginTextTestPlan(count int) *LintPlan {
 	files := make([]lintFilePlan, count)

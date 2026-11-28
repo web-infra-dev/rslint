@@ -2,7 +2,11 @@ import type { TypeServiceCompilerData } from './type-service-compiler-data.js';
 import type { DecodedFrame } from './frame.js';
 import type { ESTreeNode } from './types.js';
 import { WeakObjectCache } from './type-service-cache.js';
-import { typeReplyPackets, TypePacketReader } from './type-service-codec.js';
+import {
+  isPacketCacheable,
+  typeReplyPackets,
+  TypePacketReader,
+} from './type-service-codec.js';
 import {
   FileSyntaxViews,
   GenerationSyntaxViews,
@@ -290,13 +294,19 @@ export class TypeServiceClient {
           }),
         );
       },
-      getNullableType: (type, flags) =>
-        requiredType(() =>
+      getNullableType: (type, flags) => {
+        const tf = this.typescript.TypeFlags;
+        const masked = flags >>> 0;
+        const wireFlags =
+          (masked & tf.Undefined ? 1 << 2 : 0) |
+          (masked & tf.Null ? 1 << 3 : 0);
+        return requiredType(() =>
           this.query({
             op: 'nullableType',
-            args: { id: this.id(type, 'type'), flags: flags >>> 0 },
+            args: { id: this.id(type, 'type'), flags: wireFlags },
           }),
-        ),
+        );
+      },
       getAmbientModules: () =>
         this.namedSymbolsFor(this.query({ op: 'ambientModules', args: {} })),
       getAugmentedPropertiesOfType: (t) =>
@@ -885,7 +895,6 @@ export class TypeServiceClient {
             generation: this.descriptor.generation,
             ...request,
           };
-    const key = typeQueryKey(query);
     if (
       !isCacheableTypeQuery(query) &&
       !(
@@ -893,13 +902,14 @@ export class TypeServiceClient {
         this.syntax.isStableNodeQuery(query.op, query.args.node)
       )
     ) {
-      const reader = this.ingest(query, transport(query, key, false));
+      const reader = this.ingest(query, transport(query, '', false));
       try {
         return read(reader);
       } finally {
         reader.close();
       }
     }
+    const key = typeQueryKey(query);
     let reader = this.facts.get(key);
     if (reader) {
       this.facts.delete(key);
@@ -949,6 +959,7 @@ export class TypeServiceClient {
   ): TypePacketReader {
     const reply = typeReplyPackets(bytes);
     for (const record of reply.records) {
+      if (!isPacketCacheable(record.packet)) continue;
       const key = typeQueryKey({
         generation: query.generation,
         op: record.op,
@@ -964,7 +975,7 @@ export class TypeServiceClient {
         }
       }
     }
-    return cacheKey === undefined
+    return cacheKey === undefined || !isPacketCacheable(reply.packet)
       ? new TypePacketReader(reply.packet)
       : this.store(cacheKey, reply.packet);
   }

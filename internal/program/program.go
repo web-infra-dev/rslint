@@ -3,6 +3,7 @@ package program
 import (
 	"context"
 	"slices"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -65,7 +66,8 @@ type typeBackend interface {
 }
 
 type compilerBackend struct {
-	raw *compiler.Program
+	raw   *compiler.Program
+	cache *derivedCache
 }
 
 // IsValid reports whether Program was created by this package. The zero value
@@ -82,8 +84,9 @@ func NewFromCompiler(raw *compiler.Program) *Program {
 	if raw == nil {
 		return nil
 	}
-	backend := &compilerBackend{raw: raw}
-	return &Program{source: backend, types: backend, cache: cacheForCompiler(raw)}
+	cache := cacheForCompiler(raw)
+	backend := &compilerBackend{raw: raw, cache: cache}
+	return &Program{source: backend, types: backend, cache: cache}
 }
 
 // NewFromCompilers adapts programs in stable input order.
@@ -113,7 +116,7 @@ func NewOwnedFromCompilers(rawPrograms []*compiler.Program) []*Program {
 			cache = &derivedCache{values: make(map[any]*derivedValue)}
 			caches[raw] = cache
 		}
-		backend := &compilerBackend{raw: raw}
+		backend := &compilerBackend{raw: raw, cache: cache}
 		programs[index] = &Program{source: backend, types: backend, cache: cache}
 	}
 	return programs
@@ -433,14 +436,61 @@ func (b *compilerBackend) packageNamesBySourceFile() map[tspath.Path][]string {
 		b.raw.GetResolvedTypeReferenceDirectives(),
 	)
 }
+// tsgo's DeclarationTransformer calls unlocked EmitResolver.*Unsafe methods
+// when isolatedDeclarations is enabled. Gate checker borrows with a shared
+// read lock and declaration emit with an exclusive write lock only under that
+// compiler option so lock order stays strictly isolatedDeclMu -> checker mutex.
+func (b *compilerBackend) isolatedDeclReadLock() func() {
+	if b.cache == nil || !b.raw.Options().IsolatedDeclarations.IsTrue() {
+		return nil
+	}
+	b.cache.isolatedDeclMu.RLock()
+	return b.cache.isolatedDeclMu.RUnlock
+}
+
+func (b *compilerBackend) isolatedDeclWriteLock() func() {
+	if b.cache == nil || !b.raw.Options().IsolatedDeclarations.IsTrue() {
+		return nil
+	}
+	b.cache.isolatedDeclMu.Lock()
+	return b.cache.isolatedDeclMu.Unlock
+}
+
+func (b *compilerBackend) withIsolatedDeclReadLock(
+	acquire func() (*checker.Checker, func()),
+) (*checker.Checker, func()) {
+	unlock := b.isolatedDeclReadLock()
+	if unlock == nil {
+		return acquire()
+	}
+	acquired := false
+	defer func() {
+		if !acquired {
+			unlock()
+		}
+	}()
+	c, release := acquire()
+	acquired = true
+	return c, sync.OnceFunc(func() {
+		defer unlock()
+		if release != nil {
+			release()
+		}
+	})
+}
+
 func (b *compilerBackend) typeCheckerForFile(ctx context.Context, file *ast.SourceFile) (*checker.Checker, func()) {
-	return b.raw.GetTypeCheckerForFile(ctx, file)
+	return b.withIsolatedDeclReadLock(func() (*checker.Checker, func()) {
+		return b.raw.GetTypeCheckerForFile(ctx, file)
+	})
 }
 func (b *compilerBackend) typeCheckerForFileExclusive(ctx context.Context, file *ast.SourceFile) (*checker.Checker, func()) {
-	return b.raw.GetTypeCheckerForFileExclusive(ctx, file)
+	return b.withIsolatedDeclReadLock(func() (*checker.Checker, func()) {
+		return b.raw.GetTypeCheckerForFileExclusive(ctx, file)
+	})
 }
 func (b *compilerBackend) noEmitDiagnostics(ctx context.Context) []*ast.Diagnostic {
-	return collectNoEmitDiagnostics(ctx, b.raw)
+	return collectNoEmitDiagnostics(ctx, b)
 }
 
 func (s *parsedBackend) sourceFiles() []*ast.SourceFile { return s.files }

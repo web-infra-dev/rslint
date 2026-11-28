@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"slices"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -31,6 +32,16 @@ func executeObservation(
 	loads := plan.Loads
 	results := make([]observationUnitExecution, len(loads))
 	errs := make([]error, len(loads))
+	transferred := false
+	defer func() {
+		if !transferred {
+			for _, unit := range results {
+				if unit.deferredTask != nil {
+					unit.deferredTask.closeTypes()
+				}
+			}
+		}
+	}()
 	resources := newPluginDispatchResources()
 	sourceReadLimit := runtime.GOMAXPROCS(0)
 	if plan.SingleThreaded {
@@ -65,6 +76,7 @@ func executeObservation(
 			for _, work := range prepared {
 				if work.lease != nil {
 					work.native.close()
+					work.plugin.closeTypes()
 					work.lease.close()
 				}
 			}
@@ -80,6 +92,7 @@ func executeObservation(
 		if blocked {
 			for i := range prepared {
 				prepared[i].targetSyntaxBlocked = true
+				prepared[i].plugin.closeTypes()
 				prepared[i].plugin = pluginTask{}
 			}
 		}
@@ -129,6 +142,7 @@ func executeObservation(
 			return result, err
 		}
 	}
+	transferred = true
 	return result, nil
 }
 
@@ -170,10 +184,18 @@ func mergeObservationUnits(parts []observationUnitExecution, index int) (observa
 			if part.deferredTask != nil {
 				combined.pluginKind = pluginObservationProgressive
 				if combined.deferredTask == nil {
-					combined.deferredTask = part.deferredTask
+					copied := *part.deferredTask
+					copied.inputs = slices.Clone(part.deferredTask.inputs)
+					copied.types = slices.Clone(part.deferredTask.types)
+					copied.targetPathByWire = make(map[string]string, len(part.deferredTask.targetPathByWire))
+					for wire, target := range part.deferredTask.targetPathByWire {
+						copied.targetPathByWire[wire] = target
+					}
+					combined.deferredTask = &copied
 				} else {
 					task := combined.deferredTask
 					task.inputs = append(task.inputs, part.deferredTask.inputs...)
+					task.types = append(task.types, part.deferredTask.types...)
 					for wire, target := range part.deferredTask.targetPathByWire {
 						task.targetPathByWire[wire] = target
 					}

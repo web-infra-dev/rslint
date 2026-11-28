@@ -85,6 +85,45 @@ async function runExitFixture(scriptName, successMarker) {
 }
 
 describe('Rslint community plugin API', () => {
+  test('typed lintText reads overlay syntax and refreshed dependency generations', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-typed-'));
+    let rslint;
+    try {
+      const pluginUrl = pathToFileURL(
+        path.join(eslintPluginFixturesDir, 'typed-plugin.mjs'),
+      ).href;
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        `import typed from ${JSON.stringify(pluginUrl)};
+export default [{ files: ['**/*.ts'], languageOptions: { parserOptions: { project: ['./tsconfig.json'] } }, plugins: { typed }, rules: { 'typed/value': 'error' } }];`,
+      );
+      await writeFile(
+        path.join(tmp, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: { strict: true, module: 'ESNext', target: 'ES2020' },
+          include: ['*.ts'],
+        }),
+      );
+      await writeFile(path.join(tmp, 'index.ts'), 'export {};');
+      const dependency = path.join(tmp, 'dependency.ts');
+      await writeFile(dependency, 'export const value: string = "first";');
+      rslint = new Rslint({ cwd: tmp });
+      const source = 'import { value } from "./dependency";\nvalue;\n';
+      const first = await rslint.lintText(source, { filePath: 'index.ts' });
+      expect(first[0].messages.map((message) => message.message)).toEqual([
+        'string',
+      ]);
+      await writeFile(dependency, 'export const value: number = 42;');
+      const second = await rslint.lintText(source, { filePath: 'index.ts' });
+      expect(second[0].messages.map((message) => message.message)).toEqual([
+        'number',
+      ]);
+    } finally {
+      await rslint?.close();
+      await cleanupTempDir(tmp);
+    }
+  });
+
   test('lintText runs a local community plugin Program listener and returns its fix output', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-plugin-'));
     let rslint;
@@ -123,6 +162,51 @@ describe('Rslint community plugin API', () => {
       } finally {
         await cleanupTempDir(tmp);
       }
+    }
+  });
+
+  test('lintText preserves community plugin suggestion data', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-suggestion-'));
+    let rslint;
+    try {
+      rslint = new Rslint({ cwd: tmp });
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        `const rule = {
+  meta: {
+    hasSuggestions: true,
+    schema: [],
+    messages: { report: 'Rename store.', rename: 'Rename {{ current }} to {{ fixed }} ({{ index }}).' },
+  },
+  create(context) {
+    return { Identifier(node) {
+      if (node.name !== 'tagged') return;
+      const data = { current: node.name, fixed: '$tagged', index: 0 };
+      context.report({
+        node, messageId: 'report',
+        suggest: [{ messageId: 'rename', data, fix: fixer => fixer.replaceText(node, data.fixed) }],
+      });
+    } };
+  },
+};
+export default [{ plugins: { local: { rules: { store: rule } } }, rules: { 'local/store': 'error' } }];`,
+      );
+      const [result] = await rslint.lintText('const tagged = 1;\n', {
+        filePath: 'probe.ts',
+      });
+      expect(result.messages.map((message) => message.suggestions)).toEqual([
+        [
+          {
+            messageId: 'rename',
+            desc: 'Rename tagged to $tagged (0).',
+            data: { current: 'tagged', fixed: '$tagged', index: '0' },
+            fix: { range: [6, 12], text: '$tagged' },
+          },
+        ],
+      ]);
+    } finally {
+      await rslint?.close();
+      await cleanupTempDir(tmp);
     }
   });
 

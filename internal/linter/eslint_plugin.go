@@ -33,21 +33,23 @@ type EslintPluginRuleConfig struct {
 }
 
 type EslintPluginLintFile struct {
-	Path            string         `json:"path"`
-	Frame           []byte         `json:"frame,omitempty"`
-	FrameAttachment *uint32        `json:"frameAttachment,omitempty"`
-	ConfigKey       string         `json:"configKey"`
-	LanguageOptions map[string]any `json:"languageOptions,omitempty"`
-	Settings        map[string]any `json:"settings,omitempty"`
+	Path            string                        `json:"path"`
+	Frame           []byte                        `json:"frame,omitempty"`
+	FrameAttachment *uint32                       `json:"frameAttachment,omitempty"`
+	ConfigKey       string                        `json:"configKey"`
+	LanguageOptions map[string]any                `json:"languageOptions,omitempty"`
+	Settings        map[string]any                `json:"settings,omitempty"`
+	TypeServices    *EslintPluginFileTypeServices `json:"typeServices,omitempty"`
 }
 
 type EslintPluginLintRequest struct {
-	Generation      string                            `json:"generation,omitempty"`
-	Files           []EslintPluginLintFile            `json:"files"`
-	Rules           map[string]EslintPluginRuleConfig `json:"rules"`
-	CollectFixes    bool                              `json:"collectFixes"`
-	SuggestionsMode string                            `json:"suggestionsMode"`
-	CollectTiming   bool                              `json:"collectTiming,omitempty"`
+	RetiredTypeServices []string                          `json:"retiredTypeServices,omitempty"`
+	Generation          string                            `json:"generation,omitempty"`
+	Files               []EslintPluginLintFile            `json:"files"`
+	Rules               map[string]EslintPluginRuleConfig `json:"rules"`
+	CollectFixes        bool                              `json:"collectFixes"`
+	SuggestionsMode     string                            `json:"suggestionsMode"`
+	CollectTiming       bool                              `json:"collectTiming,omitempty"`
 }
 
 // WithFrameAttachments moves the immutable binary frames into the existing IPC
@@ -91,6 +93,7 @@ type EslintPluginFixPart struct {
 type EslintPluginSuggestion struct {
 	MessageId string            `json:"messageId,omitempty"`
 	Desc      string            `json:"desc,omitempty"`
+	Data      map[string]string `json:"data,omitempty"`
 	Fixes     []EslintPluginFix `json:"fixes"`
 }
 
@@ -125,7 +128,8 @@ type EslintPluginLintResult struct {
 // EslintPluginDispatcher opens an output/dispatch scope for each request to the Node host
 // and returns its result. It must honor ctx and return after cancellation.
 // Concurrent pipeline work joins dispatch before ending its producer lease;
-// detached inputs need no generation borrow. The CLI uses the generic IPC
+// source-only detached inputs need no generation borrow; typed work retains
+// an explicit semantic lease. The CLI uses the generic IPC
 // channel; the LSP server over an `rslint/pluginLint` request.
 // Dispatch borrows owned frames until return, or consumes allocator-owned frames
 // during publication. Callers do not inspect frames after entering Dispatch.
@@ -177,11 +181,13 @@ type EslintPluginFileInput struct {
 	// fix planning keeps the original frame until text validation completes.
 	DiagnosticSource ast.SourceFileLike
 	// Frame owns detached syntax bytes; FrameError freezes a projection failure.
-	Frame           []byte
-	FrameError      string
-	ConfigKey       string
-	LanguageOptions map[string]any
-	Settings        map[string]any
+	Frame               []byte
+	FrameError          string
+	ConfigKey           string
+	LanguageOptions     map[string]any
+	Settings            map[string]any
+	TypeServicesEnabled bool
+	TypeServices        *EslintPluginFileTypeServices
 	// Rules are the plugin rules (IsEslintPluginRule) configured for this
 	// file, carrying Name / Options / Severity.
 	Rules []rule.ConfiguredRule
@@ -213,6 +219,7 @@ func buildEslintPluginFileInput(filePath, configKey string, rules *preparedRuleS
 // from their own config ownership model, keeping the linter independent from
 // config package types and transport-specific routing identities.
 type EslintPluginFileConfig struct {
+	TypeServices    bool
 	ConfigKey       string
 	LanguageOptions map[string]any
 	Settings        map[string]any
@@ -243,7 +250,7 @@ func BuildEslintPluginFileInputs(
 			if resolveConfig != nil {
 				fileConfig = resolveConfig(filePath)
 			}
-			inputs = append(inputs, buildEslintPluginFileInput(
+			input := buildEslintPluginFileInput(
 				filePath,
 				fileConfig.ConfigKey,
 				filePlan.rules,
@@ -251,7 +258,9 @@ func BuildEslintPluginFileInputs(
 				fileConfig.Settings,
 				nil,
 				filePlan.file,
-			))
+			)
+			input.TypeServicesEnabled = fileConfig.TypeServices
+			inputs = append(inputs, input)
 		}
 	}
 	return inputs
@@ -318,7 +327,7 @@ func dispatchEslintPluginRules(
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 ) ([]EslintPluginProtocolNotice, error) {
-	return newPluginDispatchResources().dispatch(ctx, dispatch, files, collectFixes, suggestionsMode, timing, onDiagnostic, nil, nil)
+	return newPluginDispatchResources().dispatch(ctx, dispatch, files, collectFixes, suggestionsMode, timing, onDiagnostic, nil, nil, nil)
 }
 
 // One observation owns one bounded set of projection and transport windows.
@@ -337,7 +346,7 @@ func newPluginDispatchResources() *pluginDispatchResources {
 func (resources *pluginDispatchResources) dispatch(
 	ctx context.Context, dispatch EslintPluginDispatcher, files []EslintPluginFileInput,
 	collectFixes bool, suggestionsMode string, timing *TimingCollector, onDiagnostic DiagnosticHandler,
-	onBatch func(pluginBatchRange), onFailure pluginFileFailureHandler,
+	onBatch func(pluginBatchRange), onFailure pluginFileFailureHandler, onDispatched func(EslintPluginLintRequest),
 ) ([]EslintPluginProtocolNotice, error) {
 	if resources == nil {
 		resources = newPluginDispatchResources()
@@ -394,6 +403,7 @@ func (resources *pluginDispatchResources) dispatch(
 					batchNotices[i] = append(batchNotices[i], notice)
 				},
 				onFailure,
+				onDispatched,
 			)
 			return nil
 		})
@@ -439,6 +449,7 @@ type EslintPluginProtocolNoticeKind uint8
 const (
 	EslintPluginMissingFileResult EslintPluginProtocolNoticeKind = iota
 	EslintPluginUnconfiguredDiagnostic
+	EslintPluginTypeServiceRetirementFailed
 )
 
 // EslintPluginProtocolNotice describes a recoverable plugin response anomaly.
@@ -448,6 +459,7 @@ type EslintPluginProtocolNotice struct {
 	Kind     EslintPluginProtocolNoticeKind
 	FilePath string
 	RuleName string
+	Err      error
 }
 
 // EslintPluginDispatchOutcome is the result of one plugin dispatch.
@@ -586,17 +598,10 @@ func dispatchOneBatch(
 	onDiagnostic DiagnosticHandler,
 	onNotice func(EslintPluginProtocolNotice),
 	onFailure pluginFileFailureHandler,
+	onDispatched func(EslintPluginLintRequest),
 ) (err error) {
 	defer clear(batch)
-	defer func() {
-		if r := recover(); r != nil {
-			if cause, ok := r.(error); ok {
-				err = fmt.Errorf("eslint-plugin dispatch panicked: %w", cause)
-			} else {
-				err = fmt.Errorf("eslint-plugin dispatch panicked: %v", r)
-			}
-		}
-	}()
+	defer recoverPluginDispatchPanic(&err)
 	// Output buffers stay exclusive until dispatch returns, including errors
 	// and cancellation. No publication/reader lifetime enters the encoder.
 	var builder *pluginProjectionBuffers
@@ -656,7 +661,7 @@ func dispatchOneBatch(
 					}
 				}
 				var allocated []byte
-				frame, projectErr := projectPluginFrame(ctx, &builder.syntax, input, func(size int) []byte {
+				frame, projectErr := projectPluginFrame(ctx, &builder.syntax, &input, func(size int) []byte {
 					if len(window) > 0 && bytes+size > pluginWindowBytes {
 						panic(errPluginWindowFull)
 					}
@@ -731,6 +736,9 @@ func dispatchOneBatch(
 		if builder != nil {
 			builder.reset()
 		}
+		if onDispatched != nil {
+			onDispatched(req)
+		}
 		res, dispatchErr := output.Dispatch(ctx, req)
 		releaseOutput()
 		releaseBuilder()
@@ -754,6 +762,16 @@ func dispatchOneBatch(
 		}
 	}
 	return nil
+}
+
+func recoverPluginDispatchPanic(err *error) {
+	if r := recover(); r != nil {
+		if cause, ok := r.(error); ok {
+			*err = fmt.Errorf("eslint-plugin dispatch panicked: %w", cause)
+		} else {
+			*err = fmt.Errorf("eslint-plugin dispatch panicked: %v", r)
+		}
+	}
 }
 
 // dispatchConcurrency bounds how many plugin-lint batches are dispatched
@@ -835,6 +853,7 @@ func buildEslintPluginRequest(batch []EslintPluginFileInput, collectFixes bool, 
 			ConfigKey:       f.ConfigKey,
 			LanguageOptions: f.LanguageOptions,
 			Settings:        f.Settings,
+			TypeServices:    f.TypeServices,
 		})
 	}
 	return EslintPluginLintRequest{
@@ -1057,14 +1076,21 @@ func rebuildEslintPluginSuggestions(suggestions []EslintPluginSuggestion, source
 			fixes = append(fixes, rebuildEslintPluginFix(fx, source, clamp))
 		}
 		out = append(out, rule.RuleSuggestion{
-			Message:  rule.RuleMessage{Id: s.MessageId, Description: s.Desc},
+			Message:  rule.RuleMessage{Id: s.MessageId, Description: s.Desc, Data: s.Data},
 			FixesArr: fixes,
 		})
 	}
 	return &out
 }
 
-func projectPluginFrame(ctx context.Context, builder *estree.Builder, input EslintPluginFileInput, allocate func(int) []byte) ([]byte, error) {
+func (input *EslintPluginFileInput) pluginSourceType() string {
+	if sourceType, _ := input.LanguageOptions["sourceType"].(string); sourceType != "" {
+		return sourceType
+	}
+	return "module"
+}
+
+func projectPluginFrame(ctx context.Context, builder *estree.Builder, input *EslintPluginFileInput, allocate func(int) []byte) ([]byte, error) {
 	if input.SourceFile == nil {
 		return nil, errors.New("plugin ESTree projection requires the Program SourceFile")
 	}
@@ -1076,9 +1102,5 @@ func projectPluginFrame(ctx context.Context, builder *estree.Builder, input Esli
 	if strings.TrimPrefix(text, "\ufeff") != input.SourceFile.Text() {
 		return nil, errors.New("plugin source snapshot does not match Program syntax")
 	}
-	sourceType, _ := input.LanguageOptions["sourceType"].(string)
-	if sourceType == "" {
-		sourceType = "module"
-	}
-	return builder.BuildInto(ctx, input.SourceFile, estree.Options{SourceType: sourceType, HasBOM: hasBOM}, allocate)
+	return builder.BuildInto(ctx, input.SourceFile, estree.Options{SourceType: input.pluginSourceType(), HasBOM: hasBOM}, allocate)
 }

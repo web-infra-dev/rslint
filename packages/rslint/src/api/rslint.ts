@@ -18,6 +18,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { RSLintService } from '../service/service.js';
 import { NodeRslintService } from '../internal/node.js';
+import { openServiceRpc } from '../ipc/rpc-transport.js';
 import { ConfigModuleHost, normalizeConfig } from '../config/config-loader.js';
 import {
   nativePathIdentity,
@@ -136,6 +137,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export class Rslint {
+  readonly #nodeService: NodeRslintService;
   readonly #service: RSLintService;
   readonly #cwd: string;
   readonly #overrideConfig?: RslintConfigEntry | RslintConfig | null;
@@ -143,6 +145,9 @@ export class Rslint {
   readonly #fix: boolean;
   readonly #virtualFiles?: Record<string, string>;
   readonly #pluginHosts = new PluginHostLifecycle();
+  readonly #queryPluginTypes = async (
+    query: Parameters<RSLintService['queryPluginTypes']>[0],
+  ) => this.#service.queryPluginTypes(query);
   #normalizedOverrideConfig?: Record<string, unknown>[];
   #closeRequested = false;
   #closePromise?: Promise<void>;
@@ -153,7 +158,8 @@ export class Rslint {
     this.#overrideConfigFile = options.overrideConfigFile;
     this.#fix = options.fix ?? false;
     this.#virtualFiles = options.virtualFiles;
-    this.#service = new RSLintService(new NodeRslintService());
+    this.#nodeService = new NodeRslintService();
+    this.#service = new RSLintService(this.#nodeService);
   }
 
   /**
@@ -379,6 +385,7 @@ export class Rslint {
             },
             () => this.#closeRequested,
             this.#pluginHosts,
+            async () => openServiceRpc(this.#nodeService),
           );
           if (pluginHost) {
             if (this.#closeRequested) {
@@ -396,7 +403,12 @@ export class Rslint {
               'rslint API: pluginLint requested without an activated plugin host',
             );
           }
-          return pluginSession.host.lint(request, undefined, attachments);
+          return pluginSession.host.lint(
+            request,
+            undefined,
+            attachments,
+            this.#queryPluginTypes,
+          );
         },
       },
       shutdown,

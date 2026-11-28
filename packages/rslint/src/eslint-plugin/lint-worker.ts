@@ -36,6 +36,12 @@ import {
 } from './plugin/plugin-loader.js';
 import { viewForSlot } from './cancel-flag.js';
 import type { ConfigDescriptor } from './types.js';
+import type { WorkerTypeServices } from './type-service-worker.js';
+import type { WorkerRpcDescriptor } from '../native/types.js';
+import {
+  FrameCancelled,
+  checkFrameCancellation,
+} from '../languages/js/frame.js';
 
 // ─── Worker bootstrap data ──────────────────────────────────────────────
 
@@ -49,6 +55,8 @@ interface WorkerInitData {
    * pick the right `LoadedPlugins` per task.
    */
   configs: ConfigDescriptor[];
+  /** Optional leased shared-memory RPC slot for direct Worker↔Go type queries. */
+  rpc?: WorkerRpcDescriptor;
 }
 
 // ─── Messages ──────────────────────────────────────────────────────────
@@ -65,7 +73,11 @@ interface ShutdownMessage {
   kind: 'shutdown';
 }
 
-type InboundMessage = TaskMessage | ShutdownMessage;
+type InboundMessage =
+  | TaskMessage
+  | ShutdownMessage
+  | { kind: 'retire-types'; sessions: string[] }
+  | { kind: 'attach-rpc'; rpc: WorkerRpcDescriptor };
 
 interface ReadyMessage {
   kind: 'ready';
@@ -139,9 +151,33 @@ function sendInitError(message: string): void {
   parentPort?.removeAllListeners('message');
 }
 
+let typeServices: WorkerTypeServices | undefined;
+let workerRpc: WorkerRpcDescriptor | undefined = (workerData as WorkerInitData)
+  .rpc;
+let closing = false;
+
 // ── 2. Task dispatch ──
 parentPort.on('message', (msg: InboundMessage) => {
+  void handleInboundMessage(msg).catch((err: unknown) => {
+    process.nextTick(() => {
+      throw err;
+    });
+  });
+});
+
+async function handleInboundMessage(msg: InboundMessage): Promise<void> {
+  if (msg.kind === 'attach-rpc') {
+    workerRpc = msg.rpc;
+    typeServices?.attachRpc(msg.rpc);
+    return;
+  }
+  if (msg.kind === 'retire-types') {
+    typeServices?.retire(msg.sessions);
+    return;
+  }
   if (msg.kind === 'shutdown') {
+    closing = true;
+    typeServices?.close();
     // Use `parentPort.close()` instead of `process.exit(0)`. Per Node
     // docs, `MessagePort.close()` delivers any already-queued
     // outbound messages first, THEN closes the channel — the worker
@@ -195,13 +231,31 @@ parentPort.on('message', (msg: InboundMessage) => {
         taskId: msg.taskId,
         result,
       };
-      parentPort!.postMessage(out);
+      if (!closing) parentPort!.postMessage(out);
       return;
     }
 
     let result: LintFileResult;
+    let fileTypes: ReturnType<WorkerTypeServices['file']> | undefined;
     try {
-      result = lintFile(request, selected);
+      if (request.typeServices) {
+        checkFrameCancellation(cancelFlag);
+        if (!typeServices) {
+          const { WorkerTypeServices } =
+            await import('./type-service-worker.js');
+          checkFrameCancellation(cancelFlag);
+          if (closing) throw new FrameCancelled();
+          typeServices = new WorkerTypeServices(parentPort!, workerRpc);
+        }
+        checkFrameCancellation(cancelFlag);
+        if (closing) throw new FrameCancelled();
+        fileTypes = typeServices.file(
+          request.typeServices,
+          msg.taskId,
+          cancelFlag,
+        );
+      }
+      result = lintFile(request, selected, fileTypes?.services);
     } catch (err) {
       // lintFile is expected to capture errors internally; this catch
       // is purely belt-and-suspenders so a programming bug in the
@@ -211,14 +265,19 @@ parentPort.on('message', (msg: InboundMessage) => {
         diagnostics: [],
         fixes: [],
         suggestionsCount: 0,
-        cancelled: false,
-        parseError: `worker exception: ${(err as Error)?.message ?? err}`,
+        cancelled: err instanceof FrameCancelled,
+        parseError:
+          err instanceof FrameCancelled
+            ? undefined
+            : `worker exception: ${(err as Error)?.message ?? err}`,
       };
+    } finally {
+      fileTypes?.close();
     }
     const out: ResultMessage = { kind: 'result', taskId: msg.taskId, result };
-    parentPort!.postMessage(out);
+    if (!closing) parentPort!.postMessage(out);
   }
-});
+}
 
 // Kick off init asynchronously.
 void init();

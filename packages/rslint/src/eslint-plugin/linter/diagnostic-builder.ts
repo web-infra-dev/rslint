@@ -11,6 +11,7 @@
  */
 
 import { type Fix, type RuleFixer } from './fixer.js';
+import { FrameCancelled } from '../../languages/js/frame.js';
 import {
   buildLineStartOffsets,
   lineStartOffset,
@@ -59,6 +60,7 @@ function interpolateMessage(
 export interface SuggestionDescriptor {
   messageId?: string;
   desc?: string;
+  data?: Record<string, string>;
   fixes: DiagnosticFix[] | null;
 }
 
@@ -353,6 +355,7 @@ export function buildDiagnostic(args: BuildDiagnosticArgs): Diagnostic | null {
       const result = descriptor.fix(fixer);
       fixes = materializeFixes(result, text);
     } catch (err) {
+      if (err instanceof FrameCancelled) throw err;
       // A buggy fix must not turn a real diagnostic into a runtime error.
       // Drop the fix; keep the diagnostic. `console.error` is forwarded
       // through the worker's captured stderr stream to the host's
@@ -413,13 +416,25 @@ export function buildDiagnostic(args: BuildDiagnosticArgs): Diagnostic | null {
         try {
           sFixes = materializeFixes(s.fix(fixer), text) ?? null;
         } catch (err) {
+          if (err instanceof FrameCancelled) throw err;
           console.error(
             `[context] rule ${ruleName} suggestion fix() threw: ${(err as Error)?.message ?? err}`,
           );
           sFixes = null;
         }
       }
-      return { messageId: s.messageId, desc: suggestionMessage, fixes: sFixes };
+      // Rslint exposes suggestion data as strings, like message interpolation.
+      const data = s.data
+        ? Object.fromEntries(
+            Object.entries(s.data).map(([key, value]) => [key, String(value)]),
+          )
+        : undefined;
+      return {
+        messageId: s.messageId,
+        desc: suggestionMessage,
+        data,
+        fixes: sFixes,
+      };
     });
     if (suggestionsMode === 'eager') {
       const materializedSuggestions = builtSuggestions.filter(

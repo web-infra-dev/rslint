@@ -516,6 +516,7 @@ export function createTypeView(
 
   const fact = host.typeFact(id);
   const flagsValue = fact.flags.reduce((acc, name) => {
+    if (name === 'None') return acc;
     const flag: unknown = Reflect.get(tf, name);
     if (typeof flag !== 'number') unsupportedFlag(`TypeFlags.${name}`);
     return acc | flag;

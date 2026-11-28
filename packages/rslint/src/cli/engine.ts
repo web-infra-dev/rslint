@@ -14,6 +14,7 @@ import {
   type IpcProcessOptions,
   type IpcAttachment,
   type IpcMessage,
+  type RpcHostChannel,
 } from '../ipc/index.js';
 import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
@@ -24,11 +25,18 @@ import {
   type LoadConfigsRequest,
 } from '../config/config-loader.js';
 
+import type { TypeServiceHostTransport } from '../service/plugin-type-service-protocol.js';
+import {
+  resolveTypeServiceReply,
+  type NativeTypeServiceResponse,
+} from '../internal/plugin-type-service.js';
+
 interface PluginLintHost {
   lint(
     req: unknown,
     signal?: AbortSignal,
     attachments?: readonly IpcAttachment[],
+    typeServices?: TypeServiceHostTransport,
   ): Promise<unknown>;
   shutdown(): Promise<void>;
 }
@@ -39,13 +47,21 @@ type CreatePluginLintHost = (
   singleThreaded?: boolean,
 ) => Promise<PluginLintHost>;
 
+type CreatePluginLintHostWithRpc = (
+  configs: PluginConfigDescriptor[],
+  onLog?: (rec: { level: string; source: string; text: string }) => void,
+  singleThreaded?: boolean,
+  rpcChannel?: RpcHostChannel | (() => Promise<RpcHostChannel | undefined>),
+) => Promise<PluginLintHost>;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isPluginHostFactoryModule(
-  value: unknown,
-): value is { createPluginLintHost: CreatePluginLintHost } {
+function isPluginHostFactoryModule(value: unknown): value is {
+  createPluginLintHost: CreatePluginLintHost;
+  createPluginLintHostWithRpc?: CreatePluginLintHostWithRpc;
+} {
   return isRecord(value) && typeof value.createPluginLintHost === 'function';
 }
 
@@ -399,8 +415,17 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   ): Promise<PluginLintHost | null> => {
     const build = (async () => {
       if (pluginConfigs.length === 0 || shuttingDown) return null;
-      let createPluginLintHost = opts.createPluginLintHost;
-      if (!createPluginLintHost) {
+      const onLog = (rec: { level: string; source: string; text: string }) =>
+        stderr.write(`[rslint:plugin] ${rec.text}\n`);
+      let host: PluginLintHost;
+      if (opts.createPluginLintHost) {
+        if (shuttingDown) return null;
+        host = await opts.createPluginLintHost(
+          pluginConfigs,
+          onLog,
+          opts.runtime?.singleThreaded,
+        );
+      } else {
         // Resolve the standalone host beside the built CLI chunks. Importing
         // the public index would also load the worker's lint runtime here.
         const pluginEntry: string = './eslint-plugin/host.js';
@@ -410,14 +435,20 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             'rslint ESLint-plugin entry does not export createPluginLintHost',
           );
         }
-        createPluginLintHost = mod.createPluginLintHost;
+        if (shuttingDown) return null;
+        host = mod.createPluginLintHostWithRpc
+          ? await mod.createPluginLintHostWithRpc(
+              pluginConfigs,
+              onLog,
+              opts.runtime?.singleThreaded,
+              async () => (shuttingDown ? undefined : ipc.ensureRpcOpen()),
+            )
+          : await mod.createPluginLintHost(
+              pluginConfigs,
+              onLog,
+              opts.runtime?.singleThreaded,
+            );
       }
-      if (shuttingDown) return null;
-      const host = await createPluginLintHost(
-        pluginConfigs,
-        (rec) => stderr.write(`[rslint:plugin] ${rec.text}\n`),
-        opts.runtime?.singleThreaded,
-      );
       if (shuttingDown) {
         await shutdownPluginHost(host).catch(() => undefined);
         return null;
@@ -505,6 +536,14 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
 
   // Every return, including init failure, releases the plugin worker pool.
   try {
+    const queryTypeServices = async (query: unknown) =>
+      resolveTypeServiceReply(
+        await ipc.sendRequest<unknown, NativeTypeServiceResponse>(
+          'typeService',
+          query,
+        ),
+      );
+
     // Wire handlers BEFORE start so the first frame Go writes is routable.
     ipc.setInboundHandler(async (msg) => {
       switch (msg.kind) {
@@ -560,7 +599,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
               'engine: pluginLint requested without an activated plugin host',
             );
           }
-          return pluginHost.lint(msg.data, undefined, msg.attachments);
+          return pluginHost.lint(
+            msg.data,
+            undefined,
+            msg.attachments,
+            queryTypeServices,
+          );
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
       }

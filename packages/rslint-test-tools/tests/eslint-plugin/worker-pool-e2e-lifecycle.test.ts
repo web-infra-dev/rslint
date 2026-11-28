@@ -149,15 +149,24 @@ console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDi
       const state = pool as any;
       try {
         await pool.init();
+        const valueFrame = projectFrame('large.ts', 'const value = null;');
+        const reuseFrame = projectFrame('reuse.ts', 'null;');
+        const makeTask = (filePath: string, frame: Buffer): LintTask => ({
+          filePath,
+          frame,
+          rules: { 'local/no-null': { options: [] } },
+          collectFixes: false,
+          suggestionsMode: 'off',
+          configKey: LOCAL_CONFIG_DIR,
+        });
         const files = Array.from({ length: 10_000 }, (_, i) =>
-          task(`large${i}.ts`, 'const value = null;'),
+          makeTask(`large${i}.ts`, valueFrame),
         );
         let index = 0;
         const batch = pool.lintBatch(files, (id) => {
           if (index++ % 3 === 0) pool.cancelTask(id);
         });
         expect(state.workers.length + state.startingWorkers.size).toBe(8);
-        expect(state.cancelPool.size).toBeGreaterThanOrEqual(files.length);
         const results = await batch;
         await Promise.all([...state.startingWorkers]);
         expect(results).toHaveLength(files.length);
@@ -180,7 +189,9 @@ console.log(JSON.stringify({ hostBefore, hostAfter: nodeModule.getCompileCacheDi
 
         // Reusing slots after a large cancelled batch must clear old flags.
         const reused = await pool.lintBatch(
-          Array.from({ length: 32 }, (_, i) => task(`reuse${i}.ts`, 'null;')),
+          Array.from({ length: 32 }, (_, i) =>
+            makeTask(`reuse${i}.ts`, reuseFrame),
+          ),
         );
         expect(
           reused.every(

@@ -14,8 +14,9 @@ import (
 // compilerCaches. Cached values must not hold a strong reference to Program,
 // because that would keep a weak compiler key alive through its own value.
 type derivedCache struct {
-	mu     sync.Mutex
-	values map[any]*derivedValue
+	mu             sync.Mutex
+	values         map[any]*derivedValue
+	isolatedDeclMu sync.RWMutex
 }
 
 type derivedValue struct {

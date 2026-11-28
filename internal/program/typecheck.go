@@ -20,7 +20,8 @@ import (
 // removes diagnostics that cannot survive rslint's output boundary before the
 // short-circuit, filters semantic diagnostics under an explicit NoEmit clone,
 // and retains declaration diagnostics under the same policy.
-func collectNoEmitDiagnostics(ctx context.Context, raw *compiler.Program) []*ast.Diagnostic {
+func collectNoEmitDiagnostics(ctx context.Context, b *compilerBackend) []*ast.Diagnostic {
+	raw := b.raw
 	noEmitOptions := raw.Options().Clone()
 	noEmitOptions.NoEmit = core.TSTrue
 	configFilePath := raw.Options().ConfigFilePath
@@ -43,14 +44,14 @@ func collectNoEmitDiagnostics(ctx context.Context, raw *compiler.Program) []*ast
 		return all
 	}
 
-	all = append(all, raw.GetGlobalDiagnostics(ctx)...)
+	all = append(all, b.Diagnostics(ctx, GlobalDiagnostics, nil)...)
 	if len(all) == baseline {
-		semantic := compiler.FilterNoEmitSemanticDiagnostics(raw.GetSemanticDiagnostics(ctx, nil), noEmitOptions)
+		semantic := compiler.FilterNoEmitSemanticDiagnostics(b.Diagnostics(ctx, SemanticDiagnostics, nil), noEmitOptions)
 		all = append(all, semantic...)
-		all = append(all, raw.GetGlobalDiagnostics(ctx)...)
+		all = append(all, b.Diagnostics(ctx, GlobalDiagnostics, nil)...)
 	}
 	if noEmitOptions.GetEmitDeclarations() && len(all) == baseline {
-		all = append(all, raw.GetDeclarationDiagnostics(ctx, nil)...)
+		all = append(all, b.Diagnostics(ctx, DeclarationDiagnostics, nil)...)
 	}
 	return all
 }

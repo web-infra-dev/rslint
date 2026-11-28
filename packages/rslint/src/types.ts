@@ -1,3 +1,7 @@
+import type {
+  TypeServiceHostRequest,
+  TypeServiceHostResponse,
+} from './service/plugin-type-service-protocol.js';
 /**
  * Shared types for rslint IPC protocol across all environments
  */
@@ -155,6 +159,10 @@ export interface LintInboundHandlers {
 // Service interface that all implementations must follow
 export interface RslintServiceInterface {
   sendMessage(kind: string, data: any): Promise<any>;
+  /** Nested binary reads bypass the top-level request queue. */
+  queryPluginTypes?(
+    request: TypeServiceHostRequest,
+  ): Promise<TypeServiceHostResponse>;
   /** Optional for one-way backends such as the current browser worker. */
   setInboundHandler?(handler: InboundRequestHandler | null): void;
   terminate(): void;

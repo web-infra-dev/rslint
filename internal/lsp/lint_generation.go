@@ -195,6 +195,11 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		hasTypeInfo,
 		snapshot,
 	)
+	if generation.Plugin != nil {
+		plugin := *generation.Plugin
+		plugin.ReleaseOnOwner = server.queueGenerationRelease
+		generation.Plugin = &plugin
+	}
 	// Ownership transfers only after the complete generation has been built.
 	// A panic anywhere above this point leaves releasePending armed.
 	releasePending = false
@@ -224,9 +229,11 @@ func newLintGeneration(
 	}
 	var plugin *linter.PluginGeneration
 	if pluginConfig != nil {
+		fileConfig := *pluginConfig
+		fileConfig.TypeServices = fileConfig.TypeServices && hasTypeInfo
 		plugin = &linter.PluginGeneration{
 			ConfigForFile: func(string) linter.EslintPluginFileConfig {
-				return *pluginConfig
+				return fileConfig
 			},
 			WirePath: func(path string) string {
 				if path == sourcePath {
@@ -268,6 +275,7 @@ func pluginFileConfigForLintSnapshot(snapshot documentLintSnapshot) *linter.Esli
 		ConfigKey:       snapshot.configKey,
 		LanguageOptions: languageOptions,
 		Settings:        settings,
+		TypeServices:    config.PluginTypeServicesEnabled(snapshot.resolvedConfig.MergedConfig),
 	}
 }
 

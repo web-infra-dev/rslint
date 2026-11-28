@@ -209,4 +209,72 @@ describe('native API config activation', () => {
       await cleanupTempDir(root);
     }
   });
+
+  test('defers getRpcChannel until the created plugin host requests it', async () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'rslint-api-lazy-rpc-activation-'),
+    );
+    const configPath = path.join(root, 'rslint.config.mjs');
+    fs.writeFileSync(configPath, '// stable config bytes\n');
+    const configHost = new ConfigModuleHost({
+      loadCached: async () => [
+        { plugins: { local: { rules: { example: {} } } } },
+      ],
+    });
+    const request = {
+      protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+      transactionId: 'api-lazy-rpc',
+      effectiveConfigIds: ['root'],
+    } as const;
+    let rpcOpenCalls = 0;
+    let receivedRpcArg: unknown;
+
+    try {
+      await configHost.loadConfigs({
+        protocolVersion: CONFIG_DISCOVERY_PROTOCOL_VERSION,
+        transactionId: request.transactionId,
+        loadMode: 'cached',
+        candidates: [
+          {
+            id: 'root',
+            configPath,
+            configDirectory: root,
+          },
+        ],
+      });
+
+      const { pluginHost } = await stageNativeConfigActivation(
+        configHost,
+        request,
+        async () => async (_configs, _onLog, _singleThreaded, rpcChannel) => {
+          receivedRpcArg = rpcChannel;
+          return {
+            async lint() {
+              return { results: [] };
+            },
+            async shutdown() {
+              return undefined;
+            },
+          };
+        },
+        () => undefined,
+        () => false,
+        undefined,
+        async () => {
+          rpcOpenCalls++;
+          return undefined;
+        },
+      );
+
+      expect(pluginHost).not.toBeNull();
+      expect(rpcOpenCalls).toBe(0);
+      expect(typeof receivedRpcArg).toBe('function');
+      await (receivedRpcArg as () => Promise<unknown>)();
+      expect(rpcOpenCalls).toBe(1);
+      await pluginHost?.shutdown();
+    } finally {
+      configHost.deleteSession(request.transactionId);
+      await cleanupTempDir(root);
+    }
+  });
 });

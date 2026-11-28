@@ -70,9 +70,14 @@ func directRecordKind(op Operation) Operation {
 }
 
 func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Operation, result Result) ([]Record, error) {
+	records, _, err := s.directRecordsForSlot(ctx, c, op, result, 0)
+	return records, err
+}
+
+func (s *Session) directRecordsForSlot(ctx context.Context, c *checker.Checker, op Operation, result Result, slotBit uint64) ([]Record, []recordCacheKey, error) {
 	kind := directRecordKind(op)
 	if kind == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	var ids []uint32
 	switch value := result.(type) {
@@ -102,25 +107,38 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 			ids = []uint32{value.Type}
 		}
 	}
-	records := []Record{}
+	var records []Record
+	var pending []recordCacheKey
 	seen := make(map[[2]uint32]bool)
 	var add func(Operation, uint32) error
 	add = func(kind Operation, id uint32) error {
 		if id == 0 {
 			return nil
 		}
-		tag := uint32(1)
-		if kind == "symbolRecord" {
-			tag = 2
+		tag := recordTag(kind)
+		if tag == 0 {
+			return nil
 		}
-		if kind == "signatureRecord" {
-			tag = 3
-		}
-		key := [2]uint32{tag, id}
+		key := [2]uint32{uint32(tag), id}
 		if seen[key] {
 			return nil
 		}
 		seen[key] = true
+		cacheKey := recordCacheKey{tag: tag, id: id}
+		if cached, ok := s.getCachedRecord(tag, id); ok {
+			if !s.isSentToSlot(cacheKey, slotBit) {
+				records = append(records, Record{Op: kind, ID: id, packet: cached.packet, cacheable: true})
+				if slotBit != 0 {
+					pending = append(pending, cacheKey)
+				}
+			}
+			for _, symID := range cached.subSymbols {
+				if err := add("symbolRecord", symID); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 		var request Request
 		switch kind {
 		case "typeRecord":
@@ -134,29 +152,29 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 		if err != nil {
 			return err
 		}
-		records = append(records, Record{kind, id, fact})
-		switch value := fact.(type) {
-		case *TypeFact:
-			if err := add("symbolRecord", value.Symbol); err != nil {
+		cacheable := s.isCacheableRecord(tag, id)
+		records = append(records, Record{
+			Op:        kind,
+			ID:        id,
+			Fact:      fact,
+			cacheable: cacheable,
+		})
+		if slotBit != 0 && cacheable {
+			pending = append(pending, cacheKey)
+		}
+		for _, symID := range recordSubSymbols(fact) {
+			if err := add("symbolRecord", symID); err != nil {
 				return err
 			}
-			return add("symbolRecord", value.AliasSymbol)
-		case *SignatureFact:
-			for _, parameter := range value.Parameters {
-				if err := add("symbolRecord", parameter); err != nil {
-					return err
-				}
-			}
-			return add("symbolRecord", value.ThisParameter)
 		}
 		return nil
 	}
 	for _, id := range ids {
 		if err := add(kind, id); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return records, nil
+	return records, pending, nil
 }
 
 func (s *Session) execute(ctx context.Context, c *checker.Checker, request Request, native *ast.Node) (Result, error) {
@@ -655,11 +673,16 @@ func (s *Session) typeFact(t *checker.Type) (*TypeFact, error) {
 		fact.Target = s.typeID(t.Target())
 	}
 	if flags&(checker.TypeFlagsObject|checker.TypeFlagsUnionOrIntersection|checker.TypeFlagsIntrinsic|checker.TypeFlagsBooleanLiteral) != 0 {
-		objectFlags := t.ObjectFlags()
 		fact.ObjectFlags = []string{}
-		for _, flag := range publicObjectFlags {
-			if objectFlags&flag.flag != 0 {
-				fact.ObjectFlags = append(fact.ObjectFlags, flag.name)
+		// Public ObjectFlags bits (including 22..25, which tsgo overloads on
+		// unions/intersections for internal flags such as ContainsIntersections)
+		// are only meaningful on TypeFlagsObject.
+		if flags&checker.TypeFlagsObject != 0 {
+			objectFlags := t.ObjectFlags()
+			for _, flag := range publicObjectFlags {
+				if objectFlags&flag.flag != 0 {
+					fact.ObjectFlags = append(fact.ObjectFlags, flag.name)
+				}
 			}
 		}
 	}

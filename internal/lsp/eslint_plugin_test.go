@@ -127,7 +127,7 @@ func pluginRequestForProductionPassTest(
 		return linter.EslintPluginLintRequest{}, false
 	}
 	var request linter.EslintPluginLintRequest
-	outcome, err := run(context.Background(), linter.EslintPluginDispatchFunc(func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+	outcome, err := run.Run(context.Background(), linter.EslintPluginDispatchFunc(func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		request = got
 		results := make([]linter.EslintPluginFileResult, len(got.Files))
 		for index, file := range got.Files {
@@ -934,7 +934,7 @@ func TestDeferredPluginRunRebuildsWithFixes(t *testing.T) {
 
 	snapshot := s.documentLintSnapshot(uri)
 	work := preparedPluginRunForTest(t, s, uri, content, snapshot)
-	outcome, err := work(context.Background(), s.pluginDispatchForGeneration(snapshot.pluginGeneration))
+	outcome, err := work.Run(context.Background(), s.pluginDispatchForGeneration(snapshot.pluginGeneration))
 	if err != nil || outcome.DispatchError != nil {
 		t.Fatalf("plugin run failed: contract=%v dispatch=%v", err, outcome.DispatchError)
 	}
@@ -1230,6 +1230,9 @@ func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T)
 		_ context.Context,
 		req linter.EslintPluginLintRequest,
 	) (*linter.EslintPluginLintResult, error) {
+		if len(req.Files) == 0 {
+			return &linter.EslintPluginLintResult{}, nil
+		}
 		pluginCalls++
 		if req.Generation != "frozen-plugin-generation" {
 			t.Fatalf("plugin generation = %q, want frozen snapshot token", req.Generation)
@@ -1366,7 +1369,7 @@ func TestDeferredPluginRunExpiredContextReturnsPromptly(t *testing.T) {
 	cancel() // already expired before the call
 
 	start := time.Now()
-	outcome, err := work(ctx, s.pluginDispatchForGeneration(snapshot.pluginGeneration))
+	outcome, err := work.Run(ctx, s.pluginDispatchForGeneration(snapshot.pluginGeneration))
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -1378,6 +1381,198 @@ func TestDeferredPluginRunExpiredContextReturnsPromptly(t *testing.T) {
 	if elapsed > 500*time.Millisecond {
 		t.Errorf("expired ctx should return promptly, took %v", elapsed)
 	}
+}
+
+func TestPluginDispatchRetiresTypedSessionsAfterBudgetExpires(t *testing.T) {
+	t.Run("manual cancel", func(t *testing.T) {
+		s := newTestServer()
+		retiredCh := make(chan []string, 4)
+		s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(ctx context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			if len(request.RetiredTypeServices) != 0 && len(request.Files) == 0 {
+				if _, bounded := ctx.Deadline(); !bounded || ctx.Err() != nil {
+					t.Error("retirement did not use its live bounded cleanup context")
+				}
+				retiredCh <- append([]string(nil), request.RetiredTypeServices...)
+			}
+			return &linter.EslintPluginLintResult{}, nil
+		})
+		dispatch, expire := s.pluginDispatchWithinBudget(t.Context(), "generation")
+		// First send a typed file request while the budget is live so "session" is tracked.
+		if _, err := dispatch(t.Context(), linter.EslintPluginLintRequest{
+			Files: []linter.EslintPluginLintFile{{
+				Path:         "/proj/a.ts",
+				TypeServices: &linter.EslintPluginFileTypeServices{Session: "session"},
+			}},
+		}); err != nil {
+			t.Fatalf("live typed dispatch: %v", err)
+		}
+		expire()
+		cleanup, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		if _, err := dispatch(cleanup, linter.EslintPluginLintRequest{
+			Files:               []linter.EslintPluginLintFile{{Path: "/proj/a.ts", TypeServices: &linter.EslintPluginFileTypeServices{Session: "unsent"}}},
+			RetiredTypeServices: []string{"mixed"},
+		}); !errors.Is(err, context.Canceled) {
+			t.Fatalf("ordinary dispatch after budget expiry = %v", err)
+		}
+		if _, err := dispatch(cleanup, linter.EslintPluginLintRequest{RetiredTypeServices: []string{"session", "unsent"}}); err != nil {
+			t.Fatalf("retire after budget expiry: %v", err)
+		}
+		select {
+		case got := <-retiredCh:
+			if len(got) != 1 || got[0] != "session" {
+				t.Fatalf("retired sessions = %v, want [session]", got)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for async session retirement")
+		}
+		// Never-sent sessions must not trigger spurious retirement RPCs.
+		if _, err := dispatch(cleanup, linter.EslintPluginLintRequest{RetiredTypeServices: []string{"unsent"}}); err != nil {
+			t.Fatalf("retire unsent session: %v", err)
+		}
+		select {
+		case got := <-retiredCh:
+			t.Fatalf("unexpected retirement RPC for unsent session: %v", got)
+		case <-time.After(30 * time.Millisecond):
+		}
+	})
+	t.Run("deadline exceeded", func(t *testing.T) {
+		s := newTestServer()
+		s.pluginReverseTimeout = 25 * time.Millisecond
+		retiredCh := make(chan []string, 4)
+		releaseRetire := make(chan struct{}, 1)
+		s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(ctx context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			if len(request.RetiredTypeServices) != 0 && len(request.Files) == 0 {
+				if _, bounded := ctx.Deadline(); !bounded || ctx.Err() != nil {
+					t.Error("retirement did not use its live bounded cleanup context")
+				}
+				// Hold briefly to verify post-expiry retirement never stalls the caller.
+				select {
+				case <-releaseRetire:
+				case <-ctx.Done():
+				}
+				retiredCh <- append([]string(nil), request.RetiredTypeServices...)
+			}
+			return &linter.EslintPluginLintResult{}, nil
+		})
+		dispatch, expire := s.pluginDispatchWithinBudget(t.Context(), "generation")
+		defer expire()
+		// Dispatch one live typed session before budget expiry.
+		if _, err := dispatch(t.Context(), linter.EslintPluginLintRequest{
+			Files: []linter.EslintPluginLintFile{{
+				Path:         "/proj/a.ts",
+				TypeServices: &linter.EslintPluginFileTypeServices{Session: "session"},
+			}},
+		}); err != nil {
+			t.Fatalf("live typed dispatch: %v", err)
+		}
+		deadline := time.Now().Add(time.Second)
+		for {
+			_, err := dispatch(t.Context(), linter.EslintPluginLintRequest{
+				Files: []linter.EslintPluginLintFile{{
+					Path:         "/proj/a.ts",
+					TypeServices: &linter.EslintPluginFileTypeServices{Session: "session"},
+				}},
+			})
+			if errors.Is(err, context.DeadlineExceeded) {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("budget did not reach DeadlineExceeded; last err = %v", err)
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		// A subsequent round after expiry must be rejected locally without
+		// recording "unsent" as dispatched.
+		if _, err := dispatch(t.Context(), linter.EslintPluginLintRequest{
+			Files: []linter.EslintPluginLintFile{{
+				Path:         "/proj/a.ts",
+				TypeServices: &linter.EslintPluginFileTypeServices{Session: "unsent"},
+			}},
+		}); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("post-expiry dispatch = %v, want DeadlineExceeded", err)
+		}
+		cleanup, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		start := time.Now()
+		if _, err := dispatch(cleanup, linter.EslintPluginLintRequest{RetiredTypeServices: []string{"session", "unsent"}}); err != nil {
+			t.Fatalf("retire after deadline exceeded: %v", err)
+		}
+		if elapsed := time.Since(start); elapsed > 100*time.Millisecond {
+			t.Fatalf("post-expiry retirement stalled caller for %v", elapsed)
+		}
+		// Unblock mock retirement and confirm only the actually dispatched session was retired.
+		releaseRetire <- struct{}{}
+		select {
+		case got := <-retiredCh:
+			if len(got) != 1 || got[0] != "session" {
+				t.Fatalf("retired sessions after deadline = %v, want [session]", got)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for async session retirement after deadline")
+		}
+		// Subsequent rejected rounds must not send spurious retirement RPCs.
+		if _, err := dispatch(cleanup, linter.EslintPluginLintRequest{RetiredTypeServices: []string{"unsent"}}); err != nil {
+			t.Fatalf("retire unsent session: %v", err)
+		}
+		select {
+		case got := <-retiredCh:
+			t.Fatalf("unexpected retirement RPC for unsent session: %v", got)
+		case <-time.After(30 * time.Millisecond):
+		}
+	})
+	t.Run("live budget retirement timeout propagates error", func(t *testing.T) {
+		s := newTestServer()
+		s.pluginReverseTimeout = 10 * time.Second
+		s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(ctx context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			if len(request.RetiredTypeServices) != 0 && len(request.Files) == 0 {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}
+			return &linter.EslintPluginLintResult{}, nil
+		})
+		dispatch, expire := s.pluginDispatchWithinBudget(t.Context(), "generation")
+		defer expire()
+		if _, err := dispatch(t.Context(), linter.EslintPluginLintRequest{
+			Files: []linter.EslintPluginLintFile{{
+				Path:         "/proj/a.ts",
+				TypeServices: &linter.EslintPluginFileTypeServices{Session: "session"},
+			}},
+		}); err != nil {
+			t.Fatalf("live typed dispatch: %v", err)
+		}
+		retireCtx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
+		defer cancel()
+		if _, err := dispatch(retireCtx, linter.EslintPluginLintRequest{RetiredTypeServices: []string{"session"}}); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("live-budget retirement timeout err = %v, want context.DeadlineExceeded", err)
+		}
+	})
+	t.Run("panicking retirement recovers cleanly", func(t *testing.T) {
+		s := newTestServer()
+		s.pluginReverseTimeout = 10 * time.Second
+		s.eslintPluginDispatch = linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			if len(request.RetiredTypeServices) != 0 && len(request.Files) == 0 {
+				panic("simulated retirement boom")
+			}
+			return &linter.EslintPluginLintResult{}, nil
+		})
+		dispatch, expire := s.pluginDispatchWithinBudget(t.Context(), "generation")
+		defer expire()
+		if _, err := dispatch(t.Context(), linter.EslintPluginLintRequest{
+			Files: []linter.EslintPluginLintFile{{
+				Path:         "/proj/a.ts",
+				TypeServices: &linter.EslintPluginFileTypeServices{Session: "session"},
+			}},
+		}); err != nil {
+			t.Fatalf("live typed dispatch: %v", err)
+		}
+		retireCtx, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		_, err := dispatch(retireCtx, linter.EslintPluginLintRequest{RetiredTypeServices: []string{"session"}})
+		if err == nil || !strings.Contains(err.Error(), "panicked") {
+			t.Fatalf("panicking retirement err = %v, want recovered panic error", err)
+		}
+	})
 }
 
 // ======== codeAction coexistence (native fix + plugin fix/suggestion) ========
@@ -1894,5 +2089,50 @@ func TestMergePluginDiagnosticsRetargetedAliasRejectsInvalidPolicy(t *testing.T)
 				t.Fatal("retargeted alias left old diagnostics displayed")
 			}
 		})
+	}
+}
+
+func TestRetirePluginTypeServicesSuppressedDuringShutdown(t *testing.T) {
+	s := newTestServer()
+	gen := "gen-1"
+	s.activePluginGeneration.Store(&gen)
+	s.shuttingDown.Store(true)
+
+	dispatched := false
+	dispatch := linter.EslintPluginDispatchFunc(func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		dispatched = true
+		return &linter.EslintPluginLintResult{}, nil
+	})
+	res, err := s.retirePluginTypeServices(
+		context.Background(),
+		context.Background(),
+		context.Background(),
+		gen,
+		dispatch,
+		linter.EslintPluginLintRequest{RetiredTypeServices: []string{"s1"}},
+	)
+	if err != nil {
+		t.Fatalf("retire during shutdown returned error: %v", err)
+	}
+	if res == nil {
+		t.Fatal("retire during shutdown returned nil result")
+	}
+	if dispatched {
+		t.Fatal("retirePluginTypeServices dispatched reverse RPC while shutting down")
+	}
+}
+
+func TestWriteLSPPluginProtocolNoticesSuppressesCanceledRetirement(t *testing.T) {
+	var buf strings.Builder
+	writeLSPPluginProtocolNotices(&buf, []linter.EslintPluginProtocolNotice{
+		{Kind: linter.EslintPluginTypeServiceRetirementFailed, Err: context.Canceled},
+		{Kind: linter.EslintPluginTypeServiceRetirementFailed, Err: errors.New("connection dropped")},
+	})
+	got := buf.String()
+	if strings.Contains(got, "context canceled") {
+		t.Fatalf("canceled retirement error was not suppressed: %q", got)
+	}
+	if !strings.Contains(got, "connection dropped") {
+		t.Fatalf("non-cancel retirement error was dropped: %q", got)
 	}
 }

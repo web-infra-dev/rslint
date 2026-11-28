@@ -24,3 +24,16 @@ func PluginMergedMaps(merged *MergedConfig) (languageOptions, settings map[strin
 	}
 	return languageOptions, settings
 }
+
+// PluginTypeServicesEnabled uses the same effective project declaration as
+// Program selection. A checker belonging to another target is not admission.
+func PluginTypeServicesEnabled(merged *MergedConfig) bool {
+	if merged == nil || merged.LanguageOptions == nil || merged.LanguageOptions.ParserOptions == nil {
+		return false
+	}
+	options := merged.LanguageOptions.ParserOptions
+	if options.ProjectService != nil && *options.ProjectService {
+		return true
+	}
+	return !options.ProjectDisabled && merged.project != nil && len(merged.project.Patterns) != 0
+}

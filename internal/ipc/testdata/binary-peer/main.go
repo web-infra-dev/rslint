@@ -21,7 +21,7 @@ type payload struct {
 func main() {
 	channel := ipc.NewChannel(os.Stdin, os.Stdout)
 	channel.SetInboundHandler(func(ctx context.Context, msg *ipc.Message) (any, error) {
-		if msg.Kind != "startBinary" {
+		if msg.Kind != "startBinary" && msg.Kind != "replyBinary" {
 			return nil, fmt.Errorf("unexpected fixture request %q", msg.Kind)
 		}
 		var request struct {
@@ -39,6 +39,10 @@ func main() {
 		for _, bytes := range [][]byte{[]byte(text), {}, {}, data} {
 			expected.Hashes = append(expected.Hashes, fmt.Sprintf("%x", sha256.Sum256(bytes)))
 			expected.Lengths = append(expected.Lengths, len(bytes))
+		}
+		if msg.Kind == "replyBinary" {
+			return ipc.ResponseWithAttachments(expected,
+				ipc.Text(text), ipc.Text(""), ipc.Bytes([]byte{}), ipc.Bytes(data)), nil
 		}
 		response, err := channel.SendRequest(ctx, "binaryAttachments", expected,
 			ipc.Text(text), ipc.Text(""), ipc.Bytes([]byte{}), ipc.Bytes(data))

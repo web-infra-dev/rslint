@@ -47,6 +47,7 @@ define.lib(() => {
     bundle: true,
     output: {
       autoExternal: true,
+      minify: true,
       target: 'node' as const,
       distPath: { root: './dist' },
     },
@@ -75,6 +76,7 @@ define.lib(() => {
     bundle: true,
     output: {
       autoExternal: true,
+      minify: true,
       target: 'node' as const,
       distPath: { root: './dist/eslint-plugin' },
     },

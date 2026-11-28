@@ -16,3 +16,4 @@ export type {
 } from './protocol.js';
 
 export { readAttachmentBytes } from './memory-transport.js';
+export type { RpcHostChannel, WorkerRpcDescriptor } from '../native/types.js';

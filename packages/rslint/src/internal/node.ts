@@ -2,9 +2,15 @@ import type { ChildProcess } from 'node:child_process';
 import { Socket } from 'node:net';
 import { RSLintService } from '../service/service.js';
 import { spawnIpcProcess, type IpcClient } from '../ipc/index.js';
+import { registerServiceRpcOpener } from '../ipc/rpc-transport.js';
 
 export { readAttachmentBytes } from '../ipc/memory-transport.js';
 export type { ByteInput } from '../native/types.js';
+import {
+  resolveTypeServiceReply,
+  type NativeTypeServiceResponse,
+} from '../internal/plugin-type-service.js';
+import type { TypeServiceHostRequest } from '../service/plugin-type-service-protocol.js';
 import { resolveRslintBinary } from './resolve-binary.js';
 import type {
   RslintServiceInterface,
@@ -23,6 +29,7 @@ export class NodeRslintService implements RslintServiceInterface {
   private dead = false;
   private activeRequests = 0;
   private activeInboundRequests = 0;
+  private loopActive: boolean | undefined;
   private inboundHandler: InboundRequestHandler | null = null;
 
   constructor(options: RSlintOptions = {}) {
@@ -71,9 +78,22 @@ export class NodeRslintService implements RslintServiceInterface {
     // A resident service must not keep a one-shot Node script alive merely
     // because the caller omitted close(). Active requests re-reference it.
     this.updateLoopActivity();
+    registerServiceRpcOpener(this, async () => {
+      if (this.dead) return undefined;
+      this.activeRequests++;
+      this.updateLoopActivity();
+      try {
+        return await this.client.ensureRpcOpen();
+      } finally {
+        this.activeRequests--;
+        this.updateLoopActivity();
+      }
+    });
   }
 
   private setLoopActive(active: boolean): void {
+    if (this.loopActive === active) return;
+    this.loopActive = active;
     if (active) this.process.ref();
     else this.process.unref();
     for (const stream of [this.process.stdin, this.process.stdout]) {
@@ -117,6 +137,23 @@ export class NodeRslintService implements RslintServiceInterface {
       )
         return null;
       throw error;
+    } finally {
+      this.activeRequests--;
+      this.updateLoopActivity();
+    }
+  }
+
+  async queryPluginTypes(request: TypeServiceHostRequest) {
+    if (this.dead) throw new Error('rslint service is no longer running');
+    this.activeRequests++;
+    this.updateLoopActivity();
+    try {
+      return resolveTypeServiceReply(
+        await this.client.sendRequest<unknown, NativeTypeServiceResponse>(
+          'typeService',
+          request,
+        ),
+      );
     } finally {
       this.activeRequests--;
       this.updateLoopActivity();

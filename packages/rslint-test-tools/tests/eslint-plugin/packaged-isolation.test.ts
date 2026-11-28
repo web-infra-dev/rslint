@@ -369,6 +369,70 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       if (tmp) await cleanupTempDir(tmp);
     });
 
+    test(
+      'typed public API runs without a TypeScript runtime dependency',
+      () => {
+        const root = path.join(tmp, 'typed-api');
+        fs.mkdirSync(root, { recursive: true });
+        fs.cpSync(path.join(CORE_DIR, 'dist'), path.join(root, 'dist'), {
+          recursive: true,
+        });
+        fs.copyFileSync(corePackage, path.join(root, 'package.json'));
+        stageNative(root, true);
+        fs.cpSync(
+          path.dirname(require.resolve('picomatch/package.json')),
+          path.join(root, 'node_modules', 'picomatch'),
+          { recursive: true },
+        );
+        const cfgDir = path.join(root, 'cfg');
+        fs.mkdirSync(cfgDir);
+        fs.copyFileSync(
+          path.join(__dirname, 'fixtures', 'typed-plugin.mjs'),
+          path.join(cfgDir, 'typed-plugin.mjs'),
+        );
+        fs.writeFileSync(
+          path.join(cfgDir, 'rslint.config.mjs'),
+          `import typed from './typed-plugin.mjs';
+export default [{ files: ['**/*.ts'], languageOptions: { parserOptions: { project: ['./tsconfig.json'] } }, plugins: { typed }, rules: { 'typed/value': 'error' } }];`,
+        );
+        fs.writeFileSync(
+          path.join(cfgDir, 'tsconfig.json'),
+          ' {"compilerOptions":{"noLib":true},"include":["*.ts"]}',
+        );
+        fs.writeFileSync(
+          path.join(cfgDir, 'input.ts'),
+          'export const value: number = 1;\nvalue;',
+        );
+        const runner = path.join(root, 'runner.mjs');
+        fs.writeFileSync(
+          runner,
+          `import assert from 'node:assert/strict';
+import { Rslint } from './dist/index.js';
+import { fileURLToPath } from 'node:url';
+const rslint = new Rslint({ cwd: fileURLToPath(new URL('./cfg/',import.meta.url)) });
+try {
+ const result = await rslint.lintFiles(['input.ts']);
+ assert.deepEqual(result[0].messages.map(message => message.message),['number']);
+ console.log('PACKAGED_TYPED_OK');
+} finally { await rslint.close(); }`,
+        );
+        const result = spawnSync(process.execPath, [runner], {
+          cwd: cfgDir,
+          encoding: 'utf8',
+          env: { ...process.env, NODE_PATH: '' },
+          timeout: PACKAGED_CHILD_DEAD_PROCESS_WATCHDOG_MS,
+          killSignal: 'SIGKILL',
+          maxBuffer: 16 * 1024 * 1024,
+        });
+        expect(result.error).toBeUndefined();
+        expect(result.signal, result.stderr).toBeNull();
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout.trim()).toBe('PACKAGED_TYPED_OK');
+        expect(result.stderr.trim()).toBe('');
+      },
+      PACKAGED_OUTER_DEADLOCK_SENTINEL_MS,
+    );
+
     test.each(
       (['debug', 'release'] as const).flatMap((profile) =>
         (['close', 'reuse'] as const).map((ending) => ({ profile, ending })),

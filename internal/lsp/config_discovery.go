@@ -809,6 +809,10 @@ func hasUsableLexicalConfigAncestor(
 }
 
 func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *lspDiscoveredConfigSnapshot) {
+	// Publish the committed generation before canceling in-flight enrichments
+	// so retiring sessions from the torn-down host skip redundant reverse RPCs.
+	nextGeneration := snapshot.transactionID
+	s.activePluginGeneration.Store(&nextGeneration)
 	// No fallible work remains after the client commits its staged plugin host.
 	// The serialized dispatch loop makes this map swap atomic to every document
 	// and code-action handler.

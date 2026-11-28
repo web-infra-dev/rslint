@@ -25,6 +25,7 @@
  */
 
 import { getNativeBinding } from '../../native/binding.js';
+import type { PluginFileTypeServices } from '../plugin/type-service-protocol.js';
 import type { SharedBytes } from '../../native/types.js';
 import {
   decodeFrame,
@@ -98,6 +99,7 @@ export interface RuleConfig {
 /** Per-file task carrying final syntax from the Go Program. */
 export interface LintFileRequest {
   filePath: string;
+  typeServices?: PluginFileTypeServices;
   /** Workers materialize ordinary objects from owned bytes after the last native read. */
   frame: Uint8Array | SharedBytes;
   languageOptions?: LanguageOptions;
@@ -204,6 +206,33 @@ export function lintFile(
     cancelled: false,
   };
 
+  try {
+    return lintFileBody(req, loadedPlugins, services, result);
+  } catch (err) {
+    if (err instanceof FrameCancelled) {
+      return {
+        filePath: req.filePath,
+        diagnostics: [],
+        fixes: [],
+        suggestionsCount: 0,
+        cancelled: true,
+      };
+    }
+    throw err;
+  }
+}
+
+function lintFileBody(
+  req: LintFileRequest,
+  loadedPlugins: LoadedPlugins,
+  services:
+    | ((
+        frame: ReturnType<typeof decodeFrame>,
+        parserOptions?: ParserOptions,
+      ) => ParserServices)
+    | undefined,
+  result: LintFileResult,
+): LintFileResult {
   let parsed: ReturnType<typeof decodeFrame> | undefined;
   let parserServices: ParserServices | undefined;
   try {
@@ -235,8 +264,26 @@ export function lintFile(
       ? { ...req.languageOptions, parserOptions: {} }
       : req.languageOptions;
   const globals = languageOptions?.globals;
-  const ecmaFeatures = languageOptions?.parserOptions?.ecmaFeatures;
-  const compilerOptions = parserServices?.program?.getCompilerOptions();
+  const parserOptions = languageOptions?.parserOptions;
+  const ecmaFeatures = parserOptions?.ecmaFeatures;
+  // Standalone lintFile callers pass eager parserServices whose Program may
+  // close before deferred getScope() runs; snapshot compiler options eagerly.
+  // Worker-bridged files carry lazy parserServices:
+  //   - syntaxOnly files have no TypeScript Program (even when parserOptions
+  //     explicitly set project:false / projectService:false), so scope
+  //     selection stays purely extension-based with default JSX Fragment handling.
+  //   - typed files force TS scope without eagerly invoking parserServices.program
+  //     (which would allocate a ProgramView facade even when no rule reads scope).
+  const lazyWorkerServices =
+    parserServices !== undefined && req.typeServices !== undefined;
+  const workerHasTypedProgram =
+    lazyWorkerServices && req.typeServices?.syntaxOnly !== true;
+  const hasTypedProgram = lazyWorkerServices
+    ? workerHasTypedProgram
+    : parserServices?.program != null;
+  const compilerOptions = !lazyWorkerServices
+    ? parserServices?.program?.getCompilerOptions()
+    : undefined;
   const scopeCompilerOptions = compilerOptions
     ? {
         jsxFactory: compilerOptions.jsxFactory,
@@ -257,8 +304,11 @@ export function lintFile(
     // are filled in by `scope-factory` to match ESLint v10.
     impliedStrict: ecmaFeatures?.impliedStrict,
     globalReturn: ecmaFeatures?.globalReturn,
-    useTsScope: parserServices?.program !== undefined,
+    useTsScope: lazyWorkerServices
+      ? workerHasTypedProgram
+      : parserServices?.program !== undefined,
     compilerOptions: scopeCompilerOptions,
+    parserServices: workerHasTypedProgram ? parserServices : undefined,
   });
   const scopeManagerFactory = () => {
     const sm = createScopeManager();
@@ -412,9 +462,18 @@ export function lintFile(
       // target without a cast.
       returnedListeners = ruleAny.create?.(ctx) ?? {};
     } catch (err) {
+      if (err instanceof FrameCancelled) throw err;
+      const message = (err as Error)?.message ?? String(err);
+      // Files outside any configured TypeScript project (gap files or
+      // `project: false`) have no Program. Skip standard `@typescript-eslint`
+      // missing-type-info throws instead of failing the file, matching native
+      // `RequiresTypeInfo` rule filtering.
+      if (!hasTypedProgram && isMissingTypeInfoError(err, message)) {
+        continue;
+      }
       ruleErrors.push({
         rule: ruleName,
-        message: `create: ${(err as Error)?.message ?? String(err)}`,
+        message: `create: ${message}`,
       });
       continue;
     } finally {
@@ -462,6 +521,11 @@ export function lintFile(
   const visitResult = visit(ast, mergedListeners, {
     cancelFlag: req.cancelFlag,
     onListenerError: ({ ruleName, selector, node, err }) => {
+      if (err instanceof FrameCancelled) throw err;
+      const message = (err as Error)?.message ?? String(err);
+      if (!hasTypedProgram && isMissingTypeInfoError(err, message)) {
+        return;
+      }
       // Structured rule-level attribution: write one ruleErrors entry
       // per (rule, listener-throw). This is what surfaces in the
       // per-file result back to Go and ultimately to the user's
@@ -472,7 +536,6 @@ export function lintFile(
       // of identical (selector, errMsg) pairs doesn't drown the
       // terminal during interactive runs. But ruleErrors is the
       // authoritative channel: every throw lands there.
-      const message = (err as Error)?.message ?? String(err);
       if (ruleName) {
         ruleErrors.push({
           rule: ruleName,
@@ -573,6 +636,7 @@ export function lintFile(
   // ~60% of files on a clean codebase), every byte of that map is
   // unused. Gate the build on having something to convert.
   if (filteredDiagnostics.length > 0) {
+    const hasParsedUtf16ToByte = parsed.utf16ToByte !== undefined;
     const u16ToByte = parsed.utf16ToByte ?? buildUtf16ToByteMap(sourceText);
     // `u16ToByte` indexes from 0 to `sourceText.length` inclusive (the
     // sentinel at `[length]` is the total byte count for one-past-end
@@ -605,7 +669,7 @@ export function lintFile(
       const prefix = splitScalar(start) ? sourceText[--start] : '';
       const suffix = splitScalar(end) ? sourceText[end++] : '';
       let parts: FixTextPart[] | undefined;
-      if (parsed.utf16ToByte && sourceParts) {
+      if (hasParsedUtf16ToByte && sourceParts) {
         // Source spans are copied by Go from the exact frozen bytes. Only
         // partial scalar edges become text; adjacent text stays one string
         // so independently emitted surrogate halves combine before encoding.
@@ -679,6 +743,31 @@ export function lintFile(
   if (ruleErrors.length > 0) result.ruleErrors = ruleErrors;
   if (ruleTimes) result.ruleTimes = ruleTimes;
   return result;
+}
+
+function isMissingTypeInfoError(err: unknown, message: string): boolean {
+  if (
+    err instanceof TypeError ||
+    err instanceof ReferenceError ||
+    err instanceof RangeError ||
+    err instanceof SyntaxError ||
+    err instanceof URIError ||
+    err instanceof EvalError
+  ) {
+    return false;
+  }
+  if (err instanceof Error && err.name === 'TypeServiceClosedError') {
+    return false;
+  }
+  return (
+    message.includes(
+      "You have used a rule which requires type information, but don't have parserOptions set",
+    ) ||
+    message.includes(
+      'You have used a rule which requires parserServices to be generated.',
+    ) ||
+    message === 'semantic queries require a typed project'
+  );
 }
 
 /**
