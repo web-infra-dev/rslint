@@ -2057,7 +2057,8 @@ func (analysis *RstestCallAnalysis) getObjectLiteralMutationSummary(
 		case ast.KindVariableDeclaration:
 			vd := outer.Parent.AsVariableDeclaration()
 			if vd != nil && vd.Initializer == outer && vd.Name() != nil && vd.Name().Kind == ast.KindObjectBindingPattern {
-				if hasDefineProp || (hasAnyGetter && analysis.destructuringPatternMayInvokeGetter(vd.Name(), objExpr)) {
+				hasObjMutation := hasDynamicWriteOrDelete || len(writtenOrDeletedProps) > 0
+				if hasDefineProp || (hasAnyGetter && analysis.destructuringPatternMayInvokeGetter(vd.Name(), objExpr, hasObjMutation)) {
 					summary.escaped = true
 					addPropMemberBits("", false)
 					addMutation(ref, stmt, refFn, true, "")
@@ -2078,7 +2079,8 @@ func (analysis *RstestCallAnalysis) getObjectLiteralMutationSummary(
 			if bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == outer {
 				lhs := ast.SkipParentheses(bin.Left)
 				if lhs != nil && lhs.Kind == ast.KindObjectLiteralExpression {
-					if hasDefineProp || (hasAnyGetter && analysis.destructuringPatternMayInvokeGetter(lhs, objExpr)) {
+					hasObjMutation := hasDynamicWriteOrDelete || len(writtenOrDeletedProps) > 0
+					if hasDefineProp || (hasAnyGetter && analysis.destructuringPatternMayInvokeGetter(lhs, objExpr, hasObjMutation)) {
 						summary.escaped = true
 						addPropMemberBits("", false)
 						addMutation(ref, stmt, refFn, true, "")
@@ -2573,26 +2575,26 @@ func (analysis *RstestCallAnalysis) destructuredBoundSources(declaration *ast.No
 	member, known, staticKey := analysis.evalBindingElementPropertyName(binding)
 	defaultSkipped := false
 	exactFromLiteral := false
-	sources, definiteSrc, sourcesMayBeMutable := analysis.bindingPatternSourceExprs(pattern)
-	if sourcesMayBeMutable {
+	sources, definiteSrc, sourcesMayBeMutable, sourcesUnresolvedGetter := analysis.bindingPatternSourceExprs(pattern)
+	if sourcesMayBeMutable || sourcesUnresolvedGetter {
 		hasUnbound = true
 	}
 	if known {
 		if definiteSrc != nil {
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(definiteSrc); objExpr != nil && !mutableObj {
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr, false)
 				defLookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(objExpr, member, priorGetter, 0)
 				defaultSkipped = defLookup.definitelyDefined
 			}
 		}
-		allExact := len(sources) > 0 && !sourcesMayBeMutable
+		allExact := len(sources) > 0 && !sourcesMayBeMutable && !sourcesUnresolvedGetter
 		for _, srcExpr := range sources {
 			objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr)
 			if objExpr == nil {
 				allExact = false
 				continue
 			}
-			priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr)
+			priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr, mutableObj)
 			if mutableObj && !sourcesMayBeMutable && !priorGetter && len(sources) == 1 {
 				if unwrapped := internalUtils.SkipAssertionsAndParens(srcExpr); unwrapped != nil && unwrapped.Kind == ast.KindIdentifier {
 					if sym := resolveRstestRootSymbol(analysis.ctx, unwrapped); sym != nil {
@@ -2607,10 +2609,10 @@ func (analysis *RstestCallAnalysis) destructuredBoundSources(declaration *ast.No
 			lookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(objExpr, member, priorGetter || mutableObj || sourcesMayBeMutable, 0)
 			exprs = append(exprs, lookup.possibleExprs...)
 			useAllGetters := sourcesMayBeMutable || (mutableObj && analysis.srcExprObjEscaped(srcExpr, objExpr))
-			if priorGetter || useAllGetters {
-				gExprs, gContainers := analysis.collectPrecedingGetterPropWriteExprs(pattern, declaration, objExpr, member, useAllGetters)
+			if priorGetter || useAllGetters || mutableObj {
+				gExprs, gContainers, gUnresolved := analysis.collectPrecedingGetterPropWriteExprs(pattern, declaration, objExpr, member, useAllGetters, mutableObj)
 				exprs = append(exprs, gExprs...)
-				if len(gContainers) > 0 {
+				if len(gContainers) > 0 || gUnresolved {
 					hasUnbound = true
 					allExact = false
 				}
@@ -2627,10 +2629,10 @@ func (analysis *RstestCallAnalysis) destructuredBoundSources(declaration *ast.No
 		for _, srcExpr := range sources {
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr); objExpr != nil {
 				exprs = append(exprs, analysis.allObjectLiteralPropertyExprs(objExpr)...)
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr, mutableObj)
 				useAllGetters := sourcesMayBeMutable || (mutableObj && analysis.srcExprObjEscaped(srcExpr, objExpr))
-				if priorGetter || useAllGetters {
-					gExprs, _ := analysis.collectPrecedingGetterPropWriteExprs(pattern, declaration, objExpr, "", useAllGetters)
+				if priorGetter || useAllGetters || mutableObj {
+					gExprs, _, _ := analysis.collectPrecedingGetterPropWriteExprs(pattern, declaration, objExpr, "", useAllGetters, mutableObj)
 					exprs = append(exprs, gExprs...)
 				}
 			}
@@ -2662,26 +2664,26 @@ func (analysis *RstestCallAnalysis) assignmentDestructBoundSources(prop, default
 	member, known, staticKey := analysis.evalPropertyNameKey(propName)
 	defaultSkipped := false
 	exactFromLiteral := false
-	sources, definiteSrc, sourcesMayBeMutable := analysis.assignmentObjectSourceExprs(obj)
-	if sourcesMayBeMutable {
+	sources, definiteSrc, sourcesMayBeMutable, sourcesUnresolvedGetter := analysis.assignmentObjectSourceExprs(obj)
+	if sourcesMayBeMutable || sourcesUnresolvedGetter {
 		hasUnbound = true
 	}
 	if known {
 		if definiteSrc != nil {
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(definiteSrc); objExpr != nil && !mutableObj {
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr, false)
 				defLookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(objExpr, member, priorGetter, 0)
 				defaultSkipped = defLookup.definitelyDefined
 			}
 		}
-		allExact := len(sources) > 0 && !sourcesMayBeMutable
+		allExact := len(sources) > 0 && !sourcesMayBeMutable && !sourcesUnresolvedGetter
 		for _, srcExpr := range sources {
 			objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr)
 			if objExpr == nil {
 				allExact = false
 				continue
 			}
-			priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr)
+			priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr, mutableObj)
 			if mutableObj && !sourcesMayBeMutable && !priorGetter && len(sources) == 1 {
 				if unwrapped := internalUtils.SkipAssertionsAndParens(srcExpr); unwrapped != nil && unwrapped.Kind == ast.KindIdentifier {
 					if sym := resolveRstestRootSymbol(analysis.ctx, unwrapped); sym != nil {
@@ -2696,10 +2698,10 @@ func (analysis *RstestCallAnalysis) assignmentDestructBoundSources(prop, default
 			lookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(objExpr, member, priorGetter || mutableObj || sourcesMayBeMutable, 0)
 			exprs = append(exprs, lookup.possibleExprs...)
 			useAllGetters := sourcesMayBeMutable || (mutableObj && analysis.srcExprObjEscaped(srcExpr, objExpr))
-			if priorGetter || useAllGetters {
-				gExprs, gContainers := analysis.collectPrecedingGetterPropWriteExprs(obj, prop, objExpr, member, useAllGetters)
+			if priorGetter || useAllGetters || mutableObj {
+				gExprs, gContainers, gUnresolved := analysis.collectPrecedingGetterPropWriteExprs(obj, prop, objExpr, member, useAllGetters, mutableObj)
 				exprs = append(exprs, gExprs...)
-				if len(gContainers) > 0 {
+				if len(gContainers) > 0 || gUnresolved {
 					hasUnbound = true
 					allExact = false
 				}
@@ -2716,10 +2718,10 @@ func (analysis *RstestCallAnalysis) assignmentDestructBoundSources(prop, default
 		for _, srcExpr := range sources {
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr); objExpr != nil {
 				exprs = append(exprs, analysis.allObjectLiteralPropertyExprs(objExpr)...)
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr, mutableObj)
 				useAllGetters := sourcesMayBeMutable || (mutableObj && analysis.srcExprObjEscaped(srcExpr, objExpr))
-				if priorGetter || useAllGetters {
-					gExprs, _ := analysis.collectPrecedingGetterPropWriteExprs(obj, prop, objExpr, "", useAllGetters)
+				if priorGetter || useAllGetters || mutableObj {
+					gExprs, _, _ := analysis.collectPrecedingGetterPropWriteExprs(obj, prop, objExpr, "", useAllGetters, mutableObj)
 					exprs = append(exprs, gExprs...)
 				}
 			}
@@ -4550,7 +4552,7 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 							}
 						} else if vd.Name().Kind == ast.KindObjectBindingPattern && symHasAnyAccessor {
 							if constInitObj == nil || analysis.symbolHasDefineProperty(symbol, nil) ||
-								analysis.destructuringPatternMayInvokeGetter(vd.Name(), constInitObj) {
+								analysis.destructuringPatternMayInvokeGetter(vd.Name(), constInitObj, true) {
 								summary.escaped = true
 								recordAllRestores(reference, stmt, block)
 							}
@@ -4565,7 +4567,7 @@ func (analysis *RstestCallAnalysis) getExpectConfigOverwriteSummary(symbol *ast.
 								aliasSym = resolveRstestRootSymbol(analysis.ctx, lhs)
 							} else if lhs.Kind == ast.KindObjectLiteralExpression && symHasAnyAccessor {
 								if constInitObj == nil || analysis.symbolHasDefineProperty(symbol, nil) ||
-									analysis.destructuringPatternMayInvokeGetter(lhs, constInitObj) {
+									analysis.destructuringPatternMayInvokeGetter(lhs, constInitObj, true) {
 									summary.escaped = true
 									recordAllRestores(reference, stmt, block)
 								}
@@ -5543,18 +5545,21 @@ func (analysis *RstestCallAnalysis) destructuredExpectConfigMember(declaration *
 	}
 	member, known, staticKey := analysis.evalBindingElementPropertyName(binding)
 	defaultSkipped := false
-	sources, definiteSrc, sourcesMayBeMutable := analysis.bindingPatternSourceExprs(pattern)
+	sources, definiteSrc, sourcesMayBeMutable, sourcesUnresolvedGetter := analysis.bindingPatternSourceExprs(pattern)
+	if sourcesUnresolvedGetter {
+		out |= expectConfigDynamicMember
+	}
 	if known {
 		if definiteSrc != nil {
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(definiteSrc); objExpr != nil && !mutableObj {
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr, false)
 				defLookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(objExpr, member, priorGetter, 0)
 				defaultSkipped = defLookup.definitelyDefined
 			}
 		}
 		for _, srcExpr := range sources {
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr); objExpr != nil {
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr, mutableObj)
 				if mutableObj && !sourcesMayBeMutable && !priorGetter && len(sources) == 1 {
 					if unwrapped := internalUtils.SkipAssertionsAndParens(srcExpr); unwrapped != nil && unwrapped.Kind == ast.KindIdentifier {
 						if sym := resolveRstestRootSymbol(analysis.ctx, unwrapped); sym != nil {
@@ -5571,13 +5576,16 @@ func (analysis *RstestCallAnalysis) destructuredExpectConfigMember(declaration *
 					out |= analysis.expectConfigMember(expr)
 				}
 				useAllGetters := sourcesMayBeMutable || (mutableObj && analysis.srcExprObjEscaped(srcExpr, objExpr))
-				if priorGetter || useAllGetters {
-					gExprs, gContainers := analysis.collectPrecedingGetterPropWriteExprs(pattern, declaration, objExpr, member, useAllGetters)
+				if priorGetter || useAllGetters || mutableObj {
+					gExprs, gContainers, gUnresolved := analysis.collectPrecedingGetterPropWriteExprs(pattern, declaration, objExpr, member, useAllGetters, mutableObj)
 					for _, expr := range gExprs {
 						out |= analysis.expectConfigMember(expr)
 					}
 					for _, cExpr := range gContainers {
 						out |= classifyDestructuredExpectConfigProperty(analysis.expectConfigMember(cExpr), member, true, true)
+					}
+					if gUnresolved {
+						out |= expectConfigDynamicMember
 					}
 				}
 				for _, pExpr := range lookup.exposedProtoExprs {
@@ -5591,15 +5599,18 @@ func (analysis *RstestCallAnalysis) destructuredExpectConfigMember(declaration *
 				out |= analysis.expectConfigMember(expr)
 			}
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr); objExpr != nil {
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(pattern, declaration, objExpr, mutableObj)
 				useAllGetters := sourcesMayBeMutable || (mutableObj && analysis.srcExprObjEscaped(srcExpr, objExpr))
-				if priorGetter || useAllGetters {
-					gExprs, gContainers := analysis.collectPrecedingGetterPropWriteExprs(pattern, declaration, objExpr, "", useAllGetters)
+				if priorGetter || useAllGetters || mutableObj {
+					gExprs, gContainers, gUnresolved := analysis.collectPrecedingGetterPropWriteExprs(pattern, declaration, objExpr, "", useAllGetters, mutableObj)
 					for _, expr := range gExprs {
 						out |= analysis.expectConfigMember(expr)
 					}
 					for _, cExpr := range gContainers {
 						out |= classifyDestructuredExpectConfigProperty(analysis.expectConfigMember(cExpr), "", false, false)
+					}
+					if gUnresolved {
+						out |= expectConfigDynamicMember
 					}
 				}
 			}
@@ -5615,40 +5626,41 @@ func (analysis *RstestCallAnalysis) destructuredExpectConfigMember(declaration *
 	return out | classifyDestructuredExpectConfigProperty(container, member, known, staticKey)
 }
 
-func (analysis *RstestCallAnalysis) bindingPatternSourceExprs(pattern *ast.Node) (sources []*ast.Node, definiteSource *ast.Node, sourcesMayBeMutable bool) {
+func (analysis *RstestCallAnalysis) bindingPatternSourceExprs(pattern *ast.Node) (sources []*ast.Node, definiteSource *ast.Node, sourcesMayBeMutable bool, unresolvedGetter bool) {
 	if pattern == nil || pattern.Parent == nil {
-		return nil, nil, false
+		return nil, nil, false, false
 	}
 	switch pattern.Parent.Kind {
 	case ast.KindVariableDeclaration:
 		init := pattern.Parent.AsVariableDeclaration().Initializer
 		if init != nil {
-			return []*ast.Node{init}, init, false
+			return []*ast.Node{init}, init, false, false
 		}
 	case ast.KindBindingElement:
 		be := pattern.Parent.AsBindingElement()
 		if be == nil || be.DotDotDotToken != nil {
-			return nil, nil, false
+			return nil, nil, false, false
 		}
 		parentPattern := pattern.Parent.Parent
 		if parentPattern == nil {
-			return nil, nil, false
+			return nil, nil, false, false
 		}
 		if parentPattern.Kind != ast.KindObjectBindingPattern {
 			if be.Initializer != nil {
-				return []*ast.Node{be.Initializer}, nil, false
+				return []*ast.Node{be.Initializer}, nil, false, false
 			}
-			return nil, nil, false
+			return nil, nil, false, false
 		}
 		member, known, _ := analysis.evalBindingElementPropertyName(be)
 		if !known {
 			if be.Initializer != nil {
-				return []*ast.Node{be.Initializer}, nil, false
+				return []*ast.Node{be.Initializer}, nil, false, false
 			}
-			return nil, nil, false
+			return nil, nil, false, false
 		}
-		parentSources, parentDefinite, parentMutable := analysis.bindingPatternSourceExprs(parentPattern)
+		parentSources, parentDefinite, parentMutable, parentUnresolved := analysis.bindingPatternSourceExprs(parentPattern)
 		sourcesMayBeMutable = parentMutable
+		unresolvedGetter = parentUnresolved
 		parentDefDefined := false
 		// Only step `definiteSource` across a direct fresh `ObjectLiteralExpression`
 		// (not a `const` alias `cfg` whose nested sub-object `cfg.nested` could
@@ -5656,7 +5668,7 @@ func (analysis *RstestCallAnalysis) bindingPatternSourceExprs(pattern *ast.Node)
 		if parentDefinite != nil {
 			if directObj := internalUtils.SkipAssertionsAndParens(parentDefinite); directObj != nil &&
 				directObj.Kind == ast.KindObjectLiteralExpression {
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(parentPattern, pattern.Parent, directObj)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(parentPattern, pattern.Parent, directObj, false)
 				defLookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(directObj, member, priorGetter, 0)
 				if defLookup.definitelyDefined && defLookup.exactExpr != nil &&
 					!defLookup.fromNonFreshSource && !defLookup.mayHaveUnknownSource {
@@ -5674,46 +5686,49 @@ func (analysis *RstestCallAnalysis) bindingPatternSourceExprs(pattern *ast.Node)
 				if mutableObj {
 					sourcesMayBeMutable = true
 				}
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(parentPattern, pattern.Parent, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(parentPattern, pattern.Parent, objExpr, mutableObj)
 				lookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(objExpr, member, priorGetter || mutableObj || sourcesMayBeMutable, 0)
 				if lookup.mayHaveUnknownSource || lookup.fromNonFreshSource {
 					sourcesMayBeMutable = true
 				}
 				sources = append(sources, lookup.possibleExprs...)
 				useAllGetters := parentMutable || (mutableObj && analysis.srcExprObjEscaped(pSrc, objExpr))
-				if priorGetter || useAllGetters {
-					gExprs, _ := analysis.collectPrecedingGetterPropWriteExprs(parentPattern, pattern.Parent, objExpr, member, useAllGetters)
+				if priorGetter || useAllGetters || mutableObj {
+					gExprs, _, gUnresolved := analysis.collectPrecedingGetterPropWriteExprs(parentPattern, pattern.Parent, objExpr, member, useAllGetters, mutableObj)
 					sources = append(sources, gExprs...)
+					if gUnresolved {
+						unresolvedGetter = true
+					}
 				}
 			}
 		}
 		if be.Initializer != nil && !parentDefDefined {
 			sources = append(sources, be.Initializer)
 		}
-		return sources, definiteSource, sourcesMayBeMutable
+		return sources, definiteSource, sourcesMayBeMutable, unresolvedGetter
 	}
-	return nil, nil, false
+	return nil, nil, false, false
 }
 
-func (analysis *RstestCallAnalysis) assignmentObjectSourceExprs(obj *ast.Node) (sources []*ast.Node, definiteSource *ast.Node, sourcesMayBeMutable bool) {
+func (analysis *RstestCallAnalysis) assignmentObjectSourceExprs(obj *ast.Node) (sources []*ast.Node, definiteSource *ast.Node, sourcesMayBeMutable bool, unresolvedGetter bool) {
 	if obj == nil || obj.Parent == nil {
-		return nil, nil, false
+		return nil, nil, false, false
 	}
 	outer := internalUtils.OutermostParenthesizedExpression(obj)
 	if outer == nil || outer.Parent == nil {
-		return nil, nil, false
+		return nil, nil, false, false
 	}
 	switch outer.Parent.Kind {
 	case ast.KindBinaryExpression:
 		bin := outer.Parent.AsBinaryExpression()
 		if bin == nil || bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindEqualsToken || bin.Left != outer {
-			return nil, nil, false
+			return nil, nil, false, false
 		}
 		if !internalUtils.IsDefaultValueInDestructuringAssignment(outer.Parent) {
 			if bin.Right != nil {
-				return []*ast.Node{bin.Right}, bin.Right, false
+				return []*ast.Node{bin.Right}, bin.Right, false, false
 			}
-			return nil, nil, false
+			return nil, nil, false, false
 		}
 		// Nested destructuring assignment default, e.g.
 		// `({ a: { register = r.expect.extend } = fallback } = { a: {} })` or
@@ -5722,39 +5737,40 @@ func (analysis *RstestCallAnalysis) assignmentObjectSourceExprs(obj *ast.Node) (
 		// guaranteed defined (never mistaking `fallback` for `definiteSource`).
 		if outer.Parent.Parent != nil && outer.Parent.Parent.Kind == ast.KindPropertyAssignment &&
 			outer.Parent.Parent.AsPropertyAssignment().Initializer == outer.Parent {
-			pSources, pDef, pMut := analysis.assignmentPropertySourceExprs(outer.Parent.Parent)
+			pSources, pDef, pMut, pUnresolved := analysis.assignmentPropertySourceExprs(outer.Parent.Parent)
 			sources = append(sources, pSources...)
 			if pDef != nil {
-				return sources, pDef, pMut
+				return sources, pDef, pMut, pUnresolved
 			}
 			if bin.Right != nil {
 				sources = append(sources, bin.Right)
 			}
-			return sources, nil, pMut
+			return sources, nil, pMut, pUnresolved
 		}
 		if bin.Right != nil {
-			return []*ast.Node{bin.Right}, nil, false
+			return []*ast.Node{bin.Right}, nil, false, false
 		}
 	case ast.KindPropertyAssignment:
 		return analysis.assignmentPropertySourceExprs(outer.Parent)
 	}
-	return nil, nil, false
+	return nil, nil, false, false
 }
 
-func (analysis *RstestCallAnalysis) assignmentPropertySourceExprs(prop *ast.Node) (sources []*ast.Node, definiteSource *ast.Node, sourcesMayBeMutable bool) {
+func (analysis *RstestCallAnalysis) assignmentPropertySourceExprs(prop *ast.Node) (sources []*ast.Node, definiteSource *ast.Node, sourcesMayBeMutable bool, unresolvedGetter bool) {
 	if prop == nil || prop.Parent == nil || prop.Parent.Kind != ast.KindObjectLiteralExpression || prop.Name() == nil {
-		return nil, nil, false
+		return nil, nil, false, false
 	}
 	member, known, _ := analysis.evalPropertyNameKey(prop.Name())
 	if !known {
-		return nil, nil, false
+		return nil, nil, false, false
 	}
-	parentSources, parentDefinite, parentMutable := analysis.assignmentObjectSourceExprs(prop.Parent)
+	parentSources, parentDefinite, parentMutable, parentUnresolved := analysis.assignmentObjectSourceExprs(prop.Parent)
 	sourcesMayBeMutable = parentMutable
+	unresolvedGetter = parentUnresolved
 	if parentDefinite != nil {
 		if directObj := internalUtils.SkipAssertionsAndParens(parentDefinite); directObj != nil &&
 			directObj.Kind == ast.KindObjectLiteralExpression {
-			priorGetter := analysis.precedingDestructuringMayInvokeGetter(prop.Parent, prop, directObj)
+			priorGetter := analysis.precedingDestructuringMayInvokeGetter(prop.Parent, prop, directObj, false)
 			defLookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(directObj, member, priorGetter, 0)
 			if defLookup.definitelyDefined && defLookup.exactExpr != nil &&
 				!defLookup.fromNonFreshSource && !defLookup.mayHaveUnknownSource {
@@ -5771,20 +5787,23 @@ func (analysis *RstestCallAnalysis) assignmentPropertySourceExprs(prop *ast.Node
 			if mutableObj {
 				sourcesMayBeMutable = true
 			}
-			priorGetter := analysis.precedingDestructuringMayInvokeGetter(prop.Parent, prop, objExpr)
+			priorGetter := analysis.precedingDestructuringMayInvokeGetter(prop.Parent, prop, objExpr, mutableObj)
 			lookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(objExpr, member, priorGetter || mutableObj || sourcesMayBeMutable, 0)
 			if lookup.mayHaveUnknownSource || lookup.fromNonFreshSource {
 				sourcesMayBeMutable = true
 			}
 			sources = append(sources, lookup.possibleExprs...)
 			useAllGetters := parentMutable || (mutableObj && analysis.srcExprObjEscaped(pSrc, objExpr))
-			if priorGetter || useAllGetters {
-				gExprs, _ := analysis.collectPrecedingGetterPropWriteExprs(prop.Parent, prop, objExpr, member, useAllGetters)
+			if priorGetter || useAllGetters || mutableObj {
+				gExprs, _, gUnresolved := analysis.collectPrecedingGetterPropWriteExprs(prop.Parent, prop, objExpr, member, useAllGetters, mutableObj)
 				sources = append(sources, gExprs...)
+				if gUnresolved {
+					unresolvedGetter = true
+				}
 			}
 		}
 	}
-	return sources, definiteSource, sourcesMayBeMutable
+	return sources, definiteSource, sourcesMayBeMutable, unresolvedGetter
 }
 
 type objectLiteralPropertyLookup struct {
@@ -5925,10 +5944,16 @@ func (analysis *RstestCallAnalysis) collectDestructuringKeys(pattern, stopBefore
 }
 
 type objGetterSummary struct {
-	hasAny        bool
-	hasDynamic    bool
-	staticGetters map[string][]*ast.Node
-	allGetters    []*ast.Node
+	hasAny                  bool
+	hasOwnDynamic           bool
+	hasProtoDynamic         bool
+	hasOpaqueProto          bool
+	ownShadowedProps        map[string]bool
+	staticGetters           map[string][]*ast.Node
+	allGetters              []*ast.Node
+	protoDynamicGetters     []*ast.Node
+	shadowedProtoGetters    map[string][]*ast.Node
+	allShadowedProtoGetters []*ast.Node
 }
 
 func (analysis *RstestCallAnalysis) getObjectLiteralGetterSummary(objExpr *ast.Node) *objGetterSummary {
@@ -5942,11 +5967,13 @@ func (analysis *RstestCallAnalysis) getObjectLiteralGetterSummary(objExpr *ast.N
 	}
 	summary := &objGetterSummary{}
 	visited := map[*ast.Node]bool{}
+	shadowed := map[string]bool{}
 	var collect func(cur *ast.Node, depth int)
 	collect = func(cur *ast.Node, depth int) {
 		if depth > 4 {
 			summary.hasAny = true
-			summary.hasDynamic = true
+			summary.hasProtoDynamic = true
+			summary.hasOpaqueProto = true
 			return
 		}
 		if cur == nil || cur.Kind != ast.KindObjectLiteralExpression || cur.AsObjectLiteralExpression().Properties == nil || visited[cur] {
@@ -5954,6 +5981,12 @@ func (analysis *RstestCallAnalysis) getObjectLiteralGetterSummary(objExpr *ast.N
 		}
 		visited[cur] = true
 		var protoExpr *ast.Node
+		curStaticGetters := map[string]*ast.Node{}
+		curStaticData := map[string]bool{}
+		curStaticSetters := map[string]bool{}
+		var curStaticGetterOrder []string
+		var curDynamicGetters []*ast.Node
+		var curSymbolGetters []*ast.Node
 		for _, prop := range cur.AsObjectLiteralExpression().Properties.Nodes {
 			if prop == nil {
 				continue
@@ -5964,34 +5997,123 @@ func (analysis *RstestCallAnalysis) getObjectLiteralGetterSummary(objExpr *ast.N
 					continue
 				}
 			}
-			if prop.Kind != ast.KindGetAccessor {
+			switch prop.Kind {
+			case ast.KindGetAccessor:
+				if prop.Name() == nil {
+					if depth == 0 {
+						summary.hasOwnDynamic = true
+					} else {
+						summary.hasProtoDynamic = true
+						summary.protoDynamicGetters = append(summary.protoDynamicGetters, prop)
+					}
+					curDynamicGetters = append(curDynamicGetters, prop)
+					continue
+				}
+				name, ok, staticKey := analysis.evalPropertyNameKey(prop.Name())
+				if !ok && !staticKey {
+					if depth == 0 {
+						summary.hasOwnDynamic = true
+					} else {
+						summary.hasProtoDynamic = true
+						summary.protoDynamicGetters = append(summary.protoDynamicGetters, prop)
+					}
+					curDynamicGetters = append(curDynamicGetters, prop)
+					continue
+				}
+				if !ok && staticKey {
+					curSymbolGetters = append(curSymbolGetters, prop)
+					continue
+				}
+				if ok {
+					if shadowed[name] {
+						if depth > 0 {
+							if summary.shadowedProtoGetters == nil {
+								summary.shadowedProtoGetters = map[string][]*ast.Node{}
+							}
+							summary.shadowedProtoGetters[name] = append(summary.shadowedProtoGetters[name], prop)
+							summary.allShadowedProtoGetters = append(summary.allShadowedProtoGetters, prop)
+						}
+						continue
+					}
+					delete(curStaticData, name)
+					if _, exists := curStaticGetters[name]; !exists {
+						curStaticGetterOrder = append(curStaticGetterOrder, name)
+					}
+					curStaticGetters[name] = prop
+				}
+			case ast.KindSetAccessor:
+				if prop.Name() != nil {
+					if name, ok, _ := analysis.evalPropertyNameKey(prop.Name()); ok {
+						delete(curStaticData, name)
+						curStaticSetters[name] = true
+					}
+				}
+			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindMethodDeclaration:
+				if prop.Name() != nil {
+					if name, ok, _ := analysis.evalPropertyNameKey(prop.Name()); ok {
+						delete(curStaticGetters, name)
+						delete(curStaticSetters, name)
+						curStaticData[name] = true
+					}
+				}
+			}
+		}
+		if depth == 0 && (len(curStaticData) > 0 || len(curStaticGetters) > 0 || len(curStaticSetters) > 0) {
+			summary.ownShadowedProps = make(map[string]bool, len(curStaticData)+len(curStaticGetters)+len(curStaticSetters))
+			for name := range curStaticData {
+				summary.ownShadowedProps[name] = true
+			}
+			for name := range curStaticGetters {
+				summary.ownShadowedProps[name] = true
+			}
+			for name := range curStaticSetters {
+				summary.ownShadowedProps[name] = true
+			}
+		}
+		for _, prop := range curDynamicGetters {
+			summary.hasAny = true
+			summary.allGetters = append(summary.allGetters, prop)
+		}
+		for _, prop := range curSymbolGetters {
+			summary.hasAny = true
+			summary.allGetters = append(summary.allGetters, prop)
+		}
+		for _, name := range curStaticGetterOrder {
+			if shadowed[name] {
+				continue
+			}
+			prop, ok := curStaticGetters[name]
+			if !ok {
 				continue
 			}
 			summary.hasAny = true
 			summary.allGetters = append(summary.allGetters, prop)
-			if prop.Name() == nil {
-				summary.hasDynamic = true
-				continue
+			if summary.staticGetters == nil {
+				summary.staticGetters = map[string][]*ast.Node{}
 			}
-			name, ok, staticKey := analysis.evalPropertyNameKey(prop.Name())
-			if !ok && !staticKey {
-				summary.hasDynamic = true
-				continue
-			}
-			if ok {
-				if summary.staticGetters == nil {
-					summary.staticGetters = map[string][]*ast.Node{}
-				}
-				summary.staticGetters[name] = append(summary.staticGetters[name], prop)
-			}
+			summary.staticGetters[name] = append(summary.staticGetters[name], prop)
+			shadowed[name] = true
+		}
+		for name := range curStaticData {
+			shadowed[name] = true
+		}
+		for name := range curStaticSetters {
+			shadowed[name] = true
 		}
 		if protoExpr != nil {
 			unwrapped := internalUtils.SkipAssertionsAndParens(protoExpr)
 			if unwrapped != nil && unwrapped.Kind != ast.KindNullKeyword {
 				protoObj, mutableProto := analysis.resolveObjectLiteralForBoundLookup(protoExpr)
-				if protoObj == nil || mutableProto {
+				if protoObj == nil {
 					summary.hasAny = true
-					summary.hasDynamic = true
+					summary.hasProtoDynamic = true
+					summary.hasOpaqueProto = true
+				} else if mutableProto {
+					summary.hasAny = true
+					summary.hasProtoDynamic = true
+					if analysis.srcExprObjEscaped(protoExpr, protoObj) {
+						summary.hasOpaqueProto = true
+					}
 				}
 				if protoObj != nil {
 					collect(protoObj, depth+1)
@@ -6019,17 +6141,31 @@ func (analysis *RstestCallAnalysis) srcExprObjEscaped(srcExpr, objExpr *ast.Node
 	return analysis.getObjectLiteralMutationSummary(sym, objExpr).escaped
 }
 
-func (analysis *RstestCallAnalysis) collectDescriptorValueAndGetExprs(descObj *ast.Node) []*ast.Node {
+func (analysis *RstestCallAnalysis) collectDescriptorValueAndGetExprs(descObj *ast.Node) (out []*ast.Node, complete bool) {
 	if descObj == nil || descObj.Kind != ast.KindObjectLiteralExpression || descObj.AsObjectLiteralExpression().Properties == nil {
-		return nil
+		return nil, false
 	}
-	var out []*ast.Node
+	complete = true
 	for _, prop := range descObj.AsObjectLiteralExpression().Properties.Nodes {
-		if prop == nil || prop.Name() == nil {
+		if prop == nil {
 			continue
+		}
+		if prop.Kind == ast.KindSpreadAssignment || prop.Name() == nil {
+			complete = false
+			continue
+		}
+		if prop.Kind == ast.KindPropertyAssignment && prop.Name().Kind != ast.KindComputedPropertyName {
+			if name, ok := internalUtils.GetStaticPropertyName(prop.Name()); ok && name == "__proto__" {
+				init := internalUtils.SkipAssertionsAndParens(prop.AsPropertyAssignment().Initializer)
+				if init == nil || init.Kind != ast.KindNullKeyword {
+					complete = false
+				}
+				continue
+			}
 		}
 		name, ok, _ := analysis.evalPropertyNameKey(prop.Name())
 		if !ok {
+			complete = false
 			continue
 		}
 		switch name {
@@ -6039,132 +6175,440 @@ func (analysis *RstestCallAnalysis) collectDescriptorValueAndGetExprs(descObj *a
 				out = append(out, prop.AsPropertyAssignment().Initializer)
 			case ast.KindShorthandPropertyAssignment:
 				out = append(out, prop.AsShorthandPropertyAssignment().Name())
+			case ast.KindMethodDeclaration:
+				out = append(out, prop)
+			case ast.KindGetAccessor:
+				out = append(out, collectGetterReturnExprs(prop)...)
+			default:
+				complete = false
 			}
 		case "get":
 			switch prop.Kind {
 			case ast.KindMethodDeclaration:
 				out = append(out, collectGetterReturnExprs(prop)...)
 			case ast.KindPropertyAssignment:
-				out = append(out, collectGetterReturnExprs(internalUtils.SkipAssertionsAndParens(prop.AsPropertyAssignment().Initializer))...)
+				init := internalUtils.SkipAssertionsAndParens(prop.AsPropertyAssignment().Initializer)
+				if init != nil && (init.Kind == ast.KindArrowFunction || init.Kind == ast.KindFunctionExpression) {
+					out = append(out, collectGetterReturnExprs(init)...)
+				} else {
+					complete = false
+				}
+			default:
+				complete = false
 			}
 		}
 	}
-	return out
+	return out, complete
 }
 
-func (analysis *RstestCallAnalysis) destructuringPatternMayInvokeGetter(pattern, objExpr *ast.Node) bool {
+func (gs *objGetterSummary) keyMayInvokeGetter(k destructuringPropKey, mutable bool) bool {
+	if !k.known {
+		return gs.hasAny || (mutable && len(gs.allShadowedProtoGetters) > 0)
+	}
+	if len(gs.staticGetters[k.name]) > 0 {
+		return true
+	}
+	if mutable && len(gs.shadowedProtoGetters[k.name]) > 0 {
+		return true
+	}
+	if gs.hasOwnDynamic {
+		return true
+	}
+	return gs.hasProtoDynamic && (mutable || !gs.ownShadowedProps[k.name])
+}
+
+func (analysis *RstestCallAnalysis) destructuringPatternMayInvokeGetter(pattern, objExpr *ast.Node, mutable bool) bool {
 	if pattern == nil || objExpr == nil {
 		return false
 	}
 	gs := analysis.getObjectLiteralGetterSummary(objExpr)
-	if !gs.hasAny {
+	if !gs.hasAny && (!mutable || len(gs.allShadowedProtoGetters) == 0) {
 		return false
 	}
 	keys, _ := analysis.collectDestructuringKeys(pattern, nil)
-	if gs.hasDynamic {
-		return len(keys) > 0
-	}
 	for _, k := range keys {
-		if !k.known || len(gs.staticGetters[k.name]) > 0 {
+		if gs.keyMayInvokeGetter(k, mutable) {
 			return true
 		}
 	}
 	return false
 }
 
-func (analysis *RstestCallAnalysis) precedingDestructuringMayInvokeGetter(pattern, targetElem, objExpr *ast.Node) bool {
+func (analysis *RstestCallAnalysis) precedingDestructuringMayInvokeGetter(pattern, targetElem, objExpr *ast.Node, mutable bool) bool {
 	if pattern == nil || targetElem == nil || objExpr == nil {
 		return false
 	}
 	gs := analysis.getObjectLiteralGetterSummary(objExpr)
-	if !gs.hasAny {
+	if !gs.hasAny && (!mutable || len(gs.allShadowedProtoGetters) == 0) {
 		return false
 	}
 	keys, found := analysis.collectDestructuringKeys(pattern, targetElem)
 	if !found {
 		return true
 	}
-	if gs.hasDynamic {
-		return len(keys) > 0
-	}
 	for _, k := range keys {
-		if !k.known || len(gs.staticGetters[k.name]) > 0 {
+		if gs.keyMayInvokeGetter(k, mutable) {
 			return true
 		}
 	}
 	return false
 }
 
+func isImmediatelyInvokedFunction(node *ast.Node) bool {
+	if node == nil || (node.Kind != ast.KindArrowFunction && node.Kind != ast.KindFunctionExpression) {
+		return false
+	}
+	outer := outermostExpressionWrapper(node)
+	if outer == nil || outer.Parent == nil {
+		return false
+	}
+	if outer.Parent.Kind == ast.KindCallExpression {
+		if outer.Parent.AsCallExpression().Expression == outer {
+			return true
+		}
+		// Inline arrow passed directly as a callback argument (e.g. `[1].forEach(() => { this.register = ... })`).
+		if node.Kind == ast.KindArrowFunction {
+			return true
+		}
+	}
+	if ast.IsAccessExpression(outer.Parent) && outer.Parent.Expression() == outer {
+		accOuter := outermostExpressionWrapper(outer.Parent)
+		if accOuter != nil && accOuter.Parent != nil && accOuter.Parent.Kind == ast.KindCallExpression &&
+			accOuter.Parent.AsCallExpression().Expression == accOuter {
+			if name, ok := internalUtils.AccessExpressionStaticName(outer.Parent); ok && (name == "call" || name == "apply") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isSimplePrimitiveLiteralExpr(node *ast.Node) bool {
+	node = internalUtils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
+		return true
+	}
+	return false
+}
+
+func thisAccessRootProp(node *ast.Node, isThis func(*ast.Node) bool) (rootAccess *ast.Node, isDirect bool, ok bool) {
+	cur := internalUtils.SkipAssertionsAndParens(node)
+	if cur == nil || !ast.IsAccessExpression(cur) {
+		return nil, false, false
+	}
+	direct := true
+	for cur != nil && ast.IsAccessExpression(cur) {
+		recv := internalUtils.SkipAssertionsAndParens(cur.Expression())
+		if isThis(recv) {
+			return cur, direct, true
+		}
+		cur = recv
+		direct = false
+	}
+	return nil, false, false
+}
+
+func (analysis *RstestCallAnalysis) lookupOwnLiteralInlineMethod(objExpr *ast.Node, methodName string) *ast.Node {
+	if objExpr == nil || objExpr.Kind != ast.KindObjectLiteralExpression || objExpr.AsObjectLiteralExpression().Properties == nil {
+		return nil
+	}
+	var found *ast.Node
+	for _, prop := range objExpr.AsObjectLiteralExpression().Properties.Nodes {
+		if prop == nil {
+			continue
+		}
+		if prop.Kind == ast.KindSpreadAssignment {
+			found = nil
+			continue
+		}
+		if prop.Name() == nil {
+			found = nil
+			continue
+		}
+		name, ok, staticKey := analysis.evalPropertyNameKey(prop.Name())
+		if !ok && !staticKey {
+			found = nil
+			continue
+		}
+		if !ok || name != methodName {
+			continue
+		}
+		switch prop.Kind {
+		case ast.KindMethodDeclaration:
+			found = prop
+		case ast.KindPropertyAssignment:
+			init := internalUtils.SkipAssertionsAndParens(prop.AsPropertyAssignment().Initializer)
+			if init != nil && init.Kind == ast.KindFunctionExpression {
+				found = init
+			} else {
+				found = nil
+			}
+		default:
+			found = nil
+		}
+	}
+	return found
+}
+
 // collectPrecedingGetterPropWriteExprs collects RHS expressions (and non-literal
 // `Object.assign(this, src)` containers) written to `this[targetProp]` (or any
 // property when `targetProp == ""`) inside getters that can execute before
-// `targetElem` during object destructuring.
+// `targetElem` during object destructuring. It sets `unresolved` when an
+// executed getter mutates `this` / `this[targetProp]` in a way whose installed
+// value cannot be statically extracted (e.g. nested writes `this.nested.x = ...`,
+// destructuring writes, unresolved descriptors, or external method/helper calls).
 func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 	pattern, targetElem, objExpr *ast.Node,
 	targetProp string,
 	allGetters bool,
-) (exprs []*ast.Node, containers []*ast.Node) {
+	mutableObj bool,
+) (exprs []*ast.Node, containers []*ast.Node, unresolved bool) {
 	if pattern == nil || targetElem == nil || objExpr == nil {
-		return nil, nil
+		return nil, nil, false
 	}
 	gs := analysis.getObjectLiteralGetterSummary(objExpr)
-	if len(gs.allGetters) == 0 {
-		return nil, nil
+	if len(gs.allGetters) == 0 && len(gs.allShadowedProtoGetters) == 0 && !gs.hasOpaqueProto {
+		return nil, nil, false
 	}
 	var getters []*ast.Node
-	if allGetters || gs.hasDynamic {
-		getters = gs.allGetters
-	} else {
-		keys, found := analysis.collectDestructuringKeys(pattern, targetElem)
-		if !found {
-			getters = gs.allGetters
+	seen := map[*ast.Node]bool{}
+	appendGetters := func(list []*ast.Node) {
+		for _, g := range list {
+			if g != nil && !seen[g] {
+				seen[g] = true
+				getters = append(getters, g)
+			}
+		}
+	}
+	keys, found := analysis.collectDestructuringKeys(pattern, targetElem)
+	precedingKeySet := map[string]bool{}
+	hasDynamicPrecedingKey := !found
+	for _, k := range keys {
+		if k.known {
+			precedingKeySet[k.name] = true
 		} else {
-			seen := map[*ast.Node]bool{}
-			for _, k := range keys {
-				list := gs.allGetters
-				if k.known {
-					list = gs.staticGetters[k.name]
+			hasDynamicPrecedingKey = true
+		}
+	}
+	if allGetters {
+		appendGetters(gs.allGetters)
+		appendGetters(gs.allShadowedProtoGetters)
+		if gs.hasOpaqueProto && (len(keys) > 0 || !found) {
+			unresolved = true
+		}
+	} else if gs.hasOwnDynamic || !found {
+		appendGetters(gs.allGetters)
+		if mutableObj {
+			appendGetters(gs.allShadowedProtoGetters)
+		}
+		if gs.hasProtoDynamic {
+			appendGetters(gs.protoDynamicGetters)
+			if gs.hasOpaqueProto && (len(keys) > 0 || !found) {
+				unresolved = true
+			}
+		}
+	} else {
+		for _, k := range keys {
+			if !k.known {
+				appendGetters(gs.allGetters)
+				if mutableObj {
+					appendGetters(gs.allShadowedProtoGetters)
 				}
-				for _, g := range list {
-					if !seen[g] {
-						seen[g] = true
-						getters = append(getters, g)
-					}
+				if gs.hasOpaqueProto {
+					unresolved = true
+				}
+				continue
+			}
+			appendGetters(gs.staticGetters[k.name])
+			if mutableObj {
+				appendGetters(gs.shadowedProtoGetters[k.name])
+			}
+			if gs.hasProtoDynamic && (!gs.ownShadowedProps[k.name] || mutableObj) {
+				appendGetters(gs.protoDynamicGetters)
+				if gs.hasOpaqueProto {
+					unresolved = true
 				}
 			}
 		}
+	}
+	if len(getters) == 0 {
+		return nil, nil, unresolved
 	}
 	matchesTarget := func(pName string, pKnown bool) bool {
 		return targetProp == "" || !pKnown || pName == targetProp
 	}
-	for _, g := range getters {
-		body := g.Body()
-		if body == nil {
-			continue
-		}
-		var thisAliases map[*ast.Symbol]bool
-		var collectAliases func(*ast.Node)
-		collectAliases = func(node *ast.Node) {
+	thisPropWrittenInGetters := map[string]bool{}
+	gettersWriteDynamicThisProp := false
+	scanThisPropWrites := func(body *ast.Node, isThis func(*ast.Node) bool) {
+		var scan func(*ast.Node)
+		scan = func(node *ast.Node) {
 			if node == nil {
 				return
 			}
-			if node != body && testFramework.IsFunction(node) && node.Kind != ast.KindArrowFunction {
+			if node != body && testFramework.IsFunction(node) && !isImmediatelyInvokedFunction(node) {
 				return
+			}
+			if node.Kind == ast.KindBinaryExpression {
+				if bin := node.AsBinaryExpression(); bin != nil && bin.OperatorToken != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
+					if rootAccess, isDirect, ok := thisAccessRootProp(bin.Left, isThis); ok && isDirect {
+						if pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess); pKnown {
+							thisPropWrittenInGetters[pName] = true
+						} else {
+							gettersWriteDynamicThisProp = true
+						}
+					}
+				}
+			}
+			node.ForEachChild(func(child *ast.Node) bool {
+				scan(child)
+				return false
+			})
+		}
+		scan(body)
+	}
+	for _, g := range getters {
+		if g != nil && g.Body() != nil {
+			scanThisPropWrites(g.Body(), func(e *ast.Node) bool {
+				e = internalUtils.SkipAssertionsAndParens(e)
+				return e != nil && e.Kind == ast.KindThisKeyword
+			})
+		}
+	}
+	exprReferencesParams := func(expr *ast.Node, paramSymbols map[*ast.Symbol]bool) bool {
+		if expr == nil || len(paramSymbols) == 0 {
+			return false
+		}
+		foundParam := false
+		var walk func(*ast.Node)
+		walk = func(node *ast.Node) {
+			if node == nil || foundParam || ast.IsTypeNode(node) {
+				return
+			}
+			if node.Kind == ast.KindIdentifier {
+				if node.AsIdentifier().Text == "arguments" {
+					foundParam = true
+					return
+				}
+				if sym := resolveRstestRootSymbol(analysis.ctx, node); sym != nil && paramSymbols[sym] {
+					foundParam = true
+					return
+				}
+			}
+			node.ForEachChild(func(child *ast.Node) bool {
+				walk(child)
+				return foundParam
+			})
+		}
+		walk(expr)
+		return foundParam
+	}
+	collectFnParamSymbols := func(fn *ast.Node, base map[*ast.Symbol]bool) map[*ast.Symbol]bool {
+		if fn == nil {
+			return base
+		}
+		params := fn.Parameters()
+		if len(params) == 0 {
+			return base
+		}
+		out := make(map[*ast.Symbol]bool, len(base)+len(params))
+		for s := range base {
+			out[s] = true
+		}
+		var addBinding func(*ast.Node)
+		addBinding = func(n *ast.Node) {
+			if n == nil {
+				return
+			}
+			switch n.Kind {
+			case ast.KindIdentifier:
+				sym := n.Parent.Symbol()
+				if sym == nil {
+					sym = resolveRstestRootSymbol(analysis.ctx, n)
+				}
+				if sym != nil {
+					out[sym] = true
+				}
+			case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
+				if bp := n.AsBindingPattern(); bp != nil && bp.Elements != nil {
+					for _, el := range bp.Elements.Nodes {
+						if el != nil && el.Kind == ast.KindBindingElement {
+							addBinding(el.Name())
+						}
+					}
+				}
+			}
+		}
+		for _, p := range params {
+			if p != nil && p.Name() != nil {
+				addBinding(p.Name())
+			}
+		}
+		return out
+	}
+	visitedBodies := map[*ast.Node]bool{}
+	var visitBody func(body *ast.Node, ownThis bool, outerAliases map[*ast.Symbol]bool, paramSymbols map[*ast.Symbol]bool)
+	visitBody = func(body *ast.Node, ownThis bool, outerAliases map[*ast.Symbol]bool, paramSymbols map[*ast.Symbol]bool) {
+		if body == nil || visitedBodies[body] {
+			return
+		}
+		visitedBodies[body] = true
+		var thisAliases map[*ast.Symbol]bool
+		if len(outerAliases) > 0 {
+			thisAliases = make(map[*ast.Symbol]bool, len(outerAliases))
+			for sym := range outerAliases {
+				thisAliases[sym] = true
+			}
+		}
+		var localFns map[*ast.Symbol][]*ast.Node
+		addLocalFn := func(sym *ast.Symbol, fn *ast.Node) {
+			if sym == nil || fn == nil {
+				return
+			}
+			if localFns == nil {
+				localFns = map[*ast.Symbol][]*ast.Node{}
+			}
+			localFns[sym] = append(localFns[sym], fn)
+		}
+		var collectLocalBindings func(*ast.Node)
+		collectLocalBindings = func(node *ast.Node) {
+			if node == nil {
+				return
+			}
+			if node != body && testFramework.IsFunction(node) {
+				if node.Kind == ast.KindFunctionDeclaration && node.Name() != nil && node.Name().Kind == ast.KindIdentifier {
+					sym := node.Symbol()
+					if sym == nil {
+						sym = resolveRstestRootSymbol(analysis.ctx, node.Name())
+					}
+					addLocalFn(sym, node)
+				}
+				if node.Kind != ast.KindArrowFunction || !isImmediatelyInvokedFunction(node) {
+					return
+				}
 			}
 			switch node.Kind {
 			case ast.KindVariableDeclaration:
 				vd := node.AsVariableDeclaration()
 				if vd != nil && vd.Initializer != nil && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
-					if init := internalUtils.SkipAssertionsAndParens(vd.Initializer); init != nil && init.Kind == ast.KindThisKeyword {
-						sym := node.Symbol()
-						if sym == nil {
-							sym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
-						}
-						if sym != nil {
+					init := internalUtils.SkipAssertionsAndParens(vd.Initializer)
+					sym := node.Symbol()
+					if sym == nil {
+						sym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+					}
+					if sym != nil && init != nil {
+						if ownThis && init.Kind == ast.KindThisKeyword {
 							if thisAliases == nil {
 								thisAliases = map[*ast.Symbol]bool{}
 							}
 							thisAliases[sym] = true
+						} else if init.Kind == ast.KindArrowFunction || init.Kind == ast.KindFunctionExpression {
+							addLocalFn(sym, init)
 						}
 					}
 				}
@@ -6172,29 +6616,34 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 				bin := node.AsBinaryExpression()
 				if bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
 					if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
-						if rhs := internalUtils.SkipAssertionsAndParens(bin.Right); rhs != nil && rhs.Kind == ast.KindThisKeyword {
-							if sym := resolveRstestRootSymbol(analysis.ctx, lhs); sym != nil {
-								if thisAliases == nil {
-									thisAliases = map[*ast.Symbol]bool{}
+						if rhs := internalUtils.SkipAssertionsAndParens(bin.Right); rhs != nil {
+							sym := resolveRstestRootSymbol(analysis.ctx, lhs)
+							if sym != nil {
+								if ownThis && rhs.Kind == ast.KindThisKeyword {
+									if thisAliases == nil {
+										thisAliases = map[*ast.Symbol]bool{}
+									}
+									thisAliases[sym] = true
+								} else if rhs.Kind == ast.KindArrowFunction || rhs.Kind == ast.KindFunctionExpression {
+									addLocalFn(sym, rhs)
 								}
-								thisAliases[sym] = true
 							}
 						}
 					}
 				}
 			}
 			node.ForEachChild(func(child *ast.Node) bool {
-				collectAliases(child)
+				collectLocalBindings(child)
 				return false
 			})
 		}
-		collectAliases(body)
+		collectLocalBindings(body)
 		isThis := func(e *ast.Node) bool {
 			e = internalUtils.SkipAssertionsAndParens(e)
 			if e == nil {
 				return false
 			}
-			if e.Kind == ast.KindThisKeyword {
+			if ownThis && e.Kind == ast.KindThisKeyword {
 				return true
 			}
 			if e.Kind == ast.KindIdentifier && len(thisAliases) > 0 {
@@ -6204,76 +6653,259 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 			}
 			return false
 		}
+		isConsoleCallee := func(callee *ast.Node) bool {
+			if callee == nil || !ast.IsAccessExpression(callee) {
+				return false
+			}
+			recv := internalUtils.SkipAssertionsAndParens(callee.Expression())
+			return recv != nil && recv.Kind == ast.KindIdentifier && recv.AsIdentifier().Text == "console"
+		}
+		scanThisPropWrites(body, isThis)
+		recordDirectWriteExpr := func(rhs *ast.Node) {
+			exprs = append(exprs, rhs)
+			if !isSimplePrimitiveLiteralExpr(rhs) && exprReferencesParams(rhs, paramSymbols) {
+				unresolved = true
+			}
+		}
+		visitLocalFn := func(fn *ast.Node) {
+			if fn == nil || fn.Body() == nil {
+				return
+			}
+			fnOwnThis := ownThis && fn.Kind == ast.KindArrowFunction
+			visitBody(fn.Body(), fnOwnThis, thisAliases, collectFnParamSymbols(fn, paramSymbols))
+		}
 		var visit func(*ast.Node)
 		visit = func(node *ast.Node) {
 			if node == nil {
 				return
 			}
-			if node != body && testFramework.IsFunction(node) && node.Kind != ast.KindArrowFunction {
+			if node != body && testFramework.IsFunction(node) {
+				if isImmediatelyInvokedFunction(node) {
+					visitLocalFn(node)
+				}
 				return
 			}
 			switch node.Kind {
 			case ast.KindBinaryExpression:
 				bin := node.AsBinaryExpression()
-				if bin != nil && bin.OperatorToken != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
+				if bin != nil && bin.OperatorToken != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) &&
+					!internalUtils.IsDefaultValueInDestructuringAssignment(node) {
 					lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
-					if lhs != nil && ast.IsAccessExpression(lhs) && isThis(lhs.Expression()) {
-						pName, pKnown := analysis.evalExpectConfigAccessName(lhs)
+					if rootAccess, isDirect, ok := thisAccessRootProp(lhs, isThis); ok {
+						pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess)
 						if matchesTarget(pName, pKnown) {
-							exprs = append(exprs, bin.Right)
+							if isDirect {
+								recordDirectWriteExpr(bin.Right)
+							} else if !isSimplePrimitiveLiteralExpr(bin.Right) {
+								unresolved = true
+							}
+						}
+					}
+				}
+			case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+				if internalUtils.IsWriteReference(node) {
+					outer := outermostExpressionWrapper(node)
+					isDirectBinLHS := outer != nil && outer.Parent != nil &&
+						outer.Parent.Kind == ast.KindBinaryExpression &&
+						outer.Parent.AsBinaryExpression().Left == outer &&
+						!internalUtils.IsDefaultValueInDestructuringAssignment(outer.Parent)
+					if !isDirectBinLHS {
+						if rootAccess, _, ok := thisAccessRootProp(node, isThis); ok {
+							pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess)
+							if matchesTarget(pName, pKnown) {
+								unresolved = true
+							}
+						}
+					}
+				}
+			case ast.KindDeleteExpression:
+				if target := internalUtils.SkipAssertionsAndParens(node.AsDeleteExpression().Expression); target != nil {
+					if rootAccess, isDirect, ok := thisAccessRootProp(target, isThis); ok {
+						pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess)
+						if isDirect {
+							if !pKnown {
+								unresolved = true
+							} else if allGetters || hasDynamicPrecedingKey || precedingKeySet[pName] {
+								for _, sg := range gs.shadowedProtoGetters[pName] {
+									visitBody(sg.Body(), true, nil, nil)
+								}
+								if gs.hasProtoDynamic {
+									for _, dg := range gs.protoDynamicGetters {
+										visitBody(dg.Body(), true, nil, nil)
+									}
+									if gs.hasOpaqueProto {
+										unresolved = true
+									}
+								}
+							}
+						} else if matchesTarget(pName, pKnown) {
+							unresolved = true
 						}
 					}
 				}
 			case ast.KindCallExpression:
 				args := node.Arguments()
 				callee := internalUtils.SkipAssertionsAndParens(node.Expression())
-				if callee != nil && ast.IsAccessExpression(callee) && isThis(callee.Expression()) {
-					if mName, ok := analysis.evalExpectConfigAccessName(callee); ok && mName == "__defineGetter__" && len(args) >= 2 {
-						kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[0]))
-						if matchesTarget(kName, kOK) {
-							exprs = append(exprs, collectGetterReturnExprs(internalUtils.SkipAssertionsAndParens(args[1]))...)
+				handledBuiltin := false
+				if len(localFns) > 0 && callee != nil {
+					if callee.Kind == ast.KindIdentifier {
+						if sym := resolveRstestRootSymbol(analysis.ctx, callee); sym != nil {
+							for _, fn := range localFns[sym] {
+								visitLocalFn(fn)
+							}
+						}
+					} else if ast.IsAccessExpression(callee) {
+						if mName, ok := internalUtils.AccessExpressionStaticName(callee); ok && (mName == "call" || mName == "apply") {
+							if recv := internalUtils.SkipAssertionsAndParens(callee.Expression()); recv != nil && recv.Kind == ast.KindIdentifier {
+								if sym := resolveRstestRootSymbol(analysis.ctx, recv); sym != nil {
+									for _, fn := range localFns[sym] {
+										visitLocalFn(fn)
+									}
+								}
+							}
+						}
+					}
+				}
+				if rootAccess, isDirect, ok := thisAccessRootProp(callee, isThis); ok {
+					if isDirect {
+						mName, mOK := analysis.evalExpectConfigAccessName(callee)
+						if mOK && mName == "__defineGetter__" && len(args) >= 2 && !hasSpreadBeforeIndex(args, 2) {
+							kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[0]))
+							if matchesTarget(kName, kOK) {
+								fnArg := internalUtils.SkipAssertionsAndParens(args[1])
+								if fnArg != nil && (fnArg.Kind == ast.KindArrowFunction || fnArg.Kind == ast.KindFunctionExpression) {
+									for _, rExpr := range collectGetterReturnExprs(fnArg) {
+										recordDirectWriteExpr(rExpr)
+									}
+								} else {
+									unresolved = true
+								}
+							}
+						} else if mOK && len(args) == 0 && !allGetters && !mutableObj && !gettersWriteDynamicThisProp && !thisPropWrittenInGetters[mName] {
+							if methodFn := analysis.lookupOwnLiteralInlineMethod(objExpr, mName); methodFn != nil && methodFn.Body() != nil {
+								visitBody(methodFn.Body(), true, nil, nil)
+							} else {
+								unresolved = true
+							}
+						} else {
+							unresolved = true
+						}
+					} else {
+						pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess)
+						if matchesTarget(pName, pKnown) {
+							unresolved = true
 						}
 					}
 				}
 				if len(args) >= 2 && isThis(args[0]) {
 					if analysis.isGlobalBuiltinMemberCall(callee, "Object", "assign") {
+						handledBuiltin = true
 						for _, src := range args[1:] {
-							if srcObj, _ := analysis.resolveObjectLiteralForBoundLookup(src); srcObj != nil {
+							if src == nil || src.Kind == ast.KindSpreadElement {
+								unresolved = true
+								continue
+							}
+							if srcObj, mutableSrc := analysis.resolveObjectLiteralForBoundLookup(src); srcObj != nil {
+								var propExprs []*ast.Node
 								if targetProp == "" {
-									exprs = append(exprs, analysis.allObjectLiteralPropertyExprs(srcObj)...)
+									propExprs = analysis.allObjectLiteralPropertyExprs(srcObj)
 								} else {
-									exprs = append(exprs, analysis.lookupObjectLiteralProperty(srcObj, targetProp, 1).possibleExprs...)
+									propExprs = analysis.lookupObjectLiteralProperty(srcObj, targetProp, 1).possibleExprs
+								}
+								for _, pe := range propExprs {
+									recordDirectWriteExpr(pe)
+								}
+								if mutableSrc {
+									containers = append(containers, src)
 								}
 							} else {
 								containers = append(containers, src)
+								if exprReferencesParams(src, paramSymbols) {
+									unresolved = true
+								}
 							}
 						}
-					} else if analysis.isGlobalBuiltinMemberCall(callee, "Reflect", "set") && len(args) >= 3 {
-						kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[1]))
-						if matchesTarget(kName, kOK) {
-							exprs = append(exprs, args[2])
+					} else if analysis.isGlobalBuiltinMemberCall(callee, "Reflect", "set") {
+						handledBuiltin = true
+						if hasSpreadBeforeIndex(args, 3) || len(args) < 3 {
+							unresolved = true
+						} else {
+							kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[1]))
+							if matchesTarget(kName, kOK) {
+								recordDirectWriteExpr(args[2])
+							}
 						}
-					} else if (analysis.isGlobalBuiltinMemberCall(callee, "Object", "defineProperty") ||
-						analysis.isGlobalBuiltinMemberCall(callee, "Reflect", "defineProperty")) && len(args) >= 3 {
-						kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[1]))
-						if matchesTarget(kName, kOK) {
-							if descObj, _ := analysis.resolveObjectLiteralForBoundLookup(args[2]); descObj != nil {
-								exprs = append(exprs, analysis.collectDescriptorValueAndGetExprs(descObj)...)
+					} else if analysis.isGlobalBuiltinMemberCall(callee, "Object", "defineProperty") ||
+						analysis.isGlobalBuiltinMemberCall(callee, "Reflect", "defineProperty") {
+						handledBuiltin = true
+						if hasSpreadBeforeIndex(args, 3) || len(args) < 3 {
+							unresolved = true
+						} else {
+							kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[1]))
+							if matchesTarget(kName, kOK) {
+								descObj, mutableDesc := analysis.resolveObjectLiteralForBoundLookup(args[2])
+								dExprs, complete := analysis.collectDescriptorValueAndGetExprs(descObj)
+								for _, de := range dExprs {
+									recordDirectWriteExpr(de)
+								}
+								if !complete || mutableDesc {
+									unresolved = true
+								}
 							}
 						}
 					} else if analysis.isGlobalBuiltinMemberCall(callee, "Object", "defineProperties") {
-						if propsObj, _ := analysis.resolveObjectLiteralForBoundLookup(args[1]); propsObj != nil &&
-							propsObj.AsObjectLiteralExpression().Properties != nil {
-							for _, p := range propsObj.AsObjectLiteralExpression().Properties.Nodes {
-								if p == nil || p.Kind != ast.KindPropertyAssignment || p.Name() == nil {
-									continue
-								}
-								kName, kOK, _ := analysis.evalPropertyNameKey(p.Name())
-								if matchesTarget(kName, kOK) {
-									if descObj, _ := analysis.resolveObjectLiteralForBoundLookup(p.AsPropertyAssignment().Initializer); descObj != nil {
-										exprs = append(exprs, analysis.collectDescriptorValueAndGetExprs(descObj)...)
+						handledBuiltin = true
+						if hasSpreadBeforeIndex(args, 2) {
+							unresolved = true
+						} else {
+							propsObj, mutableProps := analysis.resolveObjectLiteralForBoundLookup(args[1])
+							if propsObj == nil || mutableProps || propsObj.AsObjectLiteralExpression().Properties == nil {
+								unresolved = true
+							} else {
+								for _, p := range propsObj.AsObjectLiteralExpression().Properties.Nodes {
+									if p == nil {
+										continue
+									}
+									if p.Kind != ast.KindPropertyAssignment || p.Name() == nil {
+										unresolved = true
+										continue
+									}
+									kName, kOK, _ := analysis.evalPropertyNameKey(p.Name())
+									if matchesTarget(kName, kOK) {
+										descObj, mutableDesc := analysis.resolveObjectLiteralForBoundLookup(p.AsPropertyAssignment().Initializer)
+										dExprs, complete := analysis.collectDescriptorValueAndGetExprs(descObj)
+										for _, de := range dExprs {
+											recordDirectWriteExpr(de)
+										}
+										if !complete || mutableDesc {
+											unresolved = true
+										}
 									}
 								}
+							}
+						}
+					}
+				}
+				if !handledBuiltin && !isConsoleCallee(callee) {
+					for _, arg := range args {
+						if len(localFns) > 0 {
+							if uArg := internalUtils.SkipAssertionsAndParens(arg); uArg != nil && uArg.Kind == ast.KindIdentifier {
+								if sym := resolveRstestRootSymbol(analysis.ctx, uArg); sym != nil {
+									for _, fn := range localFns[sym] {
+										visitLocalFn(fn)
+									}
+								}
+							}
+						}
+						if isThis(arg) {
+							unresolved = true
+							break
+						}
+						if rootAccess, _, ok := thisAccessRootProp(arg, isThis); ok {
+							pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess)
+							if matchesTarget(pName, pKnown) {
+								unresolved = true
+								break
 							}
 						}
 					}
@@ -6286,7 +6918,10 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 		}
 		visit(body)
 	}
-	return exprs, containers
+	for _, g := range getters {
+		visitBody(g.Body(), true, nil, nil)
+	}
+	return exprs, containers, unresolved
 }
 
 // lookupObjectLiteralProperty inspects `sourceExpr` when it is an object literal
@@ -6569,18 +7204,21 @@ func (analysis *RstestCallAnalysis) assignmentDestructuredExpectConfigMember(pro
 	var out expectConfigKind
 	member, known, staticKey := analysis.evalPropertyNameKey(propName)
 	defaultSkipped := false
-	sources, definiteSrc, sourcesMayBeMutable := analysis.assignmentObjectSourceExprs(obj)
+	sources, definiteSrc, sourcesMayBeMutable, sourcesUnresolvedGetter := analysis.assignmentObjectSourceExprs(obj)
+	if sourcesUnresolvedGetter {
+		out |= expectConfigDynamicMember
+	}
 	if known {
 		if definiteSrc != nil {
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(definiteSrc); objExpr != nil && !mutableObj {
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr, false)
 				defLookup := analysis.lookupObjectLiteralPropertyWithGetterRisk(objExpr, member, priorGetter, 0)
 				defaultSkipped = defLookup.definitelyDefined
 			}
 		}
 		for _, srcExpr := range sources {
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr); objExpr != nil {
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr, mutableObj)
 				if mutableObj && !sourcesMayBeMutable && !priorGetter && len(sources) == 1 {
 					if unwrapped := internalUtils.SkipAssertionsAndParens(srcExpr); unwrapped != nil && unwrapped.Kind == ast.KindIdentifier {
 						if sym := resolveRstestRootSymbol(analysis.ctx, unwrapped); sym != nil {
@@ -6597,13 +7235,16 @@ func (analysis *RstestCallAnalysis) assignmentDestructuredExpectConfigMember(pro
 					out |= analysis.expectConfigMember(expr)
 				}
 				useAllGetters := sourcesMayBeMutable || (mutableObj && analysis.srcExprObjEscaped(srcExpr, objExpr))
-				if priorGetter || useAllGetters {
-					gExprs, gContainers := analysis.collectPrecedingGetterPropWriteExprs(obj, prop, objExpr, member, useAllGetters)
+				if priorGetter || useAllGetters || mutableObj {
+					gExprs, gContainers, gUnresolved := analysis.collectPrecedingGetterPropWriteExprs(obj, prop, objExpr, member, useAllGetters, mutableObj)
 					for _, expr := range gExprs {
 						out |= analysis.expectConfigMember(expr)
 					}
 					for _, cExpr := range gContainers {
 						out |= classifyDestructuredExpectConfigProperty(analysis.expectConfigMember(cExpr), member, true, true)
+					}
+					if gUnresolved {
+						out |= expectConfigDynamicMember
 					}
 				}
 				for _, pExpr := range lookup.exposedProtoExprs {
@@ -6617,15 +7258,18 @@ func (analysis *RstestCallAnalysis) assignmentDestructuredExpectConfigMember(pro
 				out |= analysis.expectConfigMember(expr)
 			}
 			if objExpr, mutableObj := analysis.resolveObjectLiteralForBoundLookup(srcExpr); objExpr != nil {
-				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr)
+				priorGetter := analysis.precedingDestructuringMayInvokeGetter(obj, prop, objExpr, mutableObj)
 				useAllGetters := sourcesMayBeMutable || (mutableObj && analysis.srcExprObjEscaped(srcExpr, objExpr))
-				if priorGetter || useAllGetters {
-					gExprs, gContainers := analysis.collectPrecedingGetterPropWriteExprs(obj, prop, objExpr, "", useAllGetters)
+				if priorGetter || useAllGetters || mutableObj {
+					gExprs, gContainers, gUnresolved := analysis.collectPrecedingGetterPropWriteExprs(obj, prop, objExpr, "", useAllGetters, mutableObj)
 					for _, expr := range gExprs {
 						out |= analysis.expectConfigMember(expr)
 					}
 					for _, cExpr := range gContainers {
 						out |= classifyDestructuredExpectConfigProperty(analysis.expectConfigMember(cExpr), "", false, false)
+					}
+					if gUnresolved {
+						out |= expectConfigDynamicMember
 					}
 				}
 			}

@@ -438,6 +438,7 @@ var ValidExpectRule = rule.Rule{
 		opts := parseOptions(options)
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		asyncResolver := sharedValidExpect.NewAsyncAssertionResolver(ctx)
+		asyncResolver.DisableBuiltinToResolveReject()
 		arrayExceptions := map[string]bool{}
 		tracker := &asyncFixTracker{
 			resolver:      asyncResolver,
