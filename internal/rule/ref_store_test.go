@@ -1546,3 +1546,68 @@ func TestRefStoreMergedGlobalSymbolIdentity(t *testing.T) {
 		}
 	}
 }
+
+func TestRefStoreDottedNamespaceMergedMeaning(t *testing.T) {
+	// The instantiated segment gives the merged binder symbol a value meaning
+	// the type alias lacks. scope-manager defines nothing for the segment, so a
+	// value reference skips the binding while type references still find it.
+	const source = "export {}; const N = 1;\n" +
+		"namespace Outer {\n" +
+		"  type N = string;\n" +
+		"  namespace N.Inner { export const x = 1; }\n" +
+		"  export const value = N;\n" +
+		"  export type Root = N.Inner.Missing;\n" +
+		"  export type Alias = N;\n" +
+		"}"
+	check := func(t *testing.T, sourceFile *ast.SourceFile, refs *RefStore) {
+		t.Helper()
+		occurrences := identifiers(sourceFile.AsNode(), "N")
+		if len(occurrences) != 6 {
+			t.Fatalf("expected 6 occurrences of N, got %d", len(occurrences))
+		}
+		outer := occurrences[0].Parent.Symbol()
+		alias := occurrences[1].Parent.Symbol()
+		if outer == nil || alias == nil || outer == alias {
+			t.Fatalf("unexpected declaration symbols %v and %v", outer, alias)
+		}
+		valueRead, qualifiedRoot, typeRead := occurrences[3], occurrences[4], occurrences[5]
+		if got := refs.Resolve(valueRead); got != outer {
+			t.Fatalf("Resolve(value N) = %v, want the outer const %v", got, outer)
+		}
+		if got := refs.Resolve(qualifiedRoot); got != alias {
+			t.Fatalf("Resolve(N.Inner.Missing root) = %v, want the alias %v", got, alias)
+		}
+		if got := refs.Resolve(typeRead); got != alias {
+			t.Fatalf("Resolve(type N) = %v, want the alias %v", got, alias)
+		}
+		if got := refs.References(outer); len(got) != 1 || got[0] != valueRead {
+			t.Fatalf("References(outer const) = %v, want [%v]", got, valueRead)
+		}
+		if got := refs.References(alias); len(got) != 2 || got[0] != qualifiedRoot || got[1] != typeRead {
+			t.Fatalf("References(alias) = %v, want [%v %v]", got, qualifiedRoot, typeRead)
+		}
+	}
+
+	t.Run("binder", func(t *testing.T) {
+		sourceFile, refs := newBoundRefStore(t, "/dotted.ts", core.ScriptKindTS, source)
+		check(t, sourceFile, refs)
+	})
+	t.Run("checker", func(t *testing.T) {
+		sourceFile, refs, done := newCheckedRefStore(t, source)
+		defer done()
+		check(t, sourceFile, refs)
+	})
+	t.Run("checker fallback does not restore the merged binding", func(t *testing.T) {
+		sourceFile, refs, done := newCheckedRefStore(t,
+			"export {}; type N = string; namespace N.Inner { export const x = 1; } N;")
+		defer done()
+		occurrences := identifiers(sourceFile.AsNode(), "N")
+		alias := occurrences[0].Parent.Symbol()
+		if got := refs.Resolve(occurrences[len(occurrences)-1]); got != nil {
+			t.Fatalf("Resolve(value N) = %v, want nil", got)
+		}
+		if got := refs.References(alias); len(got) != 0 {
+			t.Fatalf("References(alias) = %v, want none", got)
+		}
+	})
+}
