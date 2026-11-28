@@ -30,13 +30,34 @@ fn layout_validation_rejects_bad_configs() {
     let valid = test_config();
     assert!(Layout::new(valid).is_ok());
     for bad in [
-        RpcConfiguration { version: 2, ..valid },
-        RpcConfiguration { slot_count: 0, ..valid },
-        RpcConfiguration { slot_count: 65, ..valid },
-        RpcConfiguration { slot_size: 1024, ..valid },
-        RpcConfiguration { slot_header_stride: 32, ..valid },
-        RpcConfiguration { slot_header_stride: 66, ..valid },
-        RpcConfiguration { header_size: 256, ..valid },
+        RpcConfiguration {
+            version: 2,
+            ..valid
+        },
+        RpcConfiguration {
+            slot_count: 0,
+            ..valid
+        },
+        RpcConfiguration {
+            slot_count: 65,
+            ..valid
+        },
+        RpcConfiguration {
+            slot_size: 1024,
+            ..valid
+        },
+        RpcConfiguration {
+            slot_header_stride: 32,
+            ..valid
+        },
+        RpcConfiguration {
+            slot_header_stride: 66,
+            ..valid
+        },
+        RpcConfiguration {
+            header_size: 256,
+            ..valid
+        },
     ] {
         assert!(Layout::new(bad).is_err());
     }
@@ -54,7 +75,9 @@ fn roundtrip_single_and_chunked_and_abandon_and_eof() {
 
     // Verify magic stamped before peer maps.
     assert_eq!(
-        inner.global_word(GLOBAL_MAGIC_OFFSET).load(Ordering::Acquire),
+        inner
+            .global_word(GLOBAL_MAGIC_OFFSET)
+            .load(Ordering::Acquire),
         RPC_MAGIC
     );
 
@@ -98,13 +121,19 @@ fn roundtrip_single_and_chunked_and_abandon_and_eof() {
                     unsafe {
                         ptr::copy_nonoverlapping(req.as_ptr(), srv.slot_payload_ptr(0), len);
                     }
-                    srv.slot_word(0, SLOT_RESP_SEQ_OFF).store(seq, Ordering::Relaxed);
-                    srv.slot_word(0, SLOT_RESP_LEN_OFF).store(len as u32, Ordering::Relaxed);
+                    srv.slot_word(0, SLOT_RESP_SEQ_OFF)
+                        .store(seq, Ordering::Relaxed);
+                    srv.slot_word(0, SLOT_RESP_LEN_OFF)
+                        .store(len as u32, Ordering::Relaxed);
                     srv.slot_word(0, SLOT_RESP_STATUS_OFF)
                         .store(WIRE_STATUS_OK, Ordering::Relaxed);
                     srv.slot_word(0, SLOT_STATE_OFF)
                         .store(STATE_RESP_READY, Ordering::SeqCst);
-                    if srv.slot_word(0, SLOT_CLIENT_SLEEPING_OFF).load(Ordering::SeqCst) != 0 {
+                    if srv
+                        .slot_word(0, SLOT_CLIENT_SLEEPING_OFF)
+                        .load(Ordering::SeqCst)
+                        != 0
+                    {
                         let b: u8 = 1;
                         unsafe {
                             libc::send(child_fd, (&raw const b).cast(), 1, libc::MSG_DONTWAIT);
@@ -124,8 +153,10 @@ fn roundtrip_single_and_chunked_and_abandon_and_eof() {
                             );
                         }
                         off += n;
-                        srv.slot_word(0, SLOT_RESP_SEQ_OFF).store(seq, Ordering::Relaxed);
-                        srv.slot_word(0, SLOT_RESP_LEN_OFF).store(n as u32, Ordering::Relaxed);
+                        srv.slot_word(0, SLOT_RESP_SEQ_OFF)
+                            .store(seq, Ordering::Relaxed);
+                        srv.slot_word(0, SLOT_RESP_LEN_OFF)
+                            .store(n as u32, Ordering::Relaxed);
                         srv.slot_word(0, SLOT_TOTAL_RESP_LEN_OFF)
                             .store(big.len() as u32, Ordering::Relaxed);
                         srv.slot_word(0, SLOT_RESP_STATUS_OFF)
@@ -137,7 +168,11 @@ fn roundtrip_single_and_chunked_and_abandon_and_eof() {
                         };
                         srv.slot_word(0, SLOT_STATE_OFF)
                             .store(next_state, Ordering::SeqCst);
-                        if srv.slot_word(0, SLOT_CLIENT_SLEEPING_OFF).load(Ordering::SeqCst) != 0 {
+                        if srv
+                            .slot_word(0, SLOT_CLIENT_SLEEPING_OFF)
+                            .load(Ordering::SeqCst)
+                            != 0
+                        {
                             let b: u8 = 1;
                             unsafe {
                                 libc::send(child_fd, (&raw const b).cast(), 1, libc::MSG_DONTWAIT);
@@ -153,8 +188,7 @@ fn roundtrip_single_and_chunked_and_abandon_and_eof() {
                     }
                 } else if served == 3 {
                     // Case 3: Wait for client to cancel via abort_slot ALONE (without is_cancelled).
-                    while srv.slot_word(0, SLOT_STATE_OFF).load(Ordering::SeqCst)
-                        == STATE_IN_FLIGHT
+                    while srv.slot_word(0, SLOT_STATE_OFF).load(Ordering::SeqCst) == STATE_IN_FLIGHT
                     {
                         thread::sleep(Duration::from_millis(1));
                     }
@@ -167,19 +201,26 @@ fn roundtrip_single_and_chunked_and_abandon_and_eof() {
                 } else {
                     // Case 4: Verify SLOT_CANCEL_SEQ was cleared on subsequent request and echo.
                     assert_eq!(
-                        srv.slot_word(0, SLOT_CANCEL_SEQ_OFF).load(Ordering::Acquire),
+                        srv.slot_word(0, SLOT_CANCEL_SEQ_OFF)
+                            .load(Ordering::Acquire),
                         0
                     );
                     unsafe {
                         ptr::copy_nonoverlapping(req.as_ptr(), srv.slot_payload_ptr(0), len);
                     }
-                    srv.slot_word(0, SLOT_RESP_SEQ_OFF).store(seq, Ordering::Relaxed);
-                    srv.slot_word(0, SLOT_RESP_LEN_OFF).store(len as u32, Ordering::Relaxed);
+                    srv.slot_word(0, SLOT_RESP_SEQ_OFF)
+                        .store(seq, Ordering::Relaxed);
+                    srv.slot_word(0, SLOT_RESP_LEN_OFF)
+                        .store(len as u32, Ordering::Relaxed);
                     srv.slot_word(0, SLOT_RESP_STATUS_OFF)
                         .store(WIRE_STATUS_OK, Ordering::Relaxed);
                     srv.slot_word(0, SLOT_STATE_OFF)
                         .store(STATE_RESP_READY, Ordering::SeqCst);
-                    if srv.slot_word(0, SLOT_CLIENT_SLEEPING_OFF).load(Ordering::SeqCst) != 0 {
+                    if srv
+                        .slot_word(0, SLOT_CLIENT_SLEEPING_OFF)
+                        .load(Ordering::SeqCst)
+                        != 0
+                    {
                         let b: u8 = 1;
                         unsafe {
                             libc::send(child_fd, (&raw const b).cast(), 1, libc::MSG_DONTWAIT);
@@ -283,11 +324,16 @@ fn release_invalidates_epoch_and_rejects_truncated_or_empty_chunks() {
             thread::yield_now();
         }
         let seq = srv.slot_word(0, SLOT_REQ_SEQ_OFF).load(Ordering::Acquire);
-        srv.slot_word(0, SLOT_RESP_SEQ_OFF).store(seq, Ordering::Relaxed);
-        srv.slot_word(0, SLOT_RESP_LEN_OFF).store(0, Ordering::Relaxed);
-        srv.slot_word(0, SLOT_TOTAL_RESP_LEN_OFF).store(100, Ordering::Relaxed);
-        srv.slot_word(0, SLOT_RESP_STATUS_OFF).store(WIRE_STATUS_OK, Ordering::Relaxed);
-        srv.slot_word(0, SLOT_STATE_OFF).store(STATE_RESP_CHUNK, Ordering::SeqCst);
+        srv.slot_word(0, SLOT_RESP_SEQ_OFF)
+            .store(seq, Ordering::Relaxed);
+        srv.slot_word(0, SLOT_RESP_LEN_OFF)
+            .store(0, Ordering::Relaxed);
+        srv.slot_word(0, SLOT_TOTAL_RESP_LEN_OFF)
+            .store(100, Ordering::Relaxed);
+        srv.slot_word(0, SLOT_RESP_STATUS_OFF)
+            .store(WIRE_STATUS_OK, Ordering::Relaxed);
+        srv.slot_word(0, SLOT_STATE_OFF)
+            .store(STATE_RESP_CHUNK, Ordering::SeqCst);
     });
     let (st, reply) = inner.call_sync_raw(0, lease2.epoch, msg.as_ptr(), msg.len(), || false);
     server_thread.join().unwrap();

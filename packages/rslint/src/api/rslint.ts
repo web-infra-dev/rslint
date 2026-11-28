@@ -385,7 +385,7 @@ export class Rslint {
             },
             () => this.#closeRequested,
             this.#pluginHosts,
-            () => openServiceRpc(this.#nodeService),
+            async () => openServiceRpc(this.#nodeService),
           );
           if (pluginHost) {
             if (this.#closeRequested) {

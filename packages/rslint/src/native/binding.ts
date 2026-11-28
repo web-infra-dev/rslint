@@ -47,10 +47,14 @@ export interface NativeBinding {
   MemoryArena: new () => MemoryArena;
   readBytes(bytes: SharedBytes): Buffer;
   RpcChannel?: new () => RpcChannel;
-  rpcAcquireSlot?(channelId: number): RpcSlotLease | null | undefined;
-  rpcReleaseSlot?(channelId: number, slot: number): void;
-  rpcAbortSlot?(channelId: number, slot: number): void;
+  rpcAcquireSlot?(
+    this: void,
+    channelId: number,
+  ): RpcSlotLease | null | undefined;
+  rpcReleaseSlot?(this: void, channelId: number, slot: number): void;
+  rpcAbortSlot?(this: void, channelId: number, slot: number): void;
   rpcCallSync?(
+    this: void,
     channelId: number,
     slot: number,
     workerEpoch: number,

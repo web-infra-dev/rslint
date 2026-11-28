@@ -100,41 +100,41 @@ impl RpcChannelInner {
         if self.reader_started.load(Ordering::Acquire) {
             return;
         }
-        let _guard = self.reader_start_mu.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = self
+            .reader_start_mu
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if self.reader_started.load(Ordering::Relaxed) || self.closed.load(Ordering::SeqCst) {
             return;
         }
         let cloned = Arc::clone(self);
         let spawn = thread::Builder::new()
             .name("rslint-rpc-wake".into())
-            .spawn(move || {
-                loop {
-                    if cloned.closed.load(Ordering::SeqCst) {
-                        break;
-                    }
-                    match cloned.mapping.wait_go_to_node() {
-                        DoorbellEvent::Wake => {
-                            for (idx, slot) in cloned.slots.iter().enumerate() {
-                                if slot.waiting.load(Ordering::SeqCst) {
-                                    let st = cloned
-                                        .slot_word(idx, SLOT_STATE_OFF)
-                                        .load(Ordering::SeqCst);
-                                    if st == STATE_RESP_READY
-                                        || st == STATE_RESP_CHUNK
-                                        || st == STATE_IDLE
-                                        || st == STATE_ABANDONED
-                                        || cloned.is_unavailable()
-                                    {
-                                        slot.wake();
-                                    }
+            .spawn(move || loop {
+                if cloned.closed.load(Ordering::SeqCst) {
+                    break;
+                }
+                match cloned.mapping.wait_go_to_node() {
+                    DoorbellEvent::Wake => {
+                        for (idx, slot) in cloned.slots.iter().enumerate() {
+                            if slot.waiting.load(Ordering::SeqCst) {
+                                let st =
+                                    cloned.slot_word(idx, SLOT_STATE_OFF).load(Ordering::SeqCst);
+                                if st == STATE_RESP_READY
+                                    || st == STATE_RESP_CHUNK
+                                    || st == STATE_IDLE
+                                    || st == STATE_ABANDONED
+                                    || cloned.is_unavailable()
+                                {
+                                    slot.wake();
                                 }
                             }
                         }
-                        DoorbellEvent::Closed => {
-                            cloned.peer_closed.store(true, Ordering::SeqCst);
-                            cloned.wake_all_slots();
-                            break;
-                        }
+                    }
+                    DoorbellEvent::Closed => {
+                        cloned.peer_closed.store(true, Ordering::SeqCst);
+                        cloned.wake_all_slots();
+                        break;
                     }
                 }
             });
@@ -249,12 +249,7 @@ impl RpcChannelInner {
                 }
                 STATE_RESP_CHUNK | STATE_CHUNK_ACK => {
                     if state_word
-                        .compare_exchange(
-                            cur,
-                            STATE_ABANDONED,
-                            Ordering::SeqCst,
-                            Ordering::Acquire,
-                        )
+                        .compare_exchange(cur, STATE_ABANDONED, Ordering::SeqCst, Ordering::Acquire)
                         .is_ok()
                     {
                         // Wake Go's chunk writer so it observes ABANDONED and resets to IDLE.
@@ -500,11 +495,8 @@ impl RpcChannelInner {
                         }
                     }
 
-                    let emitted = emit_payload(
-                        chunks.as_deref(),
-                        self.slot_payload_ptr(slot_idx),
-                        resp_len,
-                    );
+                    let emitted =
+                        emit_payload(chunks.as_deref(), self.slot_payload_ptr(slot_idx), resp_len);
                     state_word.store(STATE_IDLE, Ordering::Release);
                     return Ok((js_status, Some(emitted?)));
                 }

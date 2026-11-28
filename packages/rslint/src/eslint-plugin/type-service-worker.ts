@@ -65,6 +65,17 @@ interface ActiveFile {
   cancelFlag?: Int32Array;
 }
 
+function isBridgeReplyEnvelope(
+  value: unknown,
+): value is TypeServiceBridgeReplyEnvelope {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'reqId' in value &&
+    typeof value.reqId === 'number'
+  );
+}
+
 /** Program identities last across files. One persistent synchronous channel is
  * opened lazily per worker on first type-service use and reused across files. */
 export class WorkerTypeServices {
@@ -159,21 +170,19 @@ export class WorkerTypeServices {
       this.checkBridgeCancel(active, control);
       let raw = receiveMessageOnPort(port);
       while (raw !== undefined) {
-        const received = raw.message as
-          TypeServiceBridgeReplyEnvelope | undefined;
-        if (received && received.reqId === reqId) {
+        const message: unknown = raw.message;
+        if (isBridgeReplyEnvelope(message) && message.reqId === reqId) {
           this.checkBridgeCancel(active, control);
-          if (received.error) {
-            if (received.error.name === 'AbortError')
-              throw new FrameCancelled();
-            if (received.error.name === 'TypeServiceClosedError')
+          if (message.error) {
+            if (message.error.name === 'AbortError') throw new FrameCancelled();
+            if (message.error.name === 'TypeServiceClosedError')
               this.retire([request.session]);
-            const error = new Error(received.error.message);
-            error.name = received.error.name;
+            const error = new Error(message.error.message);
+            error.name = message.error.name;
             throw error;
           }
-          if (!received.result) throw new Error('invalid type service reply');
-          return received.result;
+          if (!message.result) throw new Error('invalid type service reply');
+          return message.result;
         }
         raw = receiveMessageOnPort(port);
       }

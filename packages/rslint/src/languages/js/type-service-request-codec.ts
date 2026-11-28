@@ -272,43 +272,99 @@ export function encodeBinaryTypeQuery(
   if (!w.u32(query.generation)) return 0;
   if (!w.u8(query.skipRecords ? FLAG_SKIP_RECORDS : 0)) return 0;
 
-  const op = query.op;
-
-  const checkerCode = CHECKER_OP_CODES[op];
+  const checkerCode = CHECKER_OP_CODES[query.op];
   if (checkerCode !== undefined) {
     return w.u8(checkerCode) ? w.pos : 0;
   }
 
-  const nodeCode = NODE_OP_CODES[op];
-  if (nodeCode !== undefined) {
-    const node = (query.args as { readonly node: NodeRef }).node;
-    return w.u8(nodeCode) && w.nodeRef(node, fileIndex) ? w.pos : 0;
-  }
-
-  const idCode = SINGLE_ID_OP_CODES[op];
-  if (idCode !== undefined) {
-    const id = (query.args as { readonly id: number }).id;
-    return w.u8(idCode) && w.u32(id) ? w.pos : 0;
-  }
-
-  const printCode = PRINT_OP_CODES[op];
-  if (printCode !== undefined) {
-    const args = query.args as {
-      readonly id: number;
-      readonly node: NodeRef | undefined;
-      readonly flags: number | undefined;
-      readonly kind?: number;
-    };
-    const presence =
-      (args.node !== undefined ? 1 : 0) | (args.flags !== undefined ? 2 : 0);
-    if (!w.u8(printCode) || !w.u32(args.id) || !w.u8(presence)) return 0;
-    if (!w.u32(args.kind ?? 0)) return 0;
-    if (args.flags !== undefined && !w.u32(args.flags)) return 0;
-    if (args.node !== undefined && !w.nodeRef(args.node, fileIndex)) return 0;
-    return w.pos;
-  }
-
   switch (query.op) {
+    case 'type':
+    case 'fromTypeNode':
+    case 'context':
+    case 'symbol':
+    case 'declarationSymbol':
+    case 'signature':
+    case 'nodeRecord':
+    case 'shorthandValueSymbol':
+    case 'exportSpecifierLocalTargetSymbol':
+    case 'propertySymbolOfDestructuringAssignment':
+    case 'jsxIntrinsicTagNamesAt':
+    case 'constantValue':
+    case 'isOptionalParameter':
+    case 'isImplementationOfOverload': {
+      const code = NODE_OP_CODES[query.op];
+      return code !== undefined &&
+        w.u8(code) &&
+        w.nodeRef(query.args.node, fileIndex)
+        ? w.pos
+        : 0;
+    }
+    case 'constraint':
+    case 'apparent':
+    case 'baseLiteral':
+    case 'nonNullable':
+    case 'properties':
+    case 'augmentedPropertiesOfType':
+    case 'typeArguments':
+    case 'isArray':
+    case 'isArrayLike':
+    case 'isTuple':
+    case 'numberIndexType':
+    case 'stringIndexType':
+    case 'typeRecord':
+    case 'typeDetails':
+    case 'declaredIndexInfos':
+    case 'awaited':
+    case 'widened':
+    case 'baseTypes':
+    case 'defaultType':
+    case 'indexInfos':
+    case 'mappedFields':
+    case 'classThisType':
+    case 'rootSymbols':
+    case 'mergedSymbol':
+    case 'isArgumentsSymbol':
+    case 'isUndefinedSymbol':
+    case 'aliasedSymbol':
+    case 'immediateAliasedSymbol':
+    case 'isUnknownSymbol':
+    case 'exportsOfModule':
+    case 'exportSymbol':
+    case 'fullyQualifiedName':
+    case 'symbolMembers':
+    case 'symbolExports':
+    case 'declaredType':
+    case 'typeOfSymbol':
+    case 'symbolRecord':
+    case 'returnType':
+    case 'signatureRecord':
+    case 'typePredicate':
+    case 'signatureDocumentation':
+    case 'signatureJSDocTags': {
+      const code = SINGLE_ID_OP_CODES[query.op];
+      return code !== undefined && w.u8(code) && w.u32(query.args.id)
+        ? w.pos
+        : 0;
+    }
+    case 'typeString':
+    case 'typeNode':
+    case 'signatureString':
+    case 'symbolString': {
+      const code = PRINT_OP_CODES[query.op];
+      if (code === undefined) return 0;
+      const { id, node, flags } = query.args;
+      const kind =
+        query.op === 'signatureString' || query.op === 'symbolString'
+          ? query.args.kind
+          : 0;
+      const presence =
+        (node !== undefined ? 1 : 0) | (flags !== undefined ? 2 : 0);
+      if (!w.u8(code) || !w.u32(id) || !w.u8(presence)) return 0;
+      if (!w.u32(kind)) return 0;
+      if (flags !== undefined && !w.u32(flags)) return 0;
+      if (node !== undefined && !w.nodeRef(node, fileIndex)) return 0;
+      return w.pos;
+    }
     case 'isTypeAssignableTo':
       return w.u8(90) && w.u32(query.args.source) && w.u32(query.args.target)
         ? w.pos

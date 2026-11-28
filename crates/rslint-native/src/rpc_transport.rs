@@ -26,6 +26,4 @@ mod protocol;
 #[cfg(test)]
 mod tests;
 
-pub use napi_api::{
-    rpc_abort_slot, rpc_acquire_slot, rpc_call_sync, rpc_release_slot, RpcChannel,
-};
+pub use napi_api::{rpc_abort_slot, rpc_acquire_slot, rpc_call_sync, rpc_release_slot, RpcChannel};
