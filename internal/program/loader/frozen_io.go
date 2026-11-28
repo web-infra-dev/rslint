@@ -22,11 +22,50 @@ func WithFrozenIO(baseFS vfs.FS, pathSpaces *config.PathSpaceSnapshot, files []t
 	if isNilFS(baseFS) {
 		return nil, errors.New("program loader: frozen IO requires a filesystem")
 	}
-	view := &frozenFileSystem{
-		FS:    baseFS,
-		files: make(map[string]string, len(files)), parents: make(map[string]string),
+	directories := pathSpaces.DirectoryIdentities()
+	caseSensitive := baseFS.UseCaseSensitiveFileNames()
+
+	if canUseIdentityFastPath(caseSensitive, directories, files) {
+		view := &frozenIdentityFS{
+			FS: baseFS,
+		}
+		if len(files) > 0 {
+			frozenFiles := make(map[string]struct{}, len(files))
+			for _, file := range files {
+				if file.CanonicalPath != "" {
+					frozenFiles[tspath.NormalizePath(file.CanonicalPath)] = struct{}{}
+				}
+			}
+			if len(frozenFiles) > 0 {
+				view.files = frozenFiles
+			}
+		}
+		if len(directories) > 0 || len(files) > 0 {
+			identityDirs := make(map[string]struct{}, len(directories))
+			for _, directory := range directories {
+				identityDirs[directory.LexicalPath] = struct{}{}
+			}
+			for _, file := range files {
+				if file.Path != "" && file.CanonicalPath != "" && file.CanonicalParentPath != "" {
+					parent := tspath.GetDirectoryPath(tspath.NormalizePath(file.Path))
+					identityDirs[parent] = struct{}{}
+				}
+			}
+			if len(identityDirs) > 0 {
+				view.identityDirs = identityDirs
+			}
+		}
+		return view, nil
 	}
-	for _, directory := range pathSpaces.DirectoryIdentities() {
+
+	view := &frozenFileSystem{
+		FS:      baseFS,
+		parents: make(map[string]string, len(directories)),
+	}
+	if len(files) > 0 {
+		view.files = make(map[string]string, len(files))
+	}
+	for _, directory := range directories {
 		view.parents[config.ExactPathID(directory.LexicalPath)] = directory.CanonicalPath
 	}
 	// A canonical target path is already an identity, even if another input
@@ -43,7 +82,12 @@ func WithFrozenIO(baseFS vfs.FS, pathSpaces *config.PathSpaceSnapshot, files []t
 		}
 		path := tspath.NormalizePath(file.Path)
 		canonical := tspath.NormalizePath(file.CanonicalPath)
-		aliases := []string{path}
+		if path != canonical {
+			id := config.ExactPathID(path)
+			if _, exists := view.files[id]; !exists {
+				view.files[id] = canonical
+			}
+		}
 		if file.CanonicalParentPath != "" {
 			parent := tspath.GetDirectoryPath(path)
 			physicalParent := tspath.NormalizePath(file.CanonicalParentPath)
@@ -52,22 +96,177 @@ func WithFrozenIO(baseFS vfs.FS, pathSpaces *config.PathSpaceSnapshot, files []t
 				return nil, fmt.Errorf("program loader: conflicting frozen parent identities for %q", parent)
 			}
 			view.parents[parentID] = physicalParent
-			aliases = append(aliases, tspath.CombinePaths(physicalParent, tspath.GetBaseFileName(path)))
-		}
-		for _, alias := range aliases {
-			id := config.ExactPathID(alias)
-			if _, exists := view.files[id]; !exists {
-				view.files[id] = canonical
+			if parent != physicalParent || (len(path) > tspath.GetRootLength(path) && tspath.HasTrailingDirectorySeparator(path)) {
+				alias := tspath.CombinePaths(physicalParent, tspath.GetBaseFileName(path))
+				id := config.ExactPathID(alias)
+				if _, exists := view.files[id]; !exists {
+					view.files[id] = canonical
+				}
 			}
 		}
 	}
-	if !baseFS.UseCaseSensitiveFileNames() {
+	if !caseSensitive {
 		view.keyPrefix = frozenKeyPrefix(view.files, view.parents)
 		view.foldedKeyPrefix = tspath.GetCanonicalFileName(view.keyPrefix, false)
 		view.foldedFiles = foldedFrozenPaths(view.files, view.keyPrefix)
 		view.foldedParents = foldedFrozenPaths(view.parents, view.keyPrefix)
 	}
 	return view, nil
+}
+
+func isExactPOSIXIdentity(path string) bool {
+	return tspath.GetRootLength(path) == 1 &&
+		(len(path) <= 1 || !tspath.HasTrailingDirectorySeparator(path)) &&
+		tspath.NormalizePath(path) == path &&
+		config.ExactPathID(path) == path
+}
+
+// canUseIdentityFastPath reports whether every planned directory and file
+// identity maps exclusively to itself with exact byte equality, so ioPath and
+// Realpath can bypass parent-map walking and the projection cache lock without
+// changing any path spelling.
+//
+// An empty snapshot is always identity-only on any filesystem. For non-empty
+// snapshots, case-insensitive filesystems still canonicalize differently-cased
+// caller spellings against frozen directories and files (e.g. mixed-volume
+// case-sensitive mounts), and ExactPathID folds Windows drive letters and
+// non-disk roots even on case-sensitive filesystems; restrict non-empty fast
+// paths to case-sensitive exact POSIX identities where no rewrite is possible.
+func canUseIdentityFastPath(caseSensitive bool, directories []config.DirectoryIdentity, files []target.File) bool {
+	if len(directories) == 0 && len(files) == 0 {
+		return true
+	}
+	if !caseSensitive {
+		return false
+	}
+	for _, directory := range directories {
+		if directory.LexicalPath != directory.CanonicalPath || !isExactPOSIXIdentity(directory.LexicalPath) {
+			return false
+		}
+	}
+	for _, file := range files {
+		if file.CanonicalPath == "" {
+			continue
+		}
+		canonical := tspath.NormalizePath(file.CanonicalPath)
+		if !isExactPOSIXIdentity(canonical) {
+			return false
+		}
+		if file.Path == "" {
+			continue
+		}
+		path := tspath.NormalizePath(file.Path)
+		if path != canonical {
+			return false
+		}
+		if file.CanonicalParentPath != "" {
+			parent := tspath.GetDirectoryPath(path)
+			physicalParent := tspath.NormalizePath(file.CanonicalParentPath)
+			if parent != physicalParent || !isExactPOSIXIdentity(parent) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// frozenIdentityFS is a lock-free frozen IO view for snapshots whose planned
+// directory and file identities map exclusively to themselves (exact POSIX
+// paths on case-sensitive filesystems, or empty snapshots). Keeping it separate
+// from frozenFileSystem avoids adding branches or fields to the non-identity
+// hot path.
+type frozenIdentityFS struct {
+	vfs.FS
+	files        map[string]struct{}
+	identityDirs map[string]struct{}
+}
+
+func (f *frozenIdentityFS) hasFrozenIdentityDirAncestor(dir string) bool {
+	if len(f.identityDirs) == 0 || tspath.GetRootLength(dir) != 1 {
+		return false
+	}
+	for current := dir; current != ""; {
+		if _, ok := f.identityDirs[current]; ok {
+			return true
+		}
+		parent := tspath.GetDirectoryPath(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return false
+}
+
+func (f *frozenIdentityFS) ioPath(path string) string {
+	normalized := tspath.NormalizePath(path)
+	if tspath.HasTrailingDirectorySeparator(normalized) && len(normalized) > tspath.GetRootLength(normalized) {
+		trimmed := tspath.RemoveTrailingDirectorySeparator(normalized)
+		if f.hasFrozenIdentityDirAncestor(trimmed) {
+			return trimmed
+		}
+	}
+	return normalized
+}
+
+func (f *frozenIdentityFS) FileExists(path string) bool { return f.FS.FileExists(f.ioPath(path)) }
+
+func (f *frozenIdentityFS) ReadFile(path string) (string, bool) { return f.FS.ReadFile(f.ioPath(path)) }
+
+func (f *frozenIdentityFS) ReadSourceBOM(path string) (bool, error) {
+	return utils.ReadSourceBOM(f.FS, f.ioPath(path))
+}
+
+func (f *frozenIdentityFS) DirectoryExists(path string) bool {
+	return f.FS.DirectoryExists(f.ioPath(path))
+}
+
+func (f *frozenIdentityFS) GetAccessibleEntries(path string) vfs.Entries {
+	return f.FS.GetAccessibleEntries(f.ioPath(path))
+}
+
+func (f *frozenIdentityFS) Stat(path string) vfs.FileInfo { return f.FS.Stat(f.ioPath(path)) }
+
+func (f *frozenIdentityFS) Realpath(path string) string {
+	normalized := tspath.NormalizePath(path)
+	if len(f.files) > 0 {
+		if _, ok := f.files[normalized]; ok {
+			return normalized
+		}
+	}
+	if tspath.HasTrailingDirectorySeparator(normalized) && len(normalized) > tspath.GetRootLength(normalized) {
+		trimmed := tspath.RemoveTrailingDirectorySeparator(normalized)
+		if f.hasFrozenIdentityDirAncestor(trimmed) {
+			normalized = trimmed
+		}
+	}
+	return f.FS.Realpath(normalized)
+}
+
+func (f *frozenIdentityFS) WriteFile(path string, data string) error {
+	return f.FS.WriteFile(f.ioPath(path), data)
+}
+
+func (f *frozenIdentityFS) AppendFile(path string, data string) error {
+	return f.FS.AppendFile(f.ioPath(path), data)
+}
+
+func (f *frozenIdentityFS) Remove(path string) error { return f.FS.Remove(f.ioPath(path)) }
+
+func (f *frozenIdentityFS) Chtimes(path string, atime time.Time, mtime time.Time) error {
+	return f.FS.Chtimes(f.ioPath(path), atime, mtime)
+}
+
+func (f *frozenIdentityFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error {
+	root = tspath.NormalizePath(root)
+	physicalRoot := f.ioPath(root)
+	if physicalRoot == root {
+		return f.FS.WalkDir(root, walkFn)
+	}
+	return f.FS.WalkDir(physicalRoot, func(path string, entry vfs.DirEntry, err error) error {
+		relative := tspath.GetRelativePathFromDirectory(physicalRoot, tspath.NormalizePath(path), tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+		return walkFn(tspath.ResolvePath(root, relative), entry, err)
+	})
 }
 
 // frozenFileSystem projects immutable planning identities. Only path projection
@@ -125,6 +324,9 @@ func frozenKeyPrefix(groups ...map[string]string) string {
 // A folded spelling is usable only when all known exact spellings agree on
 // one physical identity. An empty value permanently disables an ambiguous key.
 func foldedFrozenPaths(paths map[string]string, prefix string) map[string]string {
+	if len(paths) == 0 {
+		return nil
+	}
 	folded := make(map[string]string, len(paths))
 	for path, physical := range paths {
 		id := tspath.GetCanonicalFileName(strings.TrimPrefix(path, prefix), false)
@@ -202,6 +404,9 @@ func (f *frozenFileSystem) computePath(path string) (string, bool) {
 	}
 	// Normalize before choosing an anchor. In particular, ../outside in an
 	// aliased tsconfig keeps its lexical sibling rather than the physical one.
+	if len(f.parents) == 0 {
+		return path, false
+	}
 	directory := path
 	if len(directory) > tspath.GetRootLength(directory) && tspath.HasTrailingDirectorySeparator(directory) {
 		// A trailing separator still addresses this directory, not its parent.

@@ -4079,7 +4079,7 @@ func TestProgramInputsMapUnchangedPathsWithBoundedAllocations(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				view := frozen.(*frozenFileSystem)
+				view := frozen.(interface{ ioPath(path string) string })
 				if got := view.ioPath(test.path); got != test.path {
 					t.Fatalf("unchanged path = %q, want %q", got, test.path)
 				}
@@ -4139,15 +4139,849 @@ func BenchmarkFrozenIOPaths(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				view := frozen.(*frozenFileSystem)
 				b.ReportAllocs()
-				b.ResetTimer()
-				for range b.N {
-					view.ioPath(path)
+				switch view := frozen.(type) {
+				case *frozenIdentityFS:
+					b.ResetTimer()
+					for range b.N {
+						view.ioPath(path)
+					}
+				case *frozenFileSystem:
+					b.ResetTimer()
+					for range b.N {
+						view.ioPath(path)
+					}
+				default:
+					b.Fatalf("unexpected frozen FS type %T", frozen)
 				}
 			})
 		}
 	}
+}
+
+type frozenRealpathSpyFS struct {
+	vfs.FS
+	caseSensitive bool
+	mu            sync.Mutex
+	realPaths     map[string]string
+	realpathCalls map[string]int
+}
+
+func (fs *frozenRealpathSpyFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
+
+func (fs *frozenRealpathSpyFS) Realpath(filePath string) string {
+	normalized := tspath.NormalizePath(filePath)
+	fs.mu.Lock()
+	if fs.realpathCalls != nil {
+		fs.realpathCalls[normalized]++
+	}
+	override := fs.realPaths[normalized]
+	fs.mu.Unlock()
+	if override != "" {
+		return override
+	}
+	return fs.FS.Realpath(filePath)
+}
+
+func TestProgramInputsIdentityFastPath(t *testing.T) {
+	for _, caseSensitive := range []bool{true, false} {
+		t.Run(fmt.Sprintf("caseSensitive=%v", caseSensitive), func(t *testing.T) {
+			root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+			writeProgramTestFiles(t, root, map[string]string{
+				"src/source.ts": utils.BOM + "export const value = 1;\n",
+				"src/other.ts":  "export const other = 2;\n",
+			})
+			sourcePath := tspath.ResolvePath(root, "src/source.ts")
+			sourceDir := tspath.ResolvePath(root, "src")
+			otherPath := tspath.ResolvePath(root, "src/other.ts")
+			sourceAltCase := tspath.ResolvePath(root, "src/SOURCE.ts")
+
+			// Truly empty snapshot (0 directories, 0 files) uses *frozenIdentityFS with no maps on any platform.
+			emptySpaces := rslintconfig.NewPathSpaceSnapshot(nil, nil)
+			emptySpy := &frozenRealpathSpyFS{
+				FS:            osvfs.FS(),
+				caseSensitive: caseSensitive,
+				realPaths:     map[string]string{otherPath: "/live/other.ts"},
+				realpathCalls: make(map[string]int),
+			}
+			emptyFrozen, err := WithFrozenIO(emptySpy, emptySpaces, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			emptyView, ok := emptyFrozen.(*frozenIdentityFS)
+			if !ok || emptyView.files != nil || emptyView.identityDirs != nil {
+				t.Fatalf("empty identity view allocated unexpected state: isIdentity=%v view=%#v", ok, emptyFrozen)
+			}
+			if got := emptyFrozen.Realpath(otherPath); got != "/live/other.ts" {
+				t.Fatalf("empty identity Realpath(%q) = %q, want /live/other.ts", otherPath, got)
+			}
+			if got := emptyFrozen.Realpath(`C:\Repo\missing.ts`); got != "C:/Repo/missing.ts" {
+				t.Fatalf("empty identity Realpath(Windows backslashes) = %q, want C:/Repo/missing.ts", got)
+			}
+
+			// Exact POSIX identity directories + files use the lock-free *frozenIdentityFS
+			// fast path on case-sensitive filesystems; case-insensitive filesystems
+			// retain folded parent/file maps so differently-cased directory/file
+			// spellings canonicalize identically to aliased views.
+			spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+				rslintconfig.DirectoryIdentity{LexicalPath: root, CanonicalPath: root},
+				rslintconfig.DirectoryIdentity{LexicalPath: sourceDir, CanonicalPath: sourceDir},
+			)
+			spy := &frozenRealpathSpyFS{
+				FS:            osvfs.FS(),
+				caseSensitive: caseSensitive,
+				realPaths:     make(map[string]string),
+				realpathCalls: make(map[string]int),
+			}
+			frozenFiles := []target.File{
+				{PathIdentity: rslintconfig.PathIdentity{Path: sourcePath, CanonicalPath: sourcePath, CanonicalParentPath: sourceDir}},
+			}
+			frozen, err := WithFrozenIO(spy, spaces, frozenFiles)
+			if err != nil {
+				t.Fatal(err)
+			}
+			view := frozen.(interface{ ioPath(path string) string })
+			_, isIdentity := frozen.(*frozenIdentityFS)
+			wantIdentityOnly := caseSensitive && tspath.GetRootLength(root) == 1
+			if isIdentity != wantIdentityOnly {
+				t.Fatalf("frozenIdentityFS = %v, want %v (caseSensitive=%v root=%q)", isIdentity, wantIdentityOnly, caseSensitive, root)
+			}
+
+			// Verify every VFS read/metadata/walk operation matches live FS.
+			if !frozen.DirectoryExists(sourceDir) || !frozen.DirectoryExists(sourceDir+"/") {
+				t.Fatal("DirectoryExists failed on identity directory")
+			}
+			if !frozen.FileExists(sourcePath) || frozen.FileExists(tspath.ResolvePath(root, "src/missing.ts")) {
+				t.Fatal("FileExists returned unexpected result on identity view")
+			}
+			if text, ok := frozen.ReadFile(sourcePath); !ok || text != "export const value = 1;\n" {
+				t.Fatalf("ReadFile(%q) = %q, %v", sourcePath, text, ok)
+			}
+			if !utils.SourceHasBOM(frozen, sourcePath) {
+				t.Fatalf("ReadSourceBOM lost BOM for %q", sourcePath)
+			}
+			if info := frozen.Stat(sourcePath); info == nil || info.IsDir() {
+				t.Fatalf("Stat(%q) = %v", sourcePath, info)
+			}
+			entries := frozen.GetAccessibleEntries(sourceDir)
+			if !slices.Contains(entries.Files, "source.ts") || !slices.Contains(entries.Files, "other.ts") {
+				t.Fatalf("GetAccessibleEntries(%q) = %v", sourceDir, entries.Files)
+			}
+			var walked []string
+			if err := frozen.WalkDir(sourceDir, func(path string, entry vfs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if !entry.IsDir() {
+					walked = append(walked, tspath.GetBaseFileName(path))
+				}
+				return nil
+			}); err != nil {
+				t.Fatalf("WalkDir: %v", err)
+			}
+			slices.Sort(walked)
+			if !slices.Equal(walked, []string{"other.ts", "source.ts"}) {
+				t.Fatalf("WalkDir files = %v, want [other.ts source.ts]", walked)
+			}
+
+			// Normalization and trailing separator handling in identity ioPath match aliased behavior:
+			// unmatched paths preserve non-root trailing separators so file writes reject "file.ts/".
+			for path, want := range map[string]string{
+				"/":                      "/",
+				`\`:                      "/",
+				"/child/":                "/child/",
+				"C:/":                    "C:/",
+				`C:\`:                    "C:/",
+				"C:/child/":              "C:/child/",
+				`C:\Repo\App.ts`:         "C:/Repo/App.ts",
+				`\\server\share\file.ts`: "//server/share/file.ts",
+				"//server/":              "//server/",
+				"//server/share/":        "//server/share/",
+				"/a//b.ts":               "/a/b.ts",
+				"/a/./b.ts":              "/a/b.ts",
+				"/a/x/../b.ts":           "/a/b.ts",
+				".":                      "",
+				sourcePath:               sourcePath,
+			} {
+				if got := view.ioPath(path); got != want {
+					t.Errorf("identity ioPath(%q) = %q, want %q", path, got, want)
+				}
+			}
+
+			// Verify ReadFile and ReadSourceBOM resolve lexical .. identically across an unrecorded symlink.
+			writeProgramTestFiles(t, root, map[string]string{
+				"outside.ts":        utils.BOM + "export const lexical = 1;\n",
+				"target/outside.ts": "export const physical = 2;\n",
+				"target/sub/keep":   "",
+			})
+			linkDir := tspath.ResolvePath(root, "link")
+			if err := os.Symlink(tspath.ResolvePath(root, "target/sub"), linkDir); err == nil {
+				unnormalized := linkDir + "/../outside.ts"
+				if text, ok := frozen.ReadFile(unnormalized); !ok || text != "export const lexical = 1;\n" {
+					t.Fatalf("ReadFile(%q) = %q, %v, want lexical sibling", unnormalized, text, ok)
+				}
+				if !utils.SourceHasBOM(frozen, unnormalized) {
+					t.Fatalf("ReadSourceBOM(%q) diverged from ReadFile on unrecorded symlink .. path", unnormalized)
+				}
+			}
+
+			// Realpath on frozen identity files must not invoke baseFS.Realpath,
+			// even if the underlying filesystem later mutates.
+			spy.mu.Lock()
+			spy.realPaths[sourcePath] = "/replacement/source.ts"
+			spy.realPaths[sourceAltCase] = "/replacement/source.ts"
+			spy.realPaths[otherPath] = "/live/other-v1.ts"
+			spy.mu.Unlock()
+
+			if got := frozen.Realpath(sourcePath); got != sourcePath {
+				t.Fatalf("Realpath(%q) = %q, want %q", sourcePath, got, sourcePath)
+			}
+			spy.mu.Lock()
+			exactCalls := spy.realpathCalls[sourcePath]
+			spy.mu.Unlock()
+			if exactCalls != 0 {
+				t.Fatalf("frozen file Realpath called baseFS %d times, want 0", exactCalls)
+			}
+
+			// Identity fast path resolves case-alternate frozen files on case-insensitive
+			// filesystems identically in both ioPath and Realpath, preventing split-brain
+			// reads on mixed case-sensitive mounts under a case-insensitive host.
+			wantAltIO := sourceAltCase
+			wantAltRealpath := "/replacement/source.ts"
+			if !caseSensitive {
+				wantAltIO = sourcePath
+				wantAltRealpath = sourcePath
+			}
+			if got := view.ioPath(sourceAltCase); got != wantAltIO {
+				t.Fatalf("identity ioPath(%q) = %q, want %q", sourceAltCase, got, wantAltIO)
+			}
+			if got := frozen.Realpath(sourceAltCase); got != wantAltRealpath {
+				t.Fatalf("Realpath(%q) = %q, want %q", sourceAltCase, got, wantAltRealpath)
+			}
+			// Trailing slash on a frozen file path misses f.files before trimming,
+			// delegating to baseFS.Realpath identically on *frozenIdentityFS and *frozenFileSystem.
+			if got := frozen.Realpath(sourcePath + "/"); got != "/replacement/source.ts" {
+				t.Fatalf("Realpath(%q) = %q, want /replacement/source.ts", sourcePath+"/", got)
+			}
+			// Non-frozen paths observe live Realpath updates.
+			if got := frozen.Realpath(otherPath); got != "/live/other-v1.ts" {
+				t.Fatalf("non-frozen Realpath = %q, want /live/other-v1.ts", got)
+			}
+			spy.mu.Lock()
+			spy.realPaths[otherPath] = "/live/other-v2.ts"
+			spy.mu.Unlock()
+			if got := frozen.Realpath(otherPath); got != "/live/other-v2.ts" {
+				t.Fatalf("updated non-frozen Realpath = %q, want /live/other-v2.ts", got)
+			}
+
+			// Concurrent reads, trailing-slash queries, and Realpath under -race.
+			raceFrozen, err := WithFrozenIO(spy, spaces, frozenFiles)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raceView := raceFrozen.(interface{ ioPath(path string) string })
+			var group sync.WaitGroup
+			for worker := range 8 {
+				group.Go(func() {
+					for i := range 600 {
+						probe := fmt.Sprintf("%s/probe-%d-%d.ts", sourceDir, worker, i)
+						if got := raceView.ioPath(probe); got != probe {
+							t.Errorf("concurrent identity ioPath(%q) = %q", probe, got)
+						}
+						if i%50 == 0 {
+							if got := raceView.ioPath(sourceDir + "/"); got != sourceDir {
+								t.Errorf("concurrent trailing-slash ioPath = %q, want %q", got, sourceDir)
+							}
+							if got := raceFrozen.Realpath(sourceAltCase); got != wantAltRealpath {
+								t.Errorf("concurrent alt-case Realpath = %q, want %q", got, wantAltRealpath)
+							}
+							if got := raceFrozen.Realpath(sourcePath); got != sourcePath {
+								t.Errorf("concurrent frozen Realpath = %q, want %q", got, sourcePath)
+							}
+							if got := raceFrozen.Realpath(otherPath); got != "/live/other-v2.ts" {
+								t.Errorf("concurrent live Realpath = %q, want /live/other-v2.ts", got)
+							}
+						}
+					}
+				})
+			}
+			group.Wait()
+		})
+	}
+
+	// Virtual POSIX snapshot verifies frozenIdentityFS lock-free concurrent access
+	// on every OS (including Windows where t.TempDir is drive-rooted).
+	t.Run("virtual-posix-identity-fast-path-cross-platform", func(t *testing.T) {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo", CanonicalPath: "/repo"},
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo/src", CanonicalPath: "/repo/src"},
+		)
+		files := []target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: "/repo/src/source.ts", CanonicalPath: "/repo/src/source.ts", CanonicalParentPath: "/repo/src"}},
+		}
+		spy := &frozenRealpathSpyFS{
+			FS:            osvfs.FS(),
+			caseSensitive: true,
+			realPaths:     map[string]string{"/repo/src/source.ts": "/replaced/source.ts", "/repo/src/other.ts": "/live/other.ts"},
+			realpathCalls: make(map[string]int),
+		}
+		frozen, err := WithFrozenIO(spy, spaces, files)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view, ok := frozen.(*frozenIdentityFS)
+		if !ok {
+			t.Fatalf("expected *frozenIdentityFS for virtual POSIX identity snapshot, got %T", frozen)
+		}
+		var group sync.WaitGroup
+		for worker := range 8 {
+			group.Go(func() {
+				for i := range 200 {
+					probe := fmt.Sprintf("/repo/src/probe-%d-%d.ts", worker, i)
+					if got := view.ioPath(probe); got != probe {
+						t.Errorf("ioPath(%q) = %q", probe, got)
+					}
+					if i%40 == 0 {
+						if got := view.ioPath("/repo/src/"); got != "/repo/src" {
+							t.Errorf("ioPath(/repo/src/) = %q, want /repo/src", got)
+						}
+						if got := view.ioPath("/outside/file.ts/"); got != "/outside/file.ts/" {
+							t.Errorf("ioPath(/outside/file.ts/) = %q, want /outside/file.ts/", got)
+						}
+						if got := frozen.Realpath("/repo/src/source.ts"); got != "/repo/src/source.ts" {
+							t.Errorf("Realpath(frozen) = %q, want /repo/src/source.ts", got)
+						}
+						if got := frozen.Realpath("/repo/src/other.ts"); got != "/live/other.ts" {
+							t.Errorf("Realpath(live) = %q, want /live/other.ts", got)
+						}
+					}
+				}
+			})
+		}
+		group.Wait()
+	})
+}
+
+func TestProgramInputsAliasedAndMixedPathProjections(t *testing.T) {
+	for _, caseSensitive := range []bool{true, false} {
+		t.Run(fmt.Sprintf("caseSensitive=%v", caseSensitive), func(t *testing.T) {
+			directories := []rslintconfig.DirectoryIdentity{
+				{LexicalPath: "/a", CanonicalPath: "/real_a"},
+				{LexicalPath: "/a/sub", CanonicalPath: "/a/sub"},
+				{LexicalPath: "/u/k", CanonicalPath: "/real_k"},
+				{LexicalPath: "/u/\u212A/nested", CanonicalPath: "/u/\u212A/nested"},
+				{LexicalPath: "/b/Anchor", CanonicalPath: "/b/Anchor"},
+				{LexicalPath: "/b/anchor", CanonicalPath: "/real_anchor"},
+				{LexicalPath: "/unrelated", CanonicalPath: "/unrelated"},
+				{LexicalPath: "/unrelated/deep", CanonicalPath: "/unrelated/deep"},
+			}
+			files := []target.File{
+				{PathIdentity: rslintconfig.PathIdentity{Path: "/unrelated/deep/file.ts", CanonicalPath: "/unrelated/deep/file.ts", CanonicalParentPath: "/unrelated/deep"}},
+				{PathIdentity: rslintconfig.PathIdentity{Path: "/a/linked.ts", CanonicalPath: "/real_a/linked.ts", CanonicalParentPath: "/real_a"}},
+			}
+			spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil, directories...)
+			frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			view, ok := frozen.(*frozenFileSystem)
+			if !ok {
+				t.Fatalf("expected *frozenFileSystem for aliased snapshot, got %T", frozen)
+			}
+			// Identity directories remain in view.parents on *frozenFileSystem so
+			// lookups under unaliased subtrees terminate at the nearest identity
+			// parent instead of walking all the way to the filesystem root.
+			for _, keptDir := range []string{"/unrelated", "/unrelated/deep", "/a/sub", "/u/\u212A/nested"} {
+				if _, kept := view.parents[keptDir]; !kept {
+					t.Errorf("identity parent %q was unexpectedly dropped", keptDir)
+				}
+			}
+
+			queries := map[string]string{
+				"/a/file.ts":            "/real_a/file.ts",
+				"/a/sub/file.ts":        "/a/sub/file.ts",
+				"/a/sub/deep/file.ts":   "/a/sub/deep/file.ts",
+				"/b/Anchor/file.ts":     "/b/Anchor/file.ts",
+				"/b/anchor/file.ts":     "/real_anchor/file.ts",
+				"/b/aNcHoR/file.ts":     "/b/aNcHoR/file.ts",
+				"/u/\u212A/nested/f.ts": "/u/\u212A/nested/f.ts",
+				"/unrelated/deep/x.ts":  "/unrelated/deep/x.ts",
+				"/unrelated/child/":     "/unrelated/child",
+				"/unrecorded/child/":    "/unrecorded/child/",
+			}
+			if caseSensitive {
+				queries["/u/\u212A/other.ts"] = "/u/\u212A/other.ts"
+			} else {
+				queries["/A/file.ts"] = "/real_a/file.ts"
+				queries["/A/SUB/file.ts"] = "/a/sub/file.ts"
+				queries["/u/\u212A/other.ts"] = "/real_k/other.ts"
+				queries["/UNRELATED/DEEP/x.ts"] = "/unrelated/deep/x.ts"
+			}
+			for path, want := range queries {
+				if got := view.ioPath(path); got != want {
+					t.Errorf("ioPath(%q) = %q, want %q", path, got, want)
+				}
+			}
+		})
+	}
+
+	t.Run("file-only alias retains identity parents and preserves unmatched trailing slash", func(t *testing.T) {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo", CanonicalPath: "/repo"},
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo/src", CanonicalPath: "/repo/src"},
+		)
+		files := []target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: "/repo/src/link.ts", CanonicalPath: "/external/real.ts", CanonicalParentPath: "/repo/src"}},
+			{PathIdentity: rslintconfig.PathIdentity{Path: "/repo/src/normal.ts", CanonicalPath: "/repo/src/normal.ts", CanonicalParentPath: "/repo/src"}},
+		}
+		frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: false}, spaces, files)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view, ok := frozen.(*frozenFileSystem)
+		if !ok || view.parents["/repo"] != "/repo" || view.parents["/repo/src"] != "/repo/src" {
+			t.Fatalf("file-only alias dropped identity parents: type=%T parents=%v", frozen, view)
+		}
+		if got := view.ioPath("/repo/src/link.ts"); got != "/external/real.ts" {
+			t.Fatalf("ioPath(link) = %q, want /external/real.ts", got)
+		}
+		if got := frozen.Realpath("/repo/src/LINK.ts"); got != "/external/real.ts" {
+			t.Fatalf("Realpath(case-folded link) = %q, want /external/real.ts", got)
+		}
+		if got := view.ioPath("/outside/external.ts/"); got != "/outside/external.ts/" {
+			t.Fatalf("ioPath(unmatched trailing slash) = %q, want /outside/external.ts/", got)
+		}
+	})
+
+	t.Run("drive-case identity file retains aliased directory parent", func(t *testing.T) {
+		for _, caseSensitive := range []bool{true, false} {
+			t.Run(fmt.Sprintf("caseSensitive=%v", caseSensitive), func(t *testing.T) {
+				spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+					rslintconfig.DirectoryIdentity{LexicalPath: "c:/Repo", CanonicalPath: "C:/Repo"},
+				)
+				files := []target.File{
+					{PathIdentity: rslintconfig.PathIdentity{Path: "C:/Repo/file.ts", CanonicalPath: "C:/Repo/file.ts", CanonicalParentPath: "C:/Repo"}},
+				}
+				frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, files)
+				if err != nil {
+					t.Fatal(err)
+				}
+				view := frozen.(*frozenFileSystem)
+				if got := view.parents["c:/Repo"]; got != "C:/Repo" {
+					t.Fatalf("view.parents[%q] = %q, want %q (parents=%v)", "c:/Repo", got, "C:/Repo", view.parents)
+				}
+				if got := view.ioPath(`c:\Repo\child.ts`); got != "C:/Repo/child.ts" {
+					t.Fatalf("ioPath(%q) = %q, want %q", `c:\Repo\child.ts`, got, "C:/Repo/child.ts")
+				}
+			})
+		}
+	})
+
+	t.Run("mixed drive-cased files retain aliased parent regardless of order", func(t *testing.T) {
+		fLower := target.File{PathIdentity: rslintconfig.PathIdentity{Path: "c:/Repo/a.ts", CanonicalPath: "C:/Repo/a.ts", CanonicalParentPath: "C:/Repo"}}
+		fUpper := target.File{PathIdentity: rslintconfig.PathIdentity{Path: "C:/Repo/b.ts", CanonicalPath: "C:/Repo/b.ts", CanonicalParentPath: "C:/Repo"}}
+		orders := []struct {
+			name  string
+			files []target.File
+		}{
+			{name: "lower-then-upper", files: []target.File{fLower, fUpper}},
+			{name: "upper-then-lower", files: []target.File{fUpper, fLower}},
+		}
+		for _, caseSensitive := range []bool{true, false} {
+			for _, order := range orders {
+				t.Run(fmt.Sprintf("caseSensitive=%v/%s", caseSensitive, order.name), func(t *testing.T) {
+					spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil)
+					frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, order.files)
+					if err != nil {
+						t.Fatal(err)
+					}
+					view := frozen.(*frozenFileSystem)
+					if got := view.parents["c:/Repo"]; got != "C:/Repo" {
+						t.Fatalf("view.parents[%q] = %q, want %q (parents=%v)", "c:/Repo", got, "C:/Repo", view.parents)
+					}
+					if got := view.ioPath("c:/Repo/other.ts"); got != "C:/Repo/other.ts" {
+						t.Fatalf("ioPath(%q) = %q, want %q", "c:/Repo/other.ts", got, "C:/Repo/other.ts")
+					}
+				})
+			}
+		}
+	})
+
+	t.Run("conflicting parent identity still errors after identity prefix", func(t *testing.T) {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo", CanonicalPath: "/repo"},
+		)
+		files := []target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: "/repo/a.ts", CanonicalPath: "/repo/a.ts", CanonicalParentPath: "/other"}},
+		}
+		if _, err := WithFrozenIO(osvfs.FS(), spaces, files); err == nil {
+			t.Fatal("expected error for conflicting frozen parent identities")
+		}
+	})
+}
+
+type mixedCaseVolumeFS struct {
+	vfs.FS
+	dirs  map[string]struct{}
+	files map[string]string
+}
+
+func (f *mixedCaseVolumeFS) UseCaseSensitiveFileNames() bool { return false }
+
+func (f *mixedCaseVolumeFS) DirectoryExists(path string) bool {
+	if _, ok := f.dirs[tspath.RemoveTrailingDirectorySeparator(tspath.NormalizePath(path))]; ok {
+		return true
+	}
+	return f.FS.DirectoryExists(path)
+}
+
+func (f *mixedCaseVolumeFS) FileExists(path string) bool {
+	if _, ok := f.files[tspath.NormalizePath(path)]; ok {
+		return true
+	}
+	return f.FS.FileExists(path)
+}
+
+func (f *mixedCaseVolumeFS) ReadFile(path string) (string, bool) {
+	if content, ok := f.files[tspath.NormalizePath(path)]; ok {
+		return content, true
+	}
+	return f.FS.ReadFile(path)
+}
+
+func (f *mixedCaseVolumeFS) Realpath(path string) string {
+	normalized := tspath.NormalizePath(path)
+	if _, ok := f.files[normalized]; ok {
+		return normalized
+	}
+	return f.FS.Realpath(path)
+}
+
+type frozenWriteRecorderFS struct {
+	vfs.FS
+	caseSensitive bool
+	appendPaths   []string
+	writePaths    []string
+}
+
+func (f *frozenWriteRecorderFS) UseCaseSensitiveFileNames() bool { return f.caseSensitive }
+
+func (f *frozenWriteRecorderFS) AppendFile(path string, _ string) error {
+	f.appendPaths = append(f.appendPaths, path)
+	return nil
+}
+
+func (f *frozenWriteRecorderFS) WriteFile(path string, _ string) error {
+	f.writePaths = append(f.writePaths, path)
+	return nil
+}
+
+func TestProgramInputsReviewRegressions(t *testing.T) {
+	t.Run("mixed-volume case-sensitive sub-mount aligns ReadFile and Realpath", func(t *testing.T) {
+		root := "/repo"
+		modelUpper := "/repo/src/Model.ts"
+		modelLower := "/repo/src/model.ts"
+		base := &mixedCaseVolumeFS{
+			FS: bundled.WrapFS(osvfs.FS()),
+			dirs: map[string]struct{}{
+				"/repo":     {},
+				"/repo/src": {},
+			},
+			files: map[string]string{
+				"/repo/tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["src/model.ts"]}`,
+				modelUpper:            "export const n: number = 'wrong';\n",
+				modelLower:            "export const n: number = 2;\n",
+			},
+		}
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+			rslintconfig.DirectoryIdentity{LexicalPath: root, CanonicalPath: root},
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo/src", CanonicalPath: "/repo/src"},
+		)
+		// Select only Model.ts while tsconfig.json lists model.ts.
+		frozenFiles := []target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: modelUpper, CanonicalPath: modelUpper, CanonicalParentPath: "/repo/src"}},
+		}
+		frozen, err := WithFrozenIO(base, spaces, frozenFiles)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Both Realpath and ReadFile for model.ts must resolve to frozen Model.ts.
+		if got := frozen.Realpath(modelLower); got != modelUpper {
+			t.Fatalf("Realpath(%q) = %q, want %q", modelLower, got, modelUpper)
+		}
+		if content, ok := frozen.ReadFile(modelLower); !ok || content != base.files[modelUpper] {
+			t.Fatalf("ReadFile(%q) = (%q, %v), want frozen Model.ts content", modelLower, content, ok)
+		}
+		host := compiler.NewCompilerHost(root, frozen, bundled.LibPath(), nil, nil, nil)
+		prog, err := utils.CreateProgram(true, frozen, root, "tsconfig.json", host)
+		if err != nil {
+			t.Fatalf("CreateProgram: %v", err)
+		}
+		sf := prog.GetSourceFile(modelLower)
+		if sf == nil {
+			t.Fatal("missing model.ts in Program")
+		}
+		var codes []int32
+		for _, diag := range prog.GetSemanticDiagnostics(context.Background(), sf) {
+			codes = append(codes, diag.Code())
+		}
+		if !slices.Contains(codes, 2322) {
+			t.Fatalf("expected TS2322 from frozen Model.ts contents, got %v", codes)
+		}
+	})
+
+	t.Run("append and write with trailing slash outside frozen dirs preserve separator", func(t *testing.T) {
+		for _, rootCase := range []struct {
+			name string
+			root string
+		}{
+			{name: "posix", root: "/work"},
+			{name: "drive", root: "C:/work"},
+		} {
+			for _, caseSensitive := range []bool{true, false} {
+				t.Run(fmt.Sprintf("%s/caseSensitive=%v", rootCase.name, caseSensitive), func(t *testing.T) {
+					frozenDir := tspath.ResolvePath(rootCase.root, "frozen")
+					external := tspath.ResolvePath(rootCase.root, "external.ts")
+					spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+						rslintconfig.DirectoryIdentity{LexicalPath: frozenDir, CanonicalPath: frozenDir},
+					)
+					recorder := &frozenWriteRecorderFS{FS: osvfs.FS(), caseSensitive: caseSensitive}
+					frozen, err := WithFrozenIO(recorder, spaces, nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					_, isIdentity := frozen.(*frozenIdentityFS)
+					if want := caseSensitive && tspath.GetRootLength(rootCase.root) == 1; isIdentity != want {
+						t.Fatalf("frozenIdentityFS = %v, want %v", isIdentity, want)
+					}
+					wantPath := external + "/"
+					if err := frozen.AppendFile(wantPath, "data"); err != nil {
+						t.Fatalf("AppendFile(%q): %v", wantPath, err)
+					}
+					if err := frozen.WriteFile(wantPath, "data"); err != nil {
+						t.Fatalf("WriteFile(%q): %v", wantPath, err)
+					}
+					if !slices.Equal(recorder.appendPaths, []string{wantPath}) {
+						t.Fatalf("AppendFile received %v, want [%q]", recorder.appendPaths, wantPath)
+					}
+					if !slices.Equal(recorder.writePaths, []string{wantPath}) {
+						t.Fatalf("WriteFile received %v, want [%q]", recorder.writePaths, wantPath)
+					}
+				})
+			}
+		}
+	})
+
+	t.Run("WalkDir with trailing slash on identity directory preserves root spelling", func(t *testing.T) {
+		for _, caseSensitive := range []bool{true, false} {
+			t.Run(fmt.Sprintf("caseSensitive=%v", caseSensitive), func(t *testing.T) {
+				root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
+				writeProgramTestFiles(t, root, map[string]string{
+					"dir/inside.ts": "export const x = 1;\n",
+				})
+				dir := tspath.ResolvePath(root, "dir")
+				spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+					rslintconfig.DirectoryIdentity{LexicalPath: root, CanonicalPath: root},
+					rslintconfig.DirectoryIdentity{LexicalPath: dir, CanonicalPath: dir},
+				)
+				frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, isIdentity := frozen.(*frozenIdentityFS)
+				if want := caseSensitive && tspath.GetRootLength(root) == 1; isIdentity != want {
+					t.Fatalf("frozenIdentityFS = %v, want %v", isIdentity, want)
+				}
+				var visited []string
+				rootWithSlash := dir + "/"
+				if err := frozen.WalkDir(rootWithSlash, func(path string, entry vfs.DirEntry, err error) error {
+					if err != nil {
+						return err
+					}
+					visited = append(visited, path)
+					if entry.IsDir() && path != rootWithSlash {
+						return vfs.SkipDir
+					}
+					return nil
+				}); err != nil {
+					t.Fatalf("WalkDir(%q): %v", rootWithSlash, err)
+				}
+				wantFile := tspath.ResolvePath(dir, "inside.ts")
+				if !slices.Contains(visited, rootWithSlash) || !slices.Contains(visited, wantFile) {
+					t.Fatalf("WalkDir(%q) visited %v, want root %q and %q", rootWithSlash, visited, rootWithSlash, wantFile)
+				}
+			})
+		}
+	})
+
+	t.Run("frozen file with non-root trailing separator keeps exact match in both ioPath and Realpath", func(t *testing.T) {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo", CanonicalPath: "/repo"},
+		)
+		files := []target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: "/repo/dir/", CanonicalPath: "/repo/dir/", CanonicalParentPath: ""}},
+		}
+		frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: true}, spaces, files)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view, ok := frozen.(*frozenFileSystem)
+		if !ok {
+			t.Fatalf("frozen file with non-root trailing separator must not take *frozenIdentityFS, got %T", frozen)
+		}
+		if got := view.ioPath("/repo/dir/"); got != "/repo/dir/" {
+			t.Fatalf("ioPath(/repo/dir/) = %q, want /repo/dir/", got)
+		}
+		if got := frozen.Realpath("/repo/dir/"); got != "/repo/dir/" {
+			t.Fatalf("Realpath(/repo/dir/) = %q, want /repo/dir/", got)
+		}
+	})
+
+	t.Run("aliased sibling retains identity parent for shallow lookup under unaliased subtree", func(t *testing.T) {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo", CanonicalPath: "/repo"},
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo/src", CanonicalPath: "/repo/src"},
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo/vendor", CanonicalPath: "/real/vendor"},
+		)
+		frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: true}, spaces, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view := frozen.(*frozenFileSystem)
+		if got := view.parents["/repo/src"]; got != "/repo/src" {
+			t.Fatalf("expected /repo/src identity parent to be retained, got %q (parents=%v)", got, view.parents)
+		}
+		if got := view.ioPath("/repo/src/a/b/c/file.ts"); got != "/repo/src/a/b/c/file.ts" {
+			t.Fatalf("ioPath under unaliased subtree = %q", got)
+		}
+		if got := view.ioPath("/repo/vendor/pkg/index.ts"); got != "/real/vendor/pkg/index.ts" {
+			t.Fatalf("ioPath under aliased sibling = %q", got)
+		}
+	})
+
+	t.Run("mixed-volume directory casing canonicalizes on case-insensitive host", func(t *testing.T) {
+		root := "/repo"
+		upperDep := "/repo/Src/dep.ts"
+		lowerDep := "/repo/src/dep.ts"
+		base := &mixedCaseVolumeFS{
+			FS: bundled.WrapFS(osvfs.FS()),
+			dirs: map[string]struct{}{
+				"/repo":     {},
+				"/repo/Src": {},
+				"/repo/src": {},
+			},
+			files: map[string]string{
+				"/repo/tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["src/dep.ts"]}`,
+				upperDep:              "export const n: number = 'wrong';\n",
+				lowerDep:              "export const n: number = 2;\n",
+			},
+		}
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+			rslintconfig.DirectoryIdentity{LexicalPath: root, CanonicalPath: root},
+			rslintconfig.DirectoryIdentity{LexicalPath: "/repo/Src", CanonicalPath: "/repo/Src"},
+		)
+		frozen, err := WithFrozenIO(base, spaces, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if content, ok := frozen.ReadFile(lowerDep); !ok || content != base.files[upperDep] {
+			t.Fatalf("ReadFile(%q) = (%q, %v), want frozen /repo/Src/dep.ts content", lowerDep, content, ok)
+		}
+		host := compiler.NewCompilerHost(root, frozen, bundled.LibPath(), nil, nil, nil)
+		prog, err := utils.CreateProgram(true, frozen, root, "tsconfig.json", host)
+		if err != nil {
+			t.Fatalf("CreateProgram: %v", err)
+		}
+		sf := prog.GetSourceFile(lowerDep)
+		if sf == nil {
+			t.Fatal("missing src/dep.ts in Program")
+		}
+		var codes []int32
+		for _, diag := range prog.GetSemanticDiagnostics(context.Background(), sf) {
+			codes = append(codes, diag.Code())
+		}
+		if !slices.Contains(codes, 2322) {
+			t.Fatalf("expected TS2322 from frozen /repo/Src/dep.ts contents, got %v", codes)
+		}
+	})
+
+	t.Run("Windows drive-letter casing on identity directories preserves canonical drive", func(t *testing.T) {
+		for _, caseSensitive := range []bool{true, false} {
+			t.Run(fmt.Sprintf("caseSensitive=%v", caseSensitive), func(t *testing.T) {
+				spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+					rslintconfig.DirectoryIdentity{LexicalPath: "C:/Repo", CanonicalPath: "C:/Repo"},
+				)
+				frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: caseSensitive}, spaces, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				view := frozen.(*frozenFileSystem)
+				if got := view.ioPath("c:/Repo/child.ts"); got != "C:/Repo/child.ts" {
+					t.Fatalf("ioPath(lowercase drive) = %q, want C:/Repo/child.ts", got)
+				}
+				if got := view.ioPath("c:/Repo/"); got != "C:/Repo" {
+					t.Fatalf("ioPath(lowercase drive dir/) = %q, want C:/Repo", got)
+				}
+			})
+		}
+	})
+
+	t.Run("ambiguous case-colliding identity directories preserve unmatched trailing slash", func(t *testing.T) {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+			rslintconfig.DirectoryIdentity{LexicalPath: "/input/Anchor", CanonicalPath: "/input/Anchor"},
+			rslintconfig.DirectoryIdentity{LexicalPath: "/input/anchor", CanonicalPath: "/input/anchor"},
+		)
+		frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: false}, spaces, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view := frozen.(*frozenFileSystem)
+		if got := view.ioPath("/input/aNcHoR/external.ts/"); got != "/input/aNcHoR/external.ts/" {
+			t.Fatalf("ambiguous folded dir stripped trailing slash: got %q", got)
+		}
+	})
+
+	t.Run("empty CanonicalPath does not add identityDirs entry", func(t *testing.T) {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil)
+		files := []target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: "/repo/a.ts", CanonicalPath: "", CanonicalParentPath: "/repo"}},
+		}
+		frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: true}, spaces, files)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view, ok := frozen.(*frozenIdentityFS)
+		if !ok {
+			t.Fatalf("expected *frozenIdentityFS, got %T", frozen)
+		}
+		if got := view.ioPath("/repo/external.ts/"); got != "/repo/external.ts/" {
+			t.Fatalf("file with empty CanonicalPath stripped trailing slash: got %q", got)
+		}
+	})
+
+	t.Run("case-insensitive view with files retains zero-alloc node_modules prefix folding", func(t *testing.T) {
+		spaces := rslintconfig.NewPathSpaceSnapshot(nil, nil,
+			rslintconfig.DirectoryIdentity{LexicalPath: "/Users/Developer/repo", CanonicalPath: "/Users/Developer/repo"},
+			rslintconfig.DirectoryIdentity{LexicalPath: "/Users/Developer/repo/src", CanonicalPath: "/Users/Developer/repo/src"},
+		)
+		files := []target.File{
+			{PathIdentity: rslintconfig.PathIdentity{Path: "/Users/Developer/repo/src/index.ts", CanonicalPath: "/Users/Developer/repo/src/index.ts", CanonicalParentPath: "/Users/Developer/repo/src"}},
+		}
+		frozen, err := WithFrozenIO(&frozenCaseFlagFS{FS: osvfs.FS(), caseSensitive: false}, spaces, files)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view := frozen.(*frozenFileSystem)
+		probe := "/Users/Developer/repo/node_modules/.pnpm/pkg/lib/types.d.ts"
+		if got, _ := view.computePath(probe); got != probe {
+			t.Fatalf("computePath(%q) = %q", probe, got)
+		}
+		if allocs := testing.AllocsPerRun(50, func() {
+			_, _ = view.computePath(probe)
+		}); allocs != 0 {
+			t.Fatalf("case-insensitive computePath under shared keyPrefix allocated %.0f times, want 0", allocs)
+		}
+	})
 }
 
 func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
