@@ -295,3 +295,173 @@ func TestGetFunctionNameWithKindCoreJSDocCasts(t *testing.T) {
 		})
 	}
 }
+
+func TestIsGuaranteedSafeLiteral(t *testing.T) {
+	t.Run("nil node", func(t *testing.T) {
+		if IsGuaranteedSafeLiteral(nil) {
+			t.Fatal("IsGuaranteedSafeLiteral(nil) = true, want false")
+		}
+	})
+
+	t.Run("source file root has nil parent", func(t *testing.T) {
+		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+			FileName: "/test.ts",
+			Path:     "/test.ts",
+		}, `const x = 1;`, core.ScriptKindTS)
+		if IsGuaranteedSafeLiteral(sourceFile.AsNode()) {
+			t.Fatal("IsGuaranteedSafeLiteral(sourceFile) = true, want false")
+		}
+	})
+
+	t.Run("detached numeric literal has nil parent", func(t *testing.T) {
+		factory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
+		node := factory.NewNumericLiteral("1", ast.TokenFlagsNone)
+		if IsGuaranteedSafeLiteral(node) {
+			t.Fatal("IsGuaranteedSafeLiteral(detached numeric literal) = true, want false")
+		}
+	})
+
+	tests := []struct {
+		name string
+		tsx  bool
+		code string
+		kind ast.Kind
+		want bool
+	}{
+		{
+			name: "property assignment string key is not safe expression literal",
+			code: `const o = { "a": 1 };`,
+			kind: ast.KindStringLiteral,
+			want: false,
+		},
+		{
+			name: "import specifier string property name is not safe expression literal",
+			code: `import { "a" as b } from "./mod";`,
+			kind: ast.KindStringLiteral,
+			want: false,
+		},
+		{
+			name: "string literal inside literal type is not safe expression literal",
+			code: `type T = "a";`,
+			kind: ast.KindStringLiteral,
+			want: false,
+		},
+		{
+			name: "numeric literal inside literal type is not safe expression literal",
+			code: `type N = 1;`,
+			kind: ast.KindNumericLiteral,
+			want: false,
+		},
+		{
+			name: "import module specifier string literal is not safe expression literal",
+			code: `import "./mod";`,
+			kind: ast.KindStringLiteral,
+			want: false,
+		},
+		{
+			name: "true keyword inside literal type is not safe expression literal",
+			code: `type T = true;`,
+			kind: ast.KindTrueKeyword,
+			want: false,
+		},
+		{
+			name: "false keyword inside literal type is not safe expression literal",
+			code: `type F = false;`,
+			kind: ast.KindFalseKeyword,
+			want: false,
+		},
+		{
+			name: "null keyword inside literal type is not safe expression literal",
+			code: `type N = null;`,
+			kind: ast.KindNullKeyword,
+			want: false,
+		},
+		{
+			name: "jsx attribute string literal is not safe expression literal",
+			tsx:  true,
+			code: `const el = <Comp a="x" />;`,
+			kind: ast.KindStringLiteral,
+			want: false,
+		},
+		{
+			name: "numeric literal inside with statement is not safe expression literal",
+			code: `with (obj) { const x = 1; }`,
+			kind: ast.KindNumericLiteral,
+			want: false,
+		},
+		{
+			name: "tagged template literal is not safe primitive literal",
+			code: "const x = tag`hello`;",
+			kind: ast.KindNoSubstitutionTemplateLiteral,
+			want: false,
+		},
+		{
+			name: "untagged no-substitution template literal is safe",
+			code: "const x = `hello`;",
+			kind: ast.KindNoSubstitutionTemplateLiteral,
+			want: true,
+		},
+		{
+			name: "expression numeric literal is safe",
+			code: `const x = 1;`,
+			kind: ast.KindNumericLiteral,
+			want: true,
+		},
+		{
+			name: "expression string literal is safe",
+			code: `const x = "a";`,
+			kind: ast.KindStringLiteral,
+			want: true,
+		},
+		{
+			name: "expression true keyword is safe",
+			code: `const x = true;`,
+			kind: ast.KindTrueKeyword,
+			want: true,
+		},
+		{
+			name: "expression false keyword is safe",
+			code: `const x = false;`,
+			kind: ast.KindFalseKeyword,
+			want: true,
+		},
+		{
+			name: "bigint literal inside literal type is not safe expression literal",
+			code: `type B = 1n;`,
+			kind: ast.KindBigIntLiteral,
+			want: false,
+		},
+		{
+			name: "expression bigint literal is safe",
+			code: `const x = 1n;`,
+			kind: ast.KindBigIntLiteral,
+			want: true,
+		},
+		{
+			name: "expression null keyword is safe",
+			code: `const x = null;`,
+			kind: ast.KindNullKeyword,
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := ast.SourceFileParseOptions{
+				FileName: "/test.ts",
+				Path:     "/test.ts",
+			}
+			scriptKind := core.ScriptKindTS
+			if tt.tsx {
+				opts.FileName = "/test.tsx"
+				opts.Path = "/test.tsx"
+				scriptKind = core.ScriptKindTSX
+			}
+			sourceFile := parser.ParseSourceFile(opts, tt.code, scriptKind)
+			node := findFirstNodeOfKind(t, sourceFile, tt.kind)
+			if got := IsGuaranteedSafeLiteral(node); got != tt.want {
+				t.Fatalf("IsGuaranteedSafeLiteral() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

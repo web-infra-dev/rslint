@@ -1126,6 +1126,9 @@ func IsUnsafeAssignment(
 	typeChecker *checker.Checker,
 	senderNode *ast.Node,
 ) (receiver *checker.Type, sender *checker.Type, unsafe bool) {
+	if t == receiverT {
+		return nil, nil, false
+	}
 	return isUnsafeAssignmentWorker(
 		t,
 		receiverT,
@@ -1142,6 +1145,9 @@ func isUnsafeAssignmentWorker(
 	senderNode *ast.Node,
 	visited map[*checker.Type]*Set[*checker.Type],
 ) (*checker.Type, *checker.Type, bool) {
+	if t == receiver {
+		return nil, nil, false
+	}
 	if IsTypeAnyType(t) {
 		// Allow assignment of any ==> unknown.
 		if IsTypeUnknownType(receiver) {
@@ -1213,6 +1219,36 @@ func isUnsafeAssignmentWorker(
 	}
 
 	return nil, nil, false
+}
+
+// IsGuaranteedSafeLiteral reports whether node is a primitive literal expression
+// whose checker type is guaranteed to be a non-`any`, non-TypeReference primitive
+// (never inside a `with` statement, JSDoc-reparsed clone, or non-expression position).
+func IsGuaranteedSafeLiteral(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindNumericLiteral,
+		ast.KindStringLiteral,
+		ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword:
+		if node.Parent == nil {
+			return false
+		}
+		if node.Kind == ast.KindNoSubstitutionTemplateLiteral &&
+			ast.IsTaggedTemplateExpression(node.Parent) &&
+			node.Parent.AsTaggedTemplateExpression().Template == node {
+			return false
+		}
+		return node.Flags&(ast.NodeFlagsInWithStatement|ast.NodeFlagsJSDoc) == 0 &&
+			ast.IsInExpressionContext(node)
+	default:
+		return false
+	}
 }
 
 /**

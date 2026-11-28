@@ -54,23 +54,6 @@ func buildUnsafeReturnThisMessage(t string) rule.RuleMessage {
 	}
 }
 
-func discriminateReturnType(
-	t *checker.Type,
-	typeChecker *checker.Checker,
-	node *ast.Node,
-) utils.DiscriminatedAnyType {
-	if utils.IsTypeAnyType(t) {
-		return utils.DiscriminatedAnyTypeAny
-	}
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsPrimitive|checker.TypeFlagsUnknown|checker.TypeFlagsNever) {
-		return utils.DiscriminatedAnyTypeSafe
-	}
-	if utils.IsTypeAnyArrayType(t, typeChecker) {
-		return utils.DiscriminatedAnyTypeAnyArray
-	}
-	return utils.DiscriminateAnyType(t, typeChecker, node)
-}
-
 var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unsafe-return",
 	Schema:           rule.EmptyArraySchema,
@@ -86,20 +69,40 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			returnNode *ast.Node,
 			reportingNode *ast.Node,
 		) {
+			if utils.IsGuaranteedSafeLiteral(ast.SkipParentheses(returnNode)) {
+				return
+			}
+
 			functionNode := utils.GetParentFunctionNode(returnNode)
 			if functionNode == nil {
 				return
 			}
 
 			returnNodeType := ctx.TypeChecker.GetTypeAtLocation(returnNode)
-			anyType := discriminateReturnType(
-				returnNodeType,
-				ctx.TypeChecker,
-				returnNode,
-			)
-			if anyType == utils.DiscriminatedAnyTypeSafe &&
-				utils.IsTypeFlagSet(returnNodeType, checker.TypeFlagsPrimitive|checker.TypeFlagsUnknown|checker.TypeFlagsNever) {
+			isAsync := ast.HasSyntacticModifier(functionNode, ast.ModifierFlagsAsync)
+
+			var anyType utils.DiscriminatedAnyType
+			needAsyncDiscriminate := false
+			if utils.IsTypeAnyType(returnNodeType) {
+				anyType = utils.DiscriminatedAnyTypeAny
+			} else if utils.IsTypeFlagSet(returnNodeType, checker.TypeFlagsPrimitive|checker.TypeFlagsUnknown|checker.TypeFlagsNever) {
 				return
+			} else if utils.IsTypeAnyArrayType(returnNodeType, ctx.TypeChecker) {
+				anyType = utils.DiscriminatedAnyTypeAnyArray
+			} else if !isAsync {
+				if !utils.IsTypeReference(returnNodeType) {
+					return
+				}
+				// Defer DiscriminateAnyType until the function return type is confirmed to be a
+				// distinct TypeReference with the same generic target (where we check for
+				// Promise<any> before IsUnsafeAssignment), avoiding eager type-argument/thenable
+				// expansion on non-async functions returning to `unknown`, `any`, or identical types.
+				anyType = utils.DiscriminatedAnyTypeSafe
+			} else {
+				// Defer DiscriminateAnyType until after checking explicit return type
+				// annotations (e.g. `Promise<unknown>`), avoiding probing `.then` on
+				// deferred recursive types when the signature already allows the return.
+				needAsyncDiscriminate = true
 			}
 
 			// function expressions will not have their return type modified based on receiver typing
@@ -107,18 +110,23 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			// const foo1: () => Set<string> = () => new Set<any>();
 			// the return type of the arrow function is Set<any> even though the variable is typed as Set<string>
 			var functionType *checker.Type
-			if ast.IsFunctionExpression(functionNode) || ast.IsArrowFunction(functionNode) {
-				functionType = utils.GetContextualType(ctx.TypeChecker, functionNode)
-			}
-			if functionType == nil {
-				functionType = ctx.TypeChecker.GetTypeAtLocation(functionNode)
+			loadFunctionType := func() *checker.Type {
+				if functionType == nil {
+					if ast.IsFunctionExpression(functionNode) || ast.IsArrowFunction(functionNode) {
+						functionType = utils.GetContextualType(ctx.TypeChecker, functionNode)
+					}
+					if functionType == nil {
+						functionType = ctx.TypeChecker.GetTypeAtLocation(functionNode)
+					}
+				}
+				return functionType
 			}
 			var callSignatures []*checker.Signature
 			callSignaturesLoaded := false
 			// If there is an explicit type annotation *and* that type matches the actual
 			// function return type, we shouldn't complain (it's intentional, even if unsafe)
 			if functionNode.Type() != nil {
-				callSignatures = utils.CollectAllCallSignatures(ctx.TypeChecker, functionType)
+				callSignatures = utils.CollectAllCallSignatures(ctx.TypeChecker, loadFunctionType())
 				callSignaturesLoaded = true
 				for _, signature := range callSignatures {
 					signatureReturnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
@@ -130,20 +138,29 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 						) {
 						return
 					}
-					if ast.HasSyntacticModifier(functionNode, ast.ModifierFlagsAsync) {
+					if isAsync {
 						awaitedSignatureReturnType := checker.Checker_getAwaitedType(ctx.TypeChecker, signatureReturnType)
+						if awaitedSignatureReturnType != nil && utils.IsTypeFlagSet(awaitedSignatureReturnType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
+							return
+						}
 						awaitedReturnNodeType := checker.Checker_getAwaitedType(ctx.TypeChecker, returnNodeType)
-
-						if awaitedSignatureReturnType == awaitedReturnNodeType || (awaitedSignatureReturnType != nil && utils.IsTypeFlagSet(awaitedSignatureReturnType, checker.TypeFlagsAny|checker.TypeFlagsUnknown)) {
+						if awaitedSignatureReturnType == awaitedReturnNodeType {
 							return
 						}
 					}
 				}
 			}
 
+			if needAsyncDiscriminate {
+				anyType = utils.DiscriminateAnyType(returnNodeType, ctx.TypeChecker, returnNode)
+				if anyType == utils.DiscriminatedAnyTypeSafe && !utils.IsTypeReference(returnNodeType) {
+					return
+				}
+			}
+
 			if anyType != utils.DiscriminatedAnyTypeSafe {
 				if !callSignaturesLoaded {
-					callSignatures = utils.CollectAllCallSignatures(ctx.TypeChecker, functionType)
+					callSignatures = utils.CollectAllCallSignatures(ctx.TypeChecker, loadFunctionType())
 				}
 				// Allow cases when the declared return type of the function is either unknown or unknown[]
 				// and the function is returning any or any[].
@@ -162,10 +179,6 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 							return
 						}
 					}
-				}
-
-				if anyType == utils.DiscriminatedAnyTypePromiseAny && !ast.HasSyntacticModifier(functionNode, ast.ModifierFlagsAsync) {
-					return
 				}
 
 				var typeString string
@@ -196,8 +209,9 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if !callSignaturesLoaded || utils.IsUnionType(functionType) || utils.IsIntersectionType(functionType) {
-				callSignatures = utils.GetCallSignatures(ctx.TypeChecker, functionType)
+			ft := loadFunctionType()
+			if !callSignaturesLoaded || utils.IsUnionType(ft) || utils.IsIntersectionType(ft) {
+				callSignatures = utils.GetCallSignatures(ctx.TypeChecker, ft)
 			}
 			if len(callSignatures) < 1 {
 				return
@@ -205,6 +219,20 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 
 			signature := callSignatures[0]
 			functionReturnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+
+			if returnNodeType == functionReturnType ||
+				!utils.IsTypeReference(functionReturnType) ||
+				returnNodeType.Target() != functionReturnType.Target() {
+				return
+			}
+			// Non-async functions do not flag returning Promise<any> (matching upstream
+			// where DiscriminateAnyType returns PromiseAny and !isAsync returns early).
+			// Check this before IsUnsafeAssignment so matching generic targets that
+			// extend Promise<any> (e.g. `Job<any, Box<Link>>` -> `Job<unknown, [unknown]>`)
+			// hit the Promise<any> exemption without expanding unrelated type arguments.
+			if !isAsync && utils.DiscriminateAnyType(returnNodeType, ctx.TypeChecker, returnNode) == utils.DiscriminatedAnyTypePromiseAny {
+				return
+			}
 
 			receiver, sender, unsafe := utils.IsUnsafeAssignment(
 				returnNodeType,
