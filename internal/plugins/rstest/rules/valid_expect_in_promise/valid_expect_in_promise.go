@@ -109,7 +109,7 @@ var ValidExpectInPromiseRule = shared.NewRule(shared.Config{
 				if callNode == nil || callNode.Kind != ast.KindCallExpression {
 					return false
 				}
-				top := shared.TopMostCallExpressionOnCallee(callNode)
+				top := rstestUtils.FindTopMostCallExpression(callNode)
 				parsed := analysis.ParseExpectCall(top)
 				if parsed == nil ||
 					(!slices.Contains(parsed.Modifiers, "resolves") &&

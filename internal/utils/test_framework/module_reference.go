@@ -462,9 +462,9 @@ var nodeModuleSpecifiers = []string{"node:module", "module"}
 
 // isShadowedByNonModuleRequire reports whether a `require(...)` callee resolves
 // to a local declaration that is NOT Node's module loader. Ambient TypeScript
-// declarations (`declare const/function require`) and un-reassigned bindings
+// declarations (`declare const/function require`) and `const` bindings
 // initialized from `createRequire(...)` of `node:module` / `module` preserve
-// real module loading; local mocks and parameters do not.
+// real module loading; local mocks, mutable bindings, and parameters do not.
 func isShadowedByNonModuleRequire(callee *ast.Node, depth int) bool {
 	if callee == nil || callee.Kind != ast.KindIdentifier {
 		return true
@@ -473,7 +473,7 @@ func isShadowedByNonModuleRequire(callee *ast.Node, depth int) bool {
 	if !internalUtils.IsShadowed(callee, name) {
 		return false
 	}
-	decl, scopeNode, ambient := findInnermostDeclaration(callee, name)
+	decl, ambient := findInnermostDeclaration(callee, name)
 	if decl == nil {
 		// IsShadowed was true, so never assume a missing declaration is ambient.
 		return true
@@ -483,7 +483,7 @@ func isShadowedByNonModuleRequire(callee *ast.Node, depth int) bool {
 		// still resolves to the global CommonJS loader.
 		return false
 	}
-	if decl.Kind != ast.KindVariableDeclaration {
+	if decl.Kind != ast.KindVariableDeclaration || !isImmutableConstDeclaration(decl) {
 		return true
 	}
 	varDecl := decl.AsVariableDeclaration()
@@ -492,41 +492,33 @@ func isShadowedByNonModuleRequire(callee *ast.Node, depth int) bool {
 		varDecl.Name().AsIdentifier().Text != name {
 		return true
 	}
-	isConst := decl.Parent != nil &&
-		decl.Parent.Kind == ast.KindVariableDeclarationList &&
-		decl.Parent.Flags&ast.NodeFlagsConst != 0
-	if !isConst && bindingReassignedInScope(scopeNode, varDecl.Name(), name) {
-		return true
-	}
 	return !isNodeCreateRequireCall(varDecl.Initializer, depth+1)
 }
 
-func isHoistedVarDeclaration(decl *ast.Node) bool {
+func isImmutableConstDeclaration(decl *ast.Node) bool {
 	return decl != nil &&
 		decl.Kind == ast.KindVariableDeclaration &&
-		decl.Parent != nil &&
-		decl.Parent.Kind == ast.KindVariableDeclarationList &&
-		decl.Parent.Flags&ast.NodeFlagsBlockScoped == 0
+		ast.IsVarConst(decl) &&
+		!ast.IsVarAwaitUsing(decl)
 }
 
-func enclosingVarScope(node *ast.Node) *ast.Node {
-	for current := node; current != nil; current = current.Parent {
-		switch current.Kind {
-		case ast.KindSourceFile, ast.KindModuleBlock, ast.KindClassStaticBlockDeclaration:
-			return current
-		default:
-			if IsFunction(current) {
-				return current
-			}
-		}
-	}
-	return node
-}
-
-func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, scopeNode *ast.Node, ambient bool) {
+func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, ambient bool) {
 	prev := node
 	inParameterDecorator := false
 	crossedScope := false
+	var ambientDecl *ast.Node
+	record := func(d *ast.Node, amb bool) bool {
+		if d == nil {
+			return false
+		}
+		if !amb {
+			return true
+		}
+		if ambientDecl == nil {
+			ambientDecl = d
+		}
+		return false
+	}
 	for current := node.Parent; current != nil; prev, current = current, current.Parent {
 		if current.Kind == ast.KindParameter {
 			inParameterDecorator = prev.Kind == ast.KindDecorator
@@ -534,32 +526,28 @@ func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, scop
 		switch current.Kind {
 		case ast.KindSourceFile:
 			if sf := current.AsSourceFile(); sf != nil && sf.Statements != nil {
-				if d, amb := findDeclInStatements(sf.Statements.Nodes, name, true); d != nil {
-					return d, current, amb
+				if d, amb := findDeclInStatements(sf.Statements.Nodes, name, true); record(d, amb) {
+					return d, false
 				}
 			}
-			return nil, current, false
+			return ambientDecl, ambientDecl != nil
 		case ast.KindBlock:
 			if block := current.AsBlock(); block != nil && block.Statements != nil {
-				if d, amb := findDeclInStatements(block.Statements.Nodes, name, false); d != nil {
-					scope := current
-					if isHoistedVarDeclaration(d) {
-						scope = enclosingVarScope(current)
-					}
-					return d, scope, amb
+				if d, amb := findDeclInStatements(block.Statements.Nodes, name, false); record(d, amb) {
+					return d, false
 				}
 			}
 		case ast.KindModuleBlock:
 			if block := current.AsModuleBlock(); block != nil && block.Statements != nil {
-				if d, amb := findDeclInStatements(block.Statements.Nodes, name, true); d != nil {
-					return d, current, amb
+				if d, amb := findDeclInStatements(block.Statements.Nodes, name, true); record(d, amb) {
+					return d, false
 				}
 			}
 		case ast.KindClassStaticBlockDeclaration:
 			if sb := current.AsClassStaticBlockDeclaration(); sb != nil && sb.Body != nil && sb.Body.Kind == ast.KindBlock {
 				if block := sb.Body.AsBlock(); block != nil && block.Statements != nil {
-					if d, amb := findDeclInStatements(block.Statements.Nodes, name, true); d != nil {
-						return d, current, amb
+					if d, amb := findDeclInStatements(block.Statements.Nodes, name, true); record(d, amb) {
+						return d, false
 					}
 				}
 			}
@@ -567,12 +555,8 @@ func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, scop
 			if cb := current.AsCaseBlock(); cb != nil && cb.Clauses != nil {
 				for _, clause := range cb.Clauses.Nodes {
 					if c := clause.AsCaseOrDefaultClause(); c != nil && c.Statements != nil {
-						if d, amb := findDeclInStatements(c.Statements.Nodes, name, false); d != nil {
-							scope := current
-							if isHoistedVarDeclaration(d) {
-								scope = enclosingVarScope(current)
-							}
-							return d, scope, amb
+						if d, amb := findDeclInStatements(c.Statements.Nodes, name, false); record(d, amb) {
+							return d, false
 						}
 					}
 				}
@@ -580,27 +564,19 @@ func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, scop
 		case ast.KindCatchClause:
 			if cc := current.AsCatchClause(); cc != nil && cc.VariableDeclaration != nil {
 				if bindingDeclaresName(cc.VariableDeclaration.Name(), name) {
-					return cc.VariableDeclaration, current, false
+					return cc.VariableDeclaration, false
 				}
 			}
 		case ast.KindForStatement:
 			if fs := current.AsForStatement(); fs != nil && fs.Initializer != nil && fs.Initializer.Kind == ast.KindVariableDeclarationList {
 				if d := findDeclInVarDeclList(fs.Initializer.AsVariableDeclarationList(), name); d != nil {
-					scope := current
-					if isHoistedVarDeclaration(d) {
-						scope = enclosingVarScope(current)
-					}
-					return d, scope, false
+					return d, false
 				}
 			}
 		case ast.KindForInStatement, ast.KindForOfStatement:
 			if fs := current.AsForInOrOfStatement(); fs != nil && fs.Initializer != nil && fs.Initializer.Kind == ast.KindVariableDeclarationList {
 				if d := findDeclInVarDeclList(fs.Initializer.AsVariableDeclarationList(), name); d != nil {
-					scope := current
-					if isHoistedVarDeclaration(d) {
-						scope = enclosingVarScope(current)
-					}
-					return d, scope, false
+					return d, false
 				}
 			}
 		case ast.KindClassDeclaration, ast.KindClassExpression:
@@ -609,7 +585,7 @@ func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, scop
 			}
 			if current.Kind == ast.KindClassExpression && prev != current.Name() && prev.Kind != ast.KindDecorator {
 				if n := current.Name(); n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == name {
-					return current, current, false
+					return current, false
 				}
 			}
 			crossedScope = true
@@ -628,25 +604,27 @@ func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, scop
 				// is never mistaken for an unconditional `createRequire` binding.
 				for _, param := range current.Parameters() {
 					if param != nil && bindingDeclaresName(param.Name(), name) {
-						return param, current, false
+						return param, false
 					}
 				}
 				if !inParam && current.Body() != nil && current.Body().Kind == ast.KindBlock {
 					if block := current.Body().AsBlock(); block != nil && block.Statements != nil {
-						if d, amb := findHoistedVarOrFnInStatements(block.Statements.Nodes, name, true); d != nil {
-							return d, current, amb
+						if d, amb := findHoistedVarOrFnInStatements(block.Statements.Nodes, name, true); record(d, amb) {
+							return d, false
 						}
 					}
 				}
 				if current.Kind == ast.KindFunctionExpression || current.Kind == ast.KindFunctionDeclaration {
 					if fnName := current.Name(); fnName != nil && fnName.Kind == ast.KindIdentifier && fnName.AsIdentifier().Text == name {
-						return current, current, ast.HasSyntacticModifier(current, ast.ModifierFlagsAmbient)
+						if record(current, ast.HasSyntacticModifier(current, ast.ModifierFlagsAmbient)) {
+							return current, false
+						}
 					}
 				}
 			}
 		}
 	}
-	return nil, nil, false
+	return ambientDecl, ambientDecl != nil
 }
 
 func isDirectParameterNode(fn *ast.Node, child *ast.Node) bool {
@@ -913,175 +891,6 @@ func bindingDeclaresName(binding *ast.Node, name string) bool {
 	return found
 }
 
-// bindingReassignedInScope reports whether a non-const binding whose identifier
-// node is `declIdent` has any other runtime declaration or write reference for
-// `name` within `scopeNode`, skipping nested scopes that lexically shadow `name`.
-func bindingReassignedInScope(scopeNode *ast.Node, declIdent *ast.Node, name string) bool {
-	if scopeNode == nil {
-		return true
-	}
-	reassigned := false
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil || reassigned {
-			return
-		}
-		if node.Kind == ast.KindFunctionDeclaration {
-			if n := node.Name(); n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == name &&
-				!ast.HasSyntacticModifier(node, ast.ModifierFlagsAmbient) {
-				if n != declIdent {
-					reassigned = true
-					return
-				}
-			}
-		}
-		if node != scopeNode {
-			switch node.Kind {
-			case ast.KindBlock:
-				if block := node.AsBlock(); block != nil && block.Statements != nil {
-					if hasLexicalShadowInStatements(block.Statements.Nodes, name, declIdent) {
-						return
-					}
-				}
-			case ast.KindCaseBlock:
-				if cb := node.AsCaseBlock(); cb != nil && cb.Clauses != nil {
-					for _, clause := range cb.Clauses.Nodes {
-						if c := clause.AsCaseOrDefaultClause(); c != nil && c.Statements != nil {
-							if hasLexicalShadowInStatements(c.Statements.Nodes, name, declIdent) {
-								return
-							}
-						}
-					}
-				}
-			case ast.KindCatchClause:
-				if cc := node.AsCatchClause(); cc != nil && cc.VariableDeclaration != nil && bindingDeclaresName(cc.VariableDeclaration.Name(), name) {
-					return
-				}
-			case ast.KindForStatement:
-				if fs := node.AsForStatement(); fs != nil && fs.Initializer != nil &&
-					fs.Initializer.Kind == ast.KindVariableDeclarationList &&
-					fs.Initializer.Flags&ast.NodeFlagsBlockScoped != 0 &&
-					findDeclInVarDeclList(fs.Initializer.AsVariableDeclarationList(), name) != nil {
-					return
-				}
-			case ast.KindForInStatement, ast.KindForOfStatement:
-				if fs := node.AsForInOrOfStatement(); fs != nil && fs.Initializer != nil &&
-					fs.Initializer.Kind == ast.KindVariableDeclarationList &&
-					fs.Initializer.Flags&ast.NodeFlagsBlockScoped != 0 &&
-					findDeclInVarDeclList(fs.Initializer.AsVariableDeclarationList(), name) != nil {
-					return
-				}
-			case ast.KindClassExpression:
-				if n := node.Name(); n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == name {
-					return
-				}
-			default:
-				if IsFunction(node) {
-					if functionShadowsName(node, name) {
-						// Decorators and computed property keys always evaluate
-						// in the enclosing scope; parameter default initializers
-						// also evaluate in the enclosing scope unless shadowed
-						// by a parameter or the function's own name.
-						if mods := node.Modifiers(); mods != nil {
-							for _, mod := range mods.Nodes {
-								if mod != nil && mod.Kind == ast.KindDecorator {
-									visit(mod)
-								}
-							}
-						}
-						if fnName := node.Name(); fnName != nil && fnName.Kind == ast.KindComputedPropertyName {
-							visit(fnName)
-						}
-						if !functionParamsOrNameShadow(node, name) {
-							for _, param := range node.Parameters() {
-								if param != nil && param.Initializer() != nil {
-									visit(param.Initializer())
-								}
-							}
-						}
-						return
-					}
-				}
-			}
-		}
-		if node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == name {
-			if node == declIdent {
-				return
-			}
-			if internalUtils.IsWriteReference(node) || internalUtils.IsVariableWriteReference(node) {
-				reassigned = true
-				return
-			}
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return reassigned
-		})
-	}
-	visit(scopeNode)
-	return reassigned
-}
-
-func hasLexicalShadowInStatements(statements []*ast.Node, name string, excludeIdent *ast.Node) bool {
-	for _, stmt := range statements {
-		if stmt == nil || ast.HasSyntacticModifier(stmt, ast.ModifierFlagsAmbient) {
-			continue
-		}
-		switch stmt.Kind {
-		case ast.KindVariableStatement:
-			vs := stmt.AsVariableStatement()
-			if vs == nil || vs.DeclarationList == nil || vs.DeclarationList.Flags&ast.NodeFlagsBlockScoped == 0 {
-				continue
-			}
-			if d := findDeclInVarDeclList(vs.DeclarationList.AsVariableDeclarationList(), name); d != nil {
-				if excludeIdent == nil || !nodeContainsIdent(d, excludeIdent) {
-					return true
-				}
-			}
-		case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindEnumDeclaration:
-			if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == name && n != excludeIdent {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func nodeContainsIdent(ancestor *ast.Node, target *ast.Node) bool {
-	if ancestor == nil || target == nil {
-		return false
-	}
-	return target.Pos() >= ancestor.Pos() && target.End() <= ancestor.End()
-}
-
-func functionParamsOrNameShadow(fn *ast.Node, name string) bool {
-	if fn.Kind == ast.KindFunctionExpression || fn.Kind == ast.KindFunctionDeclaration {
-		if n := fn.Name(); n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == name {
-			return true
-		}
-	}
-	for _, param := range fn.Parameters() {
-		if param != nil && bindingDeclaresName(param.Name(), name) {
-			return true
-		}
-	}
-	return false
-}
-
-func functionShadowsName(fn *ast.Node, name string) bool {
-	if functionParamsOrNameShadow(fn, name) {
-		return true
-	}
-	if fn.Body() != nil && fn.Body().Kind == ast.KindBlock {
-		if block := fn.Body().AsBlock(); block != nil && block.Statements != nil {
-			if d, amb := findDeclInStatements(block.Statements.Nodes, name, true); d != nil && !amb {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func isNodeCreateRequireCall(node *ast.Node, depth int) bool {
 	if depth > 6 {
 		return false
@@ -1104,7 +913,7 @@ func isNodeCreateRequireFunction(expr *ast.Node, depth int) bool {
 	switch expr.Kind {
 	case ast.KindIdentifier:
 		localName := expr.AsIdentifier().Text
-		decl, scopeNode, ambient := findInnermostDeclaration(expr, localName)
+		decl, ambient := findInnermostDeclaration(expr, localName)
 		if decl == nil || ambient {
 			return false
 		}
@@ -1113,26 +922,20 @@ func isNodeCreateRequireFunction(expr *ast.Node, depth int) bool {
 			imported, _, ok := resolveModuleImportSpecifier(decl, nodeModuleSpecifiers, false)
 			return ok && imported == "createRequire"
 		case ast.KindVariableDeclaration:
+			if !isImmutableConstDeclaration(decl) {
+				return false
+			}
 			varDecl := decl.AsVariableDeclaration()
 			if varDecl == nil || varDecl.Initializer == nil {
 				return false
 			}
-			isConst := decl.Parent != nil &&
-				decl.Parent.Kind == ast.KindVariableDeclarationList &&
-				decl.Parent.Flags&ast.NodeFlagsConst != 0
 			if varDecl.Name() != nil && varDecl.Name().Kind == ast.KindIdentifier && varDecl.Name().AsIdentifier().Text == localName {
-				if !isConst && bindingReassignedInScope(scopeNode, varDecl.Name(), localName) {
-					return false
-				}
 				return isNodeCreateRequireFunction(varDecl.Initializer, depth+1)
 			}
 			// Destructured `const { createRequire } = require('node:module')`
 			// or `const { createRequire } = mod` where `mod` is `node:module`.
 			if varDecl.Name() != nil && varDecl.Name().Kind == ast.KindObjectBindingPattern {
 				if binding := findBindingElementInPattern(varDecl.Name(), localName); binding != nil {
-					if !isConst && bindingReassignedInScope(scopeNode, binding.Name(), localName) {
-						return false
-					}
 					if imported, _, ok := resolveModuleRequireBindingAtDepth(binding, nodeModuleSpecifiers, depth+1); ok && imported == "createRequire" {
 						return true
 					}
@@ -1187,7 +990,7 @@ func isNodeModuleNamespaceIdent(obj *ast.Node, depth int) bool {
 		return false
 	}
 	name := obj.AsIdentifier().Text
-	decl, scopeNode, ambient := findInnermostDeclaration(obj, name)
+	decl, ambient := findInnermostDeclaration(obj, name)
 	if decl == nil || ambient {
 		return false
 	}
@@ -1204,16 +1007,13 @@ func isNodeModuleNamespaceIdent(obj *ast.Node, depth int) bool {
 	case ast.KindImportEqualsDeclaration:
 		return IsImportEqualsOfModules(decl, nodeModuleSpecifiers)
 	case ast.KindVariableDeclaration:
+		if !isImmutableConstDeclaration(decl) {
+			return false
+		}
 		varDecl := decl.AsVariableDeclaration()
 		if varDecl == nil || varDecl.Initializer == nil ||
 			varDecl.Name() == nil || varDecl.Name().Kind != ast.KindIdentifier ||
 			varDecl.Name().AsIdentifier().Text != name {
-			return false
-		}
-		isConst := decl.Parent != nil &&
-			decl.Parent.Kind == ast.KindVariableDeclarationList &&
-			decl.Parent.Flags&ast.NodeFlagsConst != 0
-		if !isConst && bindingReassignedInScope(scopeNode, varDecl.Name(), name) {
 			return false
 		}
 		init := internalUtils.SkipAssertionsAndParens(varDecl.Initializer)

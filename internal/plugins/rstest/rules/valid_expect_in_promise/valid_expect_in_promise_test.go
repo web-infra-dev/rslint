@@ -22,6 +22,7 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 			{Code: `test("case", async () => { const pending = promise.then(value => assert.equal(value, 1)); await pending; });`},
 			{Code: `test("case", () => { const pending = promise.then(value => assert.equal(value, 1)); expect(pending).resolves.toBeUndefined(); });`},
 			{Code: `test("case", () => expect(promise.then(value => assert.equal(value, 1))).resolves.toBeUndefined());`},
+			{Code: `test("case", async () => { await expect(promise.then(() => { expect(1).toBe(1); })).resolves["to" + "Be"](undefined); });`},
 			{Code: `test("case", () => condition ? promise.then(value => assert.equal(value, 1)) : Promise.resolve());`},
 			{Code: `test("case", () => condition && promise.then(value => assert.equal(value, 1)));`},
 			{Code: `test("case", () => { const [pending] = [promise.then(value => assert.equal(value, 1))]; return pending; });`},

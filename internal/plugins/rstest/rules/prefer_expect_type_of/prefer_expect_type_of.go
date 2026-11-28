@@ -139,23 +139,6 @@ func hasAsyncExpectModifier(parsed *rstestUtils.ParsedRstestExpectCall) bool {
 	return false
 }
 
-func outermostTransparentExpr(node *ast.Node) *ast.Node {
-	current := node
-	for current != nil && current.Parent != nil {
-		parent := current.Parent
-		if parent.Kind == ast.KindParenthesizedExpression {
-			current = parent
-			continue
-		}
-		if expr, ok := utils.TransparentExpression(parent); ok && expr == current {
-			current = parent
-			continue
-		}
-		break
-	}
-	return current
-}
-
 func isAllowedTrailingAssertionShape(parsed *rstestUtils.ParsedRstestExpectCall, matcherCall *ast.Node) bool {
 	if matcherCall == nil || parsed == nil || parsed.Expression == nil {
 		return false
@@ -185,7 +168,7 @@ func isAllowedTrailingAssertionShape(parsed *rstestUtils.ParsedRstestExpectCall,
 			cur = memberOuter.Parent
 		}
 	}
-	outer := outermostTransparentExpr(parsed.Expression)
+	outer := utils.OutermostTransparentExpression(parsed.Expression)
 	if outer != nil && outer.Parent != nil {
 		switch outer.Parent.Kind {
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:

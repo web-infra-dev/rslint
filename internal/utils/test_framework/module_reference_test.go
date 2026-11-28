@@ -126,6 +126,10 @@ func TestIsModuleRequireCallModulesIgnoresShadowedRequire(t *testing.T) {
 		// Default parameter / computed method key reassigns outer `let require` even when body declares `let require`.
 		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); function hijack(x = (require = () => ({}))) { let require = 1; } hijack(); require("@rstest/core");`,
 		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); const o = { [(require = () => ({}))]() { let require = 1; } }; require("@rstest/core");`,
+		// Ambient `declare const require` inside an inner scope must not hide an outer runtime shadow.
+		`const require = () => ({}); namespace N { declare const require: any; export const r = require("@rstest/core"); }`,
+		// Mutable `let` bindings are rejected conservatively rather than scanning for reassignments.
+		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); require("@rstest/core");`,
 	} {
 		t.Run("shadowed/"+code, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
@@ -147,7 +151,6 @@ func TestIsModuleRequireCallModulesIgnoresShadowedRequire(t *testing.T) {
 		`declare const require: any; require("@rstest/core");`,
 		`declare function require(id: string): any; require("@rstest/core");`,
 		`import { createRequire } from "node:module"; const require = createRequire(import.meta.url); require("@rstest/core");`,
-		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); require("@rstest/core");`,
 		`import { createRequire } from "node:module"; const cr = createRequire; const require = cr(import.meta.url); require("@rstest/core");`,
 		`import { createRequire as makeReq } from "module"; const require = makeReq(import.meta.url); require("@rstest/core");`,
 		`import * as mod from "node:module"; const require = mod.createRequire(import.meta.url); require("@rstest/core");`,
@@ -155,12 +158,10 @@ func TestIsModuleRequireCallModulesIgnoresShadowedRequire(t *testing.T) {
 		`import { default as mod } from "node:module"; const require = mod.createRequire(import.meta.url); require("@rstest/core");`,
 		`import mod from "node:module"; const { createRequire } = mod; const require = createRequire(import.meta.url); require("@rstest/core");`,
 		`const { createRequire } = require("node:module"); function run() { const require = createRequire(import.meta.url); require("@rstest/core"); }`,
-		`let { createRequire } = require("node:module"); { const require = createRequire(import.meta.url); require("@rstest/core"); }`,
 		`const mod = require("node:module"); { const require = mod.createRequire(import.meta.url); require("@rstest/core"); }`,
 		`const make = require("node:module").createRequire; { const require = make(import.meta.url); require("@rstest/core"); }`,
 		`import type { require } from "./types"; require("@rstest/core");`,
 		`import { type require } from "./types"; require("@rstest/core");`,
-		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); function helper() { const require = () => ({}); return require; } require("@rstest/core");`,
 		`import { createRequire } from "node:module"; const require = createRequire(import.meta.url); function run() { { using require = makeDisposable(); } require("@rstest/core"); }`,
 		`class C { @dec(require("@rstest/core")) m(require: any) {} }`,
 		`import { createRequire } from "node:module"; const require = createRequire(import.meta.url); class C { m(@dec(() => require("@rstest/core")) require: any) {} }`,

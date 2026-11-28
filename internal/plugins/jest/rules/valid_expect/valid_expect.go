@@ -223,57 +223,15 @@ func resolveAsyncAssertionReportNode(
 	return resolver.ResolveAsyncAssertionReportNode(assertionExpr, alwaysAwait)
 }
 
-type asyncFixTracker struct {
-	resolver      *sharedValidExpect.AsyncAssertionResolver
-	asyncInserted map[*ast.Node]bool
-	deferredFn    map[*ast.Node]bool
-	fnFixable     map[*ast.Node]bool
-	emittedRanges []core.TextRange
-}
-
-func (t *asyncFixTracker) overlaps(pos int) bool {
-	for _, r := range t.emittedRanges {
-		if r.Pos() <= pos && pos <= r.End() {
-			return true
-		}
-	}
-	return false
-}
-
 func reportAsyncDescriptor(
 	ctx rule.RuleContext,
+	resolver *sharedValidExpect.AsyncAssertionResolver,
 	descriptor asyncDescriptor,
 	alwaysAwait bool,
-	tracker *asyncFixTracker,
+	fnFixable map[*ast.Node]bool,
 ) {
 	msg := buildAsyncDescriptorMessage(descriptor, alwaysAwait)
-
-	ctx.ReportNodeWithDeferredFixes(descriptor.node, msg, func() []rule.RuleFix {
-		fn, ok := sharedValidExpect.FindFixableContainingFunctionCached(descriptor.node, tracker.fnFixable)
-		if !ok || !tracker.resolver.CanSafelyAwaitFix(descriptor.node) {
-			return nil
-		}
-		if tracker.deferredFn[fn] {
-			return nil
-		}
-		var fixes []rule.RuleFix
-		if !sharedValidExpect.IsAsyncFunctionLike(fn) && !tracker.asyncInserted[fn] {
-			asyncFix := sharedValidExpect.AsyncInsertFix(ctx.SourceFile, fn)
-			if tracker.overlaps(asyncFix.Range.Pos()) {
-				// An earlier fix span covers this function's `async` insertion
-				// point; defer all fixes in `fn` to the next pass so later
-				// diagnostics never emit a bare `await` in a sync function.
-				tracker.deferredFn[fn] = true
-				return nil
-			}
-			fixes = append(fixes, asyncFix)
-			tracker.asyncInserted[fn] = true
-		}
-		awaitFix := tracker.resolver.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait)
-		fixes = append(fixes, awaitFix)
-		tracker.emittedRanges = append(tracker.emittedRanges, core.NewTextRange(fixes[0].Range.Pos(), fixes[len(fixes)-1].Range.End()))
-		return fixes
-	})
+	resolver.ReportAsyncDescriptor(ctx, descriptor.node, msg, alwaysAwait, fnFixable)
 }
 
 func findTopLevelMemberAccess(node *ast.Node) *ast.Node {
@@ -292,12 +250,7 @@ var ValidExpectRule = rule.Rule{
 		analysis := utils.GetJestCallAnalysis(ctx)
 		asyncResolver := sharedValidExpect.NewAsyncAssertionResolver(ctx)
 		arrayExceptions := map[string]bool{}
-		tracker := &asyncFixTracker{
-			resolver:      asyncResolver,
-			asyncInserted: map[*ast.Node]bool{},
-			deferredFn:    map[*ast.Node]bool{},
-			fnFixable:     map[*ast.Node]bool{},
-		}
+		fnFixable := map[*ast.Node]bool{}
 		var descriptors []asyncDescriptor
 
 		return rule.RuleListeners{
@@ -387,7 +340,7 @@ var ValidExpectRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindEndOfFile): func(node *ast.Node) {
 				_ = node
 				for _, descriptor := range descriptors {
-					reportAsyncDescriptor(ctx, descriptor, opts.AlwaysAwait, tracker)
+					reportAsyncDescriptor(ctx, asyncResolver, descriptor, opts.AlwaysAwait, fnFixable)
 				}
 			},
 		}

@@ -169,54 +169,15 @@ func readIntOption(options map[string]interface{}, key string, defaultValue int)
 // no jest or rstest semantics, and keeping two copies is what let the same
 // parenthesized-assertion false positive exist twice.
 
-type asyncFixTracker struct {
-	resolver      *sharedValidExpect.AsyncAssertionResolver
-	asyncInserted map[*ast.Node]bool
-	deferredFn    map[*ast.Node]bool
-	fnFixable     map[*ast.Node]bool
-	emittedRanges []core.TextRange
-}
-
-func (t *asyncFixTracker) overlaps(pos int) bool {
-	for _, r := range t.emittedRanges {
-		if r.Pos() <= pos && pos <= r.End() {
-			return true
-		}
-	}
-	return false
-}
-
 func reportAsyncDescriptor(
 	ctx rule.RuleContext,
+	resolver *sharedValidExpect.AsyncAssertionResolver,
 	descriptor asyncDescriptor,
 	alwaysAwait bool,
-	tracker *asyncFixTracker,
+	fnFixable map[*ast.Node]bool,
 ) {
 	msg := buildAsyncDescriptorMessage(descriptor, alwaysAwait)
-
-	ctx.ReportNodeWithDeferredFixes(descriptor.node, msg, func() []rule.RuleFix {
-		fn, ok := sharedValidExpect.FindFixableContainingFunctionCached(descriptor.node, tracker.fnFixable)
-		if !ok || !tracker.resolver.CanSafelyAwaitFix(descriptor.node) {
-			return nil
-		}
-		if tracker.deferredFn[fn] {
-			return nil
-		}
-		var fixes []rule.RuleFix
-		if !sharedValidExpect.IsAsyncFunctionLike(fn) && !tracker.asyncInserted[fn] {
-			asyncFix := sharedValidExpect.AsyncInsertFix(ctx.SourceFile, fn)
-			if tracker.overlaps(asyncFix.Range.Pos()) {
-				tracker.deferredFn[fn] = true
-				return nil
-			}
-			fixes = append(fixes, asyncFix)
-			tracker.asyncInserted[fn] = true
-		}
-		awaitFix := tracker.resolver.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait)
-		fixes = append(fixes, awaitFix)
-		tracker.emittedRanges = append(tracker.emittedRanges, core.NewTextRange(fixes[0].Range.Pos(), fixes[len(fixes)-1].Range.End()))
-		return fixes
-	})
+	resolver.ReportAsyncDescriptor(ctx, descriptor.node, msg, alwaysAwait, fnFixable)
 }
 
 // expectFactoryOpenParenRange locates the `(` of the assertion factory call so
@@ -327,28 +288,11 @@ func asyncAssertionExpression(parsed *rstestUtils.ParsedRstestExpectCall) *ast.N
 	return parsed.Expression
 }
 
-func outermostTransparentExpr(node *ast.Node) *ast.Node {
-	current := node
-	for current != nil && current.Parent != nil {
-		parent := current.Parent
-		if parent.Kind == ast.KindParenthesizedExpression {
-			current = parent
-			continue
-		}
-		if expr, ok := internalUtils.TransparentExpression(parent); ok && expr == current {
-			current = parent
-			continue
-		}
-		break
-	}
-	return current
-}
-
 func trailingUncalledMemberAccess(expr *ast.Node) *ast.Node {
 	var topMember *ast.Node
 	cur := expr
 	for cur != nil {
-		outer := outermostTransparentExpr(cur)
+		outer := internalUtils.OutermostTransparentExpression(cur)
 		if outer == nil || outer.Parent == nil ||
 			!ast.IsAccessExpression(outer.Parent) ||
 			outer.Parent.Expression() != outer {
@@ -360,7 +304,7 @@ func trailingUncalledMemberAccess(expr *ast.Node) *ast.Node {
 	if topMember == nil {
 		return nil
 	}
-	topOuter := outermostTransparentExpr(topMember)
+	topOuter := internalUtils.OutermostTransparentExpression(topMember)
 	if topOuter != nil && topOuter.Parent != nil &&
 		topOuter.Parent.Kind == ast.KindCallExpression &&
 		topOuter.Parent.AsCallExpression().Expression == topOuter {
@@ -440,12 +384,7 @@ var ValidExpectRule = rule.Rule{
 		asyncResolver := sharedValidExpect.NewAsyncAssertionResolver(ctx)
 		asyncResolver.DisableBuiltinToResolveReject()
 		arrayExceptions := map[string]bool{}
-		tracker := &asyncFixTracker{
-			resolver:      asyncResolver,
-			asyncInserted: map[*ast.Node]bool{},
-			deferredFn:    map[*ast.Node]bool{},
-			fnFixable:     map[*ast.Node]bool{},
-		}
+		fnFixable := map[*ast.Node]bool{}
 		var descriptors []asyncDescriptor
 
 		return rule.RuleListeners{
@@ -512,7 +451,7 @@ var ValidExpectRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindEndOfFile): func(node *ast.Node) {
 				_ = node
 				for _, descriptor := range descriptors {
-					reportAsyncDescriptor(ctx, descriptor, opts.AlwaysAwait, tracker)
+					reportAsyncDescriptor(ctx, asyncResolver, descriptor, opts.AlwaysAwait, fnFixable)
 				}
 			},
 		}
