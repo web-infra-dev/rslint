@@ -41,25 +41,150 @@ var (
 //     must run in its own phase outside native shards.
 //
 // Locking order: lifeMu (RLock for active operations, Lock for Close) is always
-// acquired before checkMu (serializing exclusive checker access and handle maps).
+// acquired before checkMu (serializing exclusive checker access and handle maps),
+// which may acquire recordMu (leaf lock guarding immutable encoded records).
 type Session struct {
-	lifeMu       sync.RWMutex
-	checkMu      sync.Mutex
-	extraMu      sync.RWMutex
-	poisoned     atomic.Bool
-	closed       bool
-	program      *program.Program
-	syntaxOnly   bool
-	syntax       *syntaxSessionData
-	anchor       *ast.SourceFile
-	eligible     map[*ast.SourceFile]bool
-	extraSources map[string]*ast.SourceFile
-	checker      *checker.Checker
-	generation   uint32
-	types        map[uint32]*checker.Type
-	symbols      map[uint32]*ast.Symbol
-	signatures   map[uint32]*checker.Signature
-	indexInfoIDs map[*checker.IndexInfo]uint32
+	lifeMu           sync.RWMutex
+	checkMu          sync.Mutex
+	extraMu          sync.RWMutex
+	recordMu         sync.RWMutex
+	poisoned         atomic.Bool
+	closed           bool
+	program          *program.Program
+	syntaxOnly       bool
+	hasJSFiles       bool
+	syntax           *syntaxSessionData
+	anchor           *ast.SourceFile
+	eligible         map[*ast.SourceFile]bool
+	extraSources     map[string]*ast.SourceFile
+	checker          *checker.Checker
+	generation       uint32
+	types            map[uint32]*checker.Type
+	symbols          map[uint32]*ast.Symbol
+	signatures       map[uint32]*checker.Signature
+	indexInfoIDs     map[*checker.IndexInfo]uint32
+	recordCache      map[recordCacheKey]cachedRecord
+	recordCachePrev  map[recordCacheKey]cachedRecord
+	recordCacheBytes int
+}
+
+// Two-generation rotating cache (8 MiB active + up to 8 MiB previous = 16 MiB
+// total cap) so large sessions keep evicting cold entries without freezing.
+const maxRecordCacheGenBytes = 8 << 20
+
+type recordCacheKey struct {
+	tag uint8
+	id  uint32
+}
+
+type cachedRecord struct {
+	packet     []byte
+	subSymbols []uint32
+}
+
+// isContextSensitiveSignatureDecl conservatively identifies declaration kinds
+// whose SignatureFact fields (typeParameters, thisParameter) may be populated
+// lazily during contextual checking or late-bound accessor merging.
+func isContextSensitiveSignatureDecl(decl *ast.Node) bool {
+	if decl == nil {
+		return false
+	}
+	switch decl.Kind {
+	case ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return true
+	default:
+		return false
+	}
+}
+
+// isCacheableSignature checks whether a SignatureFact is safe to memoize for
+// the rest of the Session. Must be called while holding checkMu.
+// In programs with JS files, a JSDoc @type tag on a context-sensitive function
+// can attach FullSignature pointing to an existing call signature whose
+// typeParameters/thisParameter are mutated in place during contextual checking.
+func (s *Session) isCacheableSignature(sig *checker.Signature) bool {
+	if sig == nil || isContextSensitiveSignatureDecl(sig.Declaration()) {
+		return false
+	}
+	if s.hasJSFiles && sig.Flags()&checker.SignatureFlagsConstruct == 0 &&
+		(len(sig.TypeParameters()) == 0 || sig.ThisParameter() == nil) {
+		return false
+	}
+	return true
+}
+
+// isCacheableRecord is the single authority on per-record fact immutability
+// across both Go and downstream JS caches. Must be called while holding checkMu.
+func (s *Session) isCacheableRecord(tag uint8, id uint32) bool {
+	switch tag {
+	case recordTagType:
+		return s.types[id] != nil
+	case recordTagSymbol:
+		sym := s.symbols[id]
+		return sym != nil && sym.Flags&ast.SymbolFlagsTransient == 0
+	case recordTagSignature:
+		return s.isCacheableSignature(s.signatures[id])
+	default:
+		return false
+	}
+}
+
+func (s *Session) getCachedRecord(tag uint8, id uint32) (cachedRecord, bool) {
+	if tag == 0 || id == 0 {
+		return cachedRecord{}, false
+	}
+	key := recordCacheKey{tag: tag, id: id}
+	s.recordMu.RLock()
+	entry, ok := s.recordCache[key]
+	if !ok && s.recordCachePrev != nil {
+		entry, ok = s.recordCachePrev[key]
+	}
+	s.recordMu.RUnlock()
+	return entry, ok
+}
+
+// putCachedRecord stores an immutable encoded record. Callers must hold lifeMu.RLock.
+func (s *Session) putCachedRecord(tag uint8, id uint32, packet []byte, subSymbols []uint32) {
+	if tag == 0 || id == 0 || len(packet) == 0 {
+		return
+	}
+	cost := len(packet) + len(subSymbols)*4 + 64
+	if cost > maxRecordCacheGenBytes {
+		return
+	}
+	s.recordMu.Lock()
+	defer s.recordMu.Unlock()
+	key := recordCacheKey{tag: tag, id: id}
+	if _, exists := s.recordCache[key]; exists {
+		return
+	}
+	if s.recordCacheBytes+cost > maxRecordCacheGenBytes {
+		s.recordCachePrev = s.recordCache
+		s.recordCache = make(map[recordCacheKey]cachedRecord)
+		s.recordCacheBytes = 0
+	}
+	if s.recordCache == nil {
+		s.recordCache = make(map[recordCacheKey]cachedRecord)
+	}
+	s.recordCache[key] = cachedRecord{packet: packet, subSymbols: subSymbols}
+	s.recordCacheBytes += cost
+}
+
+func directRecordCacheKey(req Request) (uint8, uint32, bool) {
+	tag := recordTag(req.operation())
+	if tag == 0 {
+		return 0, 0, false
+	}
+	switch r := req.(type) {
+	case *TypeRequest:
+		return tag, r.ID, true
+	case *SymbolRequest:
+		return tag, r.ID, true
+	case *SignatureRequest:
+		return tag, r.ID, true
+	default:
+		return 0, 0, false
+	}
 }
 
 // syntaxSessionData stores only detached value metadata and source text so
@@ -223,6 +348,12 @@ func newSession(ctx context.Context, p *program.Program, eligible []*ast.SourceF
 		}
 		s.eligible[f] = true
 	}
+	for _, f := range p.SourceFiles() {
+		if ast.IsSourceFileJS(f) {
+			s.hasJSFiles = true
+			break
+		}
+	}
 	if q := p.CompilerQueries(); q != nil {
 		s.recordExtraSource(q.ConfigSourceFile())
 	}
@@ -316,6 +447,11 @@ func (s *Session) Close() {
 	s.symbols = nil
 	s.signatures = nil
 	s.indexInfoIDs = nil
+	s.recordMu.Lock()
+	s.recordCache = nil
+	s.recordCachePrev = nil
+	s.recordCacheBytes = 0
+	s.recordMu.Unlock()
 }
 
 func (s *Session) isClosed() bool {
@@ -510,6 +646,8 @@ func (s *Session) source(f *ast.SourceFile) Source {
 }
 
 // Query returns one authoritative answer, with shallow facts for its direct handles.
+// Returned packet slices may alias immutable session cache entries and must be
+// treated as read-only by callers.
 func (s *Session) Query(ctx context.Context, q Query) ([]byte, error) {
 	packets, err := s.QueryBatch(ctx, []Query{q})
 	if err != nil {
@@ -528,6 +666,8 @@ func isNodeRecordRequest(req Request) (*NodeRequest, bool) {
 
 // QueryBatch resolves syntax before acquiring a short exclusive checker lease.
 // Concurrent calls to QueryBatch and Close are synchronized via lifeMu.
+// Returned packet slices may alias immutable session cache entries and must be
+// treated as read-only by callers.
 func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]byte, err error) {
 	defer func() {
 		if value := recover(); value != nil {
@@ -590,11 +730,31 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	}
 	results := make([]Result, len(queries))
 	records := make([][]Record, len(queries))
+	topCacheable := make([]bool, len(queries))
+	packets = make([][]byte, len(queries))
+	// Pre-fill syntax-only nodeRecord queries and cached direct-record hits in a
+	// single pass so interleaved hits never fracture checkBatch into multiple
+	// exclusive checker leases.
+	for i, q := range queries {
+		if r, ok := isNodeRecordRequest(q.Request); ok {
+			results[i] = nodeFacts(s.sourceFile(r.Node.File), natives[i])
+			continue
+		}
+		if tag, id, isRec := directRecordCacheKey(q.Request); isRec {
+			if cached, ok := s.getCachedRecord(tag, id); ok {
+				packets[i] = cached.packet
+			}
+		}
+	}
 	// Program diagnostics may acquire multiple checker shards; run them outside
 	// the single-file exclusive checker lease while preserving request order.
 	for start := 0; start < len(queries); {
 		if s.poisoned.Load() {
 			return nil, ErrPoisoned
+		}
+		if packets[start] != nil || results[start] != nil {
+			start++
+			continue
 		}
 		if r, ok := queries[start].Request.(*ProgramRequest); ok {
 			results[start], err = programQuery(ctx, s, p, r, natives[start])
@@ -604,22 +764,14 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 			start++
 			continue
 		}
-		if r, ok := isNodeRecordRequest(queries[start].Request); ok {
-			results[start] = nodeFacts(s.sourceFile(r.Node.File), natives[start])
-			start++
-			continue
-		}
 		end := start + 1
 		for end < len(queries) {
 			if _, ok := queries[end].Request.(*ProgramRequest); ok {
 				break
 			}
-			if _, ok := isNodeRecordRequest(queries[end].Request); ok {
-				break
-			}
 			end++
 		}
-		if err = s.checkBatch(ctx, queries[start:end], natives[start:end], results[start:end], records[start:end]); err != nil {
+		if err = s.checkBatch(ctx, queries[start:end], natives[start:end], packets[start:end], results[start:end], records[start:end], topCacheable[start:end]); err != nil {
 			return nil, err
 		}
 		start = end
@@ -627,26 +779,85 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	if s.poisoned.Load() {
 		return nil, ErrPoisoned
 	}
-	packets = make([][]byte, len(queries))
 	for i, result := range results {
 		if s.poisoned.Load() {
 			return nil, ErrPoisoned
 		}
+		if packets[i] != nil {
+			continue
+		}
 		if p != nil {
 			materializeReferences(p, result)
-			for _, record := range records[i] {
-				materializeReferences(p, record.Fact)
+			for j := range records[i] {
+				if records[i][j].packet == nil {
+					materializeReferences(p, records[i][j].Fact)
+				}
 			}
 		}
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+		for j := range records[i] {
+			if records[i][j].packet != nil {
+				continue
+			}
+			encoded, encErr := EncodePacket(records[i][j].Fact)
+			if encErr != nil {
+				return nil, encErr
+			}
+			if records[i][j].cacheable {
+				s.putCachedRecord(recordTag(records[i][j].Op), records[i][j].ID, encoded, recordSubSymbols(records[i][j].Fact))
+			} else {
+				markPacketNonCacheable(encoded)
+			}
+			records[i][j].packet = encoded
+		}
 		packets[i], err = EncodeReply(result, records[i])
 		if err != nil {
 			return nil, err
 		}
+		if tag, id, isRec := directRecordCacheKey(queries[i].Request); isRec && len(records[i]) == 0 {
+			if topCacheable[i] {
+				s.putCachedRecord(tag, id, packets[i], recordSubSymbols(result))
+			} else {
+				markPacketNonCacheable(packets[i])
+			}
+		}
 	}
 	return packets, nil
+}
+
+func recordSubSymbols(fact Result) []uint32 {
+	switch value := fact.(type) {
+	case *TypeFact:
+		if value == nil {
+			return nil
+		}
+		var sub []uint32
+		if value.Symbol != 0 {
+			sub = append(sub, value.Symbol)
+		}
+		if value.AliasSymbol != 0 {
+			sub = append(sub, value.AliasSymbol)
+		}
+		return sub
+	case *SignatureFact:
+		if value == nil || (len(value.Parameters) == 0 && value.ThisParameter == 0) {
+			return nil
+		}
+		sub := make([]uint32, 0, len(value.Parameters)+1)
+		for _, parameter := range value.Parameters {
+			if parameter != 0 {
+				sub = append(sub, parameter)
+			}
+		}
+		if value.ThisParameter != 0 {
+			sub = append(sub, value.ThisParameter)
+		}
+		return sub
+	default:
+		return nil
+	}
 }
 
 func materializeReferences(p *program.Program, result Result) {
@@ -693,7 +904,7 @@ func materializeReferences(p *program.Program, result Result) {
 	}
 }
 
-func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*ast.Node, results []Result, records [][]Record) error {
+func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*ast.Node, packets [][]byte, results []Result, records [][]Record, topCacheable []bool) error {
 	s.checkMu.Lock()
 	defer s.checkMu.Unlock()
 	if s.poisoned.Load() {
@@ -728,6 +939,9 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 		return errors.New("type service checker identity changed")
 	}
 	for i, q := range queries {
+		if packets[i] != nil || results[i] != nil {
+			continue
+		}
 		if s.poisoned.Load() {
 			return ErrPoisoned
 		}
@@ -738,6 +952,9 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 		results[i], err = s.execute(ctx, c, q.Request, natives[i])
 		if err != nil {
 			return err
+		}
+		if tag, id, isRec := directRecordCacheKey(q.Request); isRec {
+			topCacheable[i] = s.isCacheableRecord(tag, id)
 		}
 		if !q.SkipRecords {
 			records[i], err = s.directRecords(ctx, c, q.Request.operation(), results[i])

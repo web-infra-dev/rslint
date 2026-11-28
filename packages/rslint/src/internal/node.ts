@@ -28,6 +28,7 @@ export class NodeRslintService implements RslintServiceInterface {
   private dead = false;
   private activeRequests = 0;
   private activeInboundRequests = 0;
+  private loopActive: boolean | undefined;
   private inboundHandler: InboundRequestHandler | null = null;
 
   constructor(options: RSlintOptions = {}) {
@@ -79,6 +80,8 @@ export class NodeRslintService implements RslintServiceInterface {
   }
 
   private setLoopActive(active: boolean): void {
+    if (this.loopActive === active) return;
+    this.loopActive = active;
     if (active) this.process.ref();
     else this.process.unref();
     for (const stream of [this.process.stdin, this.process.stdout]) {

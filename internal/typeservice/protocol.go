@@ -395,9 +395,11 @@ type NodeFacts []NodeFact
 // Record supplements a queried handle with its directly requested object fact.
 // It never recursively expands referenced types or their properties.
 type Record struct {
-	Op   Operation
-	ID   uint32
-	Fact Result
+	Op        Operation
+	ID        uint32
+	Fact      Result
+	packet    []byte
+	cacheable bool
 }
 
 type SignatureFact struct {

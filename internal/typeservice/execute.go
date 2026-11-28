@@ -109,18 +109,24 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 		if id == 0 {
 			return nil
 		}
-		tag := uint32(1)
-		if kind == "symbolRecord" {
-			tag = 2
+		tag := recordTag(kind)
+		if tag == 0 {
+			return nil
 		}
-		if kind == "signatureRecord" {
-			tag = 3
-		}
-		key := [2]uint32{tag, id}
+		key := [2]uint32{uint32(tag), id}
 		if seen[key] {
 			return nil
 		}
 		seen[key] = true
+		if cached, ok := s.getCachedRecord(tag, id); ok {
+			records = append(records, Record{Op: kind, ID: id, packet: cached.packet, cacheable: true})
+			for _, symID := range cached.subSymbols {
+				if err := add("symbolRecord", symID); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 		var request Request
 		switch kind {
 		case "typeRecord":
@@ -134,20 +140,16 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 		if err != nil {
 			return err
 		}
-		records = append(records, Record{kind, id, fact})
-		switch value := fact.(type) {
-		case *TypeFact:
-			if err := add("symbolRecord", value.Symbol); err != nil {
+		records = append(records, Record{
+			Op:        kind,
+			ID:        id,
+			Fact:      fact,
+			cacheable: s.isCacheableRecord(tag, id),
+		})
+		for _, symID := range recordSubSymbols(fact) {
+			if err := add("symbolRecord", symID); err != nil {
 				return err
 			}
-			return add("symbolRecord", value.AliasSymbol)
-		case *SignatureFact:
-			for _, parameter := range value.Parameters {
-				if err := add("symbolRecord", parameter); err != nil {
-					return err
-				}
-			}
-			return add("symbolRecord", value.ThisParameter)
 		}
 		return nil
 	}

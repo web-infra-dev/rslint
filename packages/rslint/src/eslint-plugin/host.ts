@@ -52,12 +52,14 @@ export async function createPluginLintHost(
   onLog?: WorkerPoolOptions['onLog'],
   singleThreaded?: boolean,
 ): Promise<PluginLintHost> {
-  const types = new PluginTypeServices();
   // --singleThreaded caps both warmup and execution at one worker.
   const pool = new WorkerPool({
     configs,
     onLog,
     workerCount: singleThreaded ? 1 : undefined,
+  });
+  const types = new PluginTypeServices({
+    shouldCoalesce: () => pool.activeTypedTaskCount > 1,
   });
   await pool.init();
   return {

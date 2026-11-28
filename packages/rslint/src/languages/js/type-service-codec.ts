@@ -19,6 +19,28 @@ const invalid = (): never => {
   throw new Error('invalid type service packet');
 };
 
+export const isRecordBundle = (bytes: Readonly<Uint8Array>): boolean =>
+  bytes.byteLength >= 12 &&
+  bytes[0] === 0x52 &&
+  bytes[1] === 0x54 &&
+  bytes[2] === 0x42 &&
+  bytes[3] === 0x31;
+
+/** Returns false when Go stamped bit 31 on an RTS5 packet's kind word to mark
+ *  a mutable fact (transient merged symbol or context-sensitive signature). */
+export const isPacketCacheable = (bytes: Readonly<Uint8Array>): boolean => {
+  if (
+    bytes.byteLength >= 8 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x54 &&
+    bytes[2] === 0x53 &&
+    bytes[3] === 0x35
+  ) {
+    return (bytes[7] & 0x80) === 0;
+  }
+  return true;
+};
+
 /**
  * Decodes shallow binary records in one pass. Only this disposable reader owns
  * bytes; semantic wrappers retain decoded values, never a reader or byte view.
@@ -31,7 +53,7 @@ export class TypePacketReader {
   constructor(bytes: Readonly<Uint8Array>) {
     this.bytes = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
-    this.kind = this.word(4);
+    this.kind = this.word(4) & 0x7fff_ffff;
   }
 
   get retainedBytes(): number {
@@ -478,10 +500,10 @@ export interface TypeReply {
 }
 
 export function typeReplyPackets(bytes: Readonly<Uint8Array>): TypeReply {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (bytes.byteLength < 12 || view.getUint32(0, true) !== 0x31425452) {
+  if (!isRecordBundle(bytes)) {
     return { packet: bytes, records: [] };
   }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const packetLength = view.getUint32(4, true);
   const count = view.getUint32(8, true);
   const packetStart = 12 + count * 16;

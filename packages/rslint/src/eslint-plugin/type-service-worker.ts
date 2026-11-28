@@ -16,11 +16,20 @@ import {
   type TypeServiceFile,
 } from '../languages/js/type-service.js';
 import { TYPESCRIPT_COMPILER_DATA } from '../languages/js/type-service-compiler-data.generated.js';
-import type {
-  OpenTypeServiceBridge,
-  TypeServiceWorkerRequest,
-  TypeServiceWorkerResponse,
-  PluginFileTypeServices,
+import {
+  BRIDGE_CANCELLED_TASK_IDX,
+  BRIDGE_CONTROL_BYTES,
+  BRIDGE_STATE_CLOSED,
+  BRIDGE_STATE_ERROR,
+  BRIDGE_STATE_IDX,
+  BRIDGE_STATE_OPEN,
+  BRIDGE_WAKE_IDX,
+  type OpenTypeServiceBridge,
+  type TypeServiceBridgeReplyEnvelope,
+  type TypeServiceBridgeRequestEnvelope,
+  type TypeServiceWorkerRequest,
+  type TypeServiceWorkerResponse,
+  type PluginFileTypeServices,
 } from './plugin/type-service-protocol.js';
 
 type ParserServices = ReturnType<TypeServiceFile['parserServices']>;
@@ -30,19 +39,75 @@ interface WorkerSession {
   program: ProgramView;
   client?: TypeServiceClient;
 }
+interface WorkerBridge {
+  port: MessagePort;
+  control: Int32Array;
+  nextReqId: number;
+}
 interface ActiveFile {
   input: PluginFileTypeServices;
   taskId: number;
   cancelFlag?: Int32Array;
-  bridge?: { port: MessagePort; control: Int32Array; seq: number };
 }
 
-/** Program identities last across files. Actual clients and synchronous
- * channels are opened by the first operation that needs them. */
+/** Program identities last across files. One persistent synchronous channel is
+ * opened lazily per worker on first type-service use and reused across files. */
 export class WorkerTypeServices {
   private readonly sessions = new Map<string, WorkerSession>();
+  private bridge?: WorkerBridge;
   private active?: ActiveFile;
   constructor(private readonly parent: MessagePort) {}
+
+  private ensureBridge(): WorkerBridge {
+    if (this.bridge) return this.bridge;
+    const { port1, port2 } = new MessageChannel();
+    const control = new SharedArrayBuffer(BRIDGE_CONTROL_BYTES);
+    const message: OpenTypeServiceBridge = {
+      kind: 'type-bridge',
+      port: port2,
+      control,
+    };
+    try {
+      this.parent.postMessage(message, [port2]);
+    } catch (error) {
+      port1.close();
+      port2.close();
+      throw error;
+    }
+    this.bridge = {
+      port: port1,
+      control: new Int32Array(control),
+      nextReqId: 0,
+    };
+    return this.bridge;
+  }
+
+  private closeBridge(): void {
+    const bridge = this.bridge;
+    if (!bridge) return;
+    this.bridge = undefined;
+    bridge.port.close();
+  }
+
+  private checkBridgeCancel(active: ActiveFile, control: Int32Array): void {
+    const state = Atomics.load(control, BRIDGE_STATE_IDX);
+    if (state === BRIDGE_STATE_ERROR) {
+      // Tear down a failed bridge even if cancellation also fired so the next
+      // task on this worker lazily opens a fresh bridge instead of reusing a dead one.
+      this.closeBridge();
+    }
+    checkFrameCancellation(active.cancelFlag);
+    if (Atomics.load(control, BRIDGE_CANCELLED_TASK_IDX) === active.taskId) {
+      throw new FrameCancelled();
+    }
+    if (state === BRIDGE_STATE_CLOSED) {
+      this.closeBridge();
+      throw new FrameCancelled();
+    }
+    if (state === BRIDGE_STATE_ERROR) {
+      throw new Error('type service bridge failed');
+    }
+  }
 
   private call(request: TypeServiceWorkerRequest): TypeServiceWorkerResponse {
     const active = this.active;
@@ -54,59 +119,42 @@ export class WorkerTypeServices {
       throw new Error('type services have no active file lease');
     checkFrameCancellation(active.cancelFlag);
     if (active.input.syntaxOnly) request = { ...request, syntaxOnly: true };
-    if (!active.bridge) {
-      const { port1, port2 } = new MessageChannel();
-      const notification = new SharedArrayBuffer(4);
-      const message: OpenTypeServiceBridge = {
-        kind: 'type-bridge',
-        taskId: active.taskId,
-        session: request.session,
-        port: port2,
-        notification,
-      };
-      try {
-        this.parent.postMessage(message, [port2]);
-      } catch (error) {
-        port1.close();
-        port2.close();
-        throw error;
-      }
-      active.bridge = {
-        port: port1,
-        control: new Int32Array(notification),
-        seq: 0,
-      };
-    }
-    const { port, control } = active.bridge;
-    if (Atomics.load(control, 0) < 0) throw new FrameCancelled();
-    port.postMessage(request);
-    const expected = ++active.bridge.seq;
+    const bridge = this.ensureBridge();
+    const { port, control } = bridge;
+    this.checkBridgeCancel(active, control);
+    const reqId = ++bridge.nextReqId;
+    const envelope: TypeServiceBridgeRequestEnvelope = {
+      taskId: active.taskId,
+      reqId,
+      request,
+    };
+    port.postMessage(envelope);
     for (;;) {
-      checkFrameCancellation(active.cancelFlag);
-      const state = Atomics.load(control, 0);
-      if (state < 0) throw new FrameCancelled();
-      const received:
-        | {
-            result?: TypeServiceWorkerResponse;
-            error?: { name: string; message: string };
+      // Load wakeEpoch BEFORE checking cancel/state/port so any concurrent
+      // main-thread reply or cancel bumps the epoch and prevents a lost wake-up.
+      const epoch = Atomics.load(control, BRIDGE_WAKE_IDX);
+      this.checkBridgeCancel(active, control);
+      let raw = receiveMessageOnPort(port);
+      while (raw !== undefined) {
+        const received = raw.message as
+          TypeServiceBridgeReplyEnvelope | undefined;
+        if (received && received.reqId === reqId) {
+          this.checkBridgeCancel(active, control);
+          if (received.error) {
+            if (received.error.name === 'AbortError')
+              throw new FrameCancelled();
+            if (received.error.name === 'TypeServiceClosedError')
+              this.retire([request.session]);
+            const error = new Error(received.error.message);
+            error.name = received.error.name;
+            throw error;
           }
-        | undefined = receiveMessageOnPort(port)?.message;
-      if (received) {
-        checkFrameCancellation(active.cancelFlag);
-        if (received.error) {
-          if (received.error.name === 'AbortError') throw new FrameCancelled();
-          if (received.error.name === 'TypeServiceClosedError')
-            this.retire([request.session]);
-          const error = new Error(received.error.message);
-          error.name = received.error.name;
-          throw error;
+          if (!received.result) throw new Error('invalid type service reply');
+          return received.result;
         }
-        if (!received.result) throw new Error('invalid type service reply');
-        return received.result;
+        raw = receiveMessageOnPort(port);
       }
-      // Track the expected monotonic reply sequence so a notification racing
-      // MessagePort delivery sleeps briefly instead of spinning on subsequent calls.
-      Atomics.wait(control, 0, state, state >= expected ? 1 : 50);
+      Atomics.wait(control, BRIDGE_WAKE_IDX, epoch, 50);
     }
   }
 
@@ -312,8 +360,20 @@ export class WorkerTypeServices {
         if (input.syntaxOnly && owner) this.retire([id]);
         file = undefined;
         services = undefined;
-        active.bridge?.port.close();
-        active.bridge = undefined;
+        // Tear down a dead bridge or drain any unread reply left over from a
+        // cancelled call so buffers are released immediately.
+        if (this.bridge) {
+          if (
+            Atomics.load(this.bridge.control, BRIDGE_STATE_IDX) !==
+            BRIDGE_STATE_OPEN
+          ) {
+            this.closeBridge();
+          } else {
+            while (receiveMessageOnPort(this.bridge.port) !== undefined) {
+              /* discard stale reply */
+            }
+          }
+        }
         if (this.active === active) this.active = undefined;
       },
     };
@@ -328,5 +388,6 @@ export class WorkerTypeServices {
   }
   close(): void {
     this.retire([...this.sessions.keys()]);
+    this.closeBridge();
   }
 }

@@ -2,7 +2,11 @@ import type { TypeServiceCompilerData } from './type-service-compiler-data.js';
 import type { DecodedFrame } from './frame.js';
 import type { ESTreeNode } from './types.js';
 import { WeakObjectCache } from './type-service-cache.js';
-import { typeReplyPackets, TypePacketReader } from './type-service-codec.js';
+import {
+  isPacketCacheable,
+  typeReplyPackets,
+  TypePacketReader,
+} from './type-service-codec.js';
 import {
   FileSyntaxViews,
   GenerationSyntaxViews,
@@ -955,6 +959,7 @@ export class TypeServiceClient {
   ): TypePacketReader {
     const reply = typeReplyPackets(bytes);
     for (const record of reply.records) {
+      if (!isPacketCacheable(record.packet)) continue;
       const key = typeQueryKey({
         generation: query.generation,
         op: record.op,
@@ -970,7 +975,7 @@ export class TypeServiceClient {
         }
       }
     }
-    return cacheKey === undefined
+    return cacheKey === undefined || !isPacketCacheable(reply.packet)
       ? new TypePacketReader(reply.packet)
       : this.store(cacheKey, reply.packet);
   }

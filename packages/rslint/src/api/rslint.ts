@@ -143,6 +143,9 @@ export class Rslint {
   readonly #fix: boolean;
   readonly #virtualFiles?: Record<string, string>;
   readonly #pluginHosts = new PluginHostLifecycle();
+  readonly #queryPluginTypes = async (
+    query: Parameters<RSLintService['queryPluginTypes']>[0],
+  ) => this.#service.queryPluginTypes(query);
   #normalizedOverrideConfig?: Record<string, unknown>[];
   #closeRequested = false;
   #closePromise?: Promise<void>;
@@ -400,7 +403,7 @@ export class Rslint {
             request,
             undefined,
             attachments,
-            async (query) => this.#service.queryPluginTypes(query),
+            this.#queryPluginTypes,
           );
         },
       },

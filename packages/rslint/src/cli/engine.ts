@@ -512,6 +512,14 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
 
   // Every return, including init failure, releases the plugin worker pool.
   try {
+    const queryTypeServices = async (query: unknown) =>
+      resolveTypeServiceReply(
+        await ipc.sendRequest<unknown, NativeTypeServiceResponse>(
+          'typeService',
+          query,
+        ),
+      );
+
     // Wire handlers BEFORE start so the first frame Go writes is routable.
     ipc.setInboundHandler(async (msg) => {
       switch (msg.kind) {
@@ -571,13 +579,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             msg.data,
             undefined,
             msg.attachments,
-            async (query) =>
-              resolveTypeServiceReply(
-                await ipc.sendRequest<unknown, NativeTypeServiceResponse>(
-                  'typeService',
-                  query,
-                ),
-              ),
+            queryTypeServices,
           );
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);

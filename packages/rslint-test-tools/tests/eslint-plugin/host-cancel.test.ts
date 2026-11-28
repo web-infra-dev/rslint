@@ -270,6 +270,143 @@ export default [{plugins:{typed:{rules:{probe:{meta:{schema:[]},create(context){
       },
     );
 
+    test('reuses persistent type bridge after mid-query cancellation without leaking stale replies', async () => {
+      const directory = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-type-bridge-reuse-'),
+      );
+      let host: Awaited<ReturnType<typeof createPluginLintHost>> | undefined;
+      const terminate = rs.spyOn(Worker.prototype, 'terminate');
+      try {
+        const configPath = path.join(directory, 'rslint.config.mjs');
+        await writeFile(
+          configPath,
+          `export default [{plugins:{typed:{rules:{probe:{meta:{schema:[]},create(context){
+  return {
+    Program(node) {
+      const opts = context.sourceCode.parserServices.program.getCompilerOptions();
+      context.report({ node, message: String(opts.target ?? 'none') });
+    },
+  };
+}}}}}}];`,
+        );
+        host = await createPluginLintHost(
+          [{ configPath, configDirectory: directory }],
+          undefined,
+          true,
+        );
+        let firstStarted!: () => void;
+        let resolveFirst!: (res: {
+          descriptor: {
+            generation: number;
+            currentDirectory: string;
+            compilerOptions: Record<string, unknown>;
+            sources: [];
+          };
+        }) => void;
+        const firstReady = new Promise<void>((resolve) => {
+          firstStarted = resolve;
+        });
+        let callCount = 0;
+        const transport = async () => {
+          callCount++;
+          if (callCount === 1) {
+            firstStarted();
+            return new Promise<{
+              descriptor: {
+                generation: number;
+                currentDirectory: string;
+                compilerOptions: Record<string, unknown>;
+                sources: [];
+              };
+            }>((resolve) => {
+              resolveFirst = resolve;
+            });
+          }
+          return {
+            descriptor: {
+              generation: 1,
+              currentDirectory: directory,
+              compilerOptions: { target: 99 },
+              sources: [],
+            },
+          };
+        };
+
+        const file1 = path.join(directory, 'a.ts');
+        const ac1 = new AbortController();
+        const task1 = host.lint(
+          {
+            files: [
+              {
+                path: file1,
+                frame: projectFrame(file1, 'export const a = 1;').toString(
+                  'base64',
+                ),
+                configKey: directory,
+                typeServices: {
+                  session: 'bridge-s1',
+                  binding: { generation: 1, sourceFileName: file1 },
+                },
+              },
+            ],
+            rules: { 'typed/probe': { options: [] } },
+            collectFixes: false,
+          },
+          ac1.signal,
+          undefined,
+          transport,
+        );
+        await firstReady;
+        ac1.abort();
+        // Deliver a late reply after cancellation to confirm no stale reply leaks into task 2.
+        resolveFirst({
+          descriptor: {
+            generation: 1,
+            currentDirectory: directory,
+            compilerOptions: { target: 1 },
+            sources: [],
+          },
+        });
+        const res1 = await task1;
+        expect(res1.results[0].cancelled).toBe(true);
+
+        const file2 = path.join(directory, 'b.ts');
+        const res2 = await host.lint(
+          {
+            files: [
+              {
+                path: file2,
+                frame: projectFrame(file2, 'export const b = 2;').toString(
+                  'base64',
+                ),
+                configKey: directory,
+                typeServices: {
+                  session: 'bridge-s2',
+                  binding: { generation: 1, sourceFileName: file2 },
+                },
+              },
+            ],
+            rules: { 'typed/probe': { options: [] } },
+            collectFixes: false,
+          },
+          undefined,
+          undefined,
+          transport,
+        );
+        expect(res2.results[0].cancelled).toBe(false);
+        expect(res2.results[0].parseError).toBeUndefined();
+        expect(res2.results[0].ruleErrors).toBeUndefined();
+        expect(res2.results[0].diagnostics).toEqual([
+          expect.objectContaining({ message: '99' }),
+        ]);
+        expect(terminate).not.toHaveBeenCalled();
+      } finally {
+        terminate.mockRestore();
+        await host?.shutdown();
+        await rm(directory, { recursive: true, force: true });
+      }
+    });
+
     const req: EslintPluginLintRequest = {
       files: [
         {

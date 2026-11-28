@@ -905,3 +905,286 @@ func TestUnionWithIntersectionDoesNotLeakObjectOnlyFlags(t *testing.T) {
 		t.Fatalf("expected spread object literal to keep ContainsSpread, got %v", spreadFact.ObjectFlags)
 	}
 }
+
+func TestSessionRecordCacheImmutabilityAndGuards(t *testing.T) {
+	source := strings.Join([]string{
+		"export interface Box { value: number }",
+		"export function makeBox(x: number): Box { return { value: x }; }",
+		"declare function apply(cb: (n: number) => number): number;",
+		"export const arrowRes = apply((n) => n + 1);",
+		"export type Inter = { a: number } & { a: number };",
+		"export declare const interVal: Inter;",
+		"export const prop = interVal.a;",
+	}, "\n") + "\n"
+	p, _, root := buildTestProgram(t, map[string]string{"input.ts": source}, []string{"input.ts"})
+	fileName := tspath.ResolvePath(root, "input.ts")
+	file := p.GetSourceFile(fileName)
+	if file == nil {
+		t.Fatal("fixture source missing")
+	}
+	session, err := New(t.Context(), p, []*ast.SourceFile{file})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	binding, err := session.BindTarget(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	table := encoder.GetNodeIndexTable(file)
+	var makeBoxDeclIdx, arrowIdx, propAccessIdx uint32
+	for idx, n := range table.Nodes {
+		if n == nil {
+			continue
+		}
+		switch n.Kind {
+		case ast.KindFunctionDeclaration:
+			if n.Name() != nil && n.Name().Text() == "makeBox" {
+				makeBoxDeclIdx = uint32(idx)
+			}
+		case ast.KindArrowFunction:
+			arrowIdx = uint32(idx)
+		case ast.KindPropertyAccessExpression:
+			propAccessIdx = uint32(idx)
+		}
+	}
+	if makeBoxDeclIdx == 0 || arrowIdx == 0 || propAccessIdx == 0 {
+		t.Fatalf("missing test nodes: makeBox=%d arrow=%d prop=%d", makeBoxDeclIdx, arrowIdx, propAccessIdx)
+	}
+
+	// Querying a regular function type populates immutable TypeFact + non-transient SymbolFact in recordCache.
+	if _, err := session.QueryBatch(t.Context(), []Query{
+		{Scope: binding.Scope, Request: &NodeRequest{Op: "type", Node: NodeRef{File: fileName, Index: makeBoxDeclIdx}}},
+		{Scope: binding.Scope, Request: &NodeRequest{Op: "signature", Node: NodeRef{File: fileName, Index: makeBoxDeclIdx}}},
+		{Scope: binding.Scope, Request: &NodeRequest{Op: "signature", Node: NodeRef{File: fileName, Index: arrowIdx}}},
+		{Scope: binding.Scope, Request: &NodeRequest{Op: "symbol", Node: NodeRef{File: fileName, Index: propAccessIdx}}},
+	}); err != nil {
+		t.Fatalf("initial QueryBatch failed: %v", err)
+	}
+
+	// Verify immutable TypeFact, non-transient SymbolFact, and non-context-sensitive SignatureFact are cached,
+	// while transient merged symbols and context-sensitive arrow signatures are NEVER cached.
+	var cachedTypeID, cachedSymID, cachedSigID, transientSymID, arrowSigID uint32
+	for id, sym := range session.symbols {
+		if sym.Flags&ast.SymbolFlagsTransient != 0 {
+			transientSymID = id
+		} else if sym.Name == "makeBox" {
+			cachedSymID = id
+		}
+	}
+	for id := range session.types {
+		cachedTypeID = id
+		break
+	}
+	for id, sig := range session.signatures {
+		if sig.Declaration() == nil {
+			continue
+		}
+		switch sig.Declaration().Kind {
+		case ast.KindFunctionDeclaration:
+			cachedSigID = id
+		case ast.KindArrowFunction:
+			arrowSigID = id
+		}
+	}
+	if cachedTypeID == 0 || cachedSymID == 0 || cachedSigID == 0 || arrowSigID == 0 || transientSymID == 0 {
+		t.Fatalf("missing handles: type=%d sym=%d sig=%d arrowSig=%d transientSym=%d", cachedTypeID, cachedSymID, cachedSigID, arrowSigID, transientSymID)
+	}
+
+	// Direct signatureRecord / symbolRecord / typeRecord queries populate and hit recordCache
+	// only for immutable records, and stamp packetNonCacheableBit on mutable ones.
+	type cacheExpect struct {
+		req       Request
+		cacheable bool
+	}
+	for _, tc := range []cacheExpect{
+		{&TypeRequest{Op: "typeRecord", ID: cachedTypeID}, true},
+		{&SymbolRequest{Op: "symbolRecord", ID: cachedSymID}, true},
+		{&SignatureRequest{Op: "signatureRecord", ID: cachedSigID}, true},
+		{&SignatureRequest{Op: "signatureRecord", ID: arrowSigID}, false},
+		{&SymbolRequest{Op: "symbolRecord", ID: transientSymID}, false},
+	} {
+		first, err := session.Query(t.Context(), Query{Scope: binding.Scope, Request: tc.req})
+		if err != nil {
+			t.Fatalf("first %s failed: %v", tc.req.operation(), err)
+		}
+		second, err := session.Query(t.Context(), Query{Scope: binding.Scope, Request: tc.req})
+		if err != nil {
+			t.Fatalf("second %s failed: %v", tc.req.operation(), err)
+		}
+		if string(first) != string(second) {
+			t.Fatalf("%s mismatch between first and second reply", tc.req.operation())
+		}
+		hasNonCacheBit := readU32(first, 4)&packetNonCacheableBit != 0
+		if tc.cacheable && hasNonCacheBit {
+			t.Fatalf("cacheable %s unexpectedly marked non-cacheable", tc.req.operation())
+		}
+		if !tc.cacheable && !hasNonCacheBit {
+			t.Fatalf("mutable %s missing packetNonCacheableBit", tc.req.operation())
+		}
+	}
+
+	if _, ok := session.getCachedRecord(recordTagType, cachedTypeID); !ok {
+		t.Fatalf("expected TypeFact id=%d to be cached", cachedTypeID)
+	}
+	if _, ok := session.getCachedRecord(recordTagSymbol, cachedSymID); !ok {
+		t.Fatalf("expected non-transient SymbolFact id=%d to be cached", cachedSymID)
+	}
+	if _, ok := session.getCachedRecord(recordTagSignature, cachedSigID); !ok {
+		t.Fatalf("expected FunctionDeclaration SignatureFact id=%d to be cached", cachedSigID)
+	}
+	if _, ok := session.getCachedRecord(recordTagSignature, arrowSigID); ok {
+		t.Fatalf("context-sensitive ArrowFunction SignatureFact id=%d must NOT be cached", arrowSigID)
+	}
+	if _, ok := session.getCachedRecord(recordTagSymbol, transientSymID); ok {
+		t.Fatalf("transient SymbolFact id=%d must NOT be cached", transientSymID)
+	}
+
+	// Concurrent reads/writes to recordCache alongside Close must be race-free.
+	var wg sync.WaitGroup
+	for range 6 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 15 {
+				_, qErr := session.QueryBatch(t.Context(), []Query{
+					{Scope: binding.Scope, Request: &TypeRequest{Op: "typeRecord", ID: cachedTypeID}},
+					{Scope: binding.Scope, Request: &NodeRequest{Op: "type", Node: NodeRef{File: fileName, Index: makeBoxDeclIdx}}},
+					{Scope: binding.Scope, Request: &SignatureRequest{Op: "signatureRecord", ID: arrowSigID}},
+				})
+				if qErr != nil && !errors.Is(qErr, ErrClosed) {
+					t.Errorf("unexpected concurrent QueryBatch error: %v", qErr)
+					return
+				}
+			}
+		}()
+	}
+	time.Sleep(2 * time.Millisecond)
+	session.Close()
+	wg.Wait()
+
+	session.recordMu.RLock()
+	remaining := len(session.recordCache) + len(session.recordCachePrev)
+	remainingBytes := session.recordCacheBytes
+	session.recordMu.RUnlock()
+	if remaining != 0 || remainingBytes != 0 {
+		t.Fatalf("expected Session.Close to clear recordCache, got len=%d bytes=%d", remaining, remainingBytes)
+	}
+}
+
+func TestSessionDoesNotServeStaleSignatureForJSFullSignatureJSDoc(t *testing.T) {
+	source := strings.Join([]string{
+		"/** @typedef {(x: any) => any} PlainFn */",
+		"/** @type {PlainFn} */",
+		"export let ref;",
+		"/** @param {<T>(this: { a: number }, x: T) => T} cb */",
+		"function take(cb) {}",
+		"export const res = take(",
+		"  /** @type {PlainFn} */",
+		"  function (x) { return x; }",
+		");",
+	}, "\n") + "\n"
+	p, _, root := buildTestProgram(t, map[string]string{"input.js": source}, []string{"input.js"})
+	fileName := tspath.ResolvePath(root, "input.js")
+	file := p.GetSourceFile(fileName)
+	if file == nil {
+		t.Fatal("fixture source missing")
+	}
+	session, err := New(t.Context(), p, []*ast.SourceFile{file})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	binding, err := session.BindTarget(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	table := encoder.GetNodeIndexTable(file)
+	var refNameIdx, fnExprIdx uint32
+	for idx, n := range table.Nodes {
+		if n == nil {
+			continue
+		}
+		if n.Kind == ast.KindFunctionExpression {
+			fnExprIdx = uint32(idx)
+		}
+		if n.Kind == ast.KindVariableDeclaration && n.Name() != nil && n.Name().Kind == ast.KindIdentifier && n.Name().Text() == "ref" {
+			for nameIdx, candidate := range table.Nodes {
+				if candidate == n.Name() {
+					refNameIdx = uint32(nameIdx)
+					break
+				}
+			}
+		}
+	}
+	if refNameIdx == 0 || fnExprIdx == 0 {
+		t.Fatalf("missing test nodes: ref=%d fnExpr=%d", refNameIdx, fnExprIdx)
+	}
+
+	// Step 1: Query ref's type and its call signature BEFORE checking res/take(...).
+	if _, err := session.Query(t.Context(), Query{
+		Scope:   binding.Scope,
+		Request: &NodeRequest{Op: "type", Node: NodeRef{File: fileName, Index: refNameIdx}},
+	}); err != nil {
+		t.Fatalf("query ref type: %v", err)
+	}
+	var refTypeID uint32
+	for id := range session.types {
+		refTypeID = id
+		break
+	}
+	if _, err := session.Query(t.Context(), Query{
+		Scope:   binding.Scope,
+		Request: &SignaturesRequest{ID: refTypeID, Kind: 0},
+	}); err != nil {
+		t.Fatalf("query ref call signatures: %v", err)
+	}
+	var sigID uint32
+	for id := range session.signatures {
+		sigID = id
+		break
+	}
+	if sigID == 0 {
+		t.Fatal("expected PlainFn call signature handle")
+	}
+	beforePkt, err := session.Query(t.Context(), Query{
+		Scope:   binding.Scope,
+		Request: &SignatureRequest{Op: "signatureRecord", ID: sigID},
+	})
+	if err != nil {
+		t.Fatalf("query signatureRecord before contextual check: %v", err)
+	}
+	if readU32(beforePkt, 4)&packetNonCacheableBit == 0 {
+		t.Fatal("expected JS-program call signature without typeParameters/thisParameter to carry packetNonCacheableBit")
+	}
+	if _, ok := session.getCachedRecord(recordTagSignature, sigID); ok {
+		t.Fatal("JS-program mutable call signature must not be cached in recordCache")
+	}
+
+	// Step 2: Check the function expression argument, triggering
+	// assignContextualParameterTypes on PlainFn's shared signature.
+	if _, err := session.Query(t.Context(), Query{
+		Scope:   binding.Scope,
+		Request: &NodeRequest{Op: "type", Node: NodeRef{File: fileName, Index: fnExprIdx}},
+	}); err != nil {
+		t.Fatalf("query function expression type: %v", err)
+	}
+
+	// Step 3: Re-query signatureRecord — must reflect the mutated typeParameters / thisParameter, NOT stale bytes.
+	afterPkt, err := session.Query(t.Context(), Query{
+		Scope:   binding.Scope,
+		Request: &SignatureRequest{Op: "signatureRecord", ID: sigID},
+	})
+	if err != nil {
+		t.Fatalf("query signatureRecord after contextual check: %v", err)
+	}
+	// Byte 16 is TypeParameters offset; byte 20 is ThisParameter symbol ID.
+	if readU32(afterPkt, 16) == 0 && readU32(afterPkt, 20) == 0 {
+		t.Fatal("expected contextual check to populate signature typeParameters/thisParameter without stale cache hit")
+	}
+	if string(beforePkt) == string(afterPkt) {
+		t.Fatal("signatureRecord returned stale pre-contextual bytes after JS @type mutation")
+	}
+}

@@ -28,9 +28,10 @@ type typeServiceWireResponse struct {
 	Source            *typeServiceSourceAttachment     `json:"source,omitempty"`
 }
 
-// Small binary packets stay inline to avoid claiming 16 MiB shared-memory slots
-// and emitting separate transportRelease control frames on every checker query.
-const minSharedTypeServiceBytes = 4 << 10
+// Small binary packets stay inline to avoid claiming 16 MiB shared-memory slots,
+// triggering per-packet N-API copies, and emitting separate transportRelease
+// control frames on checker query batches.
+const minSharedTypeServiceBytes = 64 << 10
 
 // HandleTypeServices answers nested semantic reads through the same native
 // connection that dispatched plugin work. Binary facts and syntax use generic

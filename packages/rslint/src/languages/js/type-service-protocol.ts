@@ -477,7 +477,12 @@ const NON_CACHEABLE_OPS = new Set<Operation>([
  * unresolved mapped/declared member slots, diagnostics) stay uncached.
  */
 export function isCacheableTypeQuery(query: TypeServiceQuery): boolean {
-  if (query.op === 'nodeRecord' || query.op === 'syntacticDiagnostics') {
+  if (
+    query.op === 'nodeRecord' ||
+    query.op === 'syntacticDiagnostics' ||
+    query.op === 'declarationSymbol' ||
+    query.op === 'fromTypeNode'
+  ) {
     return true;
   }
   if (NON_CACHEABLE_OPS.has(query.op)) {
