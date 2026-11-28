@@ -109,11 +109,20 @@ type localExports struct {
 	// them in order reproduces what re-walking the statements would produce,
 	// including a later statement overwriting an earlier one.
 	Steps []exportStep
-	// Imports lists the file's import declarations that have an import
-	// clause, in source order, each with its resolved target. Resolving a
-	// locally re-exported namespace walks all of them, and the order matters
-	// because that walk builds their export maps along the way.
+	// Imports lists the file's resolved namespace import declarations
+	// (`import * as ns from "..."`) in source order, used to attach namespace
+	// metadata when a local export re-exports one of those bindings.
 	Imports []importedModule
+	// ValueImports records resolved default/named import bindings whose local
+	// identifier is re-exported by a local `export { ... }` in this file, used
+	// solely to preserve ECMAScript binding identity across `export *` merges
+	// without eagerly crawling non-namespace imports or attaching Namespace.
+	ValueImports map[string]importedValueBinding
+	// ExplicitNames records every name explicitly exported by this file (local
+	// declarations, namespace aliases, default exports, and named re-exports)
+	// when the file also contains `export *`, so star re-exports never override
+	// explicit bindings regardless of statement order.
+	ExplicitNames map[string]bool
 	// ImplicitDefault represents an `export =` assignment or CommonJS
 	// declaration available to default imports. Interop does not add a
 	// default to ordinary ES module exports.
@@ -141,13 +150,16 @@ type exportStep struct {
 	Kind  exportStepKind
 	Names []string
 	Docs  map[string]*exportDocSource
-	// Local is the identifier `export default` names, empty when the
-	// expression is not a plain identifier.
+	// Local is the local binding identifier for `export default <ident>` or
+	// named `export default function/class/interface <name>`, empty otherwise.
 	Local string
 	Link  exportLink
 	Specs []exportSpec
 	// FromModule distinguishes `export { a } from "m"` from `export { a }`.
 	FromModule bool
+	// NamespaceExport marks `export * as ns from "m"`, which declares an
+	// exported namespace binding without creating a local identifier binding.
+	NamespaceExport bool
 }
 
 // exportLink is a resolved `… from "specifier"`. Resolved is false when the
@@ -174,12 +186,17 @@ type exportSpec struct {
 	LocalIdent string
 }
 
-// importedModule is one `import … from "specifier"` with an import clause.
+// importedModule is one resolved `import * as ns from "specifier"` binding.
 type importedModule struct {
-	Link exportLink
-	// NamespaceName is the local name of an `import * as ns` clause, empty
-	// for every other clause shape.
+	Link          exportLink
 	NamespaceName string
+}
+
+// importedValueBinding is one resolved default or named import binding whose
+// local identifier is re-exported by a local `export { ... }` in the same file.
+type importedValueBinding struct {
+	Link         exportLink
+	ImportedName string
 }
 
 func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings) *localExports {
@@ -188,11 +205,12 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 		return local
 	}
 
-	for _, syntax := range exportSyntaxFor(sourceFile) {
+	fileSyntax := exportSyntaxFor(sourceFile)
+	for _, syntax := range fileSyntax.statements {
 		stmt := syntax.statement
 		switch stmt.Kind {
 		case ast.KindImportDeclaration:
-			local.Imports = append(local.Imports, importBinding(sourceProgram, sourceFile, settings, stmt.AsImportDeclaration()))
+			local.collectImportBindings(sourceProgram, sourceFile, settings, stmt.AsImportDeclaration(), fileSyntax.localExportedNames)
 			continue
 		case ast.KindExportAssignment:
 			assignment := stmt.AsExportAssignment()
@@ -240,7 +258,41 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 		}
 	}
 
+	hasStar := false
+	for _, step := range local.Steps {
+		if step.Kind == exportStepStar {
+			hasStar = true
+			break
+		}
+	}
+	if hasStar {
+		for _, step := range local.Steps {
+			switch step.Kind {
+			case exportStepNames:
+				for _, name := range step.Names {
+					local.markExplicitName(name)
+				}
+			case exportStepLocalDefault:
+				local.markExplicitName(defaultExportName)
+			case exportStepNamed:
+				for _, spec := range step.Specs {
+					if step.FromModule && !spec.LocalOK {
+						continue
+					}
+					local.markExplicitName(spec.Exported)
+				}
+			}
+		}
+	}
+
 	return local
+}
+
+func (local *localExports) markExplicitName(name string) {
+	if local.ExplicitNames == nil {
+		local.ExplicitNames = make(map[string]bool)
+	}
+	local.ExplicitNames[name] = true
 }
 
 func isCommonJSDeclaration(sourceProgram *program.Program, sourceFile *ast.SourceFile) bool {
@@ -336,26 +388,129 @@ func (local *localExports) appendExportDeclaration(exportDecl *ast.ExportDeclara
 		if !ok {
 			return
 		}
-		local.Steps = append(local.Steps, exportStep{Kind: exportStepNames, Names: []string{name}})
+		local.Steps = append(local.Steps, exportStep{
+			Kind:            exportStepNames,
+			Names:           []string{name},
+			NamespaceExport: true,
+		})
 	}
 }
 
-func importBinding(sourceProgram *program.Program, sourceFile *ast.SourceFile, settings *ModuleSettings, importDecl *ast.ImportDeclaration) importedModule {
-	binding := importedModule{}
+func namespaceImportName(importDecl *ast.ImportDeclaration) string {
 	if importDecl == nil || importDecl.ImportClause == nil {
-		return binding
+		return ""
 	}
-	binding.Link = resolveExportLink(sourceProgram, sourceFile, settings, modules.SourceFromSpecifier(importDecl.ModuleSpecifier))
-
 	importClause := importDecl.ImportClause.AsImportClause()
 	if importClause == nil || importClause.NamedBindings == nil || importClause.NamedBindings.Kind != ast.KindNamespaceImport {
-		return binding
+		return ""
 	}
 	namespaceImport := importClause.NamedBindings.AsNamespaceImport()
-	if namespaceImport != nil && namespaceImport.Name() != nil {
-		binding.NamespaceName = namespaceImport.Name().Text()
+	if namespaceImport == nil || namespaceImport.Name() == nil {
+		return ""
 	}
-	return binding
+	return namespaceImport.Name().Text()
+}
+
+func importDeclRelevantForExports(importDecl *ast.ImportDeclaration, localExportedNames map[string]bool) bool {
+	if importDecl == nil || importDecl.ImportClause == nil {
+		return false
+	}
+	if namespaceImportName(importDecl) != "" {
+		return true
+	}
+	if len(localExportedNames) == 0 {
+		return false
+	}
+	importClause := importDecl.ImportClause.AsImportClause()
+	if importClause == nil || importClause.IsTypeOnly() {
+		return false
+	}
+	if defaultName := importClause.Name(); defaultName != nil && localExportedNames[defaultName.Text()] {
+		return true
+	}
+	if importClause.NamedBindings != nil && importClause.NamedBindings.Kind == ast.KindNamedImports {
+		namedImports := importClause.NamedBindings.AsNamedImports()
+		if namedImports != nil && namedImports.Elements != nil {
+			for _, elem := range namedImports.Elements.Nodes {
+				if elem != nil && elem.Kind == ast.KindImportSpecifier && !elem.AsImportSpecifier().IsTypeOnly && elem.Name() != nil && localExportedNames[elem.Name().Text()] {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (local *localExports) collectImportBindings(
+	sourceProgram *program.Program,
+	sourceFile *ast.SourceFile,
+	settings *ModuleSettings,
+	importDecl *ast.ImportDeclaration,
+	localExportedNames map[string]bool,
+) {
+	if importDecl == nil || importDecl.ImportClause == nil {
+		return
+	}
+	link := resolveExportLink(sourceProgram, sourceFile, settings, modules.SourceFromSpecifier(importDecl.ModuleSpecifier))
+	if !link.Resolved {
+		return
+	}
+	if namespaceName := namespaceImportName(importDecl); namespaceName != "" {
+		local.Imports = append(local.Imports, importedModule{
+			Link:          link,
+			NamespaceName: namespaceName,
+		})
+	}
+	if len(localExportedNames) == 0 {
+		return
+	}
+	importClause := importDecl.ImportClause.AsImportClause()
+	if importClause == nil || importClause.IsTypeOnly() {
+		return
+	}
+	recordValue := func(localName, importedName string) {
+		if !localExportedNames[localName] {
+			return
+		}
+		if local.ValueImports == nil {
+			local.ValueImports = make(map[string]importedValueBinding)
+		}
+		local.ValueImports[localName] = importedValueBinding{
+			Link:         link,
+			ImportedName: importedName,
+		}
+	}
+	if defaultName := importClause.Name(); defaultName != nil {
+		recordValue(defaultName.Text(), defaultExportName)
+	}
+	if importClause.NamedBindings != nil && importClause.NamedBindings.Kind == ast.KindNamedImports {
+		namedImports := importClause.NamedBindings.AsNamedImports()
+		if namedImports != nil && namedImports.Elements != nil {
+			for _, elem := range namedImports.Elements.Nodes {
+				if elem == nil || elem.Kind != ast.KindImportSpecifier || elem.Name() == nil {
+					continue
+				}
+				spec := elem.AsImportSpecifier()
+				if spec.IsTypeOnly {
+					continue
+				}
+				source := spec.PropertyName
+				if source == nil {
+					source = spec.Name()
+				}
+				var importedName string
+				var ok bool
+				if ast.ModuleExportNameIsDefault(source) {
+					importedName, ok = defaultExportName, true
+				} else {
+					importedName, ok = moduleExportName(source)
+				}
+				if ok {
+					recordValue(spec.Name().Text(), importedName)
+				}
+			}
+		}
+	}
 }
 
 // resolveExportLink answers what getExportMap would answer for one specifier,

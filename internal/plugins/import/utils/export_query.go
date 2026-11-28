@@ -49,9 +49,7 @@ func localExportPossibilities(local *localExports) exportPossibilities {
 	possible := exportPossibilities{names: make(map[string]bool)}
 	namespaces := make(map[string]bool)
 	for _, binding := range local.Imports {
-		if binding.NamespaceName != "" && binding.Link.Resolved {
-			namespaces[binding.NamespaceName] = true
-		}
+		namespaces[binding.NamespaceName] = true
 	}
 	add := func(name string, namespace bool) {
 		// Later exports may overwrite earlier metadata in the full map. Keep
