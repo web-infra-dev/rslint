@@ -399,6 +399,17 @@ func TestRstestExpectCustomizationAnalysis(t *testing.T) {
 			{Code: `import * as r from '@rstest/core'; const holder: any = { extend: r.expect.extend, get unused() { return 1; } }; holder.__proto__ = { get a() { this.extend = r.expect.extend; return 1; } }; holder.extend = () => {}; const { a } = holder; holder.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 			{Code: `import * as r from '@rstest/core'; const { prepare, extend } = { __proto__: r.expect, extend: undefined as any, get prepare() { delete (this as any).extend; return true; } }; extend?.({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 			{Code: `import * as r from '@rstest/core'; const { prepare, nested: { register } } = { nested: { __proto__: { register: r.expect.extend }, register: undefined as any }, get prepare() { delete (this as any).nested.register; return true; } }; register?.({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { (this as any).register = r.expect.extend; return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; let prepare: any, register: any; ({ prepare, register } = { register: noop, get prepare() { (this as any).register = r.expect.extend; return 1; } }); register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const proto = { get prepare() { (this as any).register = r.expect.extend; return 1; } }; const { prepare, register } = { __proto__: proto, register: noop }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, nested: { register } } = { nested: { register: noop }, get prepare() { (this as any).nested = { register: r.expect.extend }; return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { Object.defineProperty(this, 'register', { get() { return r.expect.extend; } }); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, extend } = { extend: noop, get prepare() { Object.assign(this, r.expect); return 1; } }; extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { const self: any = this; self.register = r.expect.extend; return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const obj: any = { register: noop, get prepare() { this.register = r.expect.extend; return 1; } }; const { prepare } = obj; const { register } = obj; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const hooks = { nested: { register: noop }, get unused() { (this as any).nested = { register: r.expect.extend }; return 1; } }; const { nested: { register } } = hooks; register({ toBe() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const extra = { other: 1 }; const { nested: { register } } = { nested: { register: noop }, ...extra, get unused() { (this as any).nested = { register: r.expect.extend }; return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { let self: any; self = this; self.register = r.expect.extend; return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 		},
 	)
 }
@@ -483,6 +494,16 @@ func TestRstestExpectCustomizationLinearScaling(t *testing.T) {
 		b.WriteString("wide.reset();\n")
 	}
 	b.WriteString("wide.extend({});\n")
+	// 12. 400 data properties + 1 unused getter in one destructured object (would be O(P*K) without cached objGetterSummary).
+	b.WriteString("const { ")
+	for i := range 400 {
+		fmt.Fprintf(&b, "w%d, ", i)
+	}
+	b.WriteString("register: wideReg = core.expect.extend } = { ")
+	for i := range 400 {
+		fmt.Fprintf(&b, "w%d: %d, ", i, i)
+	}
+	b.WriteString("register: noop, get unused() { return 1; } };\nwideReg({ toBeDefined() {} });\n")
 	b.WriteString("probe();\n")
 
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())

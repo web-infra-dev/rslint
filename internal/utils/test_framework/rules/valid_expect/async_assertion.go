@@ -91,12 +91,14 @@ type scopeConsumeSite struct {
 // sites once per callback or catch block so per-argument queries only touch
 // statements referencing tracked bindings (O(S + A) instead of O(A * S)).
 type scopeBodyIndex struct {
-	deps           []scopeDepEdge
-	depsBySym      map[*ast.Symbol][]int
-	depsByName     map[string][]int
-	consumes       []scopeConsumeSite
-	consumesBySym  map[*ast.Symbol][]int
-	consumesByName map[string][]int
+	deps                  []scopeDepEdge
+	depsBySym             map[*ast.Symbol][]int
+	depsByName            map[string][]int
+	consumes              []scopeConsumeSite
+	consumesBySym         map[*ast.Symbol][]int
+	consumesByName        map[string][]int
+	removedContainers     map[*ast.Symbol]bool
+	removedContainerNames map[string]bool
 }
 
 type arrayLiteralIndex struct {
@@ -1099,12 +1101,57 @@ func (r *AsyncAssertionResolver) exprEvaluatesToTrackedPromise(expr *ast.Node, t
 	return false
 }
 
-func (r *AsyncAssertionResolver) isContainerElementAccess(expr *ast.Node, tb *trackedBindings) bool {
-	if expr == nil || expr.Kind != ast.KindElementAccessExpression {
+func (r *AsyncAssertionResolver) isKnownBuiltinCollectionExpr(expr *ast.Node, tb *trackedBindings) bool {
+	return r.isKnownBuiltinCollectionExprDepth(expr, tb, 0)
+}
+
+func (r *AsyncAssertionResolver) isKnownBuiltinCollectionExprDepth(expr *ast.Node, tb *trackedBindings, depth int) bool {
+	if depth > 4 {
 		return false
 	}
-	recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(expr))
-	return r.matchesTrackedContainerIdent(recv, tb, nil)
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindArrayLiteralExpression:
+		return true
+	case ast.KindIdentifier:
+		if r.matchesTrackedRestIdent(expr, tb, nil) {
+			return true
+		}
+		if sym := r.resolveSymbol(expr); sym != nil {
+			if decl := r.singleSameFileValueDeclaration(sym); decl != nil &&
+				decl.Kind == ast.KindVariableDeclaration &&
+				(ast.IsVarConst(decl) || !r.hasSymbolWrite(sym)) &&
+				decl.AsVariableDeclaration().Initializer != nil &&
+				!nodeContains(decl.AsVariableDeclaration().Initializer, expr) {
+				return r.isKnownBuiltinCollectionExprDepth(decl.AsVariableDeclaration().Initializer, tb, depth+1)
+			}
+		}
+	case ast.KindNewExpression:
+		return r.isBuiltinNonPromiseContainerCtor(expr.AsNewExpression().Expression)
+	case ast.KindCallExpression:
+		callee := internalUtils.SkipAssertionsAndParens(expr.AsCallExpression().Expression)
+		if callee != nil && callee.Kind == ast.KindIdentifier && callee.AsIdentifier().Text == "Array" &&
+			!r.isLocallyValueShadowed(callee, "Array") {
+			return true
+		}
+		if callee != nil && ast.IsAccessExpression(callee) {
+			recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+			if mName, ok := r.accessStaticNameThroughAssertions(callee); ok {
+				if recv != nil && recv.Kind == ast.KindIdentifier && recv.AsIdentifier().Text == "Array" &&
+					!r.isLocallyValueShadowed(recv, "Array") && (mName == "from" || mName == "of") {
+					return true
+				}
+				switch mName {
+				case "add", "set", "slice", "concat", "filter", "map", "flat", "flatMap":
+					return r.isKnownBuiltinCollectionExprDepth(recv, tb, depth+1)
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (r *AsyncAssertionResolver) exprCanBeTrackedContainer(expr *ast.Node, tb *trackedBindings) bool {
@@ -1113,8 +1160,8 @@ func (r *AsyncAssertionResolver) exprCanBeTrackedContainer(expr *ast.Node, tb *t
 
 // exprCanBeTrackedContainerDepth reports whether `expr` evaluates to an array
 // or iterable holding a tracked Promise (e.g. `[p]`, `saved`, `...checks`,
-// `[...saved]`, `new Set([p])`) that `Promise.all`/`allSettled`/`race`/`any`
-// or `for await` awaits.
+// `[...saved]`, `new Set([p])`, `new Set().add(p)`) that
+// `Promise.all`/`allSettled`/`race`/`any` or `for await` awaits.
 func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, tb *trackedBindings, depth int) bool {
 	if depth > 6 {
 		return false
@@ -1181,10 +1228,13 @@ func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, 
 		if callee != nil && ast.IsAccessExpression(callee) {
 			if mName, ok := r.accessStaticNameThroughAssertions(callee); ok {
 				switch mName {
-				case "push", "unshift", "forEach", "includes", "indexOf", "lastIndexOf",
-					"join", "toString", "every", "some", "has", "add", "delete",
-					"then", "catch", "finally":
+				case "then", "catch", "finally":
 					return false
+				case "push", "unshift", "forEach", "includes", "indexOf", "lastIndexOf",
+					"join", "toString", "every", "some", "has", "delete", "clear":
+					if r.isKnownBuiltinCollectionExpr(internalUtils.AccessExpressionObject(callee), tb) {
+						return false
+					}
 				}
 			}
 		}
@@ -1302,7 +1352,7 @@ func (r *AsyncAssertionResolver) exprCanReturnTrackedPromiseDepth(expr *ast.Node
 		}
 		return false
 	case ast.KindElementAccessExpression:
-		return r.isRestElementAccess(expr, tb) || r.isContainerElementAccess(expr, tb)
+		return r.isRestElementAccess(expr, tb)
 	case ast.KindCallExpression:
 		if isConsoleCall(expr) {
 			return false
@@ -1338,11 +1388,11 @@ func (r *AsyncAssertionResolver) exprCanReturnTrackedPromiseDepth(expr *ast.Node
 					// only treat the chain as returning a tracked Promise when a handler
 					// consumes it (either by capturing `tb` or by unwrapping a resolved container).
 					if args := expr.AsCallExpression().Arguments; args != nil {
-						var resolvedContainer bool
+						var resolvedContainerArg *ast.Node
 						if mName == "then" && recv != nil && recv.Kind == ast.KindCallExpression {
 							if pMethod, pOK := r.promiseMethodName(recv); pOK && pMethod == "resolve" {
-								if a0, aOK := staticCallArgAt(recv, 0); aOK && a0 != nil {
-									resolvedContainer = r.exprCanBeTrackedContainerDepth(a0, tb, depth+1)
+								if a0, aOK := staticCallArgAt(recv, 0); aOK && a0 != nil && r.exprCanBeTrackedContainerDepth(a0, tb, depth+1) {
+									resolvedContainerArg = internalUtils.SkipAssertionsAndParens(a0)
 								}
 							}
 						}
@@ -1365,16 +1415,66 @@ func (r *AsyncAssertionResolver) exprCanReturnTrackedPromiseDepth(expr *ast.Node
 										return true
 									}
 								}
-								if i == 0 && resolvedContainer {
+								if i == 0 && resolvedContainerArg != nil {
 									params := runtimeParameters(h)
 									if len(params) > 0 && params[0] != nil {
-										if p := params[0].AsParameterDeclaration(); p != nil && p.DotDotDotToken == nil &&
-											p.Name() != nil && p.Name().Kind == ast.KindIdentifier {
-											innerTB := &trackedBindings{restOffset: -1}
-											r.addTrackedIdentKind(innerTB, p.Name(), trackedBindingContainer)
-											r.propagateLocalAliasesInScope(h.Body(), innerTB)
-											if r.scopeConsumesTracked(h.Body(), innerTB, true) {
-												return true
+										if p := params[0].AsParameterDeclaration(); p != nil && p.DotDotDotToken == nil && p.Name() != nil {
+											var matchedIndices []int
+											if resolvedContainerArg.Kind == ast.KindArrayLiteralExpression {
+												if arr := resolvedContainerArg.AsArrayLiteralExpression(); arr != nil && arr.Elements != nil {
+													for idx, el := range arr.Elements.Nodes {
+														if el == nil || el.Kind == ast.KindOmittedExpression {
+															continue
+														}
+														if el.Kind == ast.KindSpreadElement {
+															break
+														}
+														if r.exprCanReturnTrackedPromiseDepth(el, tb, depth+1) {
+															matchedIndices = append(matchedIndices, idx)
+														}
+													}
+												}
+											} else if r.matchesTrackedRestIdent(resolvedContainerArg, tb, nil) && tb.restOffset >= 0 {
+												matchedIndices = []int{tb.restOffset}
+											}
+											checkInner := func(innerTB *trackedBindings) bool {
+												if innerTB.isEmpty() {
+													return false
+												}
+												r.propagateLocalAliasesInScope(h.Body(), innerTB)
+												return r.scopeConsumesTracked(h.Body(), innerTB, true)
+											}
+											if len(matchedIndices) > 0 {
+												for _, elemIdx := range matchedIndices {
+													innerTB := &trackedBindings{restOffset: -1}
+													if r.addTrackedRestParam(innerTB, p.Name(), elemIdx) && checkInner(innerTB) {
+														return true
+													}
+												}
+											} else if p.Name().Kind == ast.KindIdentifier {
+												innerTB := &trackedBindings{restOffset: -1}
+												kind := trackedBindingContainer
+												if r.isKnownBuiltinCollectionExpr(resolvedContainerArg, tb) {
+													kind = trackedBindingRest
+												}
+												r.addTrackedIdentKind(innerTB, p.Name(), kind)
+												if checkInner(innerTB) {
+													return true
+												}
+											} else if p.Name().Kind == ast.KindArrayBindingPattern {
+												if bp := p.Name().AsBindingPattern(); bp != nil && bp.Elements != nil && len(bp.Elements.Nodes) == 1 {
+													el := bp.Elements.Nodes[0]
+													if el != nil && el.Kind == ast.KindBindingElement {
+														be := el.AsBindingElement()
+														if be.DotDotDotToken != nil && be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
+															innerTB := &trackedBindings{restOffset: -1}
+															r.addTrackedIdentKind(innerTB, be.Name(), trackedBindingRest)
+															if checkInner(innerTB) {
+																return true
+															}
+														}
+													}
+												}
 											}
 										}
 									}
@@ -1396,8 +1496,10 @@ func (r *AsyncAssertionResolver) exprCanReturnTrackedPromiseDepth(expr *ast.Node
 				case "push", "unshift", "forEach", "includes", "indexOf", "lastIndexOf",
 					"join", "toString", "slice", "concat", "filter", "map", "flat", "flatMap",
 					"splice", "reverse", "sort", "every", "some", "keys", "values", "entries",
-					"has", "add", "delete":
-					return false
+					"has", "add", "set", "delete", "clear":
+					if r.isKnownBuiltinCollectionExpr(internalUtils.AccessExpressionObject(callee), tb) {
+						return false
+					}
 				}
 			}
 		}
@@ -1669,6 +1771,36 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 		idx.consumes = append(idx.consumes, site)
 		r.indexExprValueRefs(site.expr, enterNested, idx.consumesBySym, idx.consumesByName, siteIdx)
 	}
+	markContainerRemoved := func(ident *ast.Node) {
+		if ident == nil || ident.Kind != ast.KindIdentifier {
+			return
+		}
+		name := ident.AsIdentifier().Text
+		if r != nil && r.refs != nil {
+			if sym := r.resolveSymbol(ident); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
+				if idx.removedContainers == nil {
+					idx.removedContainers = map[*ast.Symbol]bool{}
+				}
+				idx.removedContainers[sym] = true
+				return
+			}
+		}
+		if idx.removedContainerNames == nil {
+			idx.removedContainerNames = map[string]bool{}
+		}
+		idx.removedContainerNames[name] = true
+	}
+	markLengthOperandRemoved := func(operand *ast.Node) {
+		lhs := internalUtils.SkipAssertionsAndParens(operand)
+		if lhs != nil && ast.IsAccessExpression(lhs) {
+			if mName, ok := r.accessStaticNameThroughAssertions(lhs); ok && mName == "length" {
+				if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(lhs)); recv != nil &&
+					recv.Kind == ast.KindIdentifier {
+					markContainerRemoved(recv)
+				}
+			}
+		}
+	}
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
 		if node == nil {
@@ -1700,13 +1832,25 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 		case ast.KindBinaryExpression:
 			bin := node.AsBinaryExpression()
 			if bin != nil && bin.OperatorToken != nil {
-				switch bin.OperatorToken.Kind {
+				op := bin.OperatorToken.Kind
+				if ast.IsAssignmentOperator(op) {
+					lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
+					if lhs != nil && ast.IsAccessExpression(lhs) {
+						if mName, ok := r.accessStaticNameThroughAssertions(lhs); ok && mName == "length" {
+							if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(lhs)); recv != nil &&
+								recv.Kind == ast.KindIdentifier {
+								markContainerRemoved(recv)
+							}
+						}
+					}
+				}
+				switch op {
 				case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken,
 					ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
 					lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
 					if lhs != nil && lhs.Kind == ast.KindIdentifier {
 						addDep(scopeDepEdge{kind: scopeDepAssign, target: lhs, rhs: bin.Right}, bin.Right)
-					} else if bin.OperatorToken.Kind == ast.KindEqualsToken &&
+					} else if op == ast.KindEqualsToken &&
 						lhs != nil && lhs.Kind == ast.KindElementAccessExpression {
 						if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(lhs)); recv != nil &&
 							recv.Kind == ast.KindIdentifier {
@@ -1715,19 +1859,37 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 					}
 				}
 			}
+		case ast.KindPrefixUnaryExpression:
+			if op := node.AsPrefixUnaryExpression().Operator; op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
+				markLengthOperandRemoved(node.AsPrefixUnaryExpression().Operand)
+			}
+		case ast.KindPostfixUnaryExpression:
+			markLengthOperandRemoved(node.AsPostfixUnaryExpression().Operand)
+		case ast.KindDeleteExpression:
+			if target := internalUtils.SkipAssertionsAndParens(node.AsDeleteExpression().Expression); target != nil &&
+				target.Kind == ast.KindElementAccessExpression {
+				if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(target)); recv != nil &&
+					recv.Kind == ast.KindIdentifier {
+					markContainerRemoved(recv)
+				}
+			}
 		case ast.KindCallExpression:
 			callee := internalUtils.SkipAssertionsAndParens(node.AsCallExpression().Expression)
 			if callee != nil && ast.IsAccessExpression(callee) {
-				if mName, ok := r.accessStaticNameThroughAssertions(callee); ok &&
-					(mName == "push" || mName == "unshift" || mName == "add") {
-					if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee)); recv != nil &&
-						recv.Kind == ast.KindIdentifier {
-						if args := node.AsCallExpression().Arguments; args != nil && len(args.Nodes) > 0 {
-							edgeIdx := len(idx.deps)
-							idx.deps = append(idx.deps, scopeDepEdge{kind: scopeDepContainerPush, target: recv, rhs: node})
-							for _, a := range args.Nodes {
-								r.indexExprValueRefs(a, true, idx.depsBySym, idx.depsByName, edgeIdx)
+				if mName, ok := r.accessStaticNameThroughAssertions(callee); ok {
+					recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+					if recv != nil && recv.Kind == ast.KindIdentifier {
+						switch mName {
+						case "push", "unshift", "add":
+							if args := node.AsCallExpression().Arguments; args != nil && len(args.Nodes) > 0 {
+								edgeIdx := len(idx.deps)
+								idx.deps = append(idx.deps, scopeDepEdge{kind: scopeDepContainerPush, target: recv, rhs: node})
+								for _, a := range args.Nodes {
+									r.indexExprValueRefs(a, true, idx.depsBySym, idx.depsByName, edgeIdx)
+								}
 							}
+						case "pop", "shift", "splice", "clear", "delete", "fill", "copyWithin":
+							markContainerRemoved(recv)
 						}
 					}
 				}
@@ -1763,7 +1925,27 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 		return
 	}
 	idx := r.getScopeBodyIndex(root)
-	if idx == nil || len(idx.deps) == 0 {
+	if idx == nil {
+		return
+	}
+	// Strip initial rest/container bindings if this scope removes elements from
+	// them (e.g. `checks.pop()`, `delete arguments[0]`, `items.length = 0`).
+	if len(idx.removedContainers) > 0 {
+		for sym := range idx.removedContainers {
+			delete(tb.restSymbols, sym)
+			delete(tb.containerSymbols, sym)
+		}
+	}
+	if len(idx.removedContainerNames) > 0 {
+		if idx.removedContainerNames["arguments"] {
+			tb.trackArguments = false
+		}
+		for name := range idx.removedContainerNames {
+			delete(tb.restNames, name)
+			delete(tb.containerNames, name)
+		}
+	}
+	if len(idx.deps) == 0 || tb.isEmpty() {
 		return
 	}
 	type workItem struct {
@@ -1810,6 +1992,27 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 		enqueue(nil, "arguments", trackedBindingRest)
 	}
 
+	isContainerRemoved := func(ident *ast.Node) bool {
+		if ident == nil || ident.Kind != ast.KindIdentifier {
+			return false
+		}
+		if len(idx.removedContainers) == 0 && len(idx.removedContainerNames) == 0 {
+			return false
+		}
+		if r != nil && r.refs != nil {
+			var sym *ast.Symbol
+			if ident.Parent != nil && ident.Parent.Symbol() != nil {
+				sym = ident.Parent.Symbol()
+			} else {
+				sym = r.resolveSymbol(ident)
+			}
+			if sym != nil {
+				return idx.removedContainers[sym]
+			}
+		}
+		return idx.removedContainerNames[ident.AsIdentifier().Text]
+	}
+
 	const maxWorkSteps = 256
 	steps := 0
 	for len(queue) > 0 && steps < maxWorkSteps {
@@ -1830,7 +2033,7 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 				for rhsUnwrapped != nil && internalUtils.IsCommaOperator(rhsUnwrapped) {
 					rhsUnwrapped = internalUtils.SkipAssertionsAndParens(rhsUnwrapped.AsBinaryExpression().Right)
 				}
-				if r.matchesTrackedRestIdent(rhsUnwrapped, tb, nil) {
+				if r.matchesTrackedRestIdent(rhsUnwrapped, tb, nil) && !isContainerRemoved(edge.target) {
 					if sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingRest); added {
 						enqueue(sym, name, trackedBindingRest)
 					}
@@ -1841,12 +2044,15 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 						enqueue(sym, name, trackedBindingDirect)
 					}
 				}
-				if r.exprCanBeTrackedContainer(edge.rhs, tb) {
+				if !isContainerRemoved(edge.target) && r.exprCanBeTrackedContainer(edge.rhs, tb) {
 					if sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingContainer); added {
 						enqueue(sym, name, trackedBindingContainer)
 					}
 				}
 			case scopeDepContainerPush:
+				if isContainerRemoved(edge.target) {
+					continue
+				}
 				if args := edge.rhs.AsCallExpression().Arguments; args != nil {
 					matched := false
 					for _, a := range args.Nodes {
@@ -1872,7 +2078,7 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 					}
 				}
 			case scopeDepContainerIndexWrite:
-				if r.exprCanReturnTrackedPromise(edge.rhs, tb) {
+				if !isContainerRemoved(edge.target) && r.exprCanReturnTrackedPromise(edge.rhs, tb) {
 					if sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingContainer); added {
 						enqueue(sym, name, trackedBindingContainer)
 					}
@@ -3527,27 +3733,36 @@ func (r *AsyncAssertionResolver) isPureExpectOrPromiseWrapperCall(call *ast.Node
 	if method, ok := r.promiseMethodName(call); ok && (method == "resolve" || method == "reject") {
 		return true
 	}
-	if r.isExpectCallWithoutCallback(call) {
-		return true
-	}
-	// Accept matcher calls chained onto a genuine `expect(...)` call (rejecting
-	// static mutators like `expect.extend(...)` / `expect.assertions(...)` and
-	// callback-invoking matchers like `.toThrow()`).
-	cur := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
-	if cur == nil || !ast.IsAccessExpression(cur) {
+	// Only accept async matcher chains (`expect(...).resolves...` /
+	// `expect(...).rejects...`, or built-in async matchers `toResolve`/`toReject`):
+	// synchronous matchers such as `toHaveProperty`, `toEqual`, or custom
+	// matchers can synchronously invoke getters or mutate test state.
+	outerCallee := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
+	if outerCallee == nil || !ast.IsAccessExpression(outerCallee) {
 		return false
 	}
-	if mName, ok := r.accessStaticNameThroughAssertions(cur); ok && (mName == "toThrow" || mName == "toThrowError") {
-		return false
+	cur := outerCallee
+	hasAsyncModifier := false
+	isOuterAsyncMatcher := false
+	if mName, ok := r.accessStaticNameThroughAssertions(outerCallee); ok && (mName == "toResolve" || mName == "toReject") {
+		isOuterAsyncMatcher = true
 	}
 	for cur != nil {
 		if ast.IsAccessExpression(cur) {
+			if cur != outerCallee {
+				if mName, ok := r.accessStaticNameThroughAssertions(cur); ok && (mName == "resolves" || mName == "rejects") {
+					hasAsyncModifier = true
+				}
+			}
 			cur = internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(cur))
 			continue
 		}
 		if cur.Kind == ast.KindCallExpression {
 			if r.isExpectCallWithoutCallback(cur) {
-				return true
+				return hasAsyncModifier || isOuterAsyncMatcher
+			}
+			if hasAsyncModifier || isOuterAsyncMatcher {
+				return false
 			}
 			cur = internalUtils.SkipAssertionsAndParens(cur.AsCallExpression().Expression)
 			continue
