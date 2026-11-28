@@ -105,6 +105,27 @@ describe('IPC byte attachments', () => {
     return { slot: 0, generation: 1, length: 0 };
   }
 
+  test('releases orphan response attachments without exposing a capability', async () => {
+    const pair = receiver({ memoryTransport: createMemoryTransport() });
+    try {
+      const batch = emptyBatch();
+      const acknowledgement = await pair.request({
+        kind: 'response',
+        id: 42,
+        attachments: [{ range: { offset: 0, length: 0 } }],
+        transport: { batches: [batch] },
+      });
+      expect(acknowledgement).toEqual({
+        kind: 'transportRelease',
+        id: 42,
+        transport: { released: [batch], response: true },
+      });
+      expect(pair.b.isClosed).toBe(false);
+    } finally {
+      pair.cleanup();
+    }
+  });
+
   test('delivers complete inline attachments through the ordinary request API', async () => {
     const pair = pairClients();
     pair.b.setInboundHandler((msg) => {
@@ -1166,6 +1187,8 @@ describe('real Go/Node arbitrary byte attachments', () => {
       const capabilities: SharedBytes[] = [];
       const owned: Buffer[] = [];
       const hashes: string[] = [];
+      const replyCopies: Buffer[] = [];
+      const replyHashes: string[] = [];
       let calls = 0;
       const digest = (bytes: Buffer) =>
         createHash('sha256').update(bytes).digest('hex');
@@ -1224,6 +1247,19 @@ describe('real Go/Node arbitrary byte attachments', () => {
           }
           // Revocation and the next Go publication do not affect owned copies.
           expect(owned.map(digest)).toEqual(hashes);
+          const reply = await client.sendRequest<unknown, Payload>(
+            'replyBinary',
+            { round },
+          );
+          const returned = reply.attachments!.map(readAttachmentBytes);
+          expect(returned.map(digest)).toEqual(reply.data!.hashes);
+          expect(returned.map((value) => value.length)).toEqual(
+            reply.data!.lengths,
+          );
+          expect(Buffer.isBuffer(reply.attachments![3])).toBe(true);
+          replyCopies.push(returned[3]);
+          replyHashes.push(reply.data!.hashes[3]);
+          expect(replyCopies.map(digest)).toEqual(replyHashes);
         }
         expect(hashes[0]).not.toBe(hashes[1]);
       } finally {
@@ -1232,6 +1268,7 @@ describe('real Go/Node arbitrary byte attachments', () => {
         await childClosed;
       }
       expect(owned.map(digest)).toEqual(hashes);
+      expect(replyCopies.map(digest)).toEqual(replyHashes);
     },
     120_000,
   );

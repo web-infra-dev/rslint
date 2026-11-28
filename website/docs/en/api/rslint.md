@@ -63,7 +63,7 @@ With automatic discovery, Go selects each file's nearest config and owns ignore 
 See the [`basePath` configuration reference](/config/base-path) for automatic, explicit-file, and inline-override behavior.
 
 :::warning
-Object-form community plugins are not supported in `overrideConfig`, because a plugin worker cannot re-import an in-memory plugin object. Put community plugin declarations in a JS or TS config file. Array-form built-in plugins work in `overrideConfig`.
+Object-form community plugins are not supported in `overrideConfig`, because a plugin worker cannot re-import an in-memory plugin object. Put community plugin declarations in a JS or TS config file (see [Using with the JavaScript API](/guide/eslint-plugins#using-with-the-javascript-api)). Array-form built-in plugins work in `overrideConfig`.
 :::
 
 See [Configuration File](/config/configuration-file) for config discovery and flat-config behavior.

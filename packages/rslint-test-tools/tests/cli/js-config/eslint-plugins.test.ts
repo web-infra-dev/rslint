@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'rstack/test';
 import fs from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Linter } from 'eslint';
@@ -149,6 +150,386 @@ async function lint(
 }
 
 describe('CLI community plugins (object-form) end-to-end', () => {
+  test('project false supplies compiler node maps and applies typescript-eslint assertion fixes', async () => {
+    const plugin = import.meta.resolve('@typescript-eslint/eslint-plugin');
+    const { dir, exitCode, diags } = await lint(
+      {
+        'rslint.config.mjs': `import tsPlugin from ${JSON.stringify(plugin)};
+export default [{ files: ['**/*.ts', '**/*.tsx'], languageOptions: { parserOptions: { project: false } },
+  plugins: { community: tsPlugin }, rules: {
+    'community/consistent-type-imports': 'error',
+    'community/naming-convention': ['error', { selector: 'variable', format: ['camelCase'] }],
+    'community/consistent-type-assertions': ['error', { assertionStyle: 'as' }],
+    'community/no-unused-vars': 'error'
+  } }];`,
+        'input.ts':
+          'declare const input: unknown;\nexport const value = <number>input;\n',
+        'fragment.tsx':
+          'import { Fragment } from "react";\nexport const view = <><span /></>;\n',
+      },
+      ['--fix', 'input.ts', 'fragment.tsx'],
+    );
+    try {
+      expect(diags).toEqual([]);
+      expect(exitCode).toBe(0);
+      expect(await fs.readFile(path.join(dir, 'input.ts'), 'utf8')).toBe(
+        'declare const input: unknown;\nexport const value = input as number;\n',
+      );
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
+  test('CLI runs real type-aware @typescript-eslint rules end-to-end', async () => {
+    const plugin = import.meta.resolve('@typescript-eslint/eslint-plugin');
+    const { dir, exitCode, diags } = await lint({
+      'rslint.config.mjs': `import tsPlugin from ${JSON.stringify(plugin)};
+export default [{
+  files: ['**/*.ts'],
+  languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
+  plugins: { typed: tsPlugin },
+  rules: {
+    'typed/await-thenable': 'error',
+    'typed/no-floating-promises': 'error',
+  },
+}];`,
+      'tsconfig.json':
+        '{"compilerOptions":{"target":"esnext","module":"esnext","strict":true},"include":["*.ts"]}',
+      'dep.ts':
+        'export async function fetchCount(): Promise<number> { return 1; }\n',
+      'index.ts': [
+        'import { fetchCount } from "./dep";',
+        'async function run() {',
+        '  await 123;',
+        '  fetchCount();',
+        '  await fetchCount();',
+        '}',
+        'void run();',
+        '',
+      ].join('\n'),
+    });
+    try {
+      expect(exitCode).toBe(1);
+      expect(
+        diags
+          .map((diagnostic) => [
+            path.basename(diagnostic.filePath),
+            diagnostic.ruleName,
+          ])
+          .sort(),
+      ).toEqual([
+        ['index.ts', 'typed/await-thenable'],
+        ['index.ts', 'typed/no-floating-promises'],
+      ]);
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
+  test('skips standard missing-type-info errors on gap files while keeping syntax rules and surfacing real config errors', async () => {
+    const req = createRequire(import.meta.url);
+    const tsPluginHref = pathToFileURL(
+      req.resolve('@typescript-eslint/eslint-plugin'),
+    ).href;
+    const sonarjsHref = pathToFileURL(
+      req.resolve('eslint-plugin-sonarjs'),
+    ).href;
+    const { dir, exitCode, diags } = await lint(
+      {
+        'rslint.config.mjs': `import tsPlugin from ${JSON.stringify(tsPluginHref)};
+import sonarjs from ${JSON.stringify(sonarjsHref)};
+export default [{
+  files: ['**/*.ts'],
+  languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
+  plugins: { typed: tsPlugin, s: sonarjs },
+  rules: {
+    'typed/await-thenable': 'error',
+    'typed/no-floating-promises': 'error',
+    'typed/naming-convention': ['error', { selector: 'variable', types: ['boolean'], format: ['PascalCase'] }],
+    'typed/consistent-type-imports': 'error',
+    's/no-identical-expressions': 'error',
+  },
+}];`,
+        'tsconfig.json':
+          '{"compilerOptions":{"target":"esnext","module":"esnext","strict":true},"files":["typed.ts"]}',
+        'typed.ts': 'export async function run() { await 123; }\n',
+        'gap.ts':
+          'import { Foo } from "./typed";\nexport type Bar = Foo;\nexport const same = 1 === 1;\n',
+      },
+      ['typed.ts', 'gap.ts'],
+    );
+    try {
+      expect(exitCode).toBe(1);
+      expect(
+        diags
+          .map((diagnostic) => [
+            path.basename(diagnostic.filePath),
+            diagnostic.ruleName,
+          ])
+          .sort(),
+      ).toEqual([
+        ['gap.ts', 's/no-identical-expressions'],
+        ['gap.ts', 'typed/consistent-type-imports'],
+        ['typed.ts', 'typed/await-thenable'],
+      ]);
+    } finally {
+      await cleanupTempDir(dir);
+    }
+
+    // Real configuration errors and runtime bugs must still surface on gap files.
+    const configErr = await lint(
+      {
+        'rslint.config.mjs': `const custom = {
+  rules: {
+    'missing-aliases': {
+      meta: { docs: { requiresTypeChecking: true }, schema: [] },
+      create(context) {
+        const settings = context.settings;
+        void context.sourceCode.parserServices.program;
+        if (!settings.aliases) throw new Error('Missing path aliases');
+        return {};
+      },
+    },
+    'runtime-bug': {
+      meta: { docs: { requiresTypeChecking: true }, schema: [] },
+      create(context) {
+        void context.sourceCode.parserServices.program;
+        const missing = undefined;
+        missing.boom();
+        return {};
+      },
+    },
+  },
+};
+export default [{
+  files: ['**/*.ts'],
+  languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
+  plugins: { custom },
+  rules: {
+    'custom/missing-aliases': 'error',
+    'custom/runtime-bug': 'error',
+  },
+}];`,
+        'tsconfig.json':
+          '{"compilerOptions":{"target":"esnext","module":"esnext","strict":true},"files":["typed.ts"]}',
+        'typed.ts': 'export const a = 1;\n',
+        'gap.ts': 'export const b = 2;\n',
+      },
+      ['gap.ts'],
+    );
+    try {
+      expect(configErr.exitCode).toBe(1);
+      expect(
+        configErr.diags
+          .map((diagnostic) => [
+            path.basename(diagnostic.filePath),
+            diagnostic.ruleName,
+          ])
+          .sort(),
+      ).toEqual([
+        ['gap.ts', 'custom/missing-aliases'],
+        ['gap.ts', 'custom/runtime-bug'],
+      ]);
+    } finally {
+      await cleanupTempDir(configErr.dir);
+    }
+  });
+
+  test('rules on the same file share identical parserServices identity and tsconfig scope options', async () => {
+    const { dir, exitCode, diags } = await lint(
+      {
+        'rslint.config.mjs': `const shared = new WeakMap();
+const probe = {
+  rules: {
+    produce: {
+      meta: { schema: [] },
+      create(context) {
+        const services = context.sourceCode.parserServices;
+        return {
+          Program() {
+            shared.set(services, 'marker');
+          },
+        };
+      },
+    },
+    consume: {
+      meta: { schema: [] },
+      create(context) {
+        const services = context.sourceCode.parserServices;
+        return {
+          'Program:exit'(node) {
+            const scope = context.sourceCode.getScope(node);
+            const moduleScope = scope.childScopes[0] ?? scope;
+            const hasH = moduleScope.variables.some((v) => v.name === 'h' && v.references.length > 0);
+            if (shared.get(services) === 'marker' && hasH) {
+              context.report({ node, message: 'shared-services-and-scope-ok' });
+            }
+          },
+        };
+      },
+    },
+  },
+};
+export default [{
+  files: ['**/*.tsx'],
+  languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
+  plugins: { probe },
+  rules: {
+    'probe/produce': 'error',
+    'probe/consume': 'error',
+  },
+}];`,
+        'tsconfig.json': JSON.stringify({
+          compilerOptions: {
+            target: 'esnext',
+            module: 'esnext',
+            jsx: 'react',
+            jsxFactory: 'h',
+          },
+          include: ['app.tsx'],
+        }),
+        'app.tsx': 'import { h } from "./jsx";\nexport const view = <div />;\n',
+        'jsx.ts': 'export function h() { return null; }\n',
+      },
+      ['app.tsx'],
+    );
+    try {
+      expect(exitCode).toBe(1);
+      expect(
+        diags.map((diagnostic) => [
+          path.basename(diagnostic.filePath),
+          diagnostic.ruleName,
+        ]),
+      ).toEqual([['app.tsx', 'probe/consume']]);
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
+  test('CLI preserves firstTokens, source paths, and syntax-only parserOptions flags', async () => {
+    const { dir, exitCode, diags } = await lint({
+      'rslint.config.mjs': `const probe = {
+  rules: {
+    check: {
+      meta: { schema: [] },
+      create(context) {
+        const services = context.sourceCode.parserServices;
+        return {
+          Program(node) {
+            if (!services.program) {
+              if (services.experimentalDecorators !== true || services.emitDecoratorMetadata !== false) {
+                throw new Error('syntax-only parserOptions flags were not forwarded');
+              }
+              context.report({ node, message: 'syntax-flags-ok' });
+              return;
+            }
+            const source = services.esTreeNodeToTSNodeMap.get(node);
+            const firstStmt = node.body[0];
+            const tsStmt = services.esTreeNodeToTSNodeMap.get(firstStmt);
+            if (!tsStmt || tsStmt.getStart(source) !== firstStmt.range[0]) {
+              throw new Error('firstTokens projection missing over IPC');
+            }
+            const byPath = services.program.getSourceFileByPath(source.path);
+            if (byPath !== source) {
+              throw new Error('source.path lookup mismatch over IPC');
+            }
+            context.report({ node, message: 'typed-projection-ok' });
+          },
+        };
+      },
+    },
+  },
+};
+export default [
+  {
+    files: ['typed.ts'],
+    languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
+    plugins: { probe },
+    rules: { 'probe/check': 'error' },
+  },
+  {
+    files: ['syntax.ts'],
+    languageOptions: { parserOptions: { project: false, experimentalDecorators: true } },
+    plugins: { probe },
+    rules: { 'probe/check': 'error' },
+  },
+];`,
+      'tsconfig.json':
+        '{"compilerOptions":{"target":"esnext","module":"esnext","strict":true},"files":["typed.ts"]}',
+      'typed.ts': '/* leading comment */\nexport const answer = 42;\n',
+      'syntax.ts': 'export const plain = 1;\n',
+    });
+    try {
+      expect(exitCode).toBe(1);
+      const messages = diags as Array<Diag & { message: string }>;
+      expect(
+        messages
+          .map((diagnostic) => [
+            path.basename(diagnostic.filePath),
+            diagnostic.message,
+          ])
+          .sort(),
+      ).toEqual([
+        ['syntax.ts', 'syntax-flags-ok'],
+        ['typed.ts', 'typed-projection-ok'],
+      ]);
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
+  test('typed plugins use each selected Program while a project reset stays source-only', async () => {
+    const plugin = pathToFileURL(
+      path.resolve(
+        import.meta.dirname,
+        '../../eslint-plugin/fixtures/typed-plugin.mjs',
+      ),
+    ).href;
+    const { dir, exitCode, diags } = await lint({
+      'rslint.config.mjs': `import typed from ${JSON.stringify(plugin)};
+export default [
+ { files: ['**/*.ts'], languageOptions: { parserOptions: { project: ['./tsconfig.json', './other/tsconfig.json'] } }, plugins: { typed }, rules: { 'typed/value': 'error' } },
+ { files: ['plain.ts'], languageOptions: { parserOptions: { project: false } } },
+];`,
+      'tsconfig.json':
+        '{"compilerOptions":{"target":"esnext","module":"esnext","strict":true},"files":["dependency.ts","typed.ts"]}',
+      'dependency.ts': 'export const value: string = "😀";',
+      'typed.ts':
+        'import { value } from "./dependency";\n' +
+        'declare const optional: { item?: string } | null;\n' +
+        'optional?.item?.trim();\n1, 2, 3;\nvalue;\n' +
+        'declare function choose<T extends string>(value: T): 1;\n' +
+        'declare function choose<T extends string>(value: T, extra: T): 2;\n' +
+        'choose(false,);\n',
+      'other/tsconfig.json':
+        '{"compilerOptions":{"target":"esnext","module":"esnext","strict":true},"files":["dependency.ts","other.ts"]}',
+      'other/dependency.ts': 'export const value: number = 1;',
+      'other/other.ts': 'import { value } from "./dependency";\nvalue;\n',
+      'plain.ts': 'value;\n',
+    });
+    try {
+      expect(exitCode).toBe(1);
+      const messages = diags as Array<Diag & { message: string }>;
+      expect(
+        messages
+          .map((diagnostic) => [
+            path.basename(diagnostic.filePath),
+            diagnostic.message,
+          ])
+          .sort(),
+      ).toEqual([
+        ['other.ts', 'number'],
+        ['plain.ts', 'source-only'],
+        ['typed.ts', 'ordered overload queries'],
+        ['typed.ts', 'original sequence prefix'],
+        ['typed.ts', 'string'],
+        ['typed.ts', 'string | undefined'],
+      ]);
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
   test('--fix runs plugins on a long comma expression', async () => {
     const text = 'a,'.repeat(5999) + '[1].filter(Boolean);\n';
     const { dir, exitCode, diags } = await lint(

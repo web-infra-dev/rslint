@@ -18,6 +18,8 @@ import {
 } from './plugin/plugin-lint-protocol.js';
 import type { ConfigDescriptor } from './types.js';
 import type { ByteInput } from '../native/types.js';
+import { PluginTypeServices } from './type-service-host.js';
+import type { TypeServiceHostTransport } from './plugin/type-service-protocol.js';
 import { resolvePluginAttachments } from './plugin/attachments.js';
 
 export interface PluginLintHost {
@@ -31,6 +33,7 @@ export interface PluginLintHost {
     req: EslintPluginLintRequest,
     signal?: AbortSignal,
     attachments?: readonly ByteInput[],
+    typeServices?: TypeServiceHostTransport,
   ): Promise<EslintPluginLintResult>;
   /** Drain in-flight tasks and terminate the worker pool. Idempotent. */
   shutdown(): Promise<void>;
@@ -49,6 +52,7 @@ export async function createPluginLintHost(
   onLog?: WorkerPoolOptions['onLog'],
   singleThreaded?: boolean,
 ): Promise<PluginLintHost> {
+  const types = new PluginTypeServices();
   // --singleThreaded caps both warmup and execution at one worker.
   const pool = new WorkerPool({
     configs,
@@ -57,10 +61,22 @@ export async function createPluginLintHost(
   });
   await pool.init();
   return {
-    async lint(req, signal, attachments) {
-      const tasks = buildPluginLintTasks(
-        resolvePluginAttachments(req, attachments),
-      );
+    async lint(req, signal, attachments, transport) {
+      if (req.retiredTypeServices?.length) {
+        // Cancel workers before retiring host sessions so in-flight reads
+        // observe cancellation rather than a closed-session error.
+        pool.retireTypeServices(req.retiredTypeServices);
+        types.retire(req.retiredTypeServices);
+      }
+      if (req.files.length === 0) return { results: [] };
+      const resolved = resolvePluginAttachments(req, attachments);
+      const tasks = buildPluginLintTasks(resolved);
+      if (!transport) {
+        // Backwards compatibility: older callers (e.g. an editor host before
+        // wiring rslint/typeService) omit transport; strip typeServices so
+        // untyped rules and scope analysis stay purely local instead of failing.
+        for (const task of tasks) task.typeServices = undefined;
+      }
       // Cancel the dispatched worker tasks if the caller aborts (a superseding
       // keystroke / document close). cancelTask works whether the task is still
       // queued or already running (cooperative SAB cancel-flag).
@@ -70,17 +86,28 @@ export async function createPluginLintHost(
       };
       signal?.addEventListener('abort', onAbort);
       try {
-        const results = await pool.lintBatch(tasks, (taskId) => {
-          dispatchedTaskIds.push(taskId);
-          if (signal?.aborted) pool.cancelTask(taskId);
-        });
+        const results = await pool.lintBatch(
+          tasks,
+          (taskId) => {
+            dispatchedTaskIds.push(taskId);
+            if (signal?.aborted) pool.cancelTask(taskId);
+          },
+          transport
+            ? async (request, taskSignal) =>
+                types.query(request, taskSignal, transport)
+            : undefined,
+        );
         return buildPluginLintResult(results);
       } finally {
         signal?.removeEventListener('abort', onAbort);
       }
     },
     async shutdown() {
-      await pool.shutdown();
+      try {
+        await pool.shutdown();
+      } finally {
+        types.close();
+      }
     },
   };
 }

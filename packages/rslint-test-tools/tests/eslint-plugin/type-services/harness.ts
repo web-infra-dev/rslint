@@ -4,12 +4,11 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import ts from 'typescript';
-import { typeServiceCompilerData } from '../../../../rslint/src/languages/js/type-service-compiler-data.js';
+import { TYPESCRIPT_COMPILER_DATA } from '../../../../rslint/src/languages/js/type-service-compiler-data.generated.js';
 import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 export const root = resolve(import.meta.dirname, '../../../../..');
-export const enums = typeServiceCompilerData(ts);
+export const enums = TYPESCRIPT_COMPILER_DATA;
 
 export class Host {
   mailbox: SharedArrayBuffer;

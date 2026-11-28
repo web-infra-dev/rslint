@@ -163,6 +163,9 @@ func TestHandleLint_PluginWirePathUsesProgramIdentityWhileResultsUseRequestedAli
 					}},
 				},
 				linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+					if len(request.Files) == 0 {
+						return &linter.EslintPluginLintResult{}, nil
+					}
 					if len(request.Files) != 1 {
 						return nil, fmt.Errorf("plugin files = %d, want 1", len(request.Files))
 					}

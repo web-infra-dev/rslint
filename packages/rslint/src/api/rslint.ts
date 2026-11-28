@@ -396,7 +396,12 @@ export class Rslint {
               'rslint API: pluginLint requested without an activated plugin host',
             );
           }
-          return pluginSession.host.lint(request, undefined, attachments);
+          return pluginSession.host.lint(
+            request,
+            undefined,
+            attachments,
+            async (query) => this.#service.queryPluginTypes(query),
+          );
         },
       },
       shutdown,

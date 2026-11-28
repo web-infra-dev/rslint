@@ -1446,7 +1446,7 @@ func TestDispatchEslintPluginProjectionWindowsOwnFrames(t *testing.T) {
 		return &EslintPluginLintResult{Results: results}, nil
 	})
 	ownedInputs := slices.Clone(inputs)
-	if err := dispatchOneBatch(context.Background(), dispatch, ownedInputs, make(chan *pluginProjectionBuffers, 1), false, SuggestionsModeOff, nil, func(rule.RuleDiagnostic) {}, nil, nil); err != nil {
+	if err := dispatchOneBatch(context.Background(), dispatch, ownedInputs, make(chan *pluginProjectionBuffers, 1), false, SuggestionsModeOff, nil, func(rule.RuleDiagnostic) {}, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(windows, []int{32, 32, 1}) {
@@ -1491,11 +1491,43 @@ func TestDispatchEslintPluginProjectionWindowsOwnFrames(t *testing.T) {
 		provider := testPluginBatchProvider(func(context.Context) (*EslintPluginBatch, error) {
 			return &EslintPluginBatch{Allocate: func(size int) []byte { allocations++; return make([]byte, size) }, Dispatch: dispatch, Release: func() { releases++ }}, nil
 		})
-		if err := dispatchOneBatch(context.Background(), provider, slices.Clone(inputs), make(chan *pluginProjectionBuffers, 1), false, SuggestionsModeOff, nil, func(rule.RuleDiagnostic) {}, nil, nil); err != nil {
+		if err := dispatchOneBatch(context.Background(), provider, slices.Clone(inputs), make(chan *pluginProjectionBuffers, 1), false, SuggestionsModeOff, nil, func(rule.RuleDiagnostic) {}, nil, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 		if calls != 2 || releases != 2 || allocations != 3 {
 			t.Fatalf("windows/callbacks/allocations = %d/%d/%d, want 2/2/3", calls, releases, allocations)
+		}
+	})
+	t.Run("type eligibility leaves the frame window unchanged", func(t *testing.T) {
+		text := "export const value = 1;"
+		typed := EslintPluginFileInput{Path: "/repo/typed.ts", Text: &text, SourceFile: pluginSyntax("/repo/typed.ts", text), TypeServices: &EslintPluginFileTypeServices{}}
+		var builder estree.Builder
+		frozen := typed
+		frame, err := projectPluginFrame(t.Context(), &builder, &frozen, nil)
+		if err != nil {
+			t.Fatalf("freeze typed input: %v", err)
+		}
+		frozen.Frame = frame
+		large := make([]byte, pluginWindowBytes)
+		for _, input := range []EslintPluginFileInput{typed, frozen} {
+			// Only the ESTree frame counts against the first window. An
+			// oversized ESTree frame still runs by itself.
+			inputs := []EslintPluginFileInput{
+				{Path: "/repo/full.ts", Frame: large[:pluginWindowBytes-len(frame)]},
+				input,
+				{Path: "/repo/oversize.ts", Frame: make([]byte, pluginWindowBytes+1), TypeServices: &EslintPluginFileTypeServices{}},
+			}
+			var windows []int
+			dispatch := EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				windows = append(windows, len(request.Files))
+				return &EslintPluginLintResult{}, nil
+			})
+			if err := dispatchOneBatch(t.Context(), dispatch, inputs, make(chan *pluginProjectionBuffers, 1), false, SuggestionsModeOff, nil, func(rule.RuleDiagnostic) {}, func(EslintPluginProtocolNotice) {}, nil, nil); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(windows, []int{2, 1}) {
+				t.Errorf("eligible file windows = %v, want [2 1]", windows)
+			}
 		}
 	})
 }
@@ -1516,12 +1548,12 @@ func TestDispatchEslintPluginProjectionFailureCannotFallBack(t *testing.T) {
 	}
 	input.Text = nil
 	var builder estree.Builder
-	if _, err := projectPluginFrame(context.Background(), &builder, input, nil); err == nil {
+	if _, err := projectPluginFrame(context.Background(), &builder, &input, nil); err == nil {
 		t.Fatal("missing snapshot accepted")
 	}
 	input.Text = &current
 	input.SourceFile.Statements.Nodes[0].Kind = ast.KindUnknown
-	if frame, err := projectPluginFrame(context.Background(), &builder, input, nil); err == nil || frame != nil {
+	if frame, err := projectPluginFrame(context.Background(), &builder, &input, nil); err == nil || frame != nil {
 		t.Fatal("unknown syntax accepted")
 	}
 }
@@ -1683,7 +1715,7 @@ func TestDispatchEslintPluginUsesBatchOwnedOutput(t *testing.T) {
 					},
 				}, nil
 			})
-			err := dispatchOneBatch(context.Background(), provider, slices.Clone(inputs), make(chan *pluginProjectionBuffers, 1), false, SuggestionsModeOff, nil, func(rule.RuleDiagnostic) {}, nil, nil)
+			err := dispatchOneBatch(context.Background(), provider, slices.Clone(inputs), make(chan *pluginProjectionBuffers, 1), false, SuggestionsModeOff, nil, func(rule.RuleDiagnostic) {}, nil, nil, nil)
 			if failure == "" && err != nil {
 				t.Fatal(err)
 			}

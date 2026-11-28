@@ -31,6 +31,13 @@ type documentProgressiveDiagnostics struct {
 	enrichment       linter.DeferredPluginRun
 }
 
+func (p *documentProgressiveDiagnostics) close() {
+	if p != nil && p.enrichment != nil {
+		p.enrichment.Close()
+		p.enrichment = nil
+	}
+}
+
 func (p *documentProgressiveDiagnostics) PublishBaseline(
 	_ context.Context,
 	diagnostics []rule.RuleDiagnostic,
@@ -45,7 +52,11 @@ func (p *documentProgressiveDiagnostics) PublishBaseline(
 // calculation and publication, queued notifications may have closed the document
 // or invalidated its inputs. Enrichment starts only after a valid baseline.
 func (p *documentProgressiveDiagnostics) publish() {
+	defer p.close()
 	s := p.server
+	if !s.initialized {
+		return
+	}
 	if _, open := s.documents[p.uri]; !open || s.docGeneration[p.uri] != p.generation {
 		return
 	}
@@ -69,6 +80,7 @@ func (p *documentProgressiveDiagnostics) publish() {
 		log.Printf("Error publishing diagnostics: %v", err)
 	}
 	s.startDiagnosticEnrichment(s.backgroundCtx, p.uri, p.generation, p.pluginGeneration, p.enrichment)
+	p.enrichment = nil // ownership transferred to the asynchronous executor
 }
 
 func (s *Server) invalidateOpenDocumentDiagnostics() {
@@ -83,6 +95,8 @@ func (s *Server) invalidateDocumentDiagnostics(uri lsproto.DocumentUri) {
 	delete(s.diagnostics, uri)
 	delete(s.diagnosticInputs, uri)
 	if result := s.pendingDiagnosticResult; result != nil && result.uri == uri {
+		result.close()
+		s.drainGenerationReleases()
 		s.pendingDiagnosticResult = nil
 	}
 }
@@ -151,7 +165,10 @@ func (s *Server) pushDiagnostics(ctx context.Context, uri lsproto.DocumentUri) e
 	s.consumeDiagnosticRefresh()
 	result := s.prepareDiagnostics(ctx, uri)
 	if err := ctx.Err(); err != nil {
-		// A canceled quick fix must leave the background demand in place.
+		// A canceled quick fix must release its prepared enrichment borrow
+		// while leaving the background demand in place.
+		result.close()
+		s.drainGenerationReleases()
 		return err
 	}
 	delete(s.lintSchedule.pending, uri)
@@ -162,6 +179,7 @@ func (s *Server) pushDiagnostics(ctx context.Context, uri lsproto.DocumentUri) e
 }
 
 func (s *Server) prepareDiagnostics(ctx context.Context, uri lsproto.DocumentUri) *documentProgressiveDiagnostics {
+	s.drainGenerationReleases()
 	if !s.initialized || ctx.Err() != nil {
 		return nil
 	}
@@ -198,12 +216,13 @@ func (s *Server) prepareDiagnostics(ctx context.Context, uri lsproto.DocumentUri
 		presentation,
 	))
 	if ctx.Err() != nil {
+		presentation.close()
 		return nil
 	}
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		presentation.diagnostics = nil
-		presentation.enrichment = nil
+		presentation.close()
 		var projectErr *documentProjectConfigError
 		if ctx.Err() == nil && errors.As(err, &projectErr) {
 			presentation.lspDiagnostics = []*lsproto.Diagnostic{{

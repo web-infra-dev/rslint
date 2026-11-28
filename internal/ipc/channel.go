@@ -50,6 +50,25 @@ type trackedResponse struct {
 	terminal bool
 }
 
+type attachmentResponse struct {
+	payload     any
+	attachments []Attachment
+}
+
+// ResponseWithAttachments returns an inbound handler result with complete byte
+// or text attachments. It transfers the supplied immutable values to Channel;
+// RequestOutput-backed views are not accepted. A tracked response may wrap
+// this result, or be supplied as its payload. The receiver owns copied values,
+// while Channel retains shared storage only until its exact acknowledgement.
+func ResponseWithAttachments(payload any, attachments ...Attachment) any {
+	return &attachmentResponse{payload: payload, attachments: attachments}
+}
+
+type publicationID struct {
+	id       int
+	response bool
+}
+
 // TrackResponse wraps an inbound handler result and returns a receipt for its
 // response write. The wire payload is unchanged; only Channel sees the wrapper.
 func TrackResponse(payload any) (any, *ResponseReceipt) {
@@ -106,7 +125,7 @@ type Channel struct {
 
 	mu        sync.Mutex // guards requests, storage, and channel lifecycle
 	pending   map[int]chan *Message
-	published map[int][]MemoryBatch
+	published map[publicationID][]MemoryBatch
 	nextID    int
 	closed    bool
 	closeErr  error
@@ -148,7 +167,7 @@ func NewChannel(r io.Reader, w io.Writer) *Channel {
 		reader:         bufio.NewReader(r),
 		writer:         w,
 		pending:        make(map[int]chan *Message),
-		published:      make(map[int][]MemoryBatch),
+		published:      make(map[publicationID][]MemoryBatch),
 		nextID:         1, // requests use id > 0; notifications use 0
 		notifyHandlers: make(map[MessageKind]NotificationHandler),
 		done:           make(chan struct{}),
@@ -259,7 +278,7 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 	ch := make(chan *Message, 1) // buffered so dispatch never blocks
 	c.pending[id] = ch
 	if len(batches) != 0 {
-		c.published[id] = batches
+		c.published[publicationID{id: id}] = batches
 	}
 	c.mu.Unlock()
 
@@ -269,7 +288,7 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 	if err := c.writePreparedFrame(msg, body, nil, false); err != nil {
 		c.mu.Lock()
 		delete(c.pending, id)
-		delete(c.published, id)
+		delete(c.published, publicationID{id: id})
 		c.mu.Unlock()
 		if errors.Is(err, errWriteNotAdmitted) && len(batches) != 0 {
 			memory.release(batches)
@@ -467,6 +486,10 @@ func (c *Channel) dispatch(msg *Message) {
 			return
 		}
 	}
+	if msg.Transport != nil && msg.Transport.Response && msg.Kind != KindTransportRelease {
+		c.closeWith(errors.New("ipc: response release discriminator requires transportRelease"))
+		return
+	}
 	if msg.Kind == KindTransportRelease {
 		if msg.ID <= 0 || len(msg.Data) != 0 || len(msg.Attachments) != 0 ||
 			msg.Transport == nil || msg.Transport.Mapping != nil || len(msg.Transport.Released) == 0 {
@@ -547,12 +570,13 @@ func (c *Channel) dispatch(msg *Message) {
 // has already returned or cancelled. Records remain bounded by occupied slots.
 func (c *Channel) releasePublished(msg *Message) bool {
 	c.mu.Lock()
-	batches := c.published[msg.ID]
+	key := publicationID{id: msg.ID, response: msg.Transport != nil && msg.Transport.Response}
+	batches := c.published[key]
 	memory := c.memory
 	released := memory != nil && len(batches) != 0 && msg.Transport != nil &&
 		slices.Equal(msg.Transport.Released, batches)
 	if released {
-		delete(c.published, msg.ID)
+		delete(c.published, key)
 	}
 	c.mu.Unlock()
 	if released {
@@ -565,7 +589,7 @@ func (c *Channel) handleInboundRequest(h InboundHandler, msg *Message) {
 	result, err := callInboundHandler(h, c.inCtx, msg)
 	if err != nil {
 		err = stableInboundError(err)
-		if _, receipt, _, tracked := unwrapTrackedResponse(result); tracked {
+		if _, _, receipt, _ := unwrapResponse(result); receipt != nil {
 			writeErr := c.sendErrorFrame(msg.ID, err.Error(), true)
 			if writeErr != nil {
 				err = errors.Join(err, writeErr)
@@ -605,10 +629,31 @@ func stableInboundError(err error) (stable error) {
 }
 
 func (c *Channel) sendResponse(id int, payload any) {
-	payload, receipt, terminal, _ := unwrapTrackedResponse(payload)
+	payload, attachments, receipt, terminal := unwrapResponse(payload)
 
 	msg, err := newResponseMessage(id, payload)
+	var memory *memoryPool
+	var batches []MemoryBatch
+	var body []byte
+	if err == nil {
+		for _, attachment := range attachments {
+			if attachment.output != nil {
+				err = errors.New("ipc: response attachments must own their bytes")
+				break
+			}
+		}
+	}
+	if err == nil && len(attachments) != 0 {
+		c.mu.Lock()
+		memory = c.memory
+		c.mu.Unlock()
+		batches = attach(msg, memory, attachments)
+		body, err = encodeFrame(msg)
+	}
 	if err != nil {
+		if len(batches) != 0 {
+			memory.release(batches)
+		}
 		// The intended response was not written. A tracked lifecycle response
 		// seals after its fallback error frame so its waiter can abort without
 		// another writer overtaking the eventual Close.
@@ -625,18 +670,68 @@ func (c *Channel) sendResponse(id int, payload any) {
 		}
 		return
 	}
-	if err := c.writeFrameTracked(msg, receipt, terminal); err != nil &&
-		!errors.Is(err, errWriteNotAdmitted) {
-		fmt.Fprintf(os.Stderr, "rslint: write response (id=%d): %v\n", id, err)
+	key := publicationID{id: id, response: true}
+	if len(batches) != 0 {
+		c.mu.Lock()
+		closed, closeErr := c.closed, c.closeErr
+		_, duplicate := c.published[key]
+		if !closed && !duplicate {
+			c.published[key] = batches
+		}
+		c.mu.Unlock()
+		if closed || duplicate {
+			memory.release(batches)
+			if duplicate && !closed {
+				closeErr = errors.New("ipc: duplicate shared attachment response")
+				c.closeWith(closeErr)
+			}
+			if receipt != nil {
+				receipt.complete(closeErr)
+			}
+			return
+		}
+	}
+	if err := c.writePreparedFrame(msg, body, receipt, terminal); err != nil {
+		if len(batches) != 0 {
+			c.mu.Lock()
+			delete(c.published, key)
+			c.mu.Unlock()
+		}
+		if errors.Is(err, errWriteNotAdmitted) {
+			if len(batches) != 0 {
+				memory.release(batches)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "rslint: write response (id=%d): %v\n", id, err)
+		}
 	}
 }
 
-func unwrapTrackedResponse(payload any) (any, *ResponseReceipt, bool, bool) {
-	tracked, ok := payload.(*trackedResponse)
-	if !ok {
-		return payload, nil, false, false
+func unwrapResponse(payload any) (any, []Attachment, *ResponseReceipt, bool) {
+	var attachmentGroups [][]Attachment
+	var receipt *ResponseReceipt
+	var terminal bool
+	for {
+		switch response := payload.(type) {
+		case *trackedResponse:
+			payload = response.payload
+			if receipt == nil {
+				receipt = response.receipt
+			}
+			terminal = terminal || response.terminal
+		case *attachmentResponse:
+			payload = response.payload
+			if len(response.attachments) > 0 {
+				attachmentGroups = append(attachmentGroups, response.attachments)
+			}
+		default:
+			var attachments []Attachment
+			for i := len(attachmentGroups) - 1; i >= 0; i-- {
+				attachments = append(attachments, attachmentGroups[i]...)
+			}
+			return payload, attachments, receipt, terminal
+		}
 	}
-	return tracked.payload, tracked.receipt, tracked.terminal, true
 }
 
 func (c *Channel) sendError(id int, message string) {
@@ -702,7 +797,7 @@ func (c *Channel) closeWith(cause error) {
 		c.writeSealErr = c.closeErr
 	}
 	c.pending = make(map[int]chan *Message) // drop refs; waiters wake via c.done
-	c.published = make(map[int][]MemoryBatch)
+	c.published = make(map[publicationID][]MemoryBatch)
 	memory := c.memory
 	c.memory = nil
 	// Once a request can observe closeErr, its session must already be canceled.

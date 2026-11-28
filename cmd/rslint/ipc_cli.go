@@ -45,6 +45,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/api"
 	"github.com/web-infra-dev/rslint/internal/api/plugin"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
@@ -204,6 +205,8 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 	var initOnce sync.Once
 	ch.SetInboundHandler(func(session context.Context, msg *ipc.Message) (any, error) {
 		switch msg.Kind {
+		case api.KindTypeService:
+			return plugin.HandleTypeServices(session, msg)
 		case kindInit:
 			var p initPayload
 			if err := msg.Decode(&p); err != nil {

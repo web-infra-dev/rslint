@@ -5,6 +5,11 @@ import { spawnIpcProcess, type IpcClient } from '../ipc/index.js';
 
 export { readAttachmentBytes } from '../ipc/memory-transport.js';
 export type { ByteInput } from '../native/types.js';
+import {
+  resolveTypeServiceReply,
+  type NativeTypeServiceResponse,
+} from '../internal/plugin-type-service.js';
+import type { TypeServiceHostRequest } from '../service/plugin-type-service-protocol.js';
 import { resolveRslintBinary } from './resolve-binary.js';
 import type {
   RslintServiceInterface,
@@ -117,6 +122,23 @@ export class NodeRslintService implements RslintServiceInterface {
       )
         return null;
       throw error;
+    } finally {
+      this.activeRequests--;
+      this.updateLoopActivity();
+    }
+  }
+
+  async queryPluginTypes(request: TypeServiceHostRequest) {
+    if (this.dead) throw new Error('rslint service is no longer running');
+    this.activeRequests++;
+    this.updateLoopActivity();
+    try {
+      return resolveTypeServiceReply(
+        await this.client.sendRequest<unknown, NativeTypeServiceResponse>(
+          'typeService',
+          request,
+        ),
+      );
     } finally {
       this.activeRequests--;
       this.updateLoopActivity();

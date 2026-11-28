@@ -69,9 +69,16 @@ func presentProgressiveLint(
 		var err error
 		enrichment, err = newDeferredPluginRun(*execution.deferredTask)
 		if err != nil {
+			execution.deferredTask.closeTypes()
 			return result, err
 		}
 	}
+	submitted := false
+	defer func() {
+		if enrichment != nil && !submitted {
+			enrichment.Close()
+		}
+	}()
 	baseline := append([]rule.RuleDiagnostic(nil), execution.observation.Native.Diagnostics...)
 	request.presenter.PublishBaseline(ctx, baseline)
 	if err := ctx.Err(); err != nil {
@@ -79,6 +86,7 @@ func presentProgressiveLint(
 	}
 	if enrichment != nil {
 		request.presenter.Submit(ctx, enrichment)
+		submitted = true
 	}
 	return result, nil
 }

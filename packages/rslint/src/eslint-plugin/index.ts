@@ -62,3 +62,9 @@ export type {
   ResolvedEslintPluginLintRequest,
   EslintPluginLintResult,
 } from './plugin/plugin-lint-protocol.js';
+
+export type {
+  TypeServiceHostRequest,
+  TypeServiceHostResponse,
+  TypeServiceHostTransport,
+} from './plugin/type-service-protocol.js';

@@ -48,6 +48,9 @@ func (b *compilerBackend) Diagnostics(ctx context.Context, kind DiagnosticKind, 
 		if len(b.raw.SourceFiles()) == 0 {
 			return nil
 		}
+		if unlock := b.isolatedDeclReadLock(); unlock != nil {
+			defer unlock()
+		}
 		pool := b.raw.GetCheckerPool()
 		var globals []*ast.Diagnostic
 		if collector, ok := pool.(interface{ GetGlobalDiagnostics() []*ast.Diagnostic }); ok {
@@ -62,8 +65,50 @@ func (b *compilerBackend) Diagnostics(ctx context.Context, kind DiagnosticKind, 
 	case SyntacticDiagnostics:
 		return b.raw.GetSyntacticDiagnostics(ctx, file)
 	case SemanticDiagnostics:
+		if file != nil && !b.ownsSourceFile(file) {
+			return nil
+		}
+		if unlock := b.isolatedDeclReadLock(); unlock != nil {
+			defer unlock()
+		}
+		if file == nil {
+			// Clear request affinity before tsgo fans out per-file checker borrows
+			// across goroutines so project.CheckerPool cannot alias one checker
+			// onto concurrent workers sharing the same RequestID.
+			ctx = core.WithRequestID(ctx, "")
+		}
 		return b.raw.GetSemanticDiagnostics(ctx, file)
 	case DeclarationDiagnostics:
+		// Guard non-program files (e.g. tsconfig.json) before delegating: tsgo's
+		// compiler.checkerPool only associates program source files. Do NOT
+		// pre-acquire GetTypeCheckerForFileExclusive here: compiler.checkerPool's
+		// EmitResolver already locks the checker's own mutex (the same lock as
+		// p.locks[idx], so pre-locking self-deadlocks), while external pools such
+		// as project.CheckerPool acquire an exclusive checker inside
+		// GetDeclarationDiagnostics.
+		if file != nil && (file.IsDeclarationFile || !b.ownsSourceFile(file)) {
+			return nil
+		}
+		if unlock := b.isolatedDeclWriteLock(); unlock != nil {
+			defer unlock()
+			if file == nil {
+				var diagnostics []*ast.Diagnostic
+				for _, sourceFile := range b.raw.SourceFiles() {
+					if ctx.Err() != nil {
+						return nil
+					}
+					if sourceFile.IsDeclarationFile {
+						continue
+					}
+					diagnostics = append(diagnostics, b.raw.GetDeclarationDiagnostics(ctx, sourceFile)...)
+				}
+				return compiler.SortAndDeduplicateDiagnostics(diagnostics)
+			}
+			return b.raw.GetDeclarationDiagnostics(ctx, file)
+		}
+		if file == nil {
+			ctx = core.WithRequestID(ctx, "")
+		}
 		return b.raw.GetDeclarationDiagnostics(ctx, file)
 	default:
 		panic("unknown compiler diagnostic kind")

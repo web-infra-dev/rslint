@@ -149,6 +149,82 @@ func TestChannelAttachmentReleaseAcknowledgement(t *testing.T) {
 	}
 }
 
+func TestChannelResponseAttachmentsSeparateRequestOwnership(t *testing.T) {
+	client, peer := newChannelPair(t)
+	pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+2*MemorySlotSize)}}
+	client.memory, client.memoryInitialized = pool, true
+	client.SetInboundHandler(func(_ context.Context, msg *Message) (any, error) {
+		if msg.Kind == "replyBytes" {
+			return ResponseWithAttachments("reply", Bytes([]byte{0, 255, 128})), nil
+		}
+		return true, nil
+	})
+	client.Start()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := client.SendRequest(ctx, "requestBytes", nil, Bytes([]byte("request")))
+		done <- err
+	}()
+	request, err := ReadFrame(peer.reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := peer.writeFrame(&Message{Kind: "replyBytes", ID: request.ID}); err != nil {
+		t.Fatal(err)
+	}
+	response, err := ReadFrame(peer.reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Kind != KindResponse || response.ID != request.ID || string(response.Data) != `"reply"` || response.Transport == nil || len(response.Attachments) != 1 {
+		t.Fatalf("unexpected attachment response: %+v", response)
+	}
+	batches := response.Transport.Batches
+	if got := readMemoryRange(t, pool, batches, *response.Attachments[0].Range); !bytes.Equal(got, []byte{0, 255, 128}) {
+		t.Fatalf("response bytes changed: %v", got)
+	}
+	barrier := func() {
+		t.Helper()
+		if err := peer.writeFrame(&Message{Kind: "barrier", ID: request.ID + 1}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ReadFrame(peer.reader); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ack := func(response bool, released []MemoryBatch) {
+		t.Helper()
+		if err := peer.writeFrame(&Message{Kind: KindTransportRelease, ID: request.ID, Transport: &TransportMetadata{Released: released, Response: response}}); err != nil {
+			t.Fatal(err)
+		}
+		barrier()
+	}
+	ack(false, batches)
+	ack(true, request.Transport.Batches)
+	if len(client.published) != 2 {
+		t.Fatal("a response ACK affected the same-ID request")
+	}
+	ack(true, batches)
+	if len(client.published) != 1 || !pool.slots[request.Transport.Batches[0].Slot].busy || pool.slots[batches[0].Slot].busy {
+		t.Fatal("response release did not preserve request ownership")
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("response storage ACK resolved the unrelated request: %v", err)
+	default:
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancel result: %v", err)
+	}
+	ack(false, request.Transport.Batches)
+	if len(client.published) != 0 {
+		t.Fatal("late request release retained storage")
+	}
+}
+
 func TestChannelCancelledAttachmentAcceptsOnlyExactLateAck(t *testing.T) {
 	client, peer := newChannelPair(t)
 	pool := &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+64)}}
@@ -326,6 +402,7 @@ func TestChannelRejectsMalformedDeferredRelease(t *testing.T) {
 		{Kind: KindTransportRelease, ID: 1, Data: []byte(`null`), Transport: &TransportMetadata{Released: []MemoryBatch{{}}}},
 		{Kind: KindTransportRelease, ID: 1, Attachments: []AttachmentData{{Text: new("payload")}}, Transport: &TransportMetadata{Released: []MemoryBatch{{}}}},
 		{Kind: KindTransportRelease, ID: 1, Transport: &TransportMetadata{Mapping: &MemoryMapping{}, Released: []MemoryBatch{{}}}},
+		{Kind: KindResponse, ID: 1, Transport: &TransportMetadata{Response: true, Released: []MemoryBatch{{}}}},
 	} {
 		client, _ := newChannelPair(t)
 		client.dispatch(&message)
@@ -969,6 +1046,97 @@ func TestChannel_ResponseReceiptWaitsForCompleteFrame(t *testing.T) {
 	if msg.Kind != KindResponse || msg.ID != 1 {
 		t.Fatalf("committed frame = kind %q id %d, want response id 1", msg.Kind, msg.ID)
 	}
+}
+
+func TestChannel_ResponseReceiptWithAttachments(t *testing.T) {
+	t.Run("waits for complete attachment frame", func(t *testing.T) {
+		inR, inW := io.Pipe()
+		t.Cleanup(func() { _ = inW.Close() })
+		writer := newGatedFrameWriter()
+		t.Cleanup(writer.release)
+
+		receiptCh := make(chan *ResponseReceipt, 1)
+		c := NewChannel(inR, writer)
+		c.SetInboundHandler(func(context.Context, *Message) (any, error) {
+			response, receipt := TrackResponse(ResponseWithAttachments(map[string]any{"ok": true}, Bytes([]byte("reply"))))
+			receiptCh <- receipt
+			return response, nil
+		})
+		c.Start()
+		t.Cleanup(func() { _ = c.Close() })
+
+		writeInboundRequest(t, inW, "init", 1)
+		receipt := <-receiptCh
+		select {
+		case <-writer.bodyEntered:
+		case <-time.After(2 * time.Second):
+			t.Fatal("attachment response body write did not reach the gate")
+		}
+		select {
+		case <-receipt.Done():
+			t.Fatal("receipt completed before attachment response body write returned")
+		default:
+		}
+		writer.release()
+		select {
+		case <-receipt.Done():
+			if err := receipt.Err(); err != nil {
+				t.Fatalf("attachment response receipt: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("attachment response receipt did not complete")
+		}
+		msg, err := ReadFrame(bufio.NewReader(bytes.NewReader(writer.bytes())))
+		if err != nil {
+			t.Fatalf("read committed attachment response: %v", err)
+		}
+		if msg.Kind != KindResponse || msg.ID != 1 || len(msg.Attachments) != 1 || msg.Attachments[0].Bytes == nil || !bytes.Equal(*msg.Attachments[0].Bytes, []byte("reply")) {
+			t.Fatalf("committed attachment frame = %+v", msg)
+		}
+	})
+
+	t.Run("rejects request-output backed response attachment", func(t *testing.T) {
+		inR, inW := io.Pipe()
+		t.Cleanup(func() { _ = inW.Close() })
+		var output bytes.Buffer
+
+		receiptCh := make(chan *ResponseReceipt, 1)
+		c := NewChannel(inR, &output)
+		t.Cleanup(func() { _ = c.Close() })
+		c.memory = &memoryPool{mapping: memoryMapping{data: make([]byte, MemoryHeaderSize+MemorySlotSize)}}
+		c.memoryInitialized = true
+		out, err := c.NewRequestOutput(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = out.Close() }()
+		leased := out.Bytes(out.Allocate(4))
+
+		c.SetInboundHandler(func(context.Context, *Message) (any, error) {
+			response, receipt := TrackResponse(ResponseWithAttachments(map[string]any{"ok": true}, leased))
+			receiptCh <- receipt
+			return response, nil
+		})
+		c.Start()
+
+		writeInboundRequest(t, inW, "init", 1)
+		receipt := <-receiptCh
+		select {
+		case <-receipt.Done():
+			if err := receipt.Err(); err == nil || !strings.Contains(err.Error(), "must own their bytes") {
+				t.Fatalf("receipt error = %v, want owned-bytes rejection", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("rejected attachment did not complete receipt")
+		}
+		msg, err := ReadFrame(bufio.NewReader(bytes.NewReader(output.Bytes())))
+		if err != nil {
+			t.Fatalf("read fallback error response: %v", err)
+		}
+		if msg.Kind != KindError || msg.ID != 1 {
+			t.Fatalf("fallback frame = kind %q id %d, want error id 1", msg.Kind, msg.ID)
+		}
+	})
 }
 
 func TestChannel_ResponseReceiptReportsMarshalFailure(t *testing.T) {

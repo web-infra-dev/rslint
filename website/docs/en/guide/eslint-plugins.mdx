@@ -1,22 +1,21 @@
 ---
-description: 'Run third-party ESLint plugin rules in Rslint and review unsupported ESLint APIs.'
+description: 'Run third-party ESLint plugin rules (including type-aware rules in the CLI and JavaScript API) in Rslint.'
 ---
 
 # ESLint Plugin Compatibility
 
-rslint can run community ESLint plugins' rules alongside its own native rules.
-Plugin diagnostics merge into the same report, and it works the same way in the
-CLI and the Rstack VS Code extension.
+Rslint can run third-party [ESLint plugins](https://eslint.org/docs/latest/use/configure/plugins) alongside its built-in rules. Diagnostics, `--fix`, and editor quick fixes merge into the same output across the CLI, [JavaScript API](/guide/js-api), and [Rstack VS Code extension](/guide/vscode-extension).
 
 ## Usage
 
-Import the plugin, register it in `plugins` under a prefix of your choice, and
-enable its rules under `'<prefix>/<rule>'`:
+Import the plugin in a JS or TS config file, mount it in `plugins` under a prefix of your choice, and enable its rules as `'<prefix>/<rule>'`:
 
-```js
+```ts
+// rslint.config.ts
+import { defineConfig } from '@rslint/core';
 import examplePlugin from 'eslint-plugin-example';
 
-export default [
+export default defineConfig([
   {
     files: ['**/*.ts'],
     plugins: { example: examplePlugin },
@@ -24,37 +23,80 @@ export default [
       'example/some-rule': 'error',
     },
   },
-];
+]);
 ```
 
 A few things to know:
 
-- **Built-in vs. community.** Built-in (native) plugins are named in an array —
-  `plugins: ['@typescript-eslint']`. A community plugin is mounted as an object —
-  `plugins: { example: examplePlugin }`. One entry uses one form; to use both,
-  add a second config entry.
-- **Module config required.** A community plugin is a live object, so configure
-  it in a `.js` / `.mjs` / `.ts` / `.mts` module.
-- **Pick any prefix** that doesn't clash with a
-  [built-in plugin prefix](/config/plugins#built-in-plugins); rslint reports a
-  clear error if it does.
-- **Fixes work.** A plugin rule's autofixes and suggestions apply through `--fix`
-  and the editor's `source.fixAll`.
+- **Built-in vs. third-party.** Built-in (native) plugins use an array — `plugins: ['@typescript-eslint']`. Third-party plugins use an object — `plugins: { example: examplePlugin }`. Keep the two forms in separate config entries; Rslint merges matching entries automatically. See [`plugins`](/config/plugins#third-party-eslint-plugins).
+- **JS/TS config required.** Because a plugin is a live JS object, configure it in a `.js` / `.mjs` / `.ts` / `.mts` config file.
+- **Pick a non-colliding prefix.** Avoid [built-in plugin prefixes](/config/plugins#built-in-plugins); Rslint reports a clear error on collisions.
+- **Autofixes and suggestions work.** Plugin fixes apply through `rslint --fix` and the editor's `source.fixAll`.
 
-## Unsupported ESLint APIs
+## Type-aware rules
 
-A plugin rule's `create(context)` gets the standard ESLint v10 surface:
-`context.report` (with `messageId` / `data` / `fix` / `suggest`),
-`context.options`, `context.settings`, `context.languageOptions`, AST and
-esquery visitors, and `sourceCode` (tokens, comments, and scope analysis such as
-`getScope` and `getDeclaredVariables`).
+Enable [`languageOptions.parserOptions.projectService`](/config/language-options#languageoptionsparseroptionsprojectservice) (or explicit [`project`](/config/language-options#languageoptionsparseroptionsproject) paths) so third-party rules receive full TypeScript type information from Rslint's Go compiler engine (currently supported in the **CLI** and **JavaScript API**; VS Code support requires forwarding `rslint/typeService` in [`rstackjs/rstack-editor`](https://github.com/rstackjs/rstack-editor)):
 
-These ESLint APIs are **not** available to plugin rules — a rule that relies on
-one loads without error but never reports:
+```ts
+// rslint.config.ts
+import { defineConfig, ts } from '@rslint/core';
+import typescriptEslint from '@typescript-eslint/eslint-plugin';
 
-| ESLint API                                                                                                                                                                                  | Where you'd use it                                                    |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `sourceCode.parserServices` — `program`, `getTypeChecker()`, `esTreeNodeToTSNodeMap`                                                                                                        | type-aware rules (enabled by `languageOptions.parserOptions.project`) |
-| `languageOptions.parser`                                                                                                                                                                    | a custom parser in the config                                         |
-| `processor`                                                                                                                                                                                 | a config's processor                                                  |
-| `onCodePathStart` / `onCodePathEnd` / `onCodePathSegmentStart` / `onCodePathSegmentEnd` / `onCodePathSegmentLoop` / `onUnreachableCodePathSegmentStart` / `onUnreachableCodePathSegmentEnd` | code-path (control-flow) analysis                                     |
+export default defineConfig([
+  ts.configs.recommended,
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+      },
+    },
+    plugins: {
+      // Mount under a separate prefix from the reserved native '@typescript-eslint'
+      typed: typescriptEslint,
+    },
+    rules: {
+      'typed/await-thenable': 'error',
+    },
+  },
+]);
+```
+
+- **Standard typed-linting contract.** Rules read [`sourceCode.parserServices`](https://typescript-eslint.io/developers/custom-rules/#typed-rules) (`program`, `program.getTypeChecker()`, `esTreeNodeToTSNodeMap`, `tsNodeToESTreeNodeMap`) backed by the same TypeScript snapshot as Rslint's native rules — following [typescript-eslint's typed linting model](https://typescript-eslint.io/getting-started/typed-linting/) without a separate `tsc` run or an extra runtime `typescript` dependency from Rslint.
+- **Explicit tsconfigs and monorepos.** Use `projectService: true` for automatic project discovery, or pass `project: ['./tsconfig.json']` (see [Type Checking](/guide/type-checking) for project selection and gap-file rules).
+- **Files without a project.** In the CLI and JavaScript API, when neither `projectService` nor `project` owns a file (or `project: false` clears it), `esTreeNodeToTSNodeMap` and `tsNodeToESTreeNodeMap` remain available with `parserServices.program` set to `null`.
+
+## Using with the JavaScript API
+
+Third-party plugins (including type-aware rules) work through the [`Rslint`](/api/rslint) class whenever they are declared in a JS or TS config file:
+
+```ts
+import { Rslint } from '@rslint/core';
+
+const rslint = new Rslint({
+  // Auto-discovers rslint.config.ts from cwd, or pass an explicit file:
+  overrideConfigFile: './rslint.config.ts',
+});
+
+const results = await rslint.lintFiles(['src/**/*.ts']);
+```
+
+`lintText` also runs third-party plugins configured in the resolved config file.
+
+:::note
+Keep object-form third-party plugins in a JS or TS config file rather than inline [`overrideConfig`](/api/rslint#constructor), because plugin worker threads import the config module directly.
+:::
+
+## Supported APIs and limitations
+
+Plugin rules run against the standard [ESLint v10 custom rule API](https://eslint.org/docs/latest/extend/custom-rules) (`context`, `sourceCode`, scope analysis, autofixes, suggestions) and the read-only [typescript-eslint `parserServices` surface](https://typescript-eslint.io/developers/custom-rules/#typed-rules).
+
+These APIs are **not** supported in third-party plugin rules:
+
+| API                                                      | Notes                                                                                                                     |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `languageOptions.parser`                                 | Custom parsers in config are not supported                                                                                |
+| `processor`                                              | Config processors are not supported                                                                                       |
+| `onCodePath*` (`onCodePathStart`, `onCodePathEnd`, etc.) | ESLint code-path (control-flow) analysis is not implemented                                                               |
+| `Program.emit()` / `SourceFile.update()`                 | Read-only `Program` view; mutating/emit methods throw when called                                                         |
+| `parserOptions.project: true`                            | Use [`projectService: true`](/config/language-options#languageoptionsparseroptionsprojectservice) for automatic discovery |

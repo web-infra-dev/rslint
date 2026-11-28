@@ -51,6 +51,7 @@ interface TestSlot {
   respawning: boolean;
   inflight: Map<number, never>;
   crashCount: number;
+  typeSessions: Set<string>;
 }
 
 interface TestPoolState {
@@ -68,6 +69,7 @@ function makeSlot(worker: FakeWorker, id: number): TestSlot {
     respawning: false,
     inflight: new Map(),
     crashCount: 0,
+    typeSessions: new Set(),
   };
 }
 
@@ -467,5 +469,67 @@ describe('WorkerPool shutdown state machine (no real Worker)', () => {
     expect(firstWorker.terminateCalls).toBe(0);
     expect(secondWorker.terminateCalls).toBe(1);
     expect(state.workers).toEqual([]);
+  });
+
+  test('retireTypeServices immediately resolves queued tasks for retired sessions while workers are busy', async () => {
+    const busyWorker = new FakeWorker([]);
+    const { pool, state } = makePool(busyWorker);
+    const internals = pool as unknown as {
+      attachOngoingHandlers: (slot: unknown) => void;
+      pendingQueue: unknown[];
+    };
+    internals.attachOngoingHandlers(state.workers[0]);
+
+    // First task occupies the single worker; second task stays queued in pendingQueue.
+    const batch1 = pool.lintBatch([
+      {
+        filePath: 'busy.ts',
+        frame: new Uint8Array(),
+        configKey: '/cfg',
+        rules: {},
+        collectFixes: false,
+        suggestionsMode: 'off',
+      },
+    ]);
+    const batch2 = pool.lintBatch([
+      {
+        filePath: 'queued.ts',
+        frame: new Uint8Array(),
+        configKey: '/cfg',
+        rules: {},
+        collectFixes: false,
+        suggestionsMode: 'off',
+        typeServices: {
+          session: 'retired-session',
+          binding: { generation: 1, sourceFileName: 'queued.ts' },
+        },
+      },
+    ]);
+    expect(internals.pendingQueue).toHaveLength(1);
+
+    pool.retireTypeServices(['retired-session']);
+
+    // Queued task for the retired session resolves immediately without waiting for busyWorker.
+    const retiredResults = await batch2;
+    expect(retiredResults).toHaveLength(1);
+    expect(retiredResults[0].cancelled).toBe(true);
+    expect(retiredResults[0].parseError).toBeUndefined();
+    expect(internals.pendingQueue).toEqual([]);
+
+    // Finish busyWorker task cleanly.
+    const busyMsg = busyWorker.posted[0] as { taskId: number };
+    busyWorker.emit('message', {
+      kind: 'result',
+      taskId: busyMsg.taskId,
+      result: {
+        filePath: 'busy.ts',
+        diagnostics: [],
+        fixes: [],
+        suggestionsCount: 0,
+        cancelled: false,
+      },
+    });
+    const busyResults = await batch1;
+    expect(busyResults[0].cancelled).toBe(false);
   });
 });

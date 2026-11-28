@@ -38,6 +38,7 @@
 import type { Readable, Writable } from 'node:stream';
 import { constants as bufferConstants } from 'node:buffer';
 import {
+  readAttachmentBytes,
   receiveAttachments,
   type ReceivedAttachments,
   type MemoryTransport,
@@ -99,8 +100,8 @@ export class IpcClient {
   // Only lease release functions are retained, never handler payloads/results.
   // Each owns at least one slot, bounding this queue by the negotiated arena.
   private readonly pendingReleases = new Map<
-    number,
-    ReceivedAttachments['release']
+    string,
+    { id: number; response: boolean; release: ReceivedAttachments['release'] }
   >();
   private releaseTimer: NodeJS.Timeout | undefined;
   private readonly notificationHandlers = new Map<
@@ -381,6 +382,7 @@ export class IpcClient {
     id: number,
     data: unknown,
     released?: MemoryBatch[],
+    response = false,
   ): void {
     if (this.closed) return;
     this.writeFrameNow(
@@ -388,7 +390,9 @@ export class IpcClient {
         kind,
         id,
         data,
-        transport: released ? { released } : undefined,
+        transport: released
+          ? { released, ...(response ? { response: true } : {}) }
+          : undefined,
       }),
     );
   }
@@ -401,16 +405,49 @@ export class IpcClient {
     this.releaseTimer = setTimeout(this.pollReleases, RELEASE_POLL_MS).unref();
   }
 
+  private releaseAttachments(
+    id: number,
+    received: ReceivedAttachments | undefined,
+    response = false,
+  ): MemoryBatch[] | undefined {
+    const batches = received?.release();
+    if (batches !== false) return batches;
+    if (received && !this.closed) {
+      const key = `${response ? 'response' : 'request'}:${id}`;
+      if (this.pendingReleases.has(key)) {
+        this.close(
+          new Error(
+            `duplicate pending shared memory ${response ? 'response' : 'request'}`,
+          ),
+        );
+      } else {
+        this.pendingReleases.set(key, {
+          id,
+          response,
+          release: received.release.bind(received),
+        });
+        this.scheduleReleases();
+      }
+    }
+    return undefined;
+  }
+
   private readonly pollReleases = (): void => {
     this.releaseTimer = undefined;
     try {
-      for (const [id, release] of this.pendingReleases) {
+      for (const [key, { id, response, release }] of this.pendingReleases) {
         if (this.closed) return;
         const batches = release();
         if (batches === false) continue;
-        this.pendingReleases.delete(id);
+        this.pendingReleases.delete(key);
         if (batches)
-          this.writeResponse(TRANSPORT_RELEASE_KIND, id, undefined, batches);
+          this.writeResponse(
+            TRANSPORT_RELEASE_KIND,
+            id,
+            undefined,
+            batches,
+            response,
+          );
       }
     } catch (error) {
       this.close(
@@ -660,16 +697,77 @@ export class IpcClient {
 
   private routeResponse(msg: WireMessage): void {
     const p = this.pending.get(msg.id);
-    if (!p) {
-      process.stderr.write(
-        `rslint: orphan response id=${msg.id} kind=${msg.kind}\n`,
+    this.pending.delete(msg.id);
+    let received: ReceivedAttachments | undefined;
+    let result: IpcMessage | undefined;
+    let failure: Error | undefined;
+    let closedBeforeAck = false;
+    try {
+      if (msg.id <= 0) {
+        throw new Error('invalid IPC response id');
+      }
+      if (
+        msg.transport !== undefined &&
+        (msg.transport === null ||
+          typeof msg.transport !== 'object' ||
+          Array.isArray(msg.transport) ||
+          msg.transport.mapping !== undefined ||
+          msg.transport.released !== undefined ||
+          msg.transport.response !== undefined)
+      ) {
+        throw new Error('invalid IPC response transport metadata');
+      }
+      received = receiveAttachments(
+        msg.attachments,
+        msg.transport?.batches,
+        this.memory,
       );
+      if (p && msg.kind === RESPONSE_KIND) {
+        result = this.handlerMessage(msg, received);
+        // Responses have no handler borrow. Copy before resolving the caller;
+        // no shared capability escapes into its asynchronous lifetime.
+        if (received.values !== undefined)
+          result.attachments = received.values.map((value) =>
+            typeof value === 'string' ? value : readAttachmentBytes(value),
+          );
+      }
+    } catch (error) {
+      failure =
+        error instanceof Error ? error : new Error(safeErrorMessage(error));
+    } finally {
+      try {
+        const released = this.releaseAttachments(msg.id, received, true);
+        closedBeforeAck = this.closed;
+        if (released)
+          this.writeResponse(
+            TRANSPORT_RELEASE_KIND,
+            msg.id,
+            undefined,
+            released,
+            true,
+          );
+      } catch (error) {
+        failure ??=
+          error instanceof Error ? error : new Error(safeErrorMessage(error));
+      }
+    }
+    if (!p) {
+      if (failure !== undefined)
+        this.close(
+          new Error(`invalid orphan response: ${safeErrorMessage(failure)}`),
+        );
+      else
+        process.stderr.write(
+          `rslint: orphan response id=${msg.id} kind=${msg.kind}\n`,
+        );
       return;
     }
-    this.pending.delete(msg.id);
-    if (msg.kind === ERROR_KIND) {
-      const data = msg.data as ErrorResponseData | undefined;
-      const message = data?.message;
+    if (closedBeforeAck) {
+      void this.done.then(p.reject);
+    } else if (failure !== undefined) {
+      p.reject(failure);
+    } else if (msg.kind === ERROR_KIND) {
+      const message = (msg.data as ErrorResponseData | undefined)?.message;
       p.reject(
         new Error(
           typeof message === 'string' && message.length > 0
@@ -677,18 +775,8 @@ export class IpcClient {
             : 'request failed',
         ),
       );
-      return;
-    }
-    try {
-      // This endpoint only writes inline attachments. Shared response ownership
-      // would need a separate caller lifetime, so reject it before admitting a lease.
-      if (msg.transport?.batches !== undefined) {
-        throw new Error('unexpected shared IPC response attachments');
-      }
-      const received = receiveAttachments(msg.attachments, undefined);
-      p.resolve(this.handlerMessage(msg, received));
-    } catch (error) {
-      p.reject(error instanceof Error ? error : new Error(String(error)));
+    } else {
+      p.resolve(result!);
     }
   }
 
@@ -732,7 +820,8 @@ export class IpcClient {
             typeof msg.transport !== 'object' ||
             Array.isArray(msg.transport) ||
             msg.transport.mapping !== undefined ||
-            msg.transport.released !== undefined)
+            msg.transport.released !== undefined ||
+            msg.transport.response !== undefined)
         ) {
           throw new Error('invalid inbound IPC transport metadata');
         }
@@ -753,17 +842,7 @@ export class IpcClient {
         };
       } finally {
         try {
-          const batches = received?.release();
-          if (batches === false && received && !this.closed) {
-            if (this.pendingReleases.has(msg.id)) {
-              this.close(new Error('duplicate pending shared memory request'));
-            } else {
-              this.pendingReleases.set(msg.id, received.release.bind(received));
-              this.scheduleReleases();
-            }
-          } else if (batches !== false) {
-            released = batches;
-          }
+          released = this.releaseAttachments(msg.id, received);
         } catch (error) {
           kind = ERROR_KIND;
           result = {

@@ -21,6 +21,7 @@ import (
 // Explicit and discovered projects share the same editor construction semantics.
 type lintProgramStore struct {
 	server              *Server
+	generation          uint64
 	documentPrograms    map[lsproto.DocumentUri]lintProgramKey
 	parseCache          *utils.ParseCache
 	coverage            *lintProgramCoverage
@@ -37,6 +38,9 @@ type lintProgramState struct {
 	sources    *utils.ProgramSourceLookup
 	overlayFS  *frozenLintTargetOverlayFS
 	dirtyFiles map[tspath.Path]struct{}
+	// A detached typed request keeps the compiler host's filesystem immutable
+	// until its finalizer returns to the dispatch loop.
+	borrowers int
 	// Failed lookups close the gap between a file appearing and the client's
 	// corresponding watcher notification.
 	failedLookups            map[tspath.Path]struct{}
@@ -46,6 +50,7 @@ type lintProgramState struct {
 
 type lintProgramRequest struct {
 	store             *lintProgramStore
+	storeGeneration   uint64
 	ctx               context.Context
 	uri               lsproto.DocumentUri
 	overlayFiles      map[string]string
@@ -56,6 +61,8 @@ type lintProgramRequest struct {
 	overlayPrepared   bool
 	usedKey           lintProgramKey
 	usedState         *lintProgramState
+	borrowedState     *lintProgramState
+	previousOwner     lintProgramKey
 	projectMetadata   map[string]*lintProjectMetadata
 	transientMetadata map[string]struct{}
 }
@@ -99,9 +106,11 @@ func (s *lintProgramStore) request(
 	}
 	return &lintProgramRequest{
 		store:             s,
+		storeGeneration:   s.generation,
 		ctx:               ctx,
 		uri:               uri,
 		target:            target,
+		previousOwner:     s.documentPrograms[uri],
 		projectMetadata:   make(map[string]*lintProjectMetadata),
 		transientMetadata: make(map[string]struct{}),
 	}
@@ -246,13 +255,20 @@ func (r *lintProgramRequest) load(
 	if state == nil || !r.matchesMetadata(state, metadata) {
 		return r.rebuild(configFileName, metadata)
 	}
-
 	targetSource := state.sources.SourceFileForTarget(
 		r.target.Path,
 		r.target.CanonicalPath,
 	)
 	if content, open := r.store.server.documents[r.uri]; open {
 		r.store.markStateSourceContent(state, targetSource, content)
+	}
+	if state.borrowers != 0 {
+		// Reuse an unchanged Program without replacing its frozen filesystem
+		// while another document can still query it.
+		if len(state.dirtyFiles) == 0 {
+			return r.result(configFileName, state)
+		}
+		return r.rebuild(configFileName, metadata)
 	}
 	// Cache filesystem queries only within this editor observation. The stable
 	// host must see a fresh view on every request, including incremental updates.
@@ -426,6 +442,13 @@ func (r *lintProgramRequest) result(
 		r.target.CanonicalPath,
 	)
 	if sourceFile != nil {
+		if r.borrowedState != state {
+			if r.borrowedState != nil {
+				r.borrowedState.borrowers--
+			}
+			state.borrowers++
+			r.borrowedState = state
+		}
 		state.rememberSelectedTarget(r.target, r.store.server.fs)
 		r.usedKey = r.key(configFileName)
 		r.usedState = state
@@ -448,20 +471,56 @@ func (s *lintProgramStore) ensureCoverage(ctx context.Context, files []string, d
 }
 
 func (r *lintProgramRequest) cover(state *lintProgramState) (added bool, safe bool) {
+	return r.coverWithContext(r.ctx, state)
+}
+
+func (r *lintProgramRequest) coverWithContext(ctx context.Context, state *lintProgramState) (added bool, safe bool) {
 	lookups := state.tracker.drain()
 	state.recordFailedLookups(lookups, r.store.server.fs)
-	return r.store.ensureCoverage(r.ctx, lookups.seenFiles, state.program.GetCurrentDirectory())
+	return r.store.ensureCoverage(ctx, lookups.seenFiles, state.program.GetCurrentDirectory())
+}
+
+// finalizeCtx detaches delayed finalization from a completed per-request
+// context (such as textDocument/codeAction) while still canceling when
+// dispatchLoop shuts down.
+func (r *lintProgramRequest) finalizeCtx() context.Context {
+	if r.store != nil && r.store.server != nil {
+		if r.store.server.dispatchCtx != nil {
+			return r.store.server.dispatchCtx
+		}
+		if r.store.server.backgroundCtx != nil {
+			return r.store.server.backgroundCtx
+		}
+	}
+	return r.ctx
 }
 
 func (r *lintProgramRequest) finalize() {
+	if r.borrowedState != nil {
+		r.borrowedState.borrowers--
+		r.borrowedState = nil
+	}
 	defer r.store.prune()
-	delete(r.store.documentPrograms, r.uri)
-	if !r.store.Usable() {
+	// A detached semantic borrower may finish after a configuration invalidation
+	// or another owner selection. It can cover only its own resident state.
+	if r.usedState != nil && r.store.programs[r.usedKey] != r.usedState {
 		return
 	}
-	if r.discoveryFS != nil {
+	_, open := r.store.server.documents[r.uri]
+	updateOwner := open && r.storeGeneration == r.store.generation && r.store.documentPrograms[r.uri] == r.previousOwner
+	if updateOwner {
+		delete(r.store.documentPrograms, r.uri)
+	}
+	if !r.store.Usable() || (r.store.server != nil && r.store.server.shuttingDown.Load()) {
+		return
+	}
+	ctx := r.finalizeCtx()
+	if ctx.Err() != nil {
+		return
+	}
+	if updateOwner && r.discoveryFS != nil {
 		lookups := r.discoveryFS.drain()
-		added, safe := r.store.ensureCoverage(r.ctx, lookups.seenFiles, r.store.server.cwd)
+		added, safe := r.store.ensureCoverage(ctx, lookups.seenFiles, r.store.server.cwd)
 		if !safe {
 			return
 		}
@@ -469,19 +528,35 @@ func (r *lintProgramRequest) finalize() {
 			// Re-select after registering missing-config probes, closing the interval
 			// in which a new config could appear before its watcher became active.
 			r.store.Invalidate()
-			_ = r.store.server.RefreshDiagnostics(r.ctx)
+			_ = r.store.server.RefreshDiagnostics(ctx)
 			return
 		}
 	}
 	if r.usedState == nil {
 		return
 	}
-	added, safe := r.cover(r.usedState)
-	if !safe || added {
-		delete(r.store.programs, r.usedKey)
-		return
+	// Covering drains and resets the shared filesystem tracker. The last
+	// borrower can cover all reads from this frozen Program.
+	if r.usedState.borrowers == 0 {
+		needsCoverage := updateOwner
+		if !needsCoverage {
+			for _, key := range r.store.documentPrograms {
+				if key == r.usedKey {
+					needsCoverage = true
+					break
+				}
+			}
+		}
+		if !needsCoverage {
+			return
+		}
+		added, safe := r.coverWithContext(ctx, r.usedState)
+		if !safe || added {
+			delete(r.store.programs, r.usedKey)
+			return
+		}
 	}
-	if _, open := r.store.server.documents[r.uri]; open && r.store.programs[r.usedKey] == r.usedState {
+	if _, open := r.store.server.documents[r.uri]; updateOwner && open && r.store.programs[r.usedKey] == r.usedState {
 		r.store.documentPrograms[r.uri] = r.usedKey
 	}
 }
@@ -493,8 +568,8 @@ func (s *Server) releaseDocumentProgram(uri lsproto.DocumentUri) {
 	}
 }
 
-// prune bounds both Program and parsed-source residency to document ownership.
-// Requests already holding a generation keep their own Go references.
+// prune bounds Program and parsed-source residency to document ownership and
+// requests still establishing ownership of a borrowed state.
 func (s *lintProgramStore) prune() {
 	live := make(map[lintProgramKey]bool, len(s.documentPrograms))
 	for _, key := range s.documentPrograms {
@@ -502,14 +577,14 @@ func (s *lintProgramStore) prune() {
 	}
 	programs := make([]*compiler.Program, 0, len(s.programs))
 	for key, state := range s.programs {
-		if !live[key] {
+		if !live[key] && state.borrowers == 0 {
 			delete(s.programs, key)
 		} else {
 			programs = append(programs, state.program)
 		}
 	}
 	s.parseCache.RetainOnly(programs)
-	if len(s.documentPrograms) == 0 {
+	if len(s.documentPrograms) == 0 && len(programs) == 0 {
 		clear(s.projectMetadata)
 		clear(s.observedRootConfigs)
 	}
@@ -588,6 +663,7 @@ func (s *lintProgramStore) isOpenSourceOverlayWatchChange(
 }
 
 func (s *lintProgramStore) Invalidate() bool {
+	s.generation++
 	hadState := len(s.programs) != 0 ||
 		len(s.projectMetadata) != 0 ||
 		len(s.observedRootConfigs) != 0

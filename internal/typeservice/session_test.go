@@ -824,3 +824,84 @@ func TestJSCheckFlagsBitAlignment(t *testing.T) {
 		}
 	}
 }
+
+func TestUnionWithIntersectionDoesNotLeakObjectOnlyFlags(t *testing.T) {
+	source := strings.Join([]string{
+		"declare const base: { a: 1 };",
+		"export const spread = { ...base, b: 2 };",
+		"export type U = ({ a: 1 } & { b: 2 }) | string;",
+		"export declare const unionVal: U;",
+	}, "\n") + "\n"
+	p, _, root := buildTestProgram(t, map[string]string{"input.ts": source}, []string{"input.ts"})
+	name := tspath.ResolvePath(root, "input.ts")
+	file := p.GetSourceFile(name)
+	if file == nil {
+		t.Fatal("fixture source missing")
+	}
+	session, err := New(t.Context(), p, []*ast.SourceFile{file})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	binding, err := session.BindTarget(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Prime session handle tables via a public query before inspecting typeFact.
+	if _, err := session.Query(t.Context(), Query{Scope: binding.Scope, Request: &CheckerRequest{Op: "void"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	var spreadInit, unionDecl *ast.Node
+	var walk func(*ast.Node) bool
+	walk = func(node *ast.Node) bool {
+		if node.Kind == ast.KindVariableDeclaration {
+			vd := node.AsVariableDeclaration()
+			if vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+				switch vd.Name().Text() {
+				case "spread":
+					spreadInit = vd.Initializer
+				case "unionVal":
+					unionDecl = vd.Name()
+				}
+			}
+		}
+		node.ForEachChild(walk)
+		return false
+	}
+	file.AsNode().ForEachChild(walk)
+	if spreadInit == nil || unionDecl == nil {
+		t.Fatalf("missing test declarations: spread=%v unionVal=%v", spreadInit, unionDecl)
+	}
+
+	c, release := p.TypeCheckerForFileExclusive(core.WithCheckerLifetime(t.Context(), core.CheckerLifetimeAPI), file)
+	defer release()
+
+	unionType := c.GetTypeAtLocation(unionDecl)
+	unionFact, err := session.typeFact(unionType)
+	if err != nil {
+		t.Fatalf("union typeFact: %v", err)
+	}
+	if unionFact.ObjectFlags == nil {
+		t.Fatal("expected union TypeFact.ObjectFlags slice to be non-nil (objectFlags: 0)")
+	}
+	if len(unionFact.ObjectFlags) != 0 {
+		t.Fatalf("union with intersection leaked object-only ObjectFlags: %v", unionFact.ObjectFlags)
+	}
+
+	spreadType := c.GetTypeAtLocation(spreadInit)
+	spreadFact, err := session.typeFact(spreadType)
+	if err != nil {
+		t.Fatalf("spread typeFact: %v", err)
+	}
+	foundSpread := false
+	for _, flag := range spreadFact.ObjectFlags {
+		if flag == "ContainsSpread" {
+			foundSpread = true
+			break
+		}
+	}
+	if !foundSpread {
+		t.Fatalf("expected spread object literal to keep ContainsSpread, got %v", spreadFact.ObjectFlags)
+	}
+}

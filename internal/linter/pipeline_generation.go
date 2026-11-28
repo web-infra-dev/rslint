@@ -13,19 +13,56 @@ import (
 // releaseLease gives every acquired generation exact-once release semantics,
 // including early returns, panics, and explicit release before detached work.
 type releaseLease struct {
-	release ReleaseFunc
-	once    sync.Once
+	release        ReleaseFunc
+	once           sync.Once
+	mu             sync.Mutex
+	readers        int
+	closed         bool
+	releaseOnOwner func(ReleaseFunc)
 }
 
 func (l *releaseLease) close() {
 	if l != nil {
 		l.once.Do(func() {
-			release := l.release
-			l.release = nil
-			if release != nil {
-				release()
-			}
+			l.mu.Lock()
+			l.closed = true
+			l.finishLocked(false)
 		})
+	}
+}
+
+// retain gives typed detached work a narrow borrow of the original producer.
+// Source-only plugin work still releases it before the reverse request.
+func (l *releaseLease) retain() ReleaseFunc {
+	l.mu.Lock()
+	if l.closed {
+		l.mu.Unlock()
+		panic("linter pipeline: retain released generation")
+	}
+	l.readers++
+	l.mu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			l.mu.Lock()
+			l.readers--
+			l.finishLocked(true)
+		})
+	}
+}
+
+func (l *releaseLease) finishLocked(detached bool) {
+	var release ReleaseFunc
+	if l.closed && l.readers == 0 {
+		release, l.release = l.release, nil
+	}
+	l.mu.Unlock()
+	if release != nil {
+		if detached && l.releaseOnOwner != nil {
+			l.releaseOnOwner(release)
+		} else {
+			release()
+		}
 	}
 }
 

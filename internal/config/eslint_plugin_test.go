@@ -7,6 +7,30 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
+func TestPluginTypeServicesUsesEffectiveProjectAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name, config string
+		want         bool
+	}{
+		{"omitted", `[{}]`, false},
+		{"project", `[{"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}}}]`, true},
+		{"reset", `[{"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}}},{"languageOptions":{"parserOptions":{"project":false}}}]`, false},
+		{"unmatched", `[{"files":["elsewhere.ts"],"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}}}]`, false},
+		{"service", `[{"languageOptions":{"parserOptions":{"projectService":true}}}]`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var entries RslintConfig
+			if err := json.Unmarshal([]byte(tc.config), &entries); err != nil {
+				t.Fatal(err)
+			}
+			resolved := entries.GetConfigForFile("/repo/value.ts", "/repo")
+			if got := PluginTypeServicesEnabled(resolved); got != tc.want {
+				t.Fatalf("admission=%v want=%v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestLanguageOptions_RawCaptureAndMerge(t *testing.T) {
 	// UnmarshalJSON must capture the FULL raw object (sourceType / globals /
 	// ecmaFeatures the Go core doesn't model) so Go can forward them to the

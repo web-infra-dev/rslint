@@ -5,11 +5,16 @@ import (
 
 	api "github.com/web-infra-dev/rslint/internal/api"
 	"github.com/web-infra-dev/rslint/internal/api/plugin"
+	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
 // Handler implements rslint's concrete API requests.
 type Handler struct{}
+
+func (h *Handler) HandlePluginTypeServices(ctx context.Context, msg *ipc.Message) (any, error) {
+	return plugin.HandleTypeServices(ctx, msg)
+}
 
 // HandleLint handles lint requests in IPC mode
 func (h *Handler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {

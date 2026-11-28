@@ -127,12 +127,15 @@ func (a *AttachmentData) UnmarshalJSON(data []byte) error {
 }
 
 // TransportMetadata belongs to the envelope, never the application payload.
-// Mapping is bootstrap-only. Released must match the request's complete ordered
+// Mapping is bootstrap-only. Released must match the publication's complete ordered
 // batch list; partial, reordered or unsolicited acknowledgements grant no reuse.
 type TransportMetadata struct {
 	Mapping  *MemoryMapping `json:"mapping,omitempty"`
 	Batches  []MemoryBatch  `json:"batches,omitempty"`
 	Released []MemoryBatch  `json:"released,omitempty"`
+	// Response distinguishes an attachment response from an outbound request
+	// with the same numeric ID. It is valid only on transportRelease frames.
+	Response bool `json:"response,omitempty"`
 }
 
 func (m *TransportMetadata) UnmarshalJSON(data []byte) error {

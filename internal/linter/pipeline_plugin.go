@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
@@ -25,11 +26,53 @@ type pluginTask struct {
 	suggestionsMode  string
 	timing           *TimingCollector
 	failure          PluginFailurePolicy
+	types            []*pluginTypeLease
 }
 
 type fixSourceCandidate struct {
 	path   string
 	source ast.SourceFileLike
+}
+
+type deferredPluginRun struct {
+	mu    sync.Mutex
+	run   func(context.Context, EslintPluginDispatcher) (EslintPluginDispatchOutcome, error)
+	close func()
+	ran   bool
+}
+
+func (r *deferredPluginRun) Close() {
+	r.mu.Lock()
+	if r.ran {
+		r.mu.Unlock()
+		return
+	}
+	r.ran = true
+	cleanup := r.close
+	r.run, r.close = nil, nil
+	r.mu.Unlock()
+	cleanup()
+}
+func (r *deferredPluginRun) Run(ctx context.Context, dispatcher EslintPluginDispatcher) (EslintPluginDispatchOutcome, error) {
+	if ctx == nil || dispatcher == nil {
+		return EslintPluginDispatchOutcome{}, errors.New("linter pipeline: plugin context and dispatcher must not be nil")
+	}
+	r.mu.Lock()
+	if r.ran {
+		r.mu.Unlock()
+		return EslintPluginDispatchOutcome{}, ErrDeferredPluginRunAlreadyInvoked
+	}
+	r.ran = true
+	run, cleanup := r.run, r.close
+	r.run, r.close = nil, nil
+	r.mu.Unlock()
+	defer cleanup()
+	return run(ctx, dispatcher)
+}
+func (t pluginTask) closeTypes() {
+	for _, lease := range t.types {
+		lease.close()
+	}
 }
 
 func newDeferredPluginRun(task pluginTask) (DeferredPluginRun, error) {
@@ -44,29 +87,9 @@ func newDeferredPluginRun(task pluginTask) (DeferredPluginRun, error) {
 			return nil, errors.New("linter pipeline: deferred plugin run requires frozen ESTree")
 		}
 	}
-	var state struct {
-		sync.Mutex
-		ran bool
-	}
-	return func(
-		ctx context.Context,
-		dispatcher EslintPluginDispatcher,
-	) (EslintPluginDispatchOutcome, error) {
-		if ctx == nil {
-			return EslintPluginDispatchOutcome{}, errors.New("linter pipeline: plugin context must not be nil")
-		}
-		if dispatcher == nil {
-			return EslintPluginDispatchOutcome{}, errors.New("linter pipeline: plugin dispatcher must not be nil")
-		}
-		state.Lock()
-		if state.ran {
-			state.Unlock()
-			return EslintPluginDispatchOutcome{}, ErrDeferredPluginRunAlreadyInvoked
-		}
-		state.ran = true
-		state.Unlock()
+	return &deferredPluginRun{close: task.closeTypes, run: func(ctx context.Context, dispatcher EslintPluginDispatcher) (EslintPluginDispatchOutcome, error) {
 		return task.run(ctx, dispatcher), nil
-	}, nil
+	}}, nil
 }
 
 func (t pluginTask) run(ctx context.Context, dispatcher EslintPluginDispatcher) EslintPluginDispatchOutcome {
@@ -76,7 +99,7 @@ func (t pluginTask) run(ctx context.Context, dispatcher EslintPluginDispatcher) 
 // runRaw consumes one binding's inputs. Failure policy belongs to the complete
 // observation, so a failed unit cannot discard only its own partial results or
 // manufacture one synthetic error per Program.
-func (t pluginTask) runRaw(ctx context.Context, dispatcher EslintPluginDispatcher) EslintPluginDispatchOutcome {
+func (t pluginTask) runRaw(ctx context.Context, dispatcher EslintPluginDispatcher) (outcome EslintPluginDispatchOutcome) {
 	failurePath := eslintPluginDispatchFailurePath(t.inputs)
 	if path, ok := t.targetPathByWire[failurePath]; ok {
 		failurePath = path
@@ -96,15 +119,83 @@ func (t pluginTask) runRaw(ctx context.Context, dispatcher EslintPluginDispatche
 			mu.Unlock()
 		}
 	}
-	notices, err := t.resources.dispatch(ctx, dispatcher, t.inputs, t.collectFixes, t.suggestionsMode, t.timing,
+	resources := t.resources
+	if resources == nil {
+		resources = newPluginDispatchResources()
+	}
+	var dispatchedSessionsMu sync.Mutex
+	var dispatchedSessions map[string]struct{}
+	var onDispatched func(EslintPluginLintRequest)
+	if len(t.types) != 0 {
+		var retired []string
+		for _, lease := range t.types {
+			retired = append(retired, lease.ids...)
+		}
+		if len(retired) != 0 {
+			dispatchedSessions = make(map[string]struct{}, len(retired))
+			onDispatched = func(req EslintPluginLintRequest) {
+				dispatchedSessionsMu.Lock()
+				for _, f := range req.Files {
+					if f.TypeServices != nil && !f.TypeServices.SyntaxOnly && f.TypeServices.Session != "" {
+						dispatchedSessions[f.TypeServices.Session] = struct{}{}
+					}
+				}
+				dispatchedSessionsMu.Unlock()
+			}
+		}
+		defer func() {
+			// End semantic reads before waiting for the host to retire its caches.
+			t.closeTypes()
+			var toRetire []string
+			for _, id := range retired {
+				if _, sent := dispatchedSessions[id]; sent {
+					toRetire = append(toRetire, id)
+				}
+			}
+			if len(toRetire) == 0 {
+				return
+			}
+			closeErr := dispatchTypeRetirement(context.WithoutCancel(ctx), dispatcher, toRetire)
+			if closeErr != nil {
+				start := len(outcome.Notices)
+				outcome.Notices = append(outcome.Notices, EslintPluginProtocolNotice{Kind: EslintPluginTypeServiceRetirementFailed, Err: closeErr})
+				outcome.batches = append(outcome.batches, pluginBatchRange{key: "type-services-retirement", noticeStart: start, noticeEnd: len(outcome.Notices)})
+			}
+		}()
+	}
+	notices, err := resources.dispatch(ctx, dispatcher, t.inputs, t.collectFixes, t.suggestionsMode, t.timing,
 		func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
-		func(batch pluginBatchRange) { batches = append(batches, batch) }, onFailure)
+		func(batch pluginBatchRange) { batches = append(batches, batch) }, onFailure, onDispatched)
 	for index := range diagnostics {
 		if targetPath, ok := t.targetPathByWire[diagnostics[index].FilePath]; ok {
 			diagnostics[index].FilePath = targetPath
 		}
 	}
 	return EslintPluginDispatchOutcome{Diagnostics: diagnostics, Notices: notices, DispatchError: err, failurePath: failurePath, batches: batches, fileFailures: failures}
+}
+
+func dispatchTypeRetirement(ctx context.Context, dispatcher EslintPluginDispatcher, sessions []string) (err error) {
+	if len(sessions) == 0 {
+		return nil
+	}
+	defer recoverPluginDispatchPanic(&err)
+	// Retirement requests carry no files, do no projection/SHM allocation, and
+	// execute synchronously on the plugin host's event loop; do not queue them
+	// behind saturated file-lint slots where a 2s timeout could leak host caches.
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	batch, err := dispatcher.OpenBatch(ctx)
+	if batch != nil && batch.Release != nil {
+		defer batch.Release()
+	}
+	if err != nil {
+		return err
+	}
+	if batch == nil || batch.Dispatch == nil {
+		return errors.New("plugin dispatcher returned an invalid batch")
+	}
+	_, err = batch.Dispatch(ctx, EslintPluginLintRequest{Files: []EslintPluginLintFile{}, RetiredTypeServices: sessions})
+	return err
 }
 
 func applyPluginFailure(outcome EslintPluginDispatchOutcome, failure PluginFailurePolicy) EslintPluginDispatchOutcome {
@@ -135,6 +226,16 @@ func materializePluginTask(
 		return pluginTask{failure: policy.PluginFailure}, nil
 	}
 	inputs := BuildEslintPluginFileInputs(plan, generation.Plugin.ConfigForFile)
+	types, err := bindPluginTypeServices(ctx, plan, inputs)
+	if err != nil {
+		return pluginTask{}, err
+	}
+	transferredTypes := false
+	defer func() {
+		if !transferredTypes {
+			types.close()
+		}
+	}()
 	targetPathByWire := make(map[string]string, len(inputs))
 	var fixCandidates []fixSourceCandidate
 	collectFixes := policy.Demand.Plugin&rule.EditDemandAutofix != 0
@@ -220,7 +321,13 @@ func materializePluginTask(
 		// collect plugin timing, and joined CLI/API work remains on the leased path.
 		timing = nil
 	}
+	transferredTypes = true
+	var leases []*pluginTypeLease
+	if types != nil {
+		leases = []*pluginTypeLease{types}
+	}
 	return pluginTask{
+		types:            leases,
 		inputs:           inputs,
 		targetPathByWire: targetPathByWire,
 		fixCandidates:    fixCandidates,
@@ -236,7 +343,7 @@ func materializePluginTask(
 // or retains just the rule data required by a joined plugin task.
 func finishPluginInput(ctx context.Context, builder *estree.Builder, input *EslintPluginFileInput, detached bool) error {
 	if detached {
-		frame, projectErr := projectPluginFrame(ctx, builder, *input, nil)
+		frame, projectErr := projectPluginFrame(ctx, builder, input, nil)
 		if projectErr != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -375,6 +482,7 @@ func detachPluginInput(input EslintPluginFileInput) (EslintPluginFileInput, erro
 		LanguageOptions: languageOptions,
 		Settings:        settings,
 		Rules:           rules,
+		TypeServices:    input.TypeServices,
 	}, nil
 }
 

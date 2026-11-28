@@ -290,13 +290,19 @@ export class TypeServiceClient {
           }),
         );
       },
-      getNullableType: (type, flags) =>
-        requiredType(() =>
+      getNullableType: (type, flags) => {
+        const tf = this.typescript.TypeFlags;
+        const masked = flags >>> 0;
+        const wireFlags =
+          (masked & tf.Undefined ? 1 << 2 : 0) |
+          (masked & tf.Null ? 1 << 3 : 0);
+        return requiredType(() =>
           this.query({
             op: 'nullableType',
-            args: { id: this.id(type, 'type'), flags: flags >>> 0 },
+            args: { id: this.id(type, 'type'), flags: wireFlags },
           }),
-        ),
+        );
+      },
       getAmbientModules: () =>
         this.namedSymbolsFor(this.query({ op: 'ambientModules', args: {} })),
       getAugmentedPropertiesOfType: (t) =>

@@ -24,11 +24,18 @@ import {
   type LoadConfigsRequest,
 } from '../config/config-loader.js';
 
+import type { TypeServiceHostTransport } from '../service/plugin-type-service-protocol.js';
+import {
+  resolveTypeServiceReply,
+  type NativeTypeServiceResponse,
+} from '../internal/plugin-type-service.js';
+
 interface PluginLintHost {
   lint(
     req: unknown,
     signal?: AbortSignal,
     attachments?: readonly IpcAttachment[],
+    typeServices?: TypeServiceHostTransport,
   ): Promise<unknown>;
   shutdown(): Promise<void>;
 }
@@ -560,7 +567,18 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
               'engine: pluginLint requested without an activated plugin host',
             );
           }
-          return pluginHost.lint(msg.data, undefined, msg.attachments);
+          return pluginHost.lint(
+            msg.data,
+            undefined,
+            msg.attachments,
+            async (query) =>
+              resolveTypeServiceReply(
+                await ipc.sendRequest<unknown, NativeTypeServiceResponse>(
+                  'typeService',
+                  query,
+                ),
+              ),
+          );
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
       }

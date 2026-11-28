@@ -22,6 +22,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/typeservice"
 )
 
 func TestPipelineReclaimsCompletedProgramWhileOtherConsumersRun(t *testing.T) {
@@ -468,7 +469,7 @@ func TestPipelinePublishesTextDiagnosticSources(t *testing.T) {
 				if _, retained := presentation.baseline[0].SourceFile.(*ast.SourceFile); retained {
 					t.Fatal("progressive baseline retained a compiler AST")
 				}
-				outcome, runErr := presentation.run(context.Background(), dispatch)
+				outcome, runErr := presentation.run.Run(context.Background(), dispatch)
 				if runErr != nil || outcome.DispatchError != nil {
 					t.Fatalf("progressive plugin errors = %v / %v", runErr, outcome.DispatchError)
 				}
@@ -797,7 +798,7 @@ func TestProgressivePluginRunIsFrozenAndSingleUse(t *testing.T) {
 	settings["value"] = "mutated"
 	options[0].(map[string]any)["choice"] = "mutated"
 	var request EslintPluginLintRequest
-	outcome, err := presentation.run(context.Background(), EslintPluginDispatchFunc(func(_ context.Context, got EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+	outcome, err := presentation.run.Run(context.Background(), EslintPluginDispatchFunc(func(_ context.Context, got EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		request = got
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: got.Files[0].Path}}}, nil
 	}))
@@ -809,7 +810,7 @@ func TestProgressivePluginRunIsFrozenAndSingleUse(t *testing.T) {
 		len(frozenOptions) != 1 || frozenOptions[0].(map[string]any)["choice"] != "frozen" {
 		t.Fatalf("deferred request retained mutable config: %+v", request)
 	}
-	if _, err := presentation.run(context.Background(), EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+	if _, err := presentation.run.Run(context.Background(), EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		return &EslintPluginLintResult{}, nil
 	})); !errors.Is(err, ErrDeferredPluginRunAlreadyInvoked) {
 		t.Fatalf("second run error = %v, want ErrDeferredPluginRunAlreadyInvoked", err)
@@ -992,11 +993,19 @@ func TestPipelineRetainsConfiguredPoolUntilLastPluginBorrower(t *testing.T) {
 	unblock := sync.OnceFunc(func() { close(resume) })
 	defer unblock()
 	var releases atomic.Int32
+	var query atomic.Pointer[EslintPluginTypeRequest]
 	loads := make([]GenerationLoad, 2)
 	for index := range loads {
-		loads[index] = GenerationLoad{TargetCount: 1, CheckerCount: 4, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
-			if index == 1 && releases.Load() != 1 {
-				t.Error("next pool was constructed before the previous binding's last borrower joined")
+		loads[index] = GenerationLoad{TargetCount: 1, CheckerCount: 4, Acquire: func(ctx context.Context) (Generation, ReleaseFunc, error) {
+			if index == 1 {
+				if releases.Load() != 1 {
+					t.Error("next pool was constructed before the previous binding's last borrower joined")
+				}
+				if request := query.Load(); request != nil {
+					if _, err := QueryEslintPluginTypes(ctx, *request); !errors.Is(err, ErrPluginTypeSessionClosed) {
+						t.Errorf("next pool saw a live previous session: %v", err)
+					}
+				}
 			}
 			cp, paths := createTestProgramWithFilesAndCompilerOptions(t,
 				map[string]string{"file.ts": "const value = 1;"}, `{"noLib":true}`)
@@ -1013,7 +1022,9 @@ func TestPipelineRetainsConfiguredPoolUntilLastPluginBorrower(t *testing.T) {
 						return nil
 					},
 				},
-				Plugin: &PluginGeneration{},
+				Plugin: &PluginGeneration{ConfigForFile: func(string) EslintPluginFileConfig {
+					return EslintPluginFileConfig{TypeServices: true}
+				}},
 				Target: TargetProjection{ReadText: func(_ string, source ast.SourceFileLike) (string, error) { return source.Text(), nil }},
 			}, func() { releases.Add(1) }, nil
 		}}
@@ -1022,10 +1033,27 @@ func TestPipelineRetainsConfiguredPoolUntilLastPluginBorrower(t *testing.T) {
 	go func() {
 		_, err := RunPipeline(context.Background(), NewLintRequest(
 			pipelinePlanProvider{plan: GenerationPlan{Loads: loads}}, ObservationPolicy{},
-			EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			EslintPluginDispatchFunc(func(ctx context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				if len(request.Files) == 0 {
+					return &EslintPluginLintResult{}, nil
+				}
+				file := request.Files[0]
+				if file.TypeServices == nil {
+					return nil, errors.New("plugin file did not receive type services")
+				}
+				service := file.TypeServices
+				read := EslintPluginTypeRequest{Session: service.Session, Generation: service.Binding.Generation, Queries: []typeservice.Query{{Scope: service.Binding.Scope, Request: &typeservice.CheckerRequest{Op: "void"}}}}
+				result, err := QueryEslintPluginTypes(ctx, read)
+				if err != nil {
+					return nil, fmt.Errorf("query before joining the plugin: %w", err)
+				}
+				if len(result.Packets) != 1 {
+					return nil, fmt.Errorf("typed plugin query returned %d packets", len(result.Packets))
+				}
+				query.Store(&read)
 				close(pluginStarted)
 				<-resume
-				return &EslintPluginLintResult{}, nil
+				return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: file.Path}}}, nil
 			}),
 		))
 		done <- err

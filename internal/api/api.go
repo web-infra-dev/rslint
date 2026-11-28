@@ -55,6 +55,8 @@ const (
 	KindGetAstInfo ipc.MessageKind = "getAstInfo"
 	// KindPluginLint is sent from Go to JS to run community ESLint plugin rules.
 	KindPluginLint ipc.MessageKind = "pluginLint"
+	// KindTypeService answers semantic reads nested inside an active pluginLint.
+	KindTypeService ipc.MessageKind = "typeService"
 	// KindLoadConfigs asks a capable Node host to evaluate one Go-discovered
 	// config frontier.
 	KindLoadConfigs ipc.MessageKind = "loadConfigs"
@@ -267,6 +269,12 @@ type BidirectionalHandler interface {
 	HandleLintWithContext(ctx context.Context, req LintRequest, requester Requester) (*LintResponse, error)
 }
 
+// PluginTypeServiceHandler is independent from the serialized top-level API
+// requests: an active lint must keep serving its worker's nested reads.
+type PluginTypeServiceHandler interface {
+	HandlePluginTypeServices(ctx context.Context, msg *ipc.Message) (any, error)
+}
+
 // Service manages bidirectional IPC communication for `--api` mode. Framing,
 // request multiplexing, and the continuously running read loop are delegated
 // to internal/ipc.Channel.
@@ -333,6 +341,12 @@ func (s *Service) channelResult() error {
 }
 
 func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, error) {
+	if msg.Kind == KindTypeService {
+		if handler, ok := s.handler.(PluginTypeServiceHandler); ok {
+			return handler.HandlePluginTypeServices(ctx, msg)
+		}
+		return nil, errors.New("API handler does not support plugin type services")
+	}
 	s.handlerMu.Lock()
 	defer s.handlerMu.Unlock()
 

@@ -54,7 +54,7 @@ import {
  * `ecma-language-plugin.ts:LintFileRequest` and Go's wire type. The optional
  * TypeScript syntax-only flags (`emitDecoratorMetadata`,
  * `experimentalDecorators`, `isolatedDeclarations`) are forwarded to
- * `lintFile`'s `services` factory by direct callers and future bridge wiring.
+ * `lintFile`'s `services` factory by direct callers and bridge wiring.
  */
 export interface LanguageOptions {
   /**
@@ -69,11 +69,10 @@ export interface LanguageOptions {
   sourceType?: 'module' | 'script' | 'commonjs';
   globals?: GlobalsConfig;
   /**
-   * Parser-specific extras. Only `ecmaFeatures` lives here in v10
-   * (rules that gate on `jsx` / `globalReturn` / `impliedStrict` read
-   * via `ctx.languageOptions.parserOptions.ecmaFeatures.*`). Custom
-   * `parser` instances aren't supported by the runner, so we don't
-   * include that field.
+   * Parser-specific extras: `ecmaFeatures` (`jsx` / `globalReturn` /
+   * `impliedStrict`) plus optional TypeScript project/decorator flags. Custom
+   * `parser` instances aren't supported by the runner, so we don't include
+   * that field.
    */
   parserOptions?: {
     ecmaFeatures?: {
@@ -84,6 +83,8 @@ export interface LanguageOptions {
     emitDecoratorMetadata?: boolean;
     experimentalDecorators?: boolean;
     isolatedDeclarations?: boolean;
+    project?: unknown;
+    projectService?: unknown;
   };
 }
 

@@ -7,12 +7,14 @@ import {
   type ActivateConfigsResponse,
 } from '../config/config-loader.js';
 import type { IpcAttachment } from '../ipc/protocol.js';
+import type { TypeServiceHostTransport } from '../service/plugin-type-service-protocol.js';
 
 export interface PluginLintHost {
   lint(
     request: unknown,
     signal?: AbortSignal,
     attachments?: readonly IpcAttachment[],
+    typeServices?: TypeServiceHostTransport,
   ): Promise<unknown>;
   shutdown(): Promise<void>;
 }

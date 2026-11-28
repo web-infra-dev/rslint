@@ -59,9 +59,14 @@ func prepareObservation(
 		return preparedObservation{}, &GenerationLoadError{Err: err}
 	}
 	lease := &releaseLease{release: release}
+	if generation.Plugin != nil && policy.Plugin == pluginProgressiveAfterNative {
+		lease.releaseOnOwner = generation.Plugin.ReleaseOnOwner
+	}
+	pluginWork := pluginTask{failure: policy.PluginFailure}
 	transferred := false
 	defer func() {
 		if !transferred {
+			pluginWork.closeTypes()
 			lease.close()
 		}
 	}()
@@ -94,11 +99,18 @@ func prepareObservation(
 	}
 	detachedPlugin := policy.Plugin != PluginConcurrentJoined
 	targetSyntaxBlocked := stopOnTargetSyntaxErrors && plan != nil && plan.HasSyntacticDiagnostics()
-	pluginWork := pluginTask{failure: policy.PluginFailure}
 	if !targetSyntaxBlocked {
 		pluginWork, err = materializePluginTask(ctx, plan, generation, snapshot, policy, detachedPlugin, planChanges, sourceReads)
 		if err != nil {
 			return preparedObservation{}, err
+		}
+	}
+	if detachedPlugin {
+		for _, types := range pluginWork.types {
+			// File-scoped syntax reads own their frozen source pointers.
+			if len(types.ids) != 0 {
+				types.release = lease.retain()
+			}
 		}
 	}
 	if len(pluginWork.inputs) > 0 && policy.Plugin != pluginProgressiveAfterNative && dispatcher == nil {
@@ -147,6 +159,12 @@ func executePreparedObservation(
 	nativeWork := prepared.native
 	defer nativeWork.close()
 	pluginWork := prepared.plugin
+	typesTransferred := false
+	defer func() {
+		if !typesTransferred {
+			pluginWork.closeTypes()
+		}
+	}()
 	prepared.plugin = pluginTask{}
 	targetSyntaxBlocked := prepared.targetSyntaxBlocked
 	execution := observationUnitExecution{
@@ -171,6 +189,7 @@ func executePreparedObservation(
 			)
 		}
 		execution.detachDiagnosticSources()
+		pluginWork.closeTypes()
 		lease.close()
 		return execution, joinContextError(runErr, ctx)
 	case PluginAfterNativeJoined:
@@ -178,12 +197,14 @@ func executePreparedObservation(
 		execution.native = native
 		if nativeErr != nil {
 			execution.detachDiagnosticSources()
+			pluginWork.closeTypes()
 			lease.close()
 			return execution, nativeErr
 		}
 		if stopOnTargetSyntaxErrors && native.hasTargetSyntaxErrors {
 			pluginWork.fixCandidates = nil
 			execution.detachDiagnosticSources()
+			pluginWork.closeTypes()
 			lease.close()
 			execution.pluginKind = pluginObservationNone
 			return execution, ctx.Err()
@@ -244,22 +265,31 @@ func executePreparedObservation(
 		native, nativeErr := runNativeObservation(ctx, nativeWork)
 		execution.native = native
 		execution.detachDiagnosticSources()
-		lease.close()
 		if nativeErr != nil {
+			pluginWork.closeTypes()
+			lease.close()
 			return execution, nativeErr
 		}
 		if err := ctx.Err(); err != nil {
+			pluginWork.closeTypes()
+			lease.close()
 			return execution, err
 		}
 		if stopOnTargetSyntaxErrors && native.hasTargetSyntaxErrors {
+			pluginWork.closeTypes()
+			lease.close()
 			execution.pluginKind = pluginObservationNone
 			return execution, nil
 		}
 		if len(pluginWork.inputs) == 0 {
+			pluginWork.closeTypes()
+			lease.close()
 			execution.pluginKind = pluginObservationNone
 			return execution, nil
 		}
+		lease.close()
 		execution.pluginKind = pluginObservationProgressive
+		typesTransferred = true
 		execution.deferredTask = &pluginWork
 		return execution, nil
 	default:
@@ -280,7 +310,19 @@ func executeConcurrentObservation(
 		pluginJoined bool
 	)
 	var pluginPanic workerPanic
-	if len(pluginTask.inputs) > 0 {
+	// Typed plugin sessions acquire an exclusive checker checkout on the
+	// Program's anchor shard and may also read declaration diagnostics.
+	// Keep typed plugin dispatch ordered after native lint on this binding
+	// so it never contends with native checker shards or non-exclusive emit
+	// resolvers; source-only plugins still overlap native work.
+	pluginAfterNative := false
+	for _, types := range pluginTask.types {
+		if len(types.ids) != 0 {
+			pluginAfterNative = true
+			break
+		}
+	}
+	if len(pluginTask.inputs) > 0 && !pluginAfterNative {
 		pluginCtx, cancel := context.WithCancel(ctx)
 		cancelPlugin = cancel
 		ch := make(chan EslintPluginDispatchOutcome, 1)
@@ -312,6 +354,9 @@ func executeConcurrentObservation(
 		pluginJoined = true
 		execution.pluginKind = pluginObservationJoined
 		execution.pluginOutcome = outcome
+	} else if pluginAfterNative && nativeErr == nil && ctx.Err() == nil {
+		execution.pluginKind = pluginObservationJoined
+		execution.pluginOutcome = pluginTask.runRaw(ctx, dispatcher)
 	} else {
 		execution.pluginKind = pluginObservationNone
 	}

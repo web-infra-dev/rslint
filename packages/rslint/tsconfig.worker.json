@@ -16,7 +16,8 @@
     "${configDir}/src/languages/js/**/*.ts",
     "${configDir}/src/native/**/*.ts",
     "${configDir}/src/config/config-source.ts",
-    "${configDir}/src/config/plugin-source.ts"
+    "${configDir}/src/config/plugin-source.ts",
+    "${configDir}/src/service/plugin-type-service-protocol.ts"
   ],
   "exclude": [
     "${configDir}/src/eslint-plugin/**/*.spec.ts",

@@ -79,7 +79,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 			catalog := explicitConfigCatalogForTest(dir, entries)
 			catalog.EslintPlugins = []config.EslintPluginEntry{{Prefix: "external", RuleNames: []string{"check"}}}
 			fsys := &commandReadCountingFS{FS: bundled.WrapFS(osvfs.FS()), reads: make(map[string]int)}
-			calls, dispatches := 0, 0
+			calls, dispatches, fileDispatches, retirements := 0, 0, 0, 0
 			activationError := errors.New("worker preparation rejected")
 			format := "jsonline"
 			if test.defaultFormat {
@@ -113,6 +113,12 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 				if calls != 1 {
 					t.Error("plugin dispatch did not await activation")
 				}
+				if len(req.Files) != 0 {
+					fileDispatches++
+				}
+				if len(req.RetiredTypeServices) != 0 {
+					retirements++
+				}
 				results := make([]linter.EslintPluginFileResult, len(req.Files))
 				for index, file := range req.Files {
 					results[index].FilePath = file.Path
@@ -123,8 +129,8 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 				t.Fatalf("activation joins = %d, want 1", calls)
 			}
 			if test.succeed {
-				if dispatches != 1 || !strings.Contains(stdout, "no-debugger") || stderr != "" {
-					t.Fatalf("execution after activation: dispatches=%d stdout=%q stderr=%q", dispatches, stdout, stderr)
+				if fileDispatches != 1 || retirements != 1 || dispatches != 2 || !strings.Contains(stdout, "no-debugger") || stderr != "" {
+					t.Fatalf("execution after activation: dispatches=%d fileDispatches=%d retirements=%d stdout=%q stderr=%q", dispatches, fileDispatches, retirements, stdout, stderr)
 				}
 			} else if test.defaultFormat {
 				if code != 1 || dispatches != 0 || stdout != "start   Linting...\n" ||

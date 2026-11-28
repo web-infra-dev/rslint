@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 )
@@ -46,8 +47,10 @@ type Session struct {
 	checkMu      sync.Mutex
 	extraMu      sync.RWMutex
 	poisoned     atomic.Bool
+	closed       bool
 	program      *program.Program
 	syntaxOnly   bool
+	syntax       *syntaxSessionData
 	anchor       *ast.SourceFile
 	eligible     map[*ast.SourceFile]bool
 	extraSources map[string]*ast.SourceFile
@@ -59,8 +62,55 @@ type Session struct {
 	indexInfoIDs map[*checker.IndexInfo]uint32
 }
 
+// syntaxSessionData stores only detached value metadata and source text so
+// syntax-only sessions never retain a Program or compiler SourceFile, while
+// lazily caching each parsed AST across queries until Session.Close.
+type syntaxSessionData struct {
+	currentDirectory string
+	compilerOptions  json.RawMessage
+	caseSensitive    bool
+	order            []string
+	files            map[string]*syntaxSourceEntry
+	byKey            map[string]string
+}
+
+type syntaxSourceEntry struct {
+	fileName     string
+	path         tspath.Path
+	text         string
+	parseOptions ast.SourceFileParseOptions
+	scriptKind   core.ScriptKind
+	desc         Source
+
+	parseOnce sync.Once
+	parsed    *ast.SourceFile
+}
+
+func (e *syntaxSourceEntry) sourceFile() *ast.SourceFile {
+	e.parseOnce.Do(func() {
+		e.parsed = parser.ParseSourceFile(e.parseOptions, e.text, e.scriptKind)
+	})
+	return e.parsed
+}
+
+func (d *syntaxSessionData) lookup(name string) *syntaxSourceEntry {
+	if d == nil {
+		return nil
+	}
+	if entry := d.files[name]; entry != nil {
+		return entry
+	}
+	if canonical, ok := d.byKey[tspath.NormalizePath(name)]; ok {
+		return d.files[canonical]
+	}
+	if canonical, ok := d.byKey[string(tspath.ToPath(name, d.currentDirectory, d.caseSensitive))]; ok {
+		return d.files[canonical]
+	}
+	return nil
+}
+
 type Descriptor struct {
-	SyntaxOnly        bool            `json:"syntaxOnly,omitempty"`
+	SyntaxOnly        bool            `json:"syntaxOnly,omitempty,omitzero"`
 	Generation        uint32          `json:"generation"`
 	CurrentDirectory  string          `json:"currentDirectory"`
 	CompilerOptions   json.RawMessage `json:"compilerOptions"`
@@ -69,7 +119,7 @@ type Descriptor struct {
 }
 
 type Source struct {
-	ImpliedNodeFormat core.ResolutionMode `json:"impliedNodeFormat,omitempty"`
+	ImpliedNodeFormat core.ResolutionMode `json:"impliedNodeFormat,omitempty,omitzero"`
 	CheckJSDirective  *checkJSDirective   `json:"checkJsDirective,omitempty"`
 	FileName          string              `json:"fileName"`
 	Path              string              `json:"path"`
@@ -108,23 +158,73 @@ func newSession(ctx context.Context, p *program.Program, eligible []*ast.SourceF
 	if !p.IsValid() || len(eligible) == 0 {
 		return nil, errors.New("type services require a bound Program and explicitly eligible sources")
 	}
+	if syntaxOnly {
+		options := json.RawMessage("{}")
+		if opts := p.Options(); opts != nil {
+			var err error
+			options, err = json.Marshal(compilerOptions(opts))
+			if err != nil {
+				return nil, err
+			}
+		}
+		currentDir := p.CurrentDirectory()
+		caseSensitive := p.FS() != nil && p.FS().UseCaseSensitiveFileNames()
+		data := &syntaxSessionData{
+			currentDirectory: currentDir,
+			compilerOptions:  options,
+			caseSensitive:    caseSensitive,
+			order:            make([]string, 0, len(eligible)),
+			files:            make(map[string]*syntaxSourceEntry, len(eligible)),
+			byKey:            make(map[string]string, len(eligible)*3),
+		}
+		for _, f := range eligible {
+			if !p.OwnsSourceFile(f) {
+				return nil, errors.New("ineligible or foreign type service source")
+			}
+			fileName := f.FileName()
+			if _, exists := data.files[fileName]; exists {
+				continue
+			}
+			entry := &syntaxSourceEntry{
+				fileName:     fileName,
+				path:         f.Path(),
+				text:         f.Text(),
+				parseOptions: f.ParseOptions(),
+				scriptKind:   f.ScriptKind,
+				desc:         syntaxSource(f),
+			}
+			data.order = append(data.order, fileName)
+			data.files[fileName] = entry
+			data.byKey[tspath.NormalizePath(fileName)] = fileName
+			if pathKey := string(f.Path()); pathKey != "" {
+				data.byKey[pathKey] = fileName
+			}
+			data.byKey[string(tspath.ToPath(fileName, currentDir, caseSensitive))] = fileName
+		}
+		slices.Sort(data.order)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return &Session{
+			syntaxOnly: true,
+			syntax:     data,
+			generation: nextGeneration.Add(1),
+		}, nil
+	}
 	s := &Session{
 		program:    p,
-		syntaxOnly: syntaxOnly,
 		anchor:     eligible[0],
 		eligible:   make(map[*ast.SourceFile]bool, len(eligible)),
 		generation: nextGeneration.Add(1),
 	}
 	for _, f := range eligible {
-		if !p.OwnsSourceFile(f) || (!syntaxOnly && !p.CanProvideTypeChecker(f)) {
+		if !p.OwnsSourceFile(f) || !p.CanProvideTypeChecker(f) {
 			return nil, errors.New("ineligible or foreign type service source")
 		}
 		s.eligible[f] = true
 	}
-	if !syntaxOnly {
-		if q := p.CompilerQueries(); q != nil {
-			s.recordExtraSource(q.ConfigSourceFile())
-		}
+	if q := p.CompilerQueries(); q != nil {
+		s.recordExtraSource(q.ConfigSourceFile())
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -163,13 +263,16 @@ func (s *Session) extraSource(name string) *ast.SourceFile {
 }
 
 func (s *Session) sourceFile(name string) *ast.SourceFile {
+	if s.syntaxOnly {
+		if entry := s.syntax.lookup(name); entry != nil {
+			return entry.sourceFile()
+		}
+		return nil
+	}
 	if f := s.program.GetSourceFile(name); f != nil {
 		return f
 	}
-	if !s.syntaxOnly {
-		return s.extraSource(name)
-	}
-	return nil
+	return s.extraSource(name)
 }
 
 func (s *Session) diagnosticSources() []Source {
@@ -200,7 +303,9 @@ func (s *Session) diagnosticSources() []Source {
 func (s *Session) Close() {
 	s.lifeMu.Lock()
 	defer s.lifeMu.Unlock()
+	s.closed = true
 	s.program = nil
+	s.syntax = nil
 	s.anchor = nil
 	s.checker = nil
 	s.eligible = nil
@@ -213,11 +318,31 @@ func (s *Session) Close() {
 	s.indexInfoIDs = nil
 }
 
+func (s *Session) isClosed() bool {
+	if s.closed {
+		return true
+	}
+	if s.syntaxOnly {
+		return s.syntax == nil
+	}
+	return s.program == nil
+}
+
 func (s *Session) BindTarget(file *ast.SourceFile) (Binding, error) {
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
-	if s.program == nil {
+	if s.isClosed() {
 		return Binding{}, ErrClosed
+	}
+	if s.syntaxOnly {
+		if file == nil {
+			return Binding{}, errors.New("source is not eligible for typed rules")
+		}
+		entry := s.syntax.files[file.FileName()]
+		if entry == nil || entry.path != file.Path() {
+			return Binding{}, errors.New("source is not eligible for typed rules")
+		}
+		return Binding{Scope{Generation: s.generation}, entry.fileName}, nil
 	}
 	if !s.eligible[file] {
 		return Binding{}, errors.New("source is not eligible for typed rules")
@@ -229,14 +354,14 @@ func (s *Session) BindTarget(file *ast.SourceFile) (Binding, error) {
 func (s *Session) Source(generation uint32, name string) (*ast.SourceFile, error) {
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
-	if s.program == nil {
+	if s.isClosed() {
 		return nil, ErrClosed
 	}
 	if generation != s.generation {
 		return nil, errors.New("stale type service generation")
 	}
 	file := s.sourceFile(name)
-	if s.syntaxOnly && !s.eligible[file] {
+	if s.syntaxOnly && file == nil {
 		return nil, errors.New("foreign syntax service source")
 	}
 	return file, nil //nolint:nilnil // A missing Program source is a legitimate result.
@@ -246,35 +371,48 @@ func (s *Session) Source(generation uint32, name string) (*ast.SourceFile, error
 func (s *Session) SyntaxDescriptor(file *ast.SourceFile) (Descriptor, error) {
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
-	if s.program == nil {
+	if s.isClosed() {
 		return Descriptor{}, ErrClosed
 	}
-	if !s.syntaxOnly || !s.eligible[file] {
+	if !s.syntaxOnly || file == nil {
 		return Descriptor{}, errors.New("foreign syntax projection target")
 	}
-	d, err := s.syntaxDescriptor()
-	if err != nil {
-		return Descriptor{}, err
+	entry := s.syntax.files[file.FileName()]
+	if entry == nil || entry.path != file.Path() {
+		return Descriptor{}, errors.New("foreign syntax projection target")
 	}
-	d.Sources = []Source{syntaxSource(file)}
+	d := s.syntaxDescriptor()
+	d.Sources = []Source{entry.desc}
 	return d, nil
 }
 
-func (s *Session) syntaxDescriptor() (Descriptor, error) {
-	options := json.RawMessage("{}")
-	if opts := s.program.Options(); opts != nil {
-		var err error
-		options, err = json.Marshal(compilerOptions(opts))
-		if err != nil {
-			return Descriptor{}, err
-		}
+// SyntaxDescriptorForFile opens only the requested target file name for a
+// syntax-only session without requiring the caller to retain an *ast.SourceFile.
+func (s *Session) SyntaxDescriptorForFile(fileName string) (Descriptor, error) {
+	s.lifeMu.RLock()
+	defer s.lifeMu.RUnlock()
+	if s.isClosed() {
+		return Descriptor{}, ErrClosed
 	}
+	if !s.syntaxOnly {
+		return Descriptor{}, errors.New("foreign syntax projection target")
+	}
+	entry := s.syntax.files[fileName]
+	if entry == nil {
+		return Descriptor{}, errors.New("foreign syntax projection target")
+	}
+	d := s.syntaxDescriptor()
+	d.Sources = []Source{entry.desc}
+	return d, nil
+}
+
+func (s *Session) syntaxDescriptor() Descriptor {
 	return Descriptor{
 		SyntaxOnly:       true,
 		Generation:       s.generation,
-		CurrentDirectory: s.program.CurrentDirectory(),
-		CompilerOptions:  options,
-	}, nil
+		CurrentDirectory: s.syntax.currentDirectory,
+		CompilerOptions:  s.syntax.compilerOptions,
+	}
 }
 
 func syntaxSource(f *ast.SourceFile) Source {
@@ -297,18 +435,14 @@ func syntaxSource(f *ast.SourceFile) Source {
 func (s *Session) Descriptor() (Descriptor, error) {
 	s.lifeMu.RLock()
 	defer s.lifeMu.RUnlock()
-	if s.program == nil {
+	if s.isClosed() {
 		return Descriptor{}, ErrClosed
 	}
 	if s.syntaxOnly {
-		d, err := s.syntaxDescriptor()
-		if err != nil {
-			return Descriptor{}, err
-		}
-		for _, file := range s.program.SourceFiles() {
-			if s.eligible[file] {
-				d.Sources = append(d.Sources, syntaxSource(file))
-			}
+		d := s.syntaxDescriptor()
+		d.Sources = make([]Source, 0, len(s.syntax.order))
+		for _, fileName := range s.syntax.order {
+			d.Sources = append(d.Sources, s.syntax.files[fileName].desc)
 		}
 		return d, nil
 	}
@@ -384,6 +518,14 @@ func (s *Session) Query(ctx context.Context, q Query) ([]byte, error) {
 	return packets[0], nil
 }
 
+func isNodeRecordRequest(req Request) (*NodeRequest, bool) {
+	if req.operation() != "nodeRecord" {
+		return nil, false
+	}
+	r, ok := req.(*NodeRequest)
+	return r, ok
+}
+
 // QueryBatch resolves syntax before acquiring a short exclusive checker lease.
 // Concurrent calls to QueryBatch and Close are synchronized via lifeMu.
 func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]byte, err error) {
@@ -416,11 +558,10 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 	if s.poisoned.Load() {
 		return nil, ErrPoisoned
 	}
-	if s.program == nil {
+	if s.isClosed() {
 		return nil, ErrClosed
 	}
 	p := s.program
-	eligible := s.eligible
 	for _, q := range queries {
 		if q.Generation != s.generation {
 			return nil, errors.New("stale or foreign type service handle")
@@ -428,15 +569,17 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 		if q.Request == nil {
 			return nil, errors.New("missing type service request")
 		}
-		if s.syntaxOnly && q.Request.operation() != "nodeRecord" {
-			return nil, errors.New("semantic queries require a typed project")
+		if s.syntaxOnly {
+			if _, ok := isNodeRecordRequest(q.Request); !ok {
+				return nil, errors.New("semantic queries require a typed project")
+			}
 		}
 	}
 	natives := make([]*ast.Node, len(queries))
 	for i, q := range queries {
 		if ref := requestNode(q.Request); ref != nil {
 			f := s.sourceFile(ref.File)
-			if s.syntaxOnly && !eligible[f] {
+			if s.syntaxOnly && f == nil {
 				return nil, errors.New("foreign syntax service source")
 			}
 			natives[i], err = resolveNode(f, *ref)
@@ -461,15 +604,17 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 			start++
 			continue
 		}
-		if queries[start].Request.operation() == "nodeRecord" {
-			ref := requestNode(queries[start].Request)
-			results[start] = nodeFacts(s.sourceFile(ref.File), natives[start])
+		if r, ok := isNodeRecordRequest(queries[start].Request); ok {
+			results[start] = nodeFacts(s.sourceFile(r.Node.File), natives[start])
 			start++
 			continue
 		}
 		end := start + 1
 		for end < len(queries) {
-			if _, ok := queries[end].Request.(*ProgramRequest); ok || queries[end].Request.operation() == "nodeRecord" {
+			if _, ok := queries[end].Request.(*ProgramRequest); ok {
+				break
+			}
+			if _, ok := isNodeRecordRequest(queries[end].Request); ok {
 				break
 			}
 			end++
@@ -487,9 +632,11 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 		if s.poisoned.Load() {
 			return nil, ErrPoisoned
 		}
-		materializeReferences(p, result)
-		for _, record := range records[i] {
-			materializeReferences(p, record.Fact)
+		if p != nil {
+			materializeReferences(p, result)
+			for _, record := range records[i] {
+				materializeReferences(p, record.Fact)
+			}
 		}
 		if err := ctx.Err(); err != nil {
 			return nil, err

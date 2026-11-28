@@ -655,11 +655,16 @@ func (s *Session) typeFact(t *checker.Type) (*TypeFact, error) {
 		fact.Target = s.typeID(t.Target())
 	}
 	if flags&(checker.TypeFlagsObject|checker.TypeFlagsUnionOrIntersection|checker.TypeFlagsIntrinsic|checker.TypeFlagsBooleanLiteral) != 0 {
-		objectFlags := t.ObjectFlags()
 		fact.ObjectFlags = []string{}
-		for _, flag := range publicObjectFlags {
-			if objectFlags&flag.flag != 0 {
-				fact.ObjectFlags = append(fact.ObjectFlags, flag.name)
+		// Public ObjectFlags bits (including 22..25, which tsgo overloads on
+		// unions/intersections for internal flags such as ContainsIntersections)
+		// are only meaningful on TypeFlagsObject.
+		if flags&checker.TypeFlagsObject != 0 {
+			objectFlags := t.ObjectFlags()
+			for _, flag := range publicObjectFlags {
+				if objectFlags&flag.flag != 0 {
+					fact.ObjectFlags = append(fact.ObjectFlags, flag.name)
+				}
 			}
 		}
 	}
