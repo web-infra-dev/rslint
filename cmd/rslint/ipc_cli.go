@@ -223,6 +223,7 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 		}
 	})
 
+	ch.SetSyncHandler(plugin.HandleSyncTypeServices)
 	ch.Start()
 
 	baseArgs, help, parseFatal := parseLintFlags(args)

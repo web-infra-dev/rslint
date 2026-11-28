@@ -18,6 +18,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { RSLintService } from '../service/service.js';
 import { NodeRslintService } from '../internal/node.js';
+import { openServiceRpc } from '../ipc/rpc-transport.js';
 import { ConfigModuleHost, normalizeConfig } from '../config/config-loader.js';
 import {
   nativePathIdentity,
@@ -136,6 +137,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export class Rslint {
+  readonly #nodeService: NodeRslintService;
   readonly #service: RSLintService;
   readonly #cwd: string;
   readonly #overrideConfig?: RslintConfigEntry | RslintConfig | null;
@@ -156,7 +158,8 @@ export class Rslint {
     this.#overrideConfigFile = options.overrideConfigFile;
     this.#fix = options.fix ?? false;
     this.#virtualFiles = options.virtualFiles;
-    this.#service = new RSLintService(new NodeRslintService());
+    this.#nodeService = new NodeRslintService();
+    this.#service = new RSLintService(this.#nodeService);
   }
 
   /**
@@ -382,6 +385,7 @@ export class Rslint {
             },
             () => this.#closeRequested,
             this.#pluginHosts,
+            () => openServiceRpc(this.#nodeService),
           );
           if (pluginHost) {
             if (this.#closeRequested) {

@@ -45,6 +45,7 @@ import type {
 } from './linter/ecma-language-plugin.js';
 import type { ConfigDescriptor } from './types.js';
 import type { OpenTypeServiceBridge } from './plugin/type-service-protocol.js';
+import type { RpcHostChannel, WorkerRpcDescriptor } from '../native/types.js';
 import {
   HostTypeBridge,
   type WorkerTypeTransport,
@@ -117,6 +118,8 @@ interface WorkerSlot {
   typeSessions: Set<string>;
   /** Persistent synchronous type-service channel owned by this worker. */
   typeBridge?: HostTypeBridge;
+  /** Optional leased shared-memory RPC slot for direct Worker↔Go queries. */
+  rpc?: WorkerRpcDescriptor;
 }
 
 interface PendingTask {
@@ -236,6 +239,39 @@ interface QueuedTask {
   cancelled: boolean;
 }
 
+const workerPoolRpcChannels = new WeakMap<WorkerPool, RpcHostChannel>();
+
+/**
+ * Internal helper that attaches an optional `RpcHostChannel` before `init()`
+ * without altering the public `WorkerPool` / `WorkerPoolOptions` `.d.ts`
+ * contract or bypassing module spies on `new WorkerPool(...)`.
+ */
+export function attachWorkerPoolRpc(
+  pool: WorkerPool,
+  rpcChannel?: RpcHostChannel,
+): void {
+  if (rpcChannel) {
+    workerPoolRpcChannels.set(pool, rpcChannel);
+  }
+}
+
+function getRpcChannel(pool: WorkerPool): RpcHostChannel | undefined {
+  return workerPoolRpcChannels.get(pool);
+}
+
+function abortSlotRpc(pool: WorkerPool, slot: WorkerSlot): void {
+  if (slot.rpc) {
+    getRpcChannel(pool)?.abortSlot(slot.rpc.slot);
+  }
+}
+
+function releaseSlotRpc(pool: WorkerPool, slot: WorkerSlot): void {
+  const rpc = slot.rpc;
+  if (!rpc) return;
+  slot.rpc = undefined;
+  getRpcChannel(pool)?.releaseSlot(rpc.slot);
+}
+
 export class WorkerPool {
   private readonly opts: Required<Omit<WorkerPoolOptions, 'onLog'>> & {
     onLog?: WorkerPoolOptions['onLog'];
@@ -244,7 +280,6 @@ export class WorkerPool {
   private workers: WorkerSlot[] = [];
   private nextTaskId = 1;
   private nextWorkerId = 0;
-  private activeTypedTasks = 0;
   private closed = false;
   private initStarted = false;
   private shutdownPromise?: Promise<void>;
@@ -313,10 +348,6 @@ export class WorkerPool {
     this.cancelPool = new CancelFlagPool();
   }
 
-  get activeTypedTaskCount(): number {
-    return this.activeTypedTasks;
-  }
-
   private allocateTaskId(): number {
     const id = this.nextTaskId;
     // Stay within positive signed 31-bit ints so SAB Int32 cancellation slots
@@ -327,9 +358,11 @@ export class WorkerPool {
 
   private closeSlotTypeBridge(slot: WorkerSlot): void {
     const bridge = slot.typeBridge;
-    if (!bridge) return;
-    slot.typeBridge = undefined;
-    bridge.close();
+    if (bridge) {
+      slot.typeBridge = undefined;
+      bridge.close();
+    }
+    abortSlotRpc(this, slot);
   }
 
   /**
@@ -629,6 +662,7 @@ export class WorkerPool {
         this.cancelPool.cancel(p.cancelSlot);
         p.cancelled = true;
         w.typeBridge?.cancelTask(p.taskId);
+        abortSlotRpc(this, w);
         return true;
       }
     }
@@ -703,7 +737,6 @@ export class WorkerPool {
     for (const w of this.workers) {
       for (const [, p] of w.inflight) {
         clearTimeout(p.timer);
-        if (p.typeSession) this.activeTypedTasks--;
         // Each slot is released here or by its worker's exit listener before
         // inflight.clear() drops the task bookkeeping.
         if (p.typeSession && !w.exited) {
@@ -813,10 +846,12 @@ export class WorkerPool {
    */
   private async spawnWorker(id: number): Promise<WorkerSlot> {
     return new Promise((resolveOk, reject) => {
+      const rpc = getRpcChannel(this)?.acquireSlot();
       const workerOptions: WorkerOptions = {
         workerData: {
           cancelSab: this.cancelPool.sharedBuffer,
           configs: this.opts.configs,
+          ...(rpc ? { rpc } : {}),
         },
         // Capture worker stdout/stderr instead of letting them inherit
         // the parent's. Native console behavior inside plugin code is
@@ -830,17 +865,14 @@ export class WorkerPool {
         stdout: true,
         stderr: true,
       };
-      const worker = new Worker(resolveWorkerFile(), workerOptions);
-      const exited = new Promise<void>((resolve) => {
-        worker.once('exit', () => {
-          this.initializingWorkers.delete(worker);
-          resolve();
-        });
-      });
-      this.initializingWorkers.add(worker);
-      this.workerExits.add(exited);
-      void exited.then(() => this.workerExits.delete(exited));
-
+      let worker: Worker;
+      try {
+        worker = new Worker(resolveWorkerFile(), workerOptions);
+      } catch (err) {
+        if (rpc) getRpcChannel(this)?.releaseSlot(rpc.slot);
+        reject(err instanceof Error ? err : new Error(String(err)));
+        return;
+      }
       const slot: WorkerSlot = {
         id,
         worker,
@@ -850,7 +882,18 @@ export class WorkerPool {
         inflight: new Map(),
         crashCount: 0,
         typeSessions: new Set(),
+        rpc,
       };
+      const exited = new Promise<void>((resolve) => {
+        worker.once('exit', () => {
+          this.initializingWorkers.delete(worker);
+          releaseSlotRpc(this, slot);
+          resolve();
+        });
+      });
+      this.initializingWorkers.add(worker);
+      this.workerExits.add(exited);
+      void exited.then(() => this.workerExits.delete(exited));
 
       // Forward worker stdout / stderr to the host's `onLog`. Plugin
       // code (and any runner-internal `console.*` calls inside the
@@ -1026,7 +1069,6 @@ export class WorkerPool {
         if (!p) return;
         slot.inflight.delete(taskId);
         clearTimeout(p.timer);
-        if (p.typeSession) this.activeTypedTasks--;
         slot.typeBridge?.resetCancelledTask();
         this.cancelPool.release(p.cancelSlot);
         const result = msg.result as LintFileResult;
@@ -1052,12 +1094,12 @@ export class WorkerPool {
       // Reject all in-flight tasks on this worker.
       for (const [, p] of slot.inflight) {
         clearTimeout(p.timer);
-        if (p.typeSession) this.activeTypedTasks--;
         this.cancelPool.release(p.cancelSlot);
         p.reject(new Error(`worker exited with code ${code}`));
       }
       slot.inflight.clear();
       this.closeSlotTypeBridge(slot);
+      releaseSlotRpc(this, slot);
       slot.ready = false;
       slot.exited = true;
 
@@ -1246,15 +1288,23 @@ export class WorkerPool {
     const { task, taskId, cancelSlot, resolve: resolveOk } = q;
 
     const timer = setTimeout(() => {
+      // Signal cooperative cancellation BEFORE closing bridge / aborting SHM
+      // slot, and defer releasing cancelSlot until the worker exits so a live
+      // synchronous worker call never observes a recycled slot.
+      this.cancelPool.cancel(cancelSlot);
       this.closeSlotTypeBridge(slot);
       // Per-task timeout fired: terminate the worker (its exit
       // handler triggers respawn) and fail just this task. Under the
       // queue model each worker has concurrency cap = 1, so there
       // are no sibling inflight tasks on this worker to reject.
-      if (slot.inflight.delete(taskId) && pending.typeSession) {
-        this.activeTypedTasks--;
+      slot.inflight.delete(taskId);
+      if (slot.exited) {
+        this.cancelPool.release(cancelSlot);
+      } else {
+        slot.worker.once('exit', () => {
+          this.cancelPool.release(cancelSlot);
+        });
       }
-      this.cancelPool.release(cancelSlot);
       // Mark the slot not-ready SYNCHRONOUSLY before yielding. The
       // exit handler (which sets ready=false during real cleanup)
       // runs async on the worker's 'exit' event — until that fires,
@@ -1331,7 +1381,6 @@ export class WorkerPool {
       timer,
     };
     slot.inflight.set(taskId, pending);
-    if (pending.typeSession) this.activeTypedTasks++;
 
     // postMessage can throw before the message is dispatched:
     //   - structuredClone failure (unserializable field in `task`)
@@ -1357,9 +1406,7 @@ export class WorkerPool {
         slot.typeSessions.add(pending.typeSession);
     } catch (err) {
       clearTimeout(timer);
-      if (slot.inflight.delete(taskId) && pending.typeSession) {
-        this.activeTypedTasks--;
-      }
+      slot.inflight.delete(taskId);
       this.cancelPool.release(cancelSlot);
       // postMessage throws in TWO distinct scenarios that look the
       // same at this catch site but are very different operationally:

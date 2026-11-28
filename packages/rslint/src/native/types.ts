@@ -42,3 +42,61 @@ export interface MemoryArena {
   release(lease: number): boolean;
   close(): void;
 }
+
+/** Optional bidirectional shared-memory RPC layout advertised by Go. */
+export interface RpcConfiguration {
+  version: number;
+  slotCount: number;
+  slotSize: number;
+  headerSize: number;
+  slotHeaderStride: number;
+}
+
+/** N-API descriptor returned by RpcChannel.configure() for transportRpcOpen. */
+export interface NativeRpcMapping {
+  version: number;
+  fd?: number | null;
+  doorbellFd?: number | null;
+  handle?: string | null;
+  nodeToGoEvent?: string | null;
+  goToNodeEvent?: string | null;
+  processId?: number | null;
+}
+
+export interface RpcSlotLease {
+  slot: number;
+  epoch: number;
+}
+
+export interface RpcChannel {
+  fd(): number | null | undefined;
+  doorbellFd(): number | null | undefined;
+  afterSpawn(): void;
+  configure(
+    config: RpcConfiguration,
+    inheritedFd?: number | null,
+    inheritedDoorbellFd?: number | null,
+    peerPid?: number | null,
+  ): NativeRpcMapping;
+  channelId(): number | null | undefined;
+  close(): void;
+}
+
+/** Plain structured-cloneable descriptor passed to a plugin worker via workerData. */
+export interface WorkerRpcDescriptor {
+  readonly channelId: number;
+  readonly slot: number;
+  readonly epoch: number;
+  readonly slotSize: number;
+}
+
+/**
+ * Dependency-injected RPC slot controller passed from IPC into WorkerPool.
+ * Keeps `dist/eslint-plugin/host.js` completely free of native addon imports.
+ */
+export interface RpcHostChannel {
+  readonly slotSize: number;
+  acquireSlot(): WorkerRpcDescriptor | undefined;
+  abortSlot(slot: number): void;
+  releaseSlot(slot: number): void;
+}

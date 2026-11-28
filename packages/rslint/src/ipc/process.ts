@@ -5,6 +5,7 @@ import {
   createMemoryTransport,
   type MemoryTransport,
 } from './memory-transport.js';
+import { createRpcTransport, type RpcTransport } from './rpc-transport.js';
 
 export interface IpcProcessOptions {
   binPath: string;
@@ -26,6 +27,14 @@ function optionalMemoryTransport(): MemoryTransport | undefined {
   }
 }
 
+function optionalRpcTransport(): RpcTransport | undefined {
+  try {
+    return createRpcTransport();
+  } catch {
+    return undefined;
+  }
+}
+
 export function spawnIpcProcess(options: IpcProcessOptions) {
   const memory =
     options.sharedMemory === false
@@ -33,19 +42,48 @@ export function spawnIpcProcess(options: IpcProcessOptions) {
       : options.createMemoryTransport
         ? options.createMemoryTransport()
         : optionalMemoryTransport();
+  // Only prepare the optional RPC channel when shared memory is active and not
+  // overridden by a custom memory-transport test seam, keeping stdio slots
+  // fixed: fd 3 = MemoryArena, fd 4 = RpcChannel SHM, fd 5 = RpcChannel doorbell.
+  let rpc =
+    memory !== undefined && options.createMemoryTransport === undefined
+      ? optionalRpcTransport()
+      : undefined;
   try {
     const stdio: StdioOptions = ['pipe', 'pipe', 'inherit'];
     const fd = memory?.fd();
     let inheritedMemoryFd: number | undefined;
     if (fd !== undefined) {
-      // Bootstrap reserves the first extra stdio slot; append future handles after it.
+      // Bootstrap reserves stdio[3] for MemoryArena; append RPC handles at 4 and 5.
       inheritedMemoryFd = stdio.length;
       stdio.push(fd);
+    }
+    let inheritedRpcFd: number | undefined;
+    let inheritedRpcDoorbellFd: number | undefined;
+    const rpcFd = rpc?.fd();
+    const rpcDoorbellFd = rpc?.doorbellFd();
+    if (
+      rpcFd !== undefined &&
+      rpcDoorbellFd !== undefined &&
+      inheritedMemoryFd === 3
+    ) {
+      inheritedRpcFd = stdio.length;
+      stdio.push(rpcFd);
+      inheritedRpcDoorbellFd = stdio.length;
+      stdio.push(rpcDoorbellFd);
+    } else if (rpc && (rpcFd !== undefined || rpcDoorbellFd !== undefined)) {
+      // Prepared Unix descriptors could not be placed at fixed slots 4/5:
+      // close immediately so the process does not leak idle FDs.
+      rpc.close();
+      rpc = undefined;
     }
     const child = spawn(options.binPath, options.goArgs, {
       stdio,
       cwd: options.cwd ?? process.cwd(),
     });
+    // Close parent's copy of the child's doorbell socket end immediately so
+    // child death delivers EOF on the parent's reader thread.
+    rpc?.afterSpawn();
     if (!child.stdin || !child.stdout) {
       child.kill();
       throw new Error('IPC process is missing stdin/stdout');
@@ -53,6 +91,10 @@ export function spawnIpcProcess(options: IpcProcessOptions) {
     const client = new IpcClient(child.stdout, child.stdin, {
       memoryTransport: memory,
       inheritedMemoryFd,
+      rpcTransport: rpc,
+      inheritedRpcFd,
+      inheritedRpcDoorbellFd,
+      peerPid: child.pid,
     });
     // These pipes belong to the child until its close event, beyond the IPC
     // client's lifetime. A pending write can emit EPIPE after client.close()
@@ -69,6 +111,7 @@ export function spawnIpcProcess(options: IpcProcessOptions) {
     });
     return { child, client };
   } catch (error) {
+    rpc?.close();
     memory?.close();
     throw error;
   }

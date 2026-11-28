@@ -9,7 +9,11 @@
  * runtime imports limited to worker coordination and protocol conversion;
  * plugin loading, frame decoding, and rule execution belong in `lint-worker.js`.
  */
-import { WorkerPool, type WorkerPoolOptions } from './worker-pool.js';
+import {
+  WorkerPool,
+  attachWorkerPoolRpc,
+  type WorkerPoolOptions,
+} from './worker-pool.js';
 import {
   buildPluginLintTasks,
   buildPluginLintResult,
@@ -17,7 +21,7 @@ import {
   type EslintPluginLintResult,
 } from './plugin/plugin-lint-protocol.js';
 import type { ConfigDescriptor } from './types.js';
-import type { ByteInput } from '../native/types.js';
+import type { ByteInput, RpcHostChannel } from '../native/types.js';
 import { PluginTypeServices } from './type-service-host.js';
 import type { TypeServiceHostTransport } from './plugin/type-service-protocol.js';
 import { resolvePluginAttachments } from './plugin/attachments.js';
@@ -52,15 +56,29 @@ export async function createPluginLintHost(
   onLog?: WorkerPoolOptions['onLog'],
   singleThreaded?: boolean,
 ): Promise<PluginLintHost> {
+  return createPluginLintHostWithRpc(configs, onLog, singleThreaded, undefined);
+}
+
+/**
+ * Internal host factory used by CLI and native API hosts to attach the optional
+ * shared-memory RPC channel. Intentionally not re-exported from the public
+ * `@rslint/core/eslint-plugin` entrypoint so `.d.ts` and editor contracts stay
+ * unchanged.
+ */
+export async function createPluginLintHostWithRpc(
+  configs: ConfigDescriptor[],
+  onLog?: WorkerPoolOptions['onLog'],
+  singleThreaded?: boolean,
+  rpcChannel?: RpcHostChannel,
+): Promise<PluginLintHost> {
   // --singleThreaded caps both warmup and execution at one worker.
   const pool = new WorkerPool({
     configs,
     onLog,
     workerCount: singleThreaded ? 1 : undefined,
   });
-  const types = new PluginTypeServices({
-    shouldCoalesce: () => pool.activeTypedTaskCount > 1,
-  });
+  attachWorkerPoolRpc(pool, rpcChannel);
+  const types = new PluginTypeServices();
   await pool.init();
   return {
     async lint(req, signal, attachments, transport) {

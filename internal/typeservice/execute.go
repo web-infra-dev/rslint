@@ -70,9 +70,14 @@ func directRecordKind(op Operation) Operation {
 }
 
 func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Operation, result Result) ([]Record, error) {
+	records, _, err := s.directRecordsForSlot(ctx, c, op, result, 0)
+	return records, err
+}
+
+func (s *Session) directRecordsForSlot(ctx context.Context, c *checker.Checker, op Operation, result Result, slotBit uint64) ([]Record, []recordCacheKey, error) {
 	kind := directRecordKind(op)
 	if kind == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	var ids []uint32
 	switch value := result.(type) {
@@ -102,7 +107,8 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 			ids = []uint32{value.Type}
 		}
 	}
-	records := []Record{}
+	var records []Record
+	var pending []recordCacheKey
 	seen := make(map[[2]uint32]bool)
 	var add func(Operation, uint32) error
 	add = func(kind Operation, id uint32) error {
@@ -118,8 +124,14 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 			return nil
 		}
 		seen[key] = true
+		cacheKey := recordCacheKey{tag: tag, id: id}
 		if cached, ok := s.getCachedRecord(tag, id); ok {
-			records = append(records, Record{Op: kind, ID: id, packet: cached.packet, cacheable: true})
+			if !s.isSentToSlot(cacheKey, slotBit) {
+				records = append(records, Record{Op: kind, ID: id, packet: cached.packet, cacheable: true})
+				if slotBit != 0 {
+					pending = append(pending, cacheKey)
+				}
+			}
 			for _, symID := range cached.subSymbols {
 				if err := add("symbolRecord", symID); err != nil {
 					return err
@@ -140,12 +152,16 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 		if err != nil {
 			return err
 		}
+		cacheable := s.isCacheableRecord(tag, id)
 		records = append(records, Record{
 			Op:        kind,
 			ID:        id,
 			Fact:      fact,
-			cacheable: s.isCacheableRecord(tag, id),
+			cacheable: cacheable,
 		})
+		if slotBit != 0 && cacheable {
+			pending = append(pending, cacheKey)
+		}
 		for _, symID := range recordSubSymbols(fact) {
 			if err := add("symbolRecord", symID); err != nil {
 				return err
@@ -155,10 +171,10 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 	}
 	for _, id := range ids {
 		if err := add(kind, id); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return records, nil
+	return records, pending, nil
 }
 
 func (s *Session) execute(ctx context.Context, c *checker.Checker, request Request, native *ast.Node) (Result, error) {

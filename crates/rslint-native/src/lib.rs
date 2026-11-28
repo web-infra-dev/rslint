@@ -2,11 +2,15 @@
 mod memory_transport;
 #[cfg(feature = "test-worker-termination")]
 mod reader_worker_test;
+mod rpc_transport;
 pub use memory_transport::read_bytes;
 #[cfg(feature = "test-worker-termination")]
 pub use reader_worker_test::{
     create_worker_termination_fixture, republish_worker_fixture, resume_worker_read,
     wait_for_worker_read, worker_read_bytes,
+};
+pub use rpc_transport::{
+    rpc_abort_slot, rpc_acquire_slot, rpc_call_sync, rpc_release_slot, RpcChannel,
 };
 
 /// A terminated worker may reject N-API conversion with PendingException even

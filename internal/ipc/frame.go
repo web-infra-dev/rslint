@@ -39,6 +39,8 @@ const (
 	KindHandshake MessageKind = "handshake"
 	// KindTransportConfig returns storage settings before mapping bootstrap.
 	KindTransportConfig MessageKind = "transportConfig"
+	// KindTransportRpcOpen lazily activates the bidirectional shared-memory RPC channel.
+	KindTransportRpcOpen MessageKind = "transportRpcOpen"
 	// KindTransportRelease acknowledges storage after a handler already replied.
 	// Its ID identifies that request; it carries no application result.
 	KindTransportRelease MessageKind = "transportRelease"

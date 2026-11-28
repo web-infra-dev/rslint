@@ -15,7 +15,14 @@ import {
   type ProgramView,
   type TypeServiceFile,
 } from '../languages/js/type-service.js';
+import type { TypeServiceQuery } from '../languages/js/type-service-protocol.js';
+import { encodeBinaryTypeQuery } from '../languages/js/type-service-request-codec.js';
 import { TYPESCRIPT_COMPILER_DATA } from '../languages/js/type-service-compiler-data.generated.js';
+import {
+  getNativeBinding,
+  type NativeBinding,
+  type WorkerRpcDescriptor,
+} from '../native/binding.js';
 import {
   BRIDGE_CANCELLED_TASK_IDX,
   BRIDGE_CONTROL_BYTES,
@@ -32,12 +39,20 @@ import {
   type PluginFileTypeServices,
 } from './plugin/type-service-protocol.js';
 
+// Status codes written by crates/rslint-native/src/rpc_transport.rs into statusOut[0].
+const RPC_STATUS_OK = 0;
+const RPC_STATUS_CLOSED = 1;
+const RPC_STATUS_CANCELLED = 2;
+const RPC_STATUS_ERROR = 3;
+const RPC_STATUS_UNAVAILABLE = 5;
+
 type ParserServices = ReturnType<TypeServiceFile['parserServices']>;
 type FileServices = Extract<ParserServices, { program: ProgramView }>;
 interface WorkerSession {
   generation: number;
   program: ProgramView;
   client?: TypeServiceClient;
+  fileIndex?: Map<string, number>;
 }
 interface WorkerBridge {
   port: MessagePort;
@@ -56,7 +71,15 @@ export class WorkerTypeServices {
   private readonly sessions = new Map<string, WorkerSession>();
   private bridge?: WorkerBridge;
   private active?: ActiveFile;
-  constructor(private readonly parent: MessagePort) {}
+  private rpcReqBuf?: Uint8Array;
+  private readonly rpcStatusOut = new Int32Array(1);
+  private readonly zeroCancelFlag = new Int32Array(1);
+  private rpcCallSync?: NativeBinding['rpcCallSync'];
+  private rpcDisabled = false;
+  constructor(
+    private readonly parent: MessagePort,
+    private readonly rpc?: WorkerRpcDescriptor,
+  ) {}
 
   private ensureBridge(): WorkerBridge {
     if (this.bridge) return this.bridge;
@@ -206,6 +229,127 @@ export class WorkerTypeServices {
     return session;
   }
 
+  private getRpcCallSync(): NativeBinding['rpcCallSync'] | undefined {
+    if (this.rpcDisabled || !this.rpc) return undefined;
+    if (this.rpcCallSync) return this.rpcCallSync;
+    try {
+      const fn = getNativeBinding().rpcCallSync;
+      if (typeof fn !== 'function') {
+        this.rpcDisabled = true;
+        return undefined;
+      }
+      this.rpcCallSync = fn;
+      return fn;
+    } catch {
+      this.rpcDisabled = true;
+      return undefined;
+    }
+  }
+
+  /**
+   * Direct binary shared-memory fast path for semantic checker queries.
+   * Preserves exact active-lease, cancellation, `syntaxOnly`, and error
+   * semantics, transparently falling back to `HostTypeBridge` when the query
+   * is excluded (`ProgramRequest`, `suggestionDiagnostics`), exceeds slot
+   * capacity, or the SHM channel is unavailable.
+   */
+  private queryPacket(
+    session: string,
+    generation: number,
+    owner: WorkerSession,
+    query: TypeServiceQuery,
+  ): Uint8Array {
+    const active = this.active;
+    if (
+      !active ||
+      active.input.session !== session ||
+      active.input.binding.generation !== generation
+    ) {
+      throw new Error('type services have no active file lease');
+    }
+    checkFrameCancellation(active.cancelFlag);
+
+    const rpc = this.rpc;
+    if (
+      !active.input.syntaxOnly &&
+      rpc &&
+      !this.rpcDisabled &&
+      owner.fileIndex
+    ) {
+      const callSync = this.getRpcCallSync();
+      if (callSync) {
+        if (this.bridge) {
+          this.checkBridgeCancel(active, this.bridge.control);
+        }
+        this.rpcReqBuf ??= new Uint8Array(rpc.slotSize);
+        const reqLen = encodeBinaryTypeQuery(
+          this.rpcReqBuf,
+          session,
+          query,
+          owner.fileIndex,
+        );
+        if (reqLen > 0) {
+          const replyBuf = callSync(
+            rpc.channelId,
+            rpc.slot,
+            rpc.epoch,
+            this.rpcReqBuf,
+            reqLen,
+            active.cancelFlag ?? this.zeroCancelFlag,
+            this.rpcStatusOut,
+          );
+          const status = this.rpcStatusOut[0];
+          if (status === RPC_STATUS_CLOSED) {
+            this.retire([session]);
+          }
+          // Check task/bridge cancellation unconditionally before surfacing
+          // RPC_STATUS_CLOSED or RPC_STATUS_ERROR so retired/cancelled tasks
+          // always throw FrameCancelled rather than parseError.
+          if (this.bridge) {
+            this.checkBridgeCancel(active, this.bridge.control);
+          } else {
+            checkFrameCancellation(active.cancelFlag);
+          }
+          if (status === RPC_STATUS_OK) {
+            if (!replyBuf) {
+              throw new Error('incomplete type service query reply');
+            }
+            return replyBuf;
+          }
+          if (status === RPC_STATUS_CLOSED) {
+            const error = new Error('type service session is stale or closed');
+            error.name = 'TypeServiceClosedError';
+            throw error;
+          }
+          if (status === RPC_STATUS_CANCELLED) {
+            throw new FrameCancelled();
+          }
+          if (status === RPC_STATUS_ERROR) {
+            const message =
+              replyBuf && replyBuf.byteLength > 0
+                ? replyBuf.toString('utf8')
+                : 'type service query failed';
+            throw new Error(message);
+          }
+          if (status === RPC_STATUS_UNAVAILABLE) {
+            this.rpcDisabled = true;
+          }
+          // RPC_STATUS_FALLBACK / RPC_STATUS_UNAVAILABLE: transparently fall back.
+        }
+      }
+    }
+
+    const answer = this.call({
+      session,
+      generation,
+      queries: [query],
+    });
+    if (answer.packets?.length !== 1) {
+      throw new Error('incomplete type service query reply');
+    }
+    return answer.packets[0];
+  }
+
   private load(
     id: string,
     owner: WorkerSession,
@@ -224,19 +368,16 @@ export class WorkerTypeServices {
     if (!owner.client) {
       if (!reply.descriptor) throw new Error('missing type service descriptor');
       checkFrameCancellation(this.active?.cancelFlag);
+      const fileIndex = new Map<string, number>();
+      const sources = reply.descriptor.sources;
+      for (let i = 0; i < sources.length; i++) {
+        fileIndex.set(sources[i].fileName, i);
+      }
+      owner.fileIndex = fileIndex;
       owner.client = new TypeServiceClient(
         TYPESCRIPT_COMPILER_DATA,
         reply.descriptor,
-        (query) => {
-          const answer = this.call({
-            session: id,
-            generation,
-            queries: [query],
-          });
-          if (answer.packets?.length !== 1)
-            throw new Error('incomplete type service query reply');
-          return answer.packets[0];
-        },
+        (query) => this.queryPacket(id, generation, owner, query),
         (scope, file, metadataOnly) =>
           this.call({
             session: id,

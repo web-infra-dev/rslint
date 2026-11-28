@@ -37,6 +37,7 @@ import {
 import { viewForSlot } from './cancel-flag.js';
 import type { ConfigDescriptor } from './types.js';
 import type { WorkerTypeServices } from './type-service-worker.js';
+import type { WorkerRpcDescriptor } from '../native/types.js';
 import {
   FrameCancelled,
   checkFrameCancellation,
@@ -54,6 +55,8 @@ interface WorkerInitData {
    * pick the right `LoadedPlugins` per task.
    */
   configs: ConfigDescriptor[];
+  /** Optional leased shared-memory RPC slot for direct Worker↔Go type queries. */
+  rpc?: WorkerRpcDescriptor;
 }
 
 // ─── Messages ──────────────────────────────────────────────────────────
@@ -232,7 +235,7 @@ async function handleInboundMessage(msg: InboundMessage): Promise<void> {
             await import('./type-service-worker.js');
           checkFrameCancellation(cancelFlag);
           if (closing) throw new FrameCancelled();
-          typeServices = new WorkerTypeServices(parentPort!);
+          typeServices = new WorkerTypeServices(parentPort!, data.rpc);
         }
         checkFrameCancellation(cancelFlag);
         if (closing) throw new FrameCancelled();

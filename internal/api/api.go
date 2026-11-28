@@ -275,6 +275,12 @@ type PluginTypeServiceHandler interface {
 	HandlePluginTypeServices(ctx context.Context, msg *ipc.Message) (any, error)
 }
 
+// SyncPluginTypeServiceHandler enables the optional direct shared-memory RPC
+// fast path for plugin type queries in `--api` mode.
+type SyncPluginTypeServiceHandler interface {
+	HandleSyncPluginTypeServices(ctx context.Context, reqs []ipc.SyncRequest, reply ipc.SyncReplyFunc)
+}
+
 // Service manages bidirectional IPC communication for `--api` mode. Framing,
 // request multiplexing, and the continuously running read loop are delegated
 // to internal/ipc.Channel.
@@ -303,6 +309,9 @@ func NewService(reader io.Reader, writer io.Writer, handler Handler) *Service {
 	}
 	s.channel = ipc.NewChannel(s.reader, writer)
 	s.channel.SetInboundHandler(s.handleInbound)
+	if syncHandler, ok := handler.(SyncPluginTypeServiceHandler); ok {
+		s.channel.SetSyncHandler(syncHandler.HandleSyncPluginTypeServices)
+	}
 	return s
 }
 

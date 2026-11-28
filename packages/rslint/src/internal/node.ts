@@ -2,6 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { Socket } from 'node:net';
 import { RSLintService } from '../service/service.js';
 import { spawnIpcProcess, type IpcClient } from '../ipc/index.js';
+import { registerServiceRpcOpener } from '../ipc/rpc-transport.js';
 
 export { readAttachmentBytes } from '../ipc/memory-transport.js';
 export type { ByteInput } from '../native/types.js';
@@ -77,6 +78,17 @@ export class NodeRslintService implements RslintServiceInterface {
     // A resident service must not keep a one-shot Node script alive merely
     // because the caller omitted close(). Active requests re-reference it.
     this.updateLoopActivity();
+    registerServiceRpcOpener(this, async () => {
+      if (this.dead) return undefined;
+      this.activeRequests++;
+      this.updateLoopActivity();
+      try {
+        return await this.client.ensureRpcOpen();
+      } finally {
+        this.activeRequests--;
+        this.updateLoopActivity();
+      }
+    });
   }
 
   private setLoopActive(active: boolean): void {

@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MessageChannel } from 'node:worker_threads';
 import { describe, expect, test } from 'rstack/test';
 import ts from 'typescript';
 import { TYPESCRIPT_COMPILER_DATA } from '../src/languages/js/type-service-compiler-data.generated.js';
+import { encodeBinaryTypeQuery } from '../src/languages/js/type-service-request-codec.js';
 import { PluginTypeServices } from '../src/eslint-plugin/type-service-host.js';
 import { resolveTypeServiceReply } from '../src/internal/plugin-type-service.js';
 import type {
@@ -490,311 +490,7 @@ describe('PluginTypeServices', () => {
     host.close();
   });
 
-  test('coalesces concurrent MessagePort queries into one batch and deduplicates cacheable in-flight entries only', async () => {
-    const host = new PluginTypeServices();
-    const ac = new AbortController();
-    const batches: TypeServiceHostRequest['queries'][] = [];
-    let nextId = 1;
-    const transport = async (
-      req: TypeServiceHostRequest,
-    ): Promise<TypeServiceHostResponse> => {
-      if (req.open) return { descriptor };
-      batches.push(req.queries);
-      return {
-        packets: req.queries!.map(
-          (q) => new Uint8Array([nextId++, q.op.length]),
-        ),
-      };
-    };
-
-    await host.query(
-      { session: 'coal-1', generation: 1, open: true },
-      ac.signal,
-      transport,
-    );
-
-    // Send 4 concurrent queries across distinct MessagePorts (simulating workers):
-    // - 2 identical cacheable typeRecord(7) queries -> deduplicated to 1
-    // - 2 identical non-cacheable type queries -> MUST NOT be collapsed (both sent)
-    const channels = [
-      new MessageChannel(),
-      new MessageChannel(),
-      new MessageChannel(),
-      new MessageChannel(),
-    ];
-    try {
-      const results = await new Promise<Uint8Array[]>((resolve, reject) => {
-        const out = new Array<Uint8Array>(4);
-        let done = 0;
-        channels.forEach((ch, idx) => {
-          ch.port1.on('message', (req: TypeServiceHostRequest) => {
-            void host
-              .query(req, ac.signal, transport)
-              .then((res) => {
-                out[idx] = res.packets![0];
-                if (++done === 4) resolve(out);
-              })
-              .catch(reject);
-          });
-        });
-        channels[0].port2.postMessage({
-          session: 'coal-1',
-          generation: 1,
-          queries: [{ generation: 1, op: 'typeRecord', args: { id: 7 } }],
-        });
-        channels[1].port2.postMessage({
-          session: 'coal-1',
-          generation: 1,
-          queries: [{ generation: 1, op: 'typeRecord', args: { id: 7 } }],
-        });
-        channels[2].port2.postMessage({
-          session: 'coal-1',
-          generation: 1,
-          queries: [
-            {
-              generation: 1,
-              op: 'type',
-              args: { node: { file: '/repo/a.ts', index: 1 } },
-            },
-          ],
-        });
-        channels[3].port2.postMessage({
-          session: 'coal-1',
-          generation: 1,
-          queries: [
-            {
-              generation: 1,
-              op: 'type',
-              args: { node: { file: '/repo/a.ts', index: 1 } },
-            },
-          ],
-        });
-      });
-
-      expect(batches).toHaveLength(1);
-      expect(batches[0]).toHaveLength(3);
-      // Both cacheable in-flight callers receive the exact same packet.
-      expect(results[0]).toEqual(results[1]);
-      // Non-cacheable callers received distinct replies (not collapsed).
-      expect(results[2]).not.toEqual(results[3]);
-    } finally {
-      for (const ch of channels) {
-        ch.port1.close();
-        ch.port2.close();
-      }
-      host.close();
-    }
-  });
-
-  test('isolates partial caller aborts and cancels pending or in-flight batches when all waiters abort', async () => {
-    const host = new PluginTypeServices();
-    const openAc = new AbortController();
-    let batchSignals: AbortSignal[] = [];
-    let batchLengths: number[] = [];
-    let resolveInFlight!: (res: TypeServiceHostResponse) => void;
-    let transportCalls = 0;
-
-    const transport = async (
-      req: TypeServiceHostRequest,
-      signal?: AbortSignal,
-    ): Promise<TypeServiceHostResponse> => {
-      if (req.open) return { descriptor };
-      transportCalls++;
-      if (signal) batchSignals.push(signal);
-      batchLengths.push(req.queries!.length);
-      if (transportCalls === 1) {
-        return {
-          packets: req.queries!.map((_, idx) => new Uint8Array([10 + idx])),
-        };
-      }
-      return new Promise((resolve) => {
-        resolveInFlight = resolve;
-      });
-    };
-
-    await host.query(
-      { session: 'abort-coal', generation: 1, open: true },
-      openAc.signal,
-      transport,
-    );
-
-    // Case 1: Sole waiter aborts before setImmediate flushes -> transport not called.
-    const soleAc = new AbortController();
-    const solePromise = host.query(
-      {
-        session: 'abort-coal',
-        generation: 1,
-        queries: [{ generation: 1, op: 'typeRecord', args: { id: 1 } }],
-      },
-      soleAc.signal,
-      transport,
-    );
-    soleAc.abort();
-    await expect(solePromise).rejects.toMatchObject({ name: 'AbortError' });
-    await new Promise((r) => setImmediate(r));
-    expect(transportCalls).toBe(0);
-
-    // Case 2: Caller A aborts before flush, Caller B stays live -> batch sends only B.
-    const acA = new AbortController();
-    const acB = new AbortController();
-    const pA = host.query(
-      {
-        session: 'abort-coal',
-        generation: 1,
-        queries: [{ generation: 1, op: 'typeRecord', args: { id: 2 } }],
-      },
-      acA.signal,
-      transport,
-    );
-    const pB = host.query(
-      {
-        session: 'abort-coal',
-        generation: 1,
-        queries: [{ generation: 1, op: 'typeRecord', args: { id: 3 } }],
-      },
-      acB.signal,
-      transport,
-    );
-    acA.abort();
-    await expect(pA).rejects.toMatchObject({ name: 'AbortError' });
-    const resB = await pB;
-    expect(resB.packets).toEqual([new Uint8Array([10])]);
-    expect(transportCalls).toBe(1);
-    expect(batchLengths).toEqual([1]);
-
-    // Case 3: In-flight shared batch only aborts underlying transport when ALL waiters abort.
-    const acC = new AbortController();
-    const acD = new AbortController();
-    const pC = host.query(
-      {
-        session: 'abort-coal',
-        generation: 1,
-        queries: [{ generation: 1, op: 'typeRecord', args: { id: 4 } }],
-      },
-      acC.signal,
-      transport,
-    );
-    const pD = host.query(
-      {
-        session: 'abort-coal',
-        generation: 1,
-        queries: [{ generation: 1, op: 'typeRecord', args: { id: 5 } }],
-      },
-      acD.signal,
-      transport,
-    );
-    await new Promise((r) => setImmediate(r));
-    expect(transportCalls).toBe(2);
-    acC.abort();
-    await expect(pC).rejects.toMatchObject({ name: 'AbortError' });
-    expect(batchSignals[1].aborted).toBe(false);
-    acD.abort();
-    await expect(pD).rejects.toMatchObject({ name: 'AbortError' });
-    expect(batchSignals[1].aborted).toBe(true);
-    resolveInFlight({ packets: [] });
-    host.close();
-  });
-
-  test('isolates per-query errors across coalesced callers via single-entry replay', async () => {
-    const host = new PluginTypeServices();
-    const ac = new AbortController();
-    let calls = 0;
-    const transport = async (
-      req: TypeServiceHostRequest,
-    ): Promise<TypeServiceHostResponse> => {
-      if (req.open) return { descriptor };
-      calls++;
-      if (req.queries!.some((q) => (q.args as { id?: number }).id === 999)) {
-        throw new Error('invalid type handle');
-      }
-      return {
-        packets: req.queries!.map(
-          (q) => new Uint8Array([(q.args as { id: number }).id]),
-        ),
-      };
-    };
-
-    await host.query(
-      { session: 'replay-1', generation: 1, open: true },
-      ac.signal,
-      transport,
-    );
-
-    const [bad, good] = await Promise.allSettled([
-      host.query(
-        {
-          session: 'replay-1',
-          generation: 1,
-          queries: [{ generation: 1, op: 'typeRecord', args: { id: 999 } }],
-        },
-        ac.signal,
-        transport,
-      ),
-      host.query(
-        {
-          session: 'replay-1',
-          generation: 1,
-          queries: [{ generation: 1, op: 'typeRecord', args: { id: 42 } }],
-        },
-        ac.signal,
-        transport,
-      ),
-    ]);
-
-    expect(bad.status).toBe('rejected');
-    expect(good.status).toBe('fulfilled');
-    if (good.status === 'fulfilled') {
-      expect(good.value.packets).toEqual([new Uint8Array([42])]);
-    }
-    // 1 coalesced batch + 2 isolated single-entry replays.
-    expect(calls).toBe(3);
-    host.close();
-  });
-
-  test('flushes cleanly at the 256-query coalescing cap without dropping the boundary entry', async () => {
-    const host = new PluginTypeServices();
-    const ac = new AbortController();
-    const batchSizes: number[] = [];
-    const transport = async (
-      req: TypeServiceHostRequest,
-    ): Promise<TypeServiceHostResponse> => {
-      if (req.open) return { descriptor };
-      batchSizes.push(req.queries!.length);
-      return {
-        packets: req.queries!.map(
-          (q) => new Uint8Array([(q.args as { id: number }).id & 0xff]),
-        ),
-      };
-    };
-
-    await host.query(
-      { session: 'cap-256', generation: 1, open: true },
-      ac.signal,
-      transport,
-    );
-
-    const replies = await Promise.all(
-      Array.from({ length: 256 }, (_, idx) =>
-        host.query(
-          {
-            session: 'cap-256',
-            generation: 1,
-            queries: [
-              { generation: 1, op: 'typeRecord', args: { id: idx + 1 } },
-            ],
-          },
-          ac.signal,
-          transport,
-        ),
-      ),
-    );
-    expect(batchSizes).toEqual([256]);
-    expect(replies).toHaveLength(256);
-    expect(replies[255].packets).toEqual([new Uint8Array([0])]);
-    host.close();
-  });
-
-  test('refreshes LRU recency on cache reads and distinguishes retire() vs close() errors on pending batches', async () => {
+  test('refreshes LRU recency on cache reads and distinguishes retire() vs close() errors on in-flight queries', async () => {
     const host = new PluginTypeServices();
     const ac = new AbortController();
     let calls = 0;
@@ -884,7 +580,15 @@ describe('PluginTypeServices', () => {
     );
     expect(calls).toBe(4);
 
-    // retire() on a pending (queued) coalesced query rejects with AbortError.
+    // retire() on an in-flight query rejects with AbortError.
+    const hangingTransport = async (
+      req: TypeServiceHostRequest,
+    ): Promise<TypeServiceHostResponse> => {
+      if (req.open) return { descriptor };
+      return new Promise(() => {
+        /* stays pending until retire/close */
+      });
+    };
     const pendingRetire = host.query(
       {
         session: 'lru-1',
@@ -892,16 +596,16 @@ describe('PluginTypeServices', () => {
         queries: [{ generation: 1, op: 'typeRecord', args: { id: 99 } }],
       },
       ac.signal,
-      transport,
+      hangingTransport,
     );
     host.retire(['lru-1']);
     await expect(pendingRetire).rejects.toMatchObject({ name: 'AbortError' });
 
-    // close() on a pending (queued) coalesced query rejects with TypeServiceClosedError.
+    // close() on an in-flight query rejects with TypeServiceClosedError.
     await host.query(
       { session: 'lru-2', generation: 1, open: true },
       ac.signal,
-      transport,
+      hangingTransport,
     );
     const pendingClose = host.query(
       {
@@ -910,7 +614,7 @@ describe('PluginTypeServices', () => {
         queries: [{ generation: 1, op: 'typeRecord', args: { id: 100 } }],
       },
       ac.signal,
-      transport,
+      hangingTransport,
     );
     host.close();
     await expect(pendingClose).rejects.toMatchObject({
@@ -918,8 +622,8 @@ describe('PluginTypeServices', () => {
     });
   });
 
-  test('respects Go non-cacheable RTS5 bit-31 flag, detaches base64 slabs, preserves close() precedence, and aborts direct bypass queries', async () => {
-    const host = new PluginTypeServices({ shouldCoalesce: () => false });
+  test('respects Go non-cacheable RTS5 bit-31 flag, detaches base64 slabs, preserves close() precedence, and aborts in-flight queries', async () => {
+    const host = new PluginTypeServices();
     const ac = new AbortController();
 
     // Build an RTS5 packet with bit 31 set (non-cacheable mutable symbolRecord).
@@ -1070,5 +774,110 @@ describe('resolveTypeServiceReply', () => {
         attachments: ['not-binary'],
       }),
     ).toThrow(/not binary/);
+  });
+});
+
+describe('encodeBinaryTypeQuery', () => {
+  test('encodes compact binary shapes, UTF-16 lone surrogates, tokens, optional flags, and excludes ProgramRequest/suggestionDiagnostics', () => {
+    const dst = new Uint8Array(4096);
+    const files = new Map<string, number>([['/repo/a.ts', 2]]);
+
+    // Excluded ops return 0 so callers fall back to HostTypeBridge.
+    expect(
+      encodeBinaryTypeQuery(
+        dst,
+        'demo',
+        { generation: 1, op: 'rootFileNames', args: {} },
+        files,
+      ),
+    ).toBe(0);
+    expect(
+      encodeBinaryTypeQuery(
+        dst,
+        'demo',
+        {
+          generation: 1,
+          op: 'suggestionDiagnostics',
+          args: { node: { file: '/repo/a.ts', index: 1 } },
+        },
+        files,
+      ),
+    ).toBe(0);
+
+    // Compact NodeRequest with indexed file + token + skipRecords.
+    const n1 = encodeBinaryTypeQuery(
+      dst,
+      'demo-1',
+      {
+        generation: 7,
+        op: 'type',
+        skipRecords: true,
+        args: {
+          node: {
+            file: '/repo/a.ts',
+            index: 42,
+            token: { kind: 80, pos: 10, end: 15 },
+          },
+        },
+      },
+      files,
+    );
+    expect(n1).toBe(2 + 6 + 4 + 1 + 1 + 4 + 4 + 1 + 12);
+    const view = new DataView(dst.buffer);
+    expect(view.getUint16(0, true)).toBe(6);
+    expect(view.getUint32(8, true)).toBe(7);
+    expect(dst[12]).toBe(1); // skipRecords
+    expect(dst[13]).toBe(20); // op 'type'
+    expect(view.getUint32(14, true)).toBe(2); // fileIdx
+    expect(view.getUint32(18, true)).toBe(42);
+    expect(dst[22]).toBe(1); // hasToken
+
+    // PropertyRequest with lone UTF-16 surrogate uses UTF-16 flag (bit 31).
+    const n2 = encodeBinaryTypeQuery(
+      dst,
+      's',
+      {
+        generation: 1,
+        op: 'property',
+        args: { id: 9, name: [0x61, 0xd800, 0x62] },
+      },
+      files,
+    );
+    expect(n2).toBe(2 + 1 + 4 + 1 + 1 + 4 + 4 + 6);
+    expect(view.getUint32(13, true)).toBe(0x8000_0003);
+    expect(view.getUint16(19, true)).toBe(0xd800);
+
+    // PrintRequest distinguishes undefined flags vs explicit flags: 0.
+    const nNil = encodeBinaryTypeQuery(
+      dst,
+      's',
+      {
+        generation: 1,
+        op: 'typeString',
+        args: { id: 5, node: undefined, flags: undefined },
+      },
+      files,
+    );
+    const nZero = encodeBinaryTypeQuery(
+      dst,
+      's',
+      {
+        generation: 1,
+        op: 'typeString',
+        args: { id: 5, node: undefined, flags: 0 },
+      },
+      files,
+    );
+    expect(nZero).toBe(nNil + 4);
+
+    // Tiny buffer overflow cleanly returns 0 without throwing.
+    expect(
+      encodeBinaryTypeQuery(
+        new Uint8Array(8),
+        'demo-1',
+        { generation: 1, op: 'void', args: {} },
+        files,
+      ),
+    ).toBe(0);
   });
 });

@@ -19,7 +19,12 @@
 import { createRequire } from 'node:module';
 
 import { platformPackageName } from './platform-tuple.js';
-import type { MemoryArena, SharedBytes } from './types.js';
+import type {
+  MemoryArena,
+  RpcChannel,
+  RpcSlotLease,
+  SharedBytes,
+} from './types.js';
 
 export type {
   ByteInput,
@@ -27,7 +32,13 @@ export type {
   MemoryBatch,
   MemoryConfiguration,
   NativeMemoryMapping,
+  NativeRpcMapping,
+  RpcChannel,
+  RpcConfiguration,
+  RpcHostChannel,
+  RpcSlotLease,
   SharedBytes,
+  WorkerRpcDescriptor,
 } from './types.js';
 
 const require = createRequire(import.meta.url);
@@ -35,6 +46,19 @@ const require = createRequire(import.meta.url);
 export interface NativeBinding {
   MemoryArena: new () => MemoryArena;
   readBytes(bytes: SharedBytes): Buffer;
+  RpcChannel?: new () => RpcChannel;
+  rpcAcquireSlot?(channelId: number): RpcSlotLease | null | undefined;
+  rpcReleaseSlot?(channelId: number, slot: number): void;
+  rpcAbortSlot?(channelId: number, slot: number): void;
+  rpcCallSync?(
+    channelId: number,
+    slot: number,
+    workerEpoch: number,
+    reqBuf: Uint8Array,
+    reqLen: number,
+    cancelFlag: Int32Array,
+    statusOut: Int32Array,
+  ): Buffer | null;
 }
 
 let binding: NativeBinding | undefined;

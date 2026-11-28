@@ -2,7 +2,6 @@ import {
   DIRECT_RECORD_OPS,
   isCacheableTypeQuery,
   typeQueryKey,
-  type Operation,
   type TypeServiceDescriptor,
   type TypeServiceQuery,
 } from '../languages/js/type-service-protocol.js';
@@ -21,65 +20,11 @@ import type {
 
 const MAX_SESSION_CACHE_BYTES = 8 << 20;
 const MAX_HOST_CACHE_BYTES = 32 << 20;
-const MAX_COALESCED_QUERIES = 256;
-
-// Program-wide / diagnostic queries can take hundreds of milliseconds and may
-// acquire multiple checker shards; keep them isolated from fast checker batches.
-const DIRECT_BYPASS_OPS: ReadonlySet<Operation> = new Set<Operation>([
-  'rootFileNames',
-  'configFileParsingDiagnostics',
-  'optionsDiagnostics',
-  'globalDiagnostics',
-  'syntacticDiagnostics',
-  'semanticDiagnostics',
-  'declarationDiagnostics',
-  'suggestionDiagnostics',
-]);
-
-export interface PluginTypeServicesOptions {
-  /**
-   * Returns whether query calls should defer to `setImmediate` for cross-worker
-   * `QueryBatch` coalescing. Defaults to always true; `PluginLintHost` disables
-   * coalescing automatically whenever at most one typed worker task is active.
-   */
-  shouldCoalesce?: () => boolean;
-}
-
-interface FlushedBatch {
-  readonly abort: AbortController;
-  liveEntries: number;
-}
-
-interface PendingBatch {
-  readonly sessionId: string;
-  readonly generation: number;
-  readonly owner: Session;
-  readonly active: ActiveSession;
-  readonly transport: TypeServiceHostTransport;
-  readonly entries: SharedQueryEntry[];
-  timer: NodeJS.Immediate | undefined;
-  flushed: boolean;
-}
-
-interface SharedQueryEntry {
-  readonly query: TypeServiceQuery;
-  readonly key: string | undefined;
-  readonly promise: Promise<Uint8Array>;
-  resolve: (packet: Uint8Array) => void;
-  reject: (error: unknown) => void;
-  waiters: number;
-  settled: boolean;
-  pendingBatch?: PendingBatch;
-  flushedBatch?: FlushedBatch;
-}
 
 interface ActiveSession {
   descriptor: TypeServiceDescriptor;
   cache: Map<string, Uint8Array>;
   cacheBytes: number;
-  currentBatch?: PendingBatch;
-  pendingBatches: Set<PendingBatch>;
-  inflight: Map<string, SharedQueryEntry>;
 }
 
 interface Session {
@@ -122,26 +67,6 @@ function signalError(signal: AbortSignal): Error {
     : abortError();
 }
 
-function isSessionFatalBatchError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  if (error.name === 'TypeServiceClosedError' || error.name === 'AbortError') {
-    return true;
-  }
-  const msg = error.message;
-  return (
-    msg.startsWith('type service: ') ||
-    msg.includes('unusable after an internal panic') ||
-    msg.includes('type service checker identity changed') ||
-    msg.includes('program cannot provide type services') ||
-    msg.includes('incomplete type service batch reply') ||
-    msg.includes('stale or foreign type service handle') ||
-    msg.startsWith('IpcClient:') ||
-    msg.includes('rslint service is no longer running') ||
-    msg.includes('rslint process exited') ||
-    msg.includes('rslint service has no active plugin type session')
-  );
-}
-
 async function awaitWithSignal<T>(
   promise: Promise<T>,
   signal: AbortSignal,
@@ -179,18 +104,15 @@ function extractProjection(
     : undefined;
 }
 
-/** The host owns immutable facts once per real connection/Program session.
- * Bounded LRU main-thread caching and setImmediate QueryBatch coalescing share
- * work across workers and retire cleanly when Go ends the semantic lease. */
+/**
+ * The host owns session opening and a bounded LRU cache of immutable facts for
+ * JSON-RPC / fallback paths (LSP, syntax-only, program diagnostics, and non-SHM
+ * environments) and retires cleanly when Go ends the semantic lease.
+ */
 export class PluginTypeServices {
   private readonly sessions = new Map<string, Session>();
-  private readonly shouldCoalesce: () => boolean;
   private retainedBytes = 0;
   private closed = false;
-
-  constructor(options?: PluginTypeServicesOptions) {
-    this.shouldCoalesce = options?.shouldCoalesce ?? (() => true);
-  }
 
   private assertActive(
     sessionId: string,
@@ -395,8 +317,6 @@ export class PluginTypeServices {
             descriptor: result.descriptor,
             cache: new Map(),
             cacheBytes: 0,
-            pendingBatches: new Set(),
-            inflight: new Map(),
           };
           owner.active = active;
           return active;
@@ -439,222 +359,7 @@ export class PluginTypeServices {
     }
   }
 
-  private removeFromInflight(
-    active: ActiveSession,
-    entry: SharedQueryEntry,
-  ): void {
-    if (entry.key === undefined) return;
-    if (active.inflight.get(entry.key) === entry) {
-      active.inflight.delete(entry.key);
-    }
-  }
-
-  private enqueueEntry(
-    sessionId: string,
-    generation: number,
-    owner: Session,
-    active: ActiveSession,
-    transport: TypeServiceHostTransport,
-    entry: SharedQueryEntry,
-  ): void {
-    let batch = active.currentBatch;
-    if (!batch) {
-      batch = {
-        sessionId,
-        generation,
-        owner,
-        active,
-        transport,
-        entries: [],
-        timer: undefined,
-        flushed: false,
-      };
-      active.currentBatch = batch;
-      active.pendingBatches.add(batch);
-      const scheduled = batch;
-      // Use setImmediate (libuv check phase) so all ready MessagePort requests
-      // delivered during the current poll phase coalesce into one QueryBatch.
-      scheduled.timer = setImmediate(() => {
-        this.flushBatch(scheduled);
-      });
-    }
-    entry.pendingBatch = batch;
-    batch.entries.push(entry);
-    if (batch.entries.length >= MAX_COALESCED_QUERIES) {
-      if (batch.timer !== undefined) {
-        clearImmediate(batch.timer);
-        batch.timer = undefined;
-      }
-      if (active.currentBatch === batch) {
-        active.currentBatch = undefined;
-      }
-      // Flush on a microtask instead of synchronously inside the caller's loop
-      // so a transport callback cannot re-enter retire/close mid-enqueue.
-      const full = batch;
-      queueMicrotask(() => {
-        this.flushBatch(full);
-      });
-    }
-  }
-
-  private flushBatch(batch: PendingBatch): void {
-    if (batch.flushed) return;
-    batch.flushed = true;
-    if (batch.timer !== undefined) {
-      clearImmediate(batch.timer);
-      batch.timer = undefined;
-    }
-    const { sessionId, generation, owner, active, transport } = batch;
-    active.pendingBatches.delete(batch);
-    if (active.currentBatch === batch) {
-      active.currentBatch = undefined;
-    }
-    const live: SharedQueryEntry[] = [];
-    for (const entry of batch.entries) {
-      entry.pendingBatch = undefined;
-      if (!entry.settled && entry.waiters > 0) {
-        live.push(entry);
-      }
-    }
-    if (live.length === 0) return;
-    if (this.closed || this.sessions.get(sessionId) !== owner) {
-      const err = this.closed
-        ? closedError()
-        : abortError('type service request cancelled or retired');
-      for (const entry of live) {
-        this.removeFromInflight(active, entry);
-        entry.settled = true;
-        entry.reject(err);
-      }
-      return;
-    }
-
-    const batchAbort = new AbortController();
-    owner.activeAborts.add(batchAbort);
-    const flushed: FlushedBatch = {
-      abort: batchAbort,
-      liveEntries: live.length,
-    };
-    for (const entry of live) {
-      entry.flushedBatch = flushed;
-    }
-
-    void (async () => {
-      let packets: Uint8Array[];
-      try {
-        const result = await this.send(
-          sessionId,
-          owner,
-          false,
-          {
-            session: sessionId,
-            generation,
-            queries: live.map((entry) => entry.query),
-          },
-          transport,
-          batchAbort.signal,
-        );
-        if (result.packets?.length !== live.length) {
-          throw new Error('incomplete type service batch reply');
-        }
-        packets = result.packets.map(bytes);
-      } catch (error) {
-        owner.activeAborts.delete(batchAbort);
-        const shouldReplayIndividually =
-          live.length > 1 &&
-          !this.closed &&
-          this.sessions.get(sessionId) === owner &&
-          !batchAbort.signal.aborted &&
-          !isSessionFatalBatchError(error);
-        if (shouldReplayIndividually) {
-          // Isolate per-query errors across coalesced workers so one bad query
-          // never fails unrelated sibling workers' valid queries.
-          for (const entry of live) {
-            entry.flushedBatch = undefined;
-            if (entry.settled || entry.waiters <= 0) {
-              this.removeFromInflight(active, entry);
-              entry.settled = true;
-              continue;
-            }
-            this.replaySingleEntry(
-              sessionId,
-              generation,
-              owner,
-              active,
-              transport,
-              entry,
-            );
-          }
-          return;
-        }
-        for (const entry of live) {
-          this.removeFromInflight(active, entry);
-          entry.flushedBatch = undefined;
-          entry.settled = true;
-          entry.reject(error);
-        }
-        return;
-      }
-      owner.activeAborts.delete(batchAbort);
-      // Deliver each packet independently so a corrupt bundle on one entry
-      // never triggers sibling replays or rejects valid answers.
-      for (let i = 0; i < live.length; i++) {
-        const entry = live[i];
-        this.removeFromInflight(active, entry);
-        entry.flushedBatch = undefined;
-        entry.settled = true;
-        try {
-          this.storeQueryReply(active, entry.query, packets[i], entry.key);
-          entry.resolve(packets[i]);
-        } catch (storeError) {
-          entry.reject(storeError);
-        }
-      }
-    })();
-  }
-
-  private replaySingleEntry(
-    sessionId: string,
-    generation: number,
-    owner: Session,
-    active: ActiveSession,
-    transport: TypeServiceHostTransport,
-    entry: SharedQueryEntry,
-  ): void {
-    const entryAbort = new AbortController();
-    owner.activeAborts.add(entryAbort);
-    entry.flushedBatch = { abort: entryAbort, liveEntries: 1 };
-    void (async () => {
-      try {
-        const result = await this.send(
-          sessionId,
-          owner,
-          false,
-          { session: sessionId, generation, queries: [entry.query] },
-          transport,
-          entryAbort.signal,
-        );
-        if (result.packets?.length !== 1) {
-          throw new Error('incomplete type service batch reply');
-        }
-        const raw = bytes(result.packets[0]);
-        this.removeFromInflight(active, entry);
-        this.storeQueryReply(active, entry.query, raw, entry.key);
-        entry.flushedBatch = undefined;
-        entry.settled = true;
-        entry.resolve(raw);
-      } catch (error) {
-        this.removeFromInflight(active, entry);
-        entry.flushedBatch = undefined;
-        entry.settled = true;
-        entry.reject(error);
-      } finally {
-        owner.activeAborts.delete(entryAbort);
-      }
-    })();
-  }
-
-  private async executeDirectQueryBatch(
+  private async executeQueryBatch(
     sessionId: string,
     owner: Session,
     active: ActiveSession,
@@ -701,130 +406,6 @@ export class PluginTypeServices {
       resolved[missingIndices[j]] = raw;
     }
     return { packets: resolved };
-  }
-
-  private async executeCoalescedQueries(
-    sessionId: string,
-    owner: Session,
-    active: ActiveSession,
-    queries: readonly TypeServiceQuery[],
-    transport: TypeServiceHostTransport,
-    signal: AbortSignal,
-  ): Promise<TypeServiceWorkerResponse> {
-    const resolved = new Array<Uint8Array>(queries.length);
-    const attached: Array<{
-      index: number;
-      entry: SharedQueryEntry;
-      detach: () => void;
-    }> = [];
-
-    for (let i = 0; i < queries.length; i++) {
-      const query = queries[i];
-      const key = isCacheableTypeQuery(query) ? typeQueryKey(query) : undefined;
-      if (key !== undefined) {
-        const cached = this.readCached(active, key);
-        if (cached) {
-          resolved[i] = cached;
-          continue;
-        }
-      }
-      let entry = key !== undefined ? active.inflight.get(key) : undefined;
-      if (!entry || entry.settled) {
-        let resolveEntry!: (packet: Uint8Array) => void;
-        let rejectEntry!: (error: unknown) => void;
-        const promise = new Promise<Uint8Array>((resolve, reject) => {
-          resolveEntry = resolve;
-          rejectEntry = reject;
-        });
-        void promise.catch(() => undefined);
-        entry = {
-          query,
-          key,
-          promise,
-          resolve: resolveEntry,
-          reject: rejectEntry,
-          waiters: 1,
-          settled: false,
-        };
-        if (key !== undefined) {
-          active.inflight.set(key, entry);
-        }
-        this.enqueueEntry(
-          sessionId,
-          owner.generation,
-          owner,
-          active,
-          transport,
-          entry,
-        );
-      } else {
-        entry.waiters++;
-      }
-      const ownedEntry = entry;
-      let detached = false;
-      const detachEntry = () => {
-        if (detached) return;
-        detached = true;
-        ownedEntry.waiters--;
-        if (ownedEntry.waiters > 0 || ownedEntry.settled) return;
-        this.removeFromInflight(active, ownedEntry);
-        const pending = ownedEntry.pendingBatch;
-        if (pending && !pending.flushed) {
-          const anyLive = pending.entries.some(
-            (item) => !item.settled && item.waiters > 0,
-          );
-          if (!anyLive) {
-            pending.flushed = true;
-            if (pending.timer !== undefined) {
-              clearImmediate(pending.timer);
-              pending.timer = undefined;
-            }
-            active.pendingBatches.delete(pending);
-            if (active.currentBatch === pending) {
-              active.currentBatch = undefined;
-            }
-            for (const item of pending.entries) {
-              item.pendingBatch = undefined;
-            }
-          }
-          return;
-        }
-        const flushed = ownedEntry.flushedBatch;
-        if (flushed) {
-          flushed.liveEntries--;
-          if (flushed.liveEntries <= 0) {
-            flushed.abort.abort();
-          }
-        }
-      };
-      attached.push({ index: i, entry: ownedEntry, detach: detachEntry });
-    }
-
-    if (attached.length === 0) {
-      return { packets: resolved };
-    }
-
-    try {
-      if (attached.length === 1) {
-        const packet = await awaitWithSignal(attached[0].entry.promise, signal);
-        this.assertActive(sessionId, owner, false, signal);
-        resolved[attached[0].index] = packet;
-        return { packets: resolved };
-      }
-      const packets = await awaitWithSignal(
-        Promise.all(attached.map((item) => item.entry.promise)),
-        signal,
-      );
-      this.assertActive(sessionId, owner, false, signal);
-      for (let i = 0; i < attached.length; i++) {
-        resolved[attached[i].index] = packets[i];
-      }
-      return { packets: resolved };
-    } finally {
-      for (const item of attached) {
-        item.detach();
-      }
-    }
   }
 
   async query(
@@ -987,27 +568,11 @@ export class PluginTypeServices {
       }
     }
 
-    if (
-      queries.length === 0 ||
-      queries.length > MAX_COALESCED_QUERIES ||
-      !this.shouldCoalesce() ||
-      queries.some((q) => DIRECT_BYPASS_OPS.has(q.op))
-    ) {
-      return this.executeDirectQueryBatch(
-        request.session,
-        owner,
-        active,
-        request,
-        queries,
-        transport,
-        signal,
-      );
-    }
-
-    return this.executeCoalescedQueries(
+    return this.executeQueryBatch(
       request.session,
       owner,
       active,
+      request,
       queries,
       transport,
       signal,
@@ -1022,29 +587,9 @@ export class PluginTypeServices {
     owner.openAbort = undefined;
     owner.opening = undefined;
     if (owner.active) {
-      const active = owner.active;
-      const err =
-        reason ?? abortError('type service request cancelled or retired');
-      active.currentBatch = undefined;
-      for (const batch of active.pendingBatches) {
-        batch.flushed = true;
-        if (batch.timer !== undefined) {
-          clearImmediate(batch.timer);
-          batch.timer = undefined;
-        }
-        for (const entry of batch.entries) {
-          entry.pendingBatch = undefined;
-          if (!entry.settled) {
-            entry.settled = true;
-            entry.reject(err);
-          }
-        }
-      }
-      active.pendingBatches.clear();
-      active.inflight.clear();
-      this.retainedBytes -= active.cacheBytes;
-      active.cache.clear();
-      active.cacheBytes = 0;
+      this.retainedBytes -= owner.active.cacheBytes;
+      owner.active.cache.clear();
+      owner.active.cacheBytes = 0;
     }
     for (const abort of [...owner.activeAborts]) {
       abort.abort(reason);

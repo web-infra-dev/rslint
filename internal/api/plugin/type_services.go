@@ -51,6 +51,26 @@ func HandleTypeServices(ctx context.Context, msg *ipc.Message) (any, error) {
 	return encodeTypeServiceWireResponse(result), nil
 }
 
+// HandleSyncTypeServices serves binary shared-memory RPC type-service queries
+// directly from worker threads without JSON framing or main-thread hopping.
+func HandleSyncTypeServices(ctx context.Context, reqs []ipc.SyncRequest, reply ipc.SyncReplyFunc) {
+	var stackBuf [ipc.RpcSlotCount]linter.EslintPluginSyncRequest
+	converted := stackBuf[:0]
+	if len(reqs) > len(stackBuf) {
+		converted = make([]linter.EslintPluginSyncRequest, 0, len(reqs))
+	}
+	for _, r := range reqs {
+		converted = append(converted, linter.EslintPluginSyncRequest{
+			Slot:        r.Slot,
+			ReqSeq:      r.ReqSeq,
+			WorkerEpoch: r.WorkerEpoch,
+			Payload:     r.Payload,
+			IsCancelled: r.IsCancelled,
+		})
+	}
+	linter.QueryEslintPluginTypesBatch(ctx, converted, linter.EslintPluginSyncReply(reply))
+}
+
 func encodeTypeServiceWireResponse(result *linter.EslintPluginTypeResult) any {
 	var attachments []ipc.Attachment
 	wire := typeServiceWireResponse{Descriptor: result.Descriptor}

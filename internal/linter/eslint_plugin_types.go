@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 
@@ -389,4 +390,185 @@ func queryAbortErr(queryCtx context.Context, entry *pluginTypeSession) error {
 		return context.Cause(queryCtx)
 	}
 	return nil
+}
+
+// Sync RPC status codes matching internal/ipc.SyncStatus*.
+const (
+	EslintPluginSyncStatusOK        uint32 = 0
+	EslintPluginSyncStatusClosed    uint32 = 1
+	EslintPluginSyncStatusCancelled uint32 = 2
+	EslintPluginSyncStatusError     uint32 = 3
+)
+
+// EslintPluginSyncRequest is one binary shared-memory type-service query from a
+// worker slot.
+type EslintPluginSyncRequest struct {
+	Slot        int
+	ReqSeq      uint32
+	WorkerEpoch uint32
+	Payload     []byte
+	IsCancelled func() bool
+}
+
+// EslintPluginSyncReply delivers the outcome for one worker slot.
+type EslintPluginSyncReply func(slot int, reqSeq uint32, status uint32, body []byte)
+
+// QueryEslintPluginTypesBatch serves a batch of binary shared-memory type
+// service queries, grouping by session and dispatching distinct sessions
+// concurrently while preserving exact session lifecycle and error semantics.
+func QueryEslintPluginTypesBatch(ctx context.Context, reqs []EslintPluginSyncRequest, reply EslintPluginSyncReply) {
+	if len(reqs) == 0 {
+		return
+	}
+	type decodedItem struct {
+		raw     EslintPluginSyncRequest
+		decoded typeservice.DecodedBinaryQuery
+	}
+	var groups map[string][]decodedItem
+	var firstSession string
+	var firstGroup []decodedItem
+
+	for _, req := range reqs {
+		if req.IsCancelled != nil && req.IsCancelled() {
+			reply(req.Slot, req.ReqSeq, EslintPluginSyncStatusCancelled, nil)
+			continue
+		}
+		decoded, err := typeservice.DecodeBinaryQuery(req.Payload)
+		if err != nil {
+			reply(req.Slot, req.ReqSeq, EslintPluginSyncStatusError, []byte(err.Error()))
+			continue
+		}
+		item := decodedItem{raw: req, decoded: decoded}
+		if firstSession == "" {
+			firstSession = decoded.Session
+			firstGroup = append(firstGroup, item)
+		} else if groups == nil && decoded.Session == firstSession {
+			firstGroup = append(firstGroup, item)
+		} else {
+			if groups == nil {
+				groups = make(map[string][]decodedItem, 2)
+				groups[firstSession] = firstGroup
+				firstGroup = nil
+			}
+			groups[decoded.Session] = append(groups[decoded.Session], item)
+		}
+	}
+
+	runGroup := func(sessionID string, items []decodedItem) {
+		pluginTypeSessions.RLock()
+		entry := pluginTypeSessions.byID[sessionID]
+		if entry != nil {
+			entry.mu.RLock()
+		}
+		pluginTypeSessions.RUnlock()
+		if entry == nil {
+			for _, item := range items {
+				reply(item.raw.Slot, item.raw.ReqSeq, EslintPluginSyncStatusClosed, nil)
+			}
+			return
+		}
+		defer entry.mu.RUnlock()
+		if entry.ctx.Err() != nil {
+			for _, item := range items {
+				reply(item.raw.Slot, item.raw.ReqSeq, EslintPluginSyncStatusClosed, nil)
+			}
+			return
+		}
+		queryCtx, cancel := context.WithCancelCause(ctx)
+		stop := context.AfterFunc(entry.ctx, func() { cancel(ErrPluginTypeSessionClosed) })
+		defer func() {
+			stop()
+			cancel(nil)
+		}()
+
+		if abortErr := queryAbortErr(queryCtx, entry); abortErr != nil {
+			st := syncErrorStatus(abortErr)
+			for _, item := range items {
+				reply(item.raw.Slot, item.raw.ReqSeq, st, nil)
+			}
+			return
+		}
+		if entry.syntaxOnly {
+			msg := []byte("semantic queries require a typed project")
+			for _, item := range items {
+				reply(item.raw.Slot, item.raw.ReqSeq, EslintPluginSyncStatusError, msg)
+			}
+			return
+		}
+
+		slotQueries := make([]typeservice.SlotQuery, 0, len(items))
+		slotIndices := make([]int, 0, len(items))
+		for idx, item := range items {
+			if item.decoded.Generation != entry.generation {
+				reply(item.raw.Slot, item.raw.ReqSeq, EslintPluginSyncStatusError, []byte("foreign type service query generation"))
+				continue
+			}
+			slotQueries = append(slotQueries, typeservice.SlotQuery{
+				Slot:        item.raw.Slot,
+				WorkerEpoch: item.raw.WorkerEpoch,
+				Query:       item.decoded.Query,
+				FileIdx:     item.decoded.FileIdx,
+				IsCancelled: item.raw.IsCancelled,
+			})
+			slotIndices = append(slotIndices, idx)
+		}
+		if len(slotQueries) == 0 {
+			return
+		}
+
+		results := entry.session.QuerySlots(queryCtx, slotQueries)
+		for j, res := range results {
+			item := items[slotIndices[j]]
+			if abortErr := queryAbortErr(queryCtx, entry); abortErr != nil {
+				reply(item.raw.Slot, item.raw.ReqSeq, syncErrorStatus(abortErr), nil)
+				continue
+			}
+			if res.Err != nil {
+				st := syncErrorStatus(res.Err)
+				if st == EslintPluginSyncStatusError {
+					reply(item.raw.Slot, item.raw.ReqSeq, st, []byte(res.Err.Error()))
+				} else {
+					reply(item.raw.Slot, item.raw.ReqSeq, st, nil)
+				}
+				continue
+			}
+			reply(item.raw.Slot, item.raw.ReqSeq, EslintPluginSyncStatusOK, res.Packet)
+		}
+	}
+
+	if groups == nil {
+		if len(firstGroup) > 0 {
+			runGroup(firstSession, firstGroup)
+		}
+		return
+	}
+	var wg sync.WaitGroup
+	wg.Add(len(groups))
+	for sessionID, items := range groups {
+		sid, group := sessionID, items
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					msg := []byte(fmt.Sprintf("plugin type service panicked: %v", recovered))
+					for _, item := range group {
+						reply(item.raw.Slot, item.raw.ReqSeq, EslintPluginSyncStatusError, msg)
+					}
+				}
+			}()
+			runGroup(sid, group)
+		}()
+	}
+	wg.Wait()
+}
+
+func syncErrorStatus(err error) uint32 {
+	switch {
+	case errors.Is(err, ErrPluginTypeSessionClosed), errors.Is(err, typeservice.ErrClosed):
+		return EslintPluginSyncStatusClosed
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return EslintPluginSyncStatusCancelled
+	default:
+		return EslintPluginSyncStatusError
+	}
 }

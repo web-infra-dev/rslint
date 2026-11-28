@@ -133,6 +133,8 @@ type Channel struct {
 	// serialized with closure; application handlers never own a mapping.
 	memory            *memoryPool
 	memoryInitialized bool
+	rpc               *rpcServer
+	rpcInitialized    bool
 	closeDone         chan struct{}
 	// writeSealed rejects frames that have not yet passed write admission.
 	// It is published while writeMu is held on a terminal response or write
@@ -143,6 +145,7 @@ type Channel struct {
 
 	notifyHandlers map[MessageKind]NotificationHandler
 	inbound        InboundHandler
+	syncHandler    SyncBatchHandler
 
 	done     chan struct{}      // closed when the channel shuts down
 	inCtx    context.Context    // ctx passed to inbound handlers
@@ -188,6 +191,19 @@ func (c *Channel) SetInboundHandler(h InboundHandler) {
 		panic("ipc: SetInboundHandler must be called before Start")
 	}
 	c.inbound = h
+}
+
+// SetSyncHandler enables the optional bidirectional shared-memory RPC channel
+// and installs its batch handler. Must be called before Start. When set,
+// transportConfig responses advertise the RPC layout and Node may lazily open
+// the shared-memory RPC server via transportRpcOpen.
+func (c *Channel) SetSyncHandler(h SyncBatchHandler) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.started {
+		panic("ipc: SetSyncHandler must be called before Start")
+	}
+	c.syncHandler = h
 }
 
 // RegisterNotification registers a handler for inbound notifications of a
@@ -544,8 +560,15 @@ func (c *Channel) dispatch(msg *Message) {
 		if msg.Transport != nil || len(msg.Attachments) != 0 || len(msg.Data) != 0 {
 			c.sendError(msg.ID, "transport configuration request must be empty")
 		} else {
-			c.sendResponse(msg.ID, memoryConfiguration())
+			c.sendResponse(msg.ID, memoryConfiguration(c.syncHandler != nil))
 		}
+		return
+	}
+
+	// Lazy shared-memory RPC activation runs inside transport dispatch so it
+	// bypasses serialized application handlers (e.g., API Service.handlerMu).
+	if msg.Kind == KindTransportRpcOpen {
+		c.handleTransportRpcOpen(msg)
 		return
 	}
 
@@ -800,16 +823,61 @@ func (c *Channel) closeWith(cause error) {
 	c.published = make(map[publicationID][]MemoryBatch)
 	memory := c.memory
 	c.memory = nil
+	rpc := c.rpc
+	c.rpc = nil
 	// Once a request can observe closeErr, its session must already be canceled.
 	c.inCancel()
 	c.mu.Unlock()
 	close(c.done)
+	if rpc != nil {
+		rpc.close()
+	}
 	if memory != nil {
 		// Wait for any copy/publication before releasing the mapping. An in-flight native
 		// reader owns its own retained view in the peer process.
 		_ = memory.close()
 	}
 	close(c.closeDone)
+}
+
+func (c *Channel) handleTransportRpcOpen(msg *Message) {
+	if msg.Transport != nil || len(msg.Attachments) != 0 {
+		c.sendError(msg.ID, "ipc: transportRpcOpen must not carry transport metadata or attachments")
+		return
+	}
+	if c.syncHandler == nil {
+		c.sendError(msg.ID, "ipc: shared-memory RPC is not enabled")
+		return
+	}
+	var descriptor RpcMapping
+	if err := msg.Decode(&descriptor); err != nil {
+		c.sendError(msg.ID, fmt.Sprintf("ipc: decode transportRpcOpen: %v", err))
+		return
+	}
+	c.mu.Lock()
+	if c.closed {
+		err := c.closeErr
+		c.mu.Unlock()
+		c.sendError(msg.ID, err.Error())
+		return
+	}
+	if c.rpcInitialized {
+		c.mu.Unlock()
+		c.sendError(msg.ID, "ipc: shared-memory RPC already initialized")
+		return
+	}
+	c.rpcInitialized = true
+	srv, err := openRpcServer(c.inCtx, descriptor, c.syncHandler)
+	if err != nil {
+		c.mu.Unlock()
+		c.sendError(msg.ID, err.Error())
+		return
+	}
+	c.rpc = srv
+	srv.start()
+	c.mu.Unlock()
+
+	c.sendResponse(msg.ID, map[string]bool{"ok": true})
 }
 
 // Close shuts the channel down. Pending requests fail with a stable error.

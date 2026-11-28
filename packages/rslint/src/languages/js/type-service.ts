@@ -895,7 +895,6 @@ export class TypeServiceClient {
             generation: this.descriptor.generation,
             ...request,
           };
-    const key = typeQueryKey(query);
     if (
       !isCacheableTypeQuery(query) &&
       !(
@@ -903,13 +902,14 @@ export class TypeServiceClient {
         this.syntax.isStableNodeQuery(query.op, query.args.node)
       )
     ) {
-      const reader = this.ingest(query, transport(query, key, false));
+      const reader = this.ingest(query, transport(query, '', false));
       try {
         return read(reader);
       } finally {
         reader.close();
       }
     }
+    const key = typeQueryKey(query);
     let reader = this.facts.get(key);
     if (reader) {
       this.facts.delete(key);

@@ -16,6 +16,10 @@ func (h *Handler) HandlePluginTypeServices(ctx context.Context, msg *ipc.Message
 	return plugin.HandleTypeServices(ctx, msg)
 }
 
+func (h *Handler) HandleSyncPluginTypeServices(ctx context.Context, reqs []ipc.SyncRequest, reply ipc.SyncReplyFunc) {
+	plugin.HandleSyncTypeServices(ctx, reqs, reply)
+}
+
 // HandleLint handles lint requests in IPC mode
 func (h *Handler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
 	return h.handleLint(context.Background(), req, nil, nil)

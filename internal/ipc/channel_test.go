@@ -533,7 +533,7 @@ func TestChannelMemoryBootstrapBeforeHandlerAndOnlyOnce(t *testing.T) {
 	if err := configuration.Decode(&layout); err != nil {
 		t.Fatal(err)
 	}
-	if configuration.Kind != KindResponse || configuration.ID != 1 || layout != memoryConfiguration() {
+	if configuration.Kind != KindResponse || configuration.ID != 1 || layout != memoryConfiguration(false) {
 		t.Fatalf("incorrect runtime storage configuration: %+v, %+v", configuration, layout)
 	}
 	// Even malformed control requests must not install a mapping or dispatch

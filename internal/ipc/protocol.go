@@ -26,27 +26,70 @@ const (
 	MemoryCapacity                 = MemoryHeaderSize + MemorySlotCount*MemorySlotSize
 	MemoryInheritedFD              = 3
 	MemoryMaxGeneration            = ^uint32(0)
+
+	RpcVersion             uint32 = 1
+	RpcMagic               uint32 = 0x5253_5031 // "RSP1"
+	RpcSlotCount                  = 16
+	RpcSlotSize                   = 64 * 1024
+	RpcHeaderSize                 = 4096
+	RpcSlotHeaderStride           = 128
+	RpcCapacity                   = RpcHeaderSize + RpcSlotCount*RpcSlotSize
+	RpcMemInheritedFD             = 4
+	RpcDoorbellInheritedFD        = 5
 )
 
 // MemoryConfiguration is the runtime layout supplied to the native reader.
 // Capacity is derived from HeaderSize + SlotCount*SlotSize by each consumer.
 // Version identifies the publication algorithm, not a second set of defaults.
 type MemoryConfiguration struct {
-	Version           uint32 `json:"version"`
-	SlotCount         uint32 `json:"slotCount"`
-	SlotSize          uint32 `json:"slotSize"`
-	HeaderSize        uint32 `json:"headerSize"`
-	PublicationStride uint32 `json:"publicationStride"`
+	Version           uint32            `json:"version"`
+	SlotCount         uint32            `json:"slotCount"`
+	SlotSize          uint32            `json:"slotSize"`
+	HeaderSize        uint32            `json:"headerSize"`
+	PublicationStride uint32            `json:"publicationStride"`
+	Rpc               *RpcConfiguration `json:"rpc,omitempty"`
 }
 
-func memoryConfiguration() MemoryConfiguration {
-	return MemoryConfiguration{
+// RpcConfiguration advertises the optional bidirectional shared-memory RPC layout.
+// Only present in transportConfig responses when the Go server installed a SyncHandler.
+type RpcConfiguration struct {
+	Version          uint32 `json:"version"`
+	SlotCount        uint32 `json:"slotCount"`
+	SlotSize         uint32 `json:"slotSize"`
+	HeaderSize       uint32 `json:"headerSize"`
+	SlotHeaderStride uint32 `json:"slotHeaderStride"`
+}
+
+// RpcMapping identifies the bidirectional shared-memory object and anonymous OS
+// doorbell supplied by Node in a lazy transportRpcOpen request.
+type RpcMapping struct {
+	Version       uint32 `json:"version"`
+	FD            int32  `json:"fd,omitempty"`
+	DoorbellFD    int32  `json:"doorbellFd,omitempty"`
+	Handle        string `json:"handle,omitempty"`
+	NodeToGoEvent string `json:"nodeToGoEvent,omitempty"`
+	GoToNodeEvent string `json:"goToNodeEvent,omitempty"`
+	ProcessID     uint32 `json:"processId,omitempty"`
+}
+
+func memoryConfiguration(withRpc bool) MemoryConfiguration {
+	cfg := MemoryConfiguration{
 		Version:           MemoryVersion,
 		SlotCount:         MemorySlotCount,
 		SlotSize:          MemorySlotSize,
 		HeaderSize:        MemoryHeaderSize,
 		PublicationStride: MemoryPublicationStride,
 	}
+	if withRpc {
+		cfg.Rpc = &RpcConfiguration{
+			Version:          RpcVersion,
+			SlotCount:        RpcSlotCount,
+			SlotSize:         RpcSlotSize,
+			HeaderSize:       RpcHeaderSize,
+			SlotHeaderStride: RpcSlotHeaderStride,
+		}
+	}
+	return cfg
 }
 
 // MemoryMapping identifies an OS mapping owned by the native reader.
