@@ -361,8 +361,8 @@ export class IpcClient {
   }
 
   /**
-   * Lazily activate the bidirectional shared-memory RPC channel when a plugin
-   * host is actually constructed. Cached per IpcClient across multiple lint
+   * Lazily activate the bidirectional shared-memory RPC channel when a typed
+   * plugin task is first dispatched. Cached per IpcClient across multiple lint
    * calls; silently degrades to `undefined` on unsupported peers or restricted
    * hosts so callers transparently stay on the standard JSON-RPC bridge.
    */

@@ -89,8 +89,13 @@ export class WorkerTypeServices {
   private rpcDisabled = false;
   constructor(
     private readonly parent: MessagePort,
-    private readonly rpc?: WorkerRpcDescriptor,
+    private rpc?: WorkerRpcDescriptor,
   ) {}
+
+  attachRpc(rpc: WorkerRpcDescriptor): void {
+    this.rpc = rpc;
+    this.rpcReqBuf = undefined;
+  }
 
   private ensureBridge(): WorkerBridge {
     if (this.bridge) return this.bridge;

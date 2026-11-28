@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, test } from 'rstack/test';
+import { describe, expect, rs, test } from 'rstack/test';
 import ts from 'typescript';
 import { TYPESCRIPT_COMPILER_DATA } from '../src/languages/js/type-service-compiler-data.generated.js';
 import { encodeBinaryTypeQuery } from '../src/languages/js/type-service-request-codec.js';
+import { createPluginLintHostWithRpc } from '../src/eslint-plugin/host.js';
+import * as workerPoolMod from '../src/eslint-plugin/worker-pool.js';
 import { PluginTypeServices } from '../src/eslint-plugin/type-service-host.js';
 import { resolveTypeServiceReply } from '../src/internal/plugin-type-service.js';
 import type {
@@ -879,5 +881,192 @@ describe('encodeBinaryTypeQuery', () => {
         files,
       ),
     ).toBe(0);
+
+    // Spot-check single-source-of-truth opcodes across checker, node, ID, and raw-JSON families.
+    const expectOpCode = (
+      query: Parameters<typeof encodeBinaryTypeQuery>[2],
+      expectedCode: number,
+    ) => {
+      const len = encodeBinaryTypeQuery(dst, 's', query, files);
+      expect(len).toBeGreaterThan(8);
+      expect(dst[8]).toBe(expectedCode);
+    };
+    expectOpCode({ generation: 1, op: 'void', args: {} }, 15);
+    expectOpCode(
+      {
+        generation: 1,
+        op: 'isImplementationOfOverload',
+        args: { node: { file: '/repo/a.ts', index: 3 } },
+      },
+      33,
+    );
+    expectOpCode({ generation: 1, op: 'classThisType', args: { id: 7 } }, 61);
+    expectOpCode({ generation: 1, op: 'symbolRecord', args: { id: 8 } }, 79);
+    expectOpCode(
+      { generation: 1, op: 'signatureJSDocTags', args: { id: 9 } },
+      84,
+    );
+    expectOpCode(
+      {
+        generation: 1,
+        op: 'stringLiteralType',
+        args: { value: [97, 98] },
+      },
+      255,
+    );
+  });
+});
+
+describe('createPluginLintHostWithRpc lazy RPC activation', () => {
+  test('skips opening SHM RPC for syntax-only tasks and opens once on first typed task', async () => {
+    const spyPool = rs.spyOn(workerPoolMod, 'WorkerPool').mockImplementation(
+      () =>
+        ({
+          init: async () => undefined,
+          lintBatch: async () => [],
+          cancelTask: () => false,
+          retireTypeServices: () => undefined,
+          shutdown: async () => undefined,
+        }) as unknown as InstanceType<typeof workerPoolMod.WorkerPool>,
+    );
+    const spyAttach = rs.spyOn(workerPoolMod, 'attachWorkerPoolRpc');
+    let openCalls = 0;
+    const fakeChannel = {
+      slotSize: 65536,
+      acquireSlot: () => undefined,
+      abortSlot: () => undefined,
+      releaseSlot: () => undefined,
+    };
+    const fakeTransport = async () => ({});
+    const baseFile = {
+      path: '/repo/a.ts',
+      frame: Buffer.from([]).toString('base64'),
+      configKey: '/repo',
+    };
+
+    try {
+      const host = await createPluginLintHostWithRpc(
+        [{ configPath: '/repo/rslint.config.ts', configDirectory: '/repo' }],
+        undefined,
+        false,
+        async () => {
+          openCalls++;
+          return fakeChannel;
+        },
+      );
+      expect(openCalls).toBe(0);
+      expect(spyAttach).not.toHaveBeenCalled();
+
+      // Syntax-only batch must not open SHM RPC.
+      await host.lint(
+        {
+          files: [
+            {
+              ...baseFile,
+              typeServices: {
+                syntaxOnly: true,
+                session: 's-syntax',
+                binding: { generation: 1, sourceFileName: '/repo/a.ts' },
+              },
+            },
+          ],
+          rules: {},
+          collectFixes: false,
+        },
+        undefined,
+        undefined,
+        fakeTransport,
+      );
+      expect(openCalls).toBe(0);
+      expect(spyAttach).not.toHaveBeenCalled();
+
+      // Typed batch without transport must not open SHM RPC.
+      await host.lint({
+        files: [
+          {
+            ...baseFile,
+            typeServices: {
+              session: 's-typed',
+              binding: { generation: 1, sourceFileName: '/repo/a.ts' },
+            },
+          },
+        ],
+        rules: {},
+        collectFixes: false,
+      });
+      expect(openCalls).toBe(0);
+
+      // Already-aborted typed batch must not open SHM RPC.
+      const aborted = new AbortController();
+      aborted.abort();
+      await host.lint(
+        {
+          files: [
+            {
+              ...baseFile,
+              typeServices: {
+                session: 's-typed',
+                binding: { generation: 1, sourceFileName: '/repo/a.ts' },
+              },
+            },
+          ],
+          rules: {},
+          collectFixes: false,
+        },
+        aborted.signal,
+        undefined,
+        fakeTransport,
+      );
+      expect(openCalls).toBe(0);
+
+      // First active typed batch opens SHM RPC once and attaches it to the pool.
+      await host.lint(
+        {
+          files: [
+            {
+              ...baseFile,
+              typeServices: {
+                session: 's-typed',
+                binding: { generation: 1, sourceFileName: '/repo/a.ts' },
+              },
+            },
+          ],
+          rules: {},
+          collectFixes: false,
+        },
+        undefined,
+        undefined,
+        fakeTransport,
+      );
+      expect(openCalls).toBe(1);
+      expect(spyAttach).toHaveBeenCalledTimes(1);
+
+      // Subsequent typed batches reuse the already-attached channel.
+      await host.lint(
+        {
+          files: [
+            {
+              ...baseFile,
+              typeServices: {
+                session: 's-typed-2',
+                binding: { generation: 2, sourceFileName: '/repo/b.ts' },
+              },
+            },
+          ],
+          rules: {},
+          collectFixes: false,
+        },
+        undefined,
+        undefined,
+        fakeTransport,
+      );
+      expect(openCalls).toBe(1);
+      expect(spyAttach).toHaveBeenCalledTimes(1);
+
+      await host.shutdown();
+    } finally {
+      spyAttach.mockRestore();
+      spyPool.mockRestore();
+    }
   });
 });

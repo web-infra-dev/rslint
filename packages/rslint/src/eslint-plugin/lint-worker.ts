@@ -74,7 +74,10 @@ interface ShutdownMessage {
 }
 
 type InboundMessage =
-  TaskMessage | ShutdownMessage | { kind: 'retire-types'; sessions: string[] };
+  | TaskMessage
+  | ShutdownMessage
+  | { kind: 'retire-types'; sessions: string[] }
+  | { kind: 'attach-rpc'; rpc: WorkerRpcDescriptor };
 
 interface ReadyMessage {
   kind: 'ready';
@@ -149,6 +152,8 @@ function sendInitError(message: string): void {
 }
 
 let typeServices: WorkerTypeServices | undefined;
+let workerRpc: WorkerRpcDescriptor | undefined = (workerData as WorkerInitData)
+  .rpc;
 let closing = false;
 
 // ── 2. Task dispatch ──
@@ -161,6 +166,11 @@ parentPort.on('message', (msg: InboundMessage) => {
 });
 
 async function handleInboundMessage(msg: InboundMessage): Promise<void> {
+  if (msg.kind === 'attach-rpc') {
+    workerRpc = msg.rpc;
+    typeServices?.attachRpc(msg.rpc);
+    return;
+  }
   if (msg.kind === 'retire-types') {
     typeServices?.retire(msg.sessions);
     return;
@@ -235,7 +245,7 @@ async function handleInboundMessage(msg: InboundMessage): Promise<void> {
             await import('./type-service-worker.js');
           checkFrameCancellation(cancelFlag);
           if (closing) throw new FrameCancelled();
-          typeServices = new WorkerTypeServices(parentPort!, data.rpc);
+          typeServices = new WorkerTypeServices(parentPort!, workerRpc);
         }
         checkFrameCancellation(cancelFlag);
         if (closing) throw new FrameCancelled();

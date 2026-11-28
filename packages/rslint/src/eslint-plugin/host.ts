@@ -59,17 +59,22 @@ export async function createPluginLintHost(
   return createPluginLintHostWithRpc(configs, onLog, singleThreaded, undefined);
 }
 
+export type RpcChannelProvider =
+  RpcHostChannel | (() => Promise<RpcHostChannel | undefined>);
+
 /**
  * Internal host factory used by CLI and native API hosts to attach the optional
- * shared-memory RPC channel. Intentionally not re-exported from the public
- * `@rslint/core/eslint-plugin` entrypoint so `.d.ts` and editor contracts stay
- * unchanged.
+ * shared-memory RPC channel. Accepts either an eager `RpcHostChannel` or a lazy
+ * opener invoked only when the first typed plugin task is dispatched so
+ * syntax-only runs never allocate shared memory or start Go's slot scanner.
+ * Intentionally not re-exported from the public `@rslint/core/eslint-plugin`
+ * entrypoint so `.d.ts` and editor contracts stay unchanged.
  */
 export async function createPluginLintHostWithRpc(
   configs: ConfigDescriptor[],
   onLog?: WorkerPoolOptions['onLog'],
   singleThreaded?: boolean,
-  rpcChannel?: RpcHostChannel,
+  rpcChannel?: RpcChannelProvider,
 ): Promise<PluginLintHost> {
   // --singleThreaded caps both warmup and execution at one worker.
   const pool = new WorkerPool({
@@ -77,7 +82,30 @@ export async function createPluginLintHostWithRpc(
     onLog,
     workerCount: singleThreaded ? 1 : undefined,
   });
-  attachWorkerPoolRpc(pool, rpcChannel);
+  const rpcOpener = typeof rpcChannel === 'function' ? rpcChannel : undefined;
+  if (rpcChannel && typeof rpcChannel !== 'function') {
+    attachWorkerPoolRpc(pool, rpcChannel);
+  }
+  let rpcReady = !rpcOpener || configs.length === 0;
+  let rpcOpenPromise: Promise<void> | undefined;
+  let closed = false;
+  const ensureRpc = async (): Promise<void> => {
+    if (rpcReady || closed || !rpcOpener) return;
+    rpcOpenPromise ??= Promise.resolve()
+      .then(rpcOpener)
+      .then(
+        (channel) => {
+          if (channel && !closed) {
+            attachWorkerPoolRpc(pool, channel);
+          }
+        },
+        () => undefined,
+      )
+      .finally(() => {
+        rpcReady = true;
+      });
+    await rpcOpenPromise;
+  };
   const types = new PluginTypeServices();
   await pool.init();
   return {
@@ -96,6 +124,12 @@ export async function createPluginLintHostWithRpc(
         // wiring rslint/typeService) omit transport; strip typeServices so
         // untyped rules and scope analysis stay purely local instead of failing.
         for (const task of tasks) task.typeServices = undefined;
+      } else if (
+        !rpcReady &&
+        !signal?.aborted &&
+        tasks.some((task) => task.typeServices && !task.typeServices.syntaxOnly)
+      ) {
+        await ensureRpc();
       }
       // Cancel the dispatched worker tasks if the caller aborts (a superseding
       // keystroke / document close). cancelTask works whether the task is still
@@ -123,6 +157,7 @@ export async function createPluginLintHostWithRpc(
       }
     },
     async shutdown() {
+      closed = true;
       try {
         await pool.shutdown();
       } finally {

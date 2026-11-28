@@ -23,7 +23,7 @@ type CreatePluginLintHost = (
   configs: PluginConfigDescriptor[],
   onLog?: (record: { level: string; source: string; text: string }) => void,
   singleThreaded?: boolean,
-  rpcChannel?: RpcHostChannel,
+  rpcChannel?: RpcHostChannel | (() => Promise<RpcHostChannel | undefined>),
 ) => Promise<PluginLintHost>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -144,18 +144,18 @@ export async function stageNativeConfigActivation(
       async (candidate) => {
         if (candidate.pluginConfigs.length === 0) return;
         if (isClosing()) throw new Error('rslint service is closing');
-        const [createPluginLintHost, rpcChannel] = await Promise.all([
-          getPluginHostFactory(),
-          getRpcChannel ? getRpcChannel() : Promise.resolve(undefined),
-        ]);
+        const createPluginLintHost = await getPluginHostFactory();
         if (isClosing()) throw new Error('rslint service is closing');
+        const rpcOpener = getRpcChannel
+          ? async () => (isClosing() ? undefined : getRpcChannel())
+          : undefined;
         const build = (async () => {
-          const host = rpcChannel
+          const host = rpcOpener
             ? await createPluginLintHost(
                 candidate.pluginConfigs,
                 onLog,
                 undefined,
-                rpcChannel,
+                rpcOpener,
               )
             : await createPluginLintHost(candidate.pluginConfigs, onLog);
           lifecycle?.stage(host);

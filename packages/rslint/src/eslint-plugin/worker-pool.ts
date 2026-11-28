@@ -240,19 +240,21 @@ interface QueuedTask {
 }
 
 const workerPoolRpcChannels = new WeakMap<WorkerPool, RpcHostChannel>();
+const workerPoolRpcAttachHooks = new WeakMap<WorkerPool, () => void>();
 
 /**
- * Internal helper that attaches an optional `RpcHostChannel` before `init()`
- * without altering the public `WorkerPool` / `WorkerPoolOptions` `.d.ts`
- * contract or bypassing module spies on `new WorkerPool(...)`.
+ * Internal helper that attaches an optional `RpcHostChannel` before or after
+ * `init()` without altering the public `WorkerPool` / `WorkerPoolOptions`
+ * `.d.ts` contract or bypassing module spies on `new WorkerPool(...)`.
  */
 export function attachWorkerPoolRpc(
   pool: WorkerPool,
   rpcChannel?: RpcHostChannel,
 ): void {
-  if (rpcChannel) {
-    workerPoolRpcChannels.set(pool, rpcChannel);
-  }
+  if (!rpcChannel) return;
+  if (workerPoolRpcChannels.get(pool) === rpcChannel) return;
+  workerPoolRpcChannels.set(pool, rpcChannel);
+  workerPoolRpcAttachHooks.get(pool)?.();
 }
 
 function getRpcChannel(pool: WorkerPool): RpcHostChannel | undefined {
@@ -346,6 +348,30 @@ export class WorkerPool {
     // backing SharedArrayBuffer on demand up to MAX_CAPACITY, so it
     // scales to arbitrarily large batches without an explicit size hint.
     this.cancelPool = new CancelFlagPool();
+    workerPoolRpcAttachHooks.set(this, () => {
+      this.attachRpcToExistingWorkers();
+    });
+  }
+
+  private attachSlotRpc(slot: WorkerSlot): void {
+    if (this.closed || slot.exited || slot.rpc) return;
+    const channel = getRpcChannel(this);
+    if (!channel) return;
+    const rpc = channel.acquireSlot();
+    if (!rpc) return;
+    slot.rpc = rpc;
+    try {
+      slot.worker.postMessage({ kind: 'attach-rpc', rpc });
+    } catch {
+      releaseSlotRpc(this, slot);
+    }
+  }
+
+  private attachRpcToExistingWorkers(): void {
+    if (this.closed) return;
+    for (const slot of this.workers) {
+      this.attachSlotRpc(slot);
+    }
   }
 
   private allocateTaskId(): number {
@@ -990,6 +1016,7 @@ export class WorkerPool {
           worker.off('exit', onExit);
           worker.off('error', onError);
           this.attachOngoingHandlers(slot);
+          this.attachSlotRpc(slot);
           resolveOk(slot);
         } else if (msg.kind === 'init-error') {
           clearTimeout(initTimer);

@@ -75,11 +75,18 @@ type rpcServer struct {
 	mapping rpcMapping
 	handler SyncBatchHandler
 
-	ctx         context.Context
-	cancel      context.CancelFunc
-	scannerDone chan struct{}
-	wg          sync.WaitGroup
-	closeOnce   sync.Once
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+	closeOnce sync.Once
+
+	// Adaptive leader-handoff state: the active scanner goroutine runs batches
+	// inline for zero handoff overhead on sub-millisecond queries. If one batch
+	// runs across a watchdog tick, watchdogLoop promotes a replacement scanner
+	// so independent slots/projects are never blocked.
+	nextBatchSeq atomic.Uint64
+	inBatchSeq   atomic.Uint64
+	watchdogWake chan struct{}
 
 	// Per-slot Go-owned request scratch buffers. Slot i is exclusively owned
 	// by the single handler processing slot i until reply transitions the slot
@@ -101,11 +108,11 @@ func openRpcServer(parentCtx context.Context, descriptor RpcMapping, handler Syn
 func newRpcServer(parentCtx context.Context, mapping rpcMapping, handler SyncBatchHandler) *rpcServer {
 	ctx, cancel := context.WithCancel(parentCtx)
 	s := &rpcServer{
-		mapping:     mapping,
-		handler:     handler,
-		ctx:         ctx,
-		cancel:      cancel,
-		scannerDone: make(chan struct{}),
+		mapping:      mapping,
+		handler:      handler,
+		ctx:          ctx,
+		cancel:       cancel,
+		watchdogWake: make(chan struct{}, 1),
 	}
 	s.cancelCheckFn = s.isSlotCancelled
 	for i := range s.slotChunkWake {
@@ -115,7 +122,21 @@ func newRpcServer(parentCtx context.Context, mapping rpcMapping, handler SyncBat
 }
 
 func (s *rpcServer) start() {
+	s.launchScanner()
+	s.wg.Add(1)
+	go s.watchdogLoop()
+}
+
+func (s *rpcServer) launchScanner() {
+	s.wg.Add(1)
 	go s.scanLoop()
+}
+
+func (s *rpcServer) wakeWatchdog() {
+	select {
+	case s.watchdogWake <- struct{}{}:
+	default:
+	}
 }
 
 func (s *rpcServer) globalWord(offset int) *uint32 {
@@ -184,8 +205,15 @@ func (s *rpcServer) scanSlots(claimed []SyncRequest) []SyncRequest {
 	return claimed
 }
 
+func (s *rpcServer) runInlineBatch(claimed []SyncRequest) bool {
+	seq := s.nextBatchSeq.Add(1)
+	s.inBatchSeq.Store(seq)
+	s.runBatch(claimed)
+	return s.inBatchSeq.CompareAndSwap(seq, 0)
+}
+
 func (s *rpcServer) scanLoop() {
-	defer close(s.scannerDone)
+	defer s.wg.Done()
 
 	// Only spin immediately after active work on >=4-core machines; 0% CPU while idle
 	// and zero starvation on 2-core CI runners.
@@ -197,22 +225,23 @@ func (s *rpcServer) scanLoop() {
 	clientClosed := s.globalWord(rpcGlobalClientClosedOff)
 
 	claimed := make([]SyncRequest, 0, RpcSlotCount)
-	lastActive := time.Time{}
+	lastActive := time.Now()
 	idleSpins := 0
 
 	for {
 		if s.ctx.Err() != nil || atomic.LoadUint32(clientClosed) != 0 {
+			s.cancel()
 			return
 		}
 
 		claimed = s.scanSlots(claimed)
 		if len(claimed) > 0 {
-			// Execute directly on the scanner goroutine: avoids per-query
-			// goroutine scheduling/wake-up thrash and naturally batches concurrent
-			// workers into one checker lease. Rare >64 KiB replies offload
-			// chunk streaming to a background goroutine so scanLoop stays free
-			// to pump slotChunkWake.
-			s.runBatch(claimed)
+			// Execute directly on the scanner goroutine for zero handoff overhead
+			// on sub-millisecond queries; watchdogLoop promotes a replacement
+			// scanner if a batch runs long so independent projects are never blocked.
+			if !s.runInlineBatch(claimed) {
+				return
+			}
 			lastActive = time.Now()
 			idleSpins = 0
 			continue
@@ -239,12 +268,16 @@ func (s *rpcServer) scanLoop() {
 		atomic.StoreUint32(serverSleeping, 1)
 		if s.ctx.Err() != nil || atomic.LoadUint32(clientClosed) != 0 {
 			atomic.StoreUint32(serverSleeping, 0)
+			s.cancel()
 			return
 		}
 		claimed = s.scanSlots(claimed)
 		if len(claimed) > 0 {
 			atomic.StoreUint32(serverSleeping, 0)
-			s.runBatch(claimed)
+			s.wakeWatchdog()
+			if !s.runInlineBatch(claimed) {
+				return
+			}
 			lastActive = time.Now()
 			idleSpins = 0
 			continue
@@ -253,9 +286,72 @@ func (s *rpcServer) scanLoop() {
 		err := s.mapping.waitDoorbell()
 		atomic.StoreUint32(serverSleeping, 0)
 		if err != nil {
+			s.cancel()
 			return
 		}
+		s.wakeWatchdog()
+		lastActive = time.Now()
 		idleSpins = 0
+	}
+}
+
+func (s *rpcServer) watchdogLoop() {
+	defer s.wg.Done()
+	serverSleeping := s.globalWord(rpcGlobalServerSleepingOff)
+	clientClosed := s.globalWord(rpcGlobalClientClosedOff)
+
+	const handoffInterval = time.Millisecond
+	timer := time.NewTimer(handoffInterval)
+	defer timer.Stop()
+
+	var lastSeq uint64
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-s.watchdogWake:
+			lastSeq = 0
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(handoffInterval)
+		case <-timer.C:
+			if s.ctx.Err() != nil || atomic.LoadUint32(clientClosed) != 0 {
+				return
+			}
+			cur := s.inBatchSeq.Load()
+			if cur == 0 {
+				lastSeq = 0
+				if atomic.LoadUint32(serverSleeping) != 0 && s.inBatchSeq.Load() == 0 {
+					// Scanner is parked in waitDoorbell; sleep with 0% CPU until
+					// scanLoop wakes from the doorbell.
+					select {
+					case <-s.watchdogWake:
+						timer.Reset(handoffInterval)
+						continue
+					case <-s.ctx.Done():
+						return
+					}
+				}
+				timer.Reset(handoffInterval)
+				continue
+			}
+			if cur != lastSeq {
+				lastSeq = cur
+				timer.Reset(handoffInterval)
+				continue
+			}
+			// Same batch stayed active across a full handoff tick; promote a
+			// replacement scanner leader so other slots/projects never wait.
+			if s.inBatchSeq.CompareAndSwap(cur, 0) {
+				lastSeq = 0
+				s.launchScanner()
+			}
+			timer.Reset(handoffInterval)
+		}
 	}
 }
 
@@ -449,7 +545,6 @@ func (s *rpcServer) close() {
 		atomic.StoreUint32(s.globalWord(rpcGlobalServerClosedOff), 1)
 		s.mapping.ringGoToNode()
 		s.mapping.closeDoorbell()
-		<-s.scannerDone
 		s.wg.Wait()
 		_ = s.mapping.unmap()
 	})

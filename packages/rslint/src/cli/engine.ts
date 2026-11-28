@@ -51,7 +51,7 @@ type CreatePluginLintHostWithRpc = (
   configs: PluginConfigDescriptor[],
   onLog?: (rec: { level: string; source: string; text: string }) => void,
   singleThreaded?: boolean,
-  rpcChannel?: RpcHostChannel,
+  rpcChannel?: RpcHostChannel | (() => Promise<RpcHostChannel | undefined>),
 ) => Promise<PluginLintHost>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -429,10 +429,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
         // Resolve the standalone host beside the built CLI chunks. Importing
         // the public index would also load the worker's lint runtime here.
         const pluginEntry: string = './eslint-plugin/host.js';
-        const [mod, rpcChannel] = await Promise.all([
-          import(pluginEntry) as Promise<unknown>,
-          ipc.ensureRpcOpen(),
-        ]);
+        const mod: unknown = await import(pluginEntry);
         if (!isPluginHostFactoryModule(mod)) {
           throw new Error(
             'rslint ESLint-plugin entry does not export createPluginLintHost',
@@ -444,7 +441,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
               pluginConfigs,
               onLog,
               opts.runtime?.singleThreaded,
-              rpcChannel,
+              async () => (shuttingDown ? undefined : ipc.ensureRpcOpen()),
             )
           : await mod.createPluginLintHost(
               pluginConfigs,

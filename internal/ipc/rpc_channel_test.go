@@ -182,6 +182,73 @@ func TestRpcServerSingleChunkedPanicAbandonAndClose(t *testing.T) {
 	}
 }
 
+func TestRpcServerSlowSlotDoesNotBlockOtherSlots(t *testing.T) {
+	mapping, nodeToGo, goToNode, _ := newTestRpcMapping()
+	inSlow := make(chan struct{})
+	releaseSlow := make(chan struct{})
+
+	srv := newRpcServer(context.Background(), mapping, func(ctx context.Context, reqs []SyncRequest, reply SyncReplyFunc) {
+		for _, r := range reqs {
+			switch string(r.Payload) {
+			case "slow":
+				close(inSlow)
+				select {
+				case <-releaseSlow:
+				case <-ctx.Done():
+				}
+				reply(r.Slot, r.ReqSeq, SyncStatusOK, []byte("slow-done"))
+			case "fast":
+				reply(r.Slot, r.ReqSeq, SyncStatusOK, []byte("fast-done"))
+			}
+		}
+	})
+	srv.start()
+	defer srv.close()
+
+	slowResult := make(chan string, 1)
+	go func() {
+		st, body := simCall(t, srv, nodeToGo, goToNode, 0, 1, []byte("slow"))
+		if st != SyncStatusOK {
+			slowResult <- "err"
+			return
+		}
+		slowResult <- string(body)
+	}()
+
+	select {
+	case <-inSlow:
+	case <-time.After(3 * time.Second):
+		t.Fatal("slow request never entered handler")
+	}
+
+	// While slot 0 is still blocked inside the handler, slot 1 must be admitted
+	// and completed without waiting for slot 0 to be released.
+	start := time.Now()
+	st, body := simCall(t, srv, nodeToGo, goToNode, 1, 1, []byte("fast"))
+	if st != SyncStatusOK || string(body) != "fast-done" {
+		t.Fatalf("expected fast-done while slow slot blocked, got status=%d body=%q", st, body)
+	}
+	if elapsed := time.Since(start); elapsed > 100*time.Millisecond {
+		t.Fatalf("expected fast slot to bypass slow slot quickly, took %v", elapsed)
+	}
+
+	close(releaseSlow)
+	select {
+	case got := <-slowResult:
+		if got != "slow-done" {
+			t.Fatalf("expected slow-done, got %q", got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("slow request did not complete after release")
+	}
+
+	// Verify server remains healthy after displaced scanner exits and replacement takes over.
+	st, body = simCall(t, srv, nodeToGo, goToNode, 2, 1, []byte("fast"))
+	if st != SyncStatusOK || string(body) != "fast-done" {
+		t.Fatalf("expected post-handoff fast-done, got status=%d body=%q", st, body)
+	}
+}
+
 func TestTransportConfigAdvertisesRpcOnlyWhenSyncHandlerSet(t *testing.T) {
 	check := func(withHandler bool) MemoryConfiguration {
 		r1, w1 := io.Pipe()
