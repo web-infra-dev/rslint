@@ -10,11 +10,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
@@ -46,7 +43,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 
 	// Create filesystem
-	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	fs := utils.NewCachedDiskFS()
 	programBaseFS := fs
 	var allowedFiles []string
 	seenAllowedFiles := make(map[string]struct{})

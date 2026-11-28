@@ -12,11 +12,8 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -192,7 +189,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 
 	fs := args.FS
 	if fs == nil {
-		fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		fs = utils.NewCachedDiskFS()
 	}
 	eslintPlugins := configCatalog.EslintPlugins
 	ruleCatalog, shadowedPluginRules := rules.All().ForESLintPlugins(eslintPlugins)
