@@ -12,6 +12,7 @@ import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
 } from '../src/config/config-loader.js';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 describe('native API config activation', () => {
   test('shutdownAll does not settle before every host shutdown settles', async () => {
@@ -124,7 +125,7 @@ describe('native API config activation', () => {
       expect(shutdownCalls).toBe(1);
     } finally {
       configHost.deleteSession(request.transactionId);
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -205,7 +206,7 @@ describe('native API config activation', () => {
     } finally {
       releasePostPrepare();
       configHost.deleteSession(request.transactionId);
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 });

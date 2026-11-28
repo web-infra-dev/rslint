@@ -7,6 +7,7 @@ import {
   loadPluginsFromConfigs,
   PluginLoaderError,
 } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
+import { cleanupTempDir } from '../../cleanup-temp-dir.js';
 
 /**
  * Lock the quality of plugin-loader error messages so a future refactor
@@ -43,7 +44,7 @@ async function withTempConfig(
     }
     await fn(path.join(dir, 'rslint.config.mjs'));
   } finally {
-    await fs.rm(dir, { recursive: true, force: true });
+    await cleanupTempDir(dir);
   }
 }
 

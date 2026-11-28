@@ -5,7 +5,6 @@ import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 import {
   writeFile,
-  rm,
   mkdtemp,
   mkdir,
   readFile,
@@ -20,17 +19,7 @@ const { Rslint, ts } = await import(
   ).href
 );
 
-async function cleanupTempDir(tempDir) {
-  // Windows can retain a child process's working directory during teardown.
-  // Retry only filesystem cleanup; assertions and lint execution run once.
-  // Linear backoff allows a busy host time to release locks. Exhaustion throws.
-  await rm(tempDir, {
-    recursive: true,
-    force: true,
-    maxRetries: 20,
-    retryDelay: 1_000,
-  });
-}
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 const serviceConfig = {
   ...ts.configs.base,
@@ -716,7 +705,7 @@ module.exports = config;`
   });
 
   test('lintFiles returns one result per matched file, routed correctly', async () => {
-    const { mkdtemp, writeFile, mkdir, rm } = await import('node:fs/promises');
+    const { mkdtemp, writeFile, mkdir } = await import('node:fs/promises');
     const os = await import('node:os');
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-multifile-'));
     try {
@@ -1523,8 +1512,8 @@ module.exports = config;`
             await rslint.close();
           }
         }
-        await rm(path.join(tmp, 'rslint.config.mjs'));
-        await rm(path.join(tmp, 'nested', 'rslint.config.mjs'));
+        await cleanupTempDir(path.join(tmp, 'rslint.config.mjs'));
+        await cleanupTempDir(path.join(tmp, 'nested', 'rslint.config.mjs'));
         await mkdir(path.join(tmp, 'ignored'));
         await writeFile(path.join(tmp, '.gitignore'), 'nested/\nignored/\n');
         for (const file of ['keep.ts', 'other.ts']) {

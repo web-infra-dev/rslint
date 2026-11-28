@@ -5,16 +5,18 @@
  * captured from that release; the shared tester also rejects fixes/suggestions.
  */
 import assert from 'node:assert/strict';
-import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'rstack/test';
-import { lint } from '@rslint/core/internal';
+import { NodeRslintService } from '@rslint/core/internal';
+import { RSLintService } from '@rslint/core/service';
 import {
   RuleTester,
   type TestCase,
   type ValidTestCase,
 } from '@rslint/rule-tester';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 const ruleTester = new RuleTester({
   plugin: '',
@@ -346,44 +348,46 @@ test('no-await-in-loop leaves every upstream case unchanged with fix enabled', a
     await mkdtemp(path.join(tmpdir(), 'rslint-no-await-in-loop-')),
   );
   try {
-    for (const entry of [...cases.valid, ...cases.invalid]) {
-      const item = typeof entry === 'string' ? { code: entry } : entry;
-      const result = await lint({
-        configDirectory: root,
-        workingDirectory: root,
-        config: [
-          {
-            languageOptions: {
-              ecmaVersion: 2018,
-              sourceType: 'script',
-              ...('languageOptions' in item ? item.languageOptions : {}),
-              parserOptions: { projectService: false },
+    const service = new RSLintService(
+      new NodeRslintService({ workingDirectory: root }),
+    );
+    try {
+      for (const entry of [...cases.valid, ...cases.invalid]) {
+        const item = typeof entry === 'string' ? { code: entry } : entry;
+        const result = await service.lint({
+          configDirectory: root,
+          workingDirectory: root,
+          config: [
+            {
+              languageOptions: {
+                ecmaVersion: 2018,
+                sourceType: 'script',
+                ...('languageOptions' in item ? item.languageOptions : {}),
+                parserOptions: { projectService: false },
+              },
+              rules: { 'no-await-in-loop': 'error' },
             },
-            rules: { 'no-await-in-loop': 'error' },
-          },
-        ],
-        fileContents: { [path.join(root, 'input.js')]: item.code },
-        fix: true,
-      });
-      assert.equal(result.fileCount, 1);
-      assert.equal(result.ruleCount, 1);
-      assert.deepEqual(result.output ?? {}, {}, item.code);
-      assert.equal(
-        result.diagnostics.length,
-        'errors' in item ? item.errors.length : 0,
-        item.code,
-      );
-      for (const diagnostic of result.diagnostics) {
-        assert.equal(diagnostic.fixes, undefined);
-        assert.equal(diagnostic.suggestions?.length ?? 0, 0);
+          ],
+          fileContents: { [path.join(root, 'input.js')]: item.code },
+          fix: true,
+        });
+        assert.equal(result.fileCount, 1);
+        assert.equal(result.ruleCount, 1);
+        assert.deepEqual(result.output ?? {}, {}, item.code);
+        assert.equal(
+          result.diagnostics.length,
+          'errors' in item ? item.errors.length : 0,
+          item.code,
+        );
+        for (const diagnostic of result.diagnostics) {
+          assert.equal(diagnostic.fixes, undefined);
+          assert.equal(diagnostic.suggestions?.length ?? 0, 0);
+        }
       }
+    } finally {
+      await service.close();
     }
   } finally {
-    await rm(root, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 1000,
-    });
+    await cleanupTempDir(root);
   }
 });

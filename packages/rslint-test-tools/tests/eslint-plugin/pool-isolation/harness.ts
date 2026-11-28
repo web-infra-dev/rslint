@@ -5,12 +5,14 @@
 // terminate-churning scenario, and applies a milestone-driven verdict. A
 // native napi-terminate abort (Windows) crashes only that subprocess, never
 // the rstest process.
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RUNNER = path.join(HERE, 'runner.mjs');
@@ -221,29 +223,51 @@ export async function runPoolScenario(
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-pool-iso-'));
   const milestoneFile = path.join(tmpDir, 'milestones.ndjson');
   const scenarioTmpDir = path.join(tmpDir, 'scenario');
-  fs.mkdirSync(scenarioTmpDir);
-  fs.writeFileSync(milestoneFile, '');
+  try {
+    fs.mkdirSync(scenarioTmpDir);
+    fs.writeFileSync(milestoneFile, '');
+  } catch (error) {
+    await cleanupTempDir(tmpDir);
+    throw error;
+  }
 
-  return new Promise<ScenarioResult>((resolve) => {
-    const child = spawn(process.execPath, [RUNNER, scenario], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        RSLINT_MILESTONE_FILE: milestoneFile,
-        RSLINT_DIST_ESLINT_PLUGIN: DIST_ESLINT_PLUGIN,
-        RSLINT_RUN_ID: runId,
-        RSLINT_SCENARIO_TMP_DIR: scenarioTmpDir,
-      },
+  return new Promise<ScenarioResult>((resolve, reject) => {
+    let child: ChildProcessByStdio<null, Readable, Readable>;
+    try {
+      child = spawn(process.execPath, [RUNNER, scenario], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          RSLINT_MILESTONE_FILE: milestoneFile,
+          RSLINT_DIST_ESLINT_PLUGIN: DIST_ESLINT_PLUGIN,
+          RSLINT_RUN_ID: runId,
+          RSLINT_SCENARIO_TMP_DIR: scenarioTmpDir,
+        },
+      });
+    } catch (error) {
+      cleanupTempDir(tmpDir).then(
+        () => reject(error),
+        () => reject(error),
+      );
+      return;
+    }
+
+    let timedOut = false;
+    let spawnError: string | undefined;
+    child.on('error', (err) => {
+      // Node guarantees `close` after `error`; let that single terminal path
+      // collect the complete journal and stream state.
+      spawnError = `failed to run isolated child: ${err.message}`;
     });
 
     // Never let an unconsumed pipe backpressure the child. Scenario output is
     // intentionally irrelevant; durable state lives in the journal.
-    child.stdout.resume();
+    child.stdout?.resume();
 
     const stderrChunks: Buffer[] = [];
     let stderrBytes = 0;
     let stderrTruncated = false;
-    child.stderr.on('data', (value: Buffer | string) => {
+    child.stderr?.on('data', (value: Buffer | string) => {
       const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
       const remaining = STDERR_LIMIT_BYTES - stderrBytes;
       if (remaining > 0) {
@@ -254,8 +278,6 @@ export async function runPoolScenario(
       if (chunk.length > remaining) stderrTruncated = true;
     });
 
-    let timedOut = false;
-    let spawnError: string | undefined;
     const timer = setTimeout(() => {
       // Do not resolve here: the journal and stdio are not final until
       // ChildProcess emits `close`. A late `done` cannot override timedOut.
@@ -263,80 +285,71 @@ export async function runPoolScenario(
       child.kill('SIGKILL');
     }, timeoutMs);
 
-    child.on('error', (err) => {
-      // Node guarantees `close` after `error`; let that single terminal path
-      // collect the complete journal and stream state.
-      spawnError = `failed to run isolated child: ${err.message}`;
-    });
-
     child.on('close', (exitCode, signal) => {
-      clearTimeout(timer);
-      const journal = readJournal(milestoneFile, { runId, scenario });
-      let cleanupError: string | undefined;
-      try {
-        fs.rmSync(tmpDir, {
-          recursive: true,
-          force: true,
-          maxRetries: 10,
-          retryDelay: 50,
-        });
-      } catch (err) {
-        cleanupError = `failed to remove scenario temp directory: ${String(
-          err,
-        )}`;
-      }
+      void (async () => {
+        clearTimeout(timer);
+        const journal = readJournal(milestoneFile, { runId, scenario });
+        let cleanupError: string | undefined;
+        try {
+          await cleanupTempDir(tmpDir);
+        } catch (err) {
+          cleanupError = `failed to remove scenario temp directory: ${String(
+            err,
+          )}`;
+        }
 
-      const milestones = journal.records
-        .filter((r) => r.kind === 'milestone')
-        .map((r) => r.name!);
-      const asserts = journal.records
-        .filter((r) => r.kind === 'assert')
-        .map((r) => ({ name: r.name!, pass: r.pass!, detail: r.detail }));
-      const reportedError = journal.records.find(
-        (r) => r.kind === 'error',
-      )?.detail;
-      const stderr = Buffer.concat(stderrChunks).toString('utf8');
-      const unexpectedCleanStderr =
-        exitCode === 0 && signal === null && stderr.trim() !== ''
-          ? `clean child wrote unexpected stderr (${Buffer.byteLength(stderr)} bytes)`
-          : undefined;
-      const processError =
-        reportedError ??
-        spawnError ??
-        cleanupError ??
-        (stderrTruncated
-          ? `child stderr exceeded ${STDERR_LIMIT_BYTES} byte limit`
-          : unexpectedCleanStderr);
+        const milestones = journal.records
+          .filter((r) => r.kind === 'milestone')
+          .map((r) => r.name!);
+        const asserts = journal.records
+          .filter((r) => r.kind === 'assert')
+          .map((r) => ({ name: r.name!, pass: r.pass!, detail: r.detail }));
+        const reportedError = journal.records.find(
+          (r) => r.kind === 'error',
+        )?.detail;
+        const stderr = Buffer.concat(stderrChunks).toString('utf8');
+        const unexpectedCleanStderr =
+          exitCode === 0 && signal === null && stderr.trim() !== ''
+            ? `clean child wrote unexpected stderr (${Buffer.byteLength(stderr)} bytes)`
+            : undefined;
+        const processError =
+          reportedError ??
+          spawnError ??
+          cleanupError ??
+          (stderrTruncated
+            ? `child stderr exceeded ${STDERR_LIMIT_BYTES} byte limit`
+            : unexpectedCleanStderr);
 
-      const result: ScenarioResult = {
-        scenario,
-        verdict: classifyScenario({
+        const result: ScenarioResult = {
           scenario,
-          records: journal.records,
+          verdict: classifyScenario({
+            scenario,
+            records: journal.records,
+            journalError: journal.error,
+            processError,
+            exitCode,
+            signal,
+            timedOut,
+            stderr,
+          }),
+          milestones,
+          asserts,
+          error: processError,
           journalError: journal.error,
-          processError,
           exitCode,
           signal,
           timedOut,
           stderr,
-        }),
-        milestones,
-        asserts,
-        error: processError,
-        journalError: journal.error,
-        exitCode,
-        signal,
-        timedOut,
-        stderr,
-        stderrTruncated,
-      };
+          stderrTruncated,
+        };
 
-      // Emit exactly one parent-authored, machine-readable record per isolated
-      // scenario. Child stdout is discarded, so it cannot forge this success
-      // evidence. In particular, CI logs distinguish a clean PASS from the
-      // diagnostic-only Windows EXPECTED-NATIVE-ABORT verdict.
-      process.stdout.write(`${formatScenarioAudit(result)}\n`);
-      resolve(result);
+        // Emit exactly one parent-authored, machine-readable record per isolated
+        // scenario. Child stdout is discarded, so it cannot forge this success
+        // evidence. In particular, CI logs distinguish a clean PASS from the
+        // diagnostic-only Windows EXPECTED-NATIVE-ABORT verdict.
+        process.stdout.write(`${formatScenarioAudit(result)}\n`);
+        resolve(result);
+      })().catch(reject);
     });
   });
 }

@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
+import { cleanupTempDir } from '../helpers/cleanup-temp-dir.js';
 const RSLINT_BIN = require.resolve('@rslint/core/bin');
 
 /**
@@ -30,13 +31,6 @@ async function createTempDir(files: Record<string, string>): Promise<string> {
   }
 
   return tempDir;
-}
-
-/**
- * Cleanup temporary directory
- */
-async function cleanupTempDir(tempDir: string): Promise<void> {
-  await fs.rm(tempDir, { recursive: true, force: true });
 }
 
 describe('CLI Configuration Tests', () => {

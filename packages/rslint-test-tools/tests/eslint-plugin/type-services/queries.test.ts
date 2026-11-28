@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import tsParser from '@typescript-eslint/parser';
 import ts from 'typescript';
@@ -11,6 +11,7 @@ import { lintFile } from '../../../../rslint/src/eslint-plugin/linter/ecma-langu
 import { decodeFrame } from '../../../../rslint/src/languages/js/frame.js';
 import type { ESTreeNode } from '../../../../rslint/src/languages/js/types.js';
 import { VISITOR_KEYS } from '../../../../rslint/src/languages/js/visitor-keys.js';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 import { enums, Host, root, useTypeServiceHarness } from './harness.js';
 
 const harness = useTypeServiceHarness();
@@ -186,9 +187,12 @@ describe('TypeScript node maps and type queries', () => {
     mapping = readMapping(host, directory);
   });
   afterAll(async () => {
-    mapping?.client.close();
-    await host.close();
-    rmSync(directory, { recursive: true, force: true });
+    try {
+      mapping?.client.close();
+      await host?.close();
+    } finally {
+      await cleanupTempDir(directory);
+    }
   });
 
   test('node maps, tokens and aliases match TypeScript', () => {
@@ -777,15 +781,18 @@ test('public checker, Program, mapped types and declared index infos match TypeS
     }),
   );
   const host = harness.createHost();
-  const descriptor = host.request({ method: 'init', config });
-  const owner = new TypeServiceClient(
-    enums,
-    descriptor,
-    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
-    host.source,
-    { maxFactsBytes: 1 << 18 },
-  );
+  let closeOwner: (() => void) | undefined;
   try {
+    const descriptor = host.request({ method: 'init', config });
+    const owner = new TypeServiceClient(
+      enums,
+      descriptor,
+      (query) =>
+        Buffer.from(host.request({ method: 'query', query }), 'base64'),
+      host.source,
+      { maxFactsBytes: 1 << 18 },
+    );
+    closeOwner = () => owner.close();
     const parsed = ts.getParsedCommandLineOfConfigFile(
       config,
       {},
@@ -968,7 +975,7 @@ test('public checker, Program, mapped types and declared index infos match TypeS
     const index = checker.getIndexInfoOfType(dictionary, ts.IndexKind.String)!;
     expect(Reflect.set(index, 'type', stringType)).toBe(false);
   } finally {
-    owner.close();
+    closeOwner?.();
     await host.close();
   }
 });

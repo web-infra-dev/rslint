@@ -104,20 +104,21 @@ export class Consumer {
     },
   ) => {
     const host = harness.createHost();
-    const descriptor = host.request({
-      method: 'init',
-      config,
-      syntaxOnly,
-    }) as TypeServiceDescriptor;
-    const client = new TypeServiceClient(
-      enums,
-      descriptor,
-      (query) =>
-        Buffer.from(host.request({ method: 'query', query }), 'base64'),
-      host.source,
-      { maxFactsBytes: 1 << 20 },
-    );
+    let client: TypeServiceClient | undefined;
     try {
+      const descriptor = host.request({
+        method: 'init',
+        config,
+        syntaxOnly,
+      }) as TypeServiceDescriptor;
+      client = new TypeServiceClient(
+        enums,
+        descriptor,
+        (query) =>
+          Buffer.from(host.request({ method: 'query', query }), 'base64'),
+        host.source,
+        { maxFactsBytes: 1 << 20 },
+      );
       const encoded = host.request({ method: 'project', file: consumerFile });
       const frame = Buffer.from(encoded.frame, 'base64');
       const projection = {
@@ -255,7 +256,7 @@ export class Consumer {
         originalInstance,
       };
     } finally {
-      client.close();
+      client?.close();
       await host.close();
     }
   };
@@ -387,19 +388,21 @@ test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json loc
   });
 
   const host = harness.createHost();
-  const descriptor = host.request({
-    method: 'init',
-    config,
-  }) as TypeServiceDescriptor;
-  const owner = new TypeServiceClient(
-    enums,
-    descriptor,
-    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
-    host.source,
-    { maxFactsBytes: 1 << 20 },
-  );
+  let owner: TypeServiceClient | undefined;
 
   try {
+    const descriptor = host.request({
+      method: 'init',
+      config,
+    }) as TypeServiceDescriptor;
+    owner = new TypeServiceClient(
+      enums,
+      descriptor,
+      (query) =>
+        Buffer.from(host.request({ method: 'query', query }), 'base64'),
+      host.source,
+      { maxFactsBytes: 1 << 20 },
+    );
     const actualProgram = owner.program as unknown as ts.Program;
     // Config file must remain excluded from Program source-file APIs.
     expect(actualProgram.getSourceFile(config)).toBeUndefined();
@@ -519,32 +522,33 @@ test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json loc
     );
     const readInheritedDiag = async (cfg: string) => {
       const inheritedHost = harness.createHost();
-      const inheritedDesc = inheritedHost.request({
-        method: 'init',
-        config: cfg,
-      }) as TypeServiceDescriptor;
-      const legacySource = (
-        scope: { generation: number },
-        reqFile: string,
-        metadataOnly?: boolean,
-      ) => {
-        const reply = inheritedHost.source(scope, reqFile, metadataOnly);
-        return reply
-          ? { fileName: reply.fileName, tree: reply.tree }
-          : undefined;
-      };
-      const inheritedClient = new TypeServiceClient(
-        enums,
-        inheritedDesc,
-        (query) =>
-          Buffer.from(
-            inheritedHost.request({ method: 'query', query }),
-            'base64',
-          ),
-        legacySource,
-        { maxFactsBytes: 1 << 20 },
-      );
+      let inheritedClient: TypeServiceClient | undefined;
       try {
+        const inheritedDesc = inheritedHost.request({
+          method: 'init',
+          config: cfg,
+        }) as TypeServiceDescriptor;
+        const legacySource = (
+          scope: { generation: number },
+          reqFile: string,
+          metadataOnly?: boolean,
+        ) => {
+          const reply = inheritedHost.source(scope, reqFile, metadataOnly);
+          return reply
+            ? { fileName: reply.fileName, tree: reply.tree }
+            : undefined;
+        };
+        inheritedClient = new TypeServiceClient(
+          enums,
+          inheritedDesc,
+          (query) =>
+            Buffer.from(
+              inheritedHost.request({ method: 'query', query }),
+              'base64',
+            ),
+          legacySource,
+          { maxFactsBytes: 1 << 20 },
+        );
         const inheritedActual =
           inheritedClient.program as unknown as ts.Program;
         const diag = inheritedActual
@@ -555,7 +559,7 @@ test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json loc
           path: normalizeSlashes((diag.file as any)?.path),
         };
       } finally {
-        inheritedClient.close();
+        inheritedClient?.close();
         await inheritedHost.close();
       }
     };
@@ -577,7 +581,7 @@ test('ts.getPreEmitDiagnostics and config diagnostics preserve tsconfig.json loc
       expect(lowerInherited.path).toBe(upperInherited.path);
     }
   } finally {
-    owner.close();
+    owner?.close();
     await host.close();
   }
 });
@@ -638,19 +642,21 @@ export const call2 = pick(1, true);
   });
 
   const host = harness.createHost();
-  const descriptor = host.request({
-    method: 'init',
-    config,
-  }) as TypeServiceDescriptor;
-  const owner = new TypeServiceClient(
-    enums,
-    descriptor,
-    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
-    host.source,
-    { maxFactsBytes: 1 << 20 },
-  );
+  let owner: TypeServiceClient | undefined;
 
   try {
+    const descriptor = host.request({
+      method: 'init',
+      config,
+    }) as TypeServiceDescriptor;
+    owner = new TypeServiceClient(
+      enums,
+      descriptor,
+      (query) =>
+        Buffer.from(host.request({ method: 'query', query }), 'base64'),
+      host.source,
+      { maxFactsBytes: 1 << 20 },
+    );
     const exercise = (p: ts.Program) => {
       const c = p.getTypeChecker();
       const src = p.getSourceFile(file)!;
@@ -759,7 +765,7 @@ export const call2 = pick(1, true);
     );
     expect(actual.candidatesInfo).toEqual(['1', '2']);
   } finally {
-    owner.close();
+    owner?.close();
     await host.close();
   }
 });
@@ -818,19 +824,21 @@ export function assertPresent(x: unknown): asserts x {
   });
 
   const host = harness.createHost();
-  const descriptor = host.request({
-    method: 'init',
-    config,
-  }) as TypeServiceDescriptor;
-  const owner = new TypeServiceClient(
-    enums,
-    descriptor,
-    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
-    host.source,
-    { maxFactsBytes: 1 << 20 },
-  );
+  let owner: TypeServiceClient | undefined;
 
   try {
+    const descriptor = host.request({
+      method: 'init',
+      config,
+    }) as TypeServiceDescriptor;
+    owner = new TypeServiceClient(
+      enums,
+      descriptor,
+      (query) =>
+        Buffer.from(host.request({ method: 'query', query }), 'base64'),
+      host.source,
+      { maxFactsBytes: 1 << 20 },
+    );
     const exercise = (p: ts.Program) => {
       const c = p.getTypeChecker();
       const src = p.getSourceFile(file)!;
@@ -933,7 +941,7 @@ export function assertPresent(x: unknown): asserts x {
       exercise(reference),
     );
   } finally {
-    owner.close();
+    owner?.close();
     await host.close();
   }
 });
@@ -964,54 +972,56 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
   );
 
   const host = harness.createHost();
-  const descriptor = host.request({
-    method: 'init',
-    config,
-  }) as TypeServiceDescriptor;
-
-  let transportCalls = 0;
-  let transportRecordCalls = 0;
-  let serverTrips = 0;
-  let recordServerTrips = 0;
-  let lastReplyBytes = 0;
-  const sharedTransportCache = new Map<string, Uint8Array>();
-  const sharedTransport = (
-    query: Parameters<typeof typeQueryKey>[0],
-    key: string,
-    cacheable: boolean,
-  ): Uint8Array => {
-    transportCalls++;
-    const isRecordOp =
-      query.op === 'typeRecord' ||
-      query.op === 'symbolRecord' ||
-      query.op === 'signatureRecord';
-    if (isRecordOp) transportRecordCalls++;
-    if (cacheable) {
-      const cached = sharedTransportCache.get(key);
-      if (cached) {
-        lastReplyBytes = cached.byteLength;
-        return cached;
-      }
-    }
-    serverTrips++;
-    if (isRecordOp) recordServerTrips++;
-    const reply = Buffer.from(
-      host.request({ method: 'query', query }),
-      'base64',
-    );
-    if (cacheable) sharedTransportCache.set(key, reply);
-    lastReplyBytes = reply.byteLength;
-    return reply;
-  };
-  const zeroCacheClient = new TypeServiceClient(
-    enums,
-    descriptor,
-    sharedTransport,
-    host.source,
-    { maxFactsBytes: 0 },
-  );
+  let zeroCacheClient: TypeServiceClient | undefined;
 
   try {
+    const descriptor = host.request({
+      method: 'init',
+      config,
+    }) as TypeServiceDescriptor;
+
+    let transportCalls = 0;
+    let transportRecordCalls = 0;
+    let serverTrips = 0;
+    let recordServerTrips = 0;
+    let lastReplyBytes = 0;
+    const sharedTransportCache = new Map<string, Uint8Array>();
+    const sharedTransport = (
+      query: Parameters<typeof typeQueryKey>[0],
+      key: string,
+      cacheable: boolean,
+    ): Uint8Array => {
+      transportCalls++;
+      const isRecordOp =
+        query.op === 'typeRecord' ||
+        query.op === 'symbolRecord' ||
+        query.op === 'signatureRecord';
+      if (isRecordOp) transportRecordCalls++;
+      if (cacheable) {
+        const cached = sharedTransportCache.get(key);
+        if (cached) {
+          lastReplyBytes = cached.byteLength;
+          return cached;
+        }
+      }
+      serverTrips++;
+      if (isRecordOp) recordServerTrips++;
+      const reply = Buffer.from(
+        host.request({ method: 'query', query }),
+        'base64',
+      );
+      if (cacheable) sharedTransportCache.set(key, reply);
+      lastReplyBytes = reply.byteLength;
+      return reply;
+    };
+    zeroCacheClient = new TypeServiceClient(
+      enums,
+      descriptor,
+      sharedTransport,
+      host.source,
+      { maxFactsBytes: 0 },
+    );
+
     const zc = zeroCacheClient.program.getTypeChecker();
 
     // Compact vs full reply shapes MUST produce distinct transport cache keys
@@ -1171,7 +1181,7 @@ test('zero-byte fact cache uses single-pass reads without retaining pending reco
       cachedClient.close();
     }
   } finally {
-    zeroCacheClient.close();
+    zeroCacheClient?.close();
     await host.close();
   }
 });
@@ -1212,31 +1222,38 @@ test('withFile supports sync/async callbacks and GC preserves live node maps', a
   );
   const host = harness.createHost();
   const syntaxHost = harness.createHost();
-  const typedDescriptor = host.request({
-    method: 'init',
-    config,
-  }) as TypeServiceDescriptor;
-  const syntaxDescriptor = syntaxHost.request({
-    method: 'init',
-    config,
-    syntaxOnly: true,
-  }) as TypeServiceDescriptor;
-  const client = new TypeServiceClient(
-    enums,
-    typedDescriptor,
-    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
-    host.source,
-    { maxFactsBytes: 1 << 20 },
-  );
-  const syntaxClient = new TypeServiceClient(
-    enums,
-    syntaxDescriptor,
-    (query) =>
-      Buffer.from(syntaxHost.request({ method: 'query', query }), 'base64'),
-    syntaxHost.source,
-    { maxFactsBytes: 1 << 20 },
-  );
+  let disposeClients: (() => void) | undefined;
   try {
+    const typedDescriptor = host.request({
+      method: 'init',
+      config,
+    }) as TypeServiceDescriptor;
+    const syntaxDescriptor = syntaxHost.request({
+      method: 'init',
+      config,
+      syntaxOnly: true,
+    }) as TypeServiceDescriptor;
+    const client = new TypeServiceClient(
+      enums,
+      typedDescriptor,
+      (query) =>
+        Buffer.from(host.request({ method: 'query', query }), 'base64'),
+      host.source,
+      { maxFactsBytes: 1 << 20 },
+    );
+    let syntaxClient: TypeServiceClient | undefined;
+    disposeClients = () => {
+      client[Symbol.dispose]();
+      syntaxClient?.[Symbol.dispose]();
+    };
+    syntaxClient = new TypeServiceClient(
+      enums,
+      syntaxDescriptor,
+      (query) =>
+        Buffer.from(syntaxHost.request({ method: 'query', query }), 'base64'),
+      syntaxHost.source,
+      { maxFactsBytes: 1 << 20 },
+    );
     const encoded = host.request({
       method: 'project',
       file,
@@ -1483,10 +1500,10 @@ test('withFile supports sync/async callbacks and GC preserves live node maps', a
       'type service client is closed',
     );
   } finally {
-    client[Symbol.dispose]();
-    syntaxClient[Symbol.dispose]();
-    await host.close();
-    await syntaxHost.close();
+    disposeClients?.();
+    const closed = await Promise.allSettled([host.close(), syntaxHost.close()]);
+    const failed = closed.find((entry) => entry.status === 'rejected');
+    if (failed) throw failed.reason;
   }
 });
 
@@ -1558,18 +1575,20 @@ test('decodes deep diagnostic message chains above 64 levels and rejects cyclic 
   expect(chainDepth(nativeDiags[1].messageText)).toBe(1);
 
   const host = harness.createHost();
-  const descriptor = host.request({
-    method: 'init',
-    config,
-  }) as TypeServiceDescriptor;
-  const client = new TypeServiceClient(
-    enums,
-    descriptor,
-    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
-    host.source,
-    { maxFactsBytes: 1 << 20 },
-  );
+  let client: TypeServiceClient | undefined;
   try {
+    const descriptor = host.request({
+      method: 'init',
+      config,
+    }) as TypeServiceDescriptor;
+    client = new TypeServiceClient(
+      enums,
+      descriptor,
+      (query) =>
+        Buffer.from(host.request({ method: 'query', query }), 'base64'),
+      host.source,
+      { maxFactsBytes: 1 << 20 },
+    );
     const sf = client.program.getSourceFile(file);
     expect(sf).toBeDefined();
     const diags = client.program.getSemanticDiagnostics(sf);
@@ -1593,7 +1612,7 @@ test('decodes deep diagnostic message chains above 64 levels and rejects cyclic 
       ts.flattenDiagnosticMessageText(nativeDiags[1].messageText, '\n'),
     );
   } finally {
-    client[Symbol.dispose]();
+    client?.[Symbol.dispose]();
     await host.close();
   }
 
@@ -1632,4 +1651,100 @@ test('decodes deep diagnostic message chains above 64 levels and rejects cyclic 
     'invalid type service packet',
   );
   diamondReader.close();
+});
+
+test('Host.close surfaces post-request broker crashes and unexpected exits without masking reported request errors', async () => {
+  const dir = mkdtempSync(resolve(harness.temp, 'host-close-crash-'));
+  const file = resolve(dir, 'index.ts');
+  const bigFile = resolve(dir, 'big.ts');
+  const config = resolve(dir, 'tsconfig.json');
+  writeFileSync(file, 'export const ok = 1;\n');
+  writeFileSync(
+    bigFile,
+    `export const bigPayload = ${JSON.stringify('x'.repeat(16_384))};\n`,
+  );
+  writeFileSync(config, JSON.stringify({ include: ['index.ts', 'big.ts'] }));
+
+  const hosts: ReturnType<typeof harness.createHost>[] = [];
+  const spawnHost = (mailboxBytes?: number) => {
+    const instance = harness.createHost(mailboxBytes);
+    hosts.push(instance);
+    return instance;
+  };
+
+  try {
+    // 1. Worker throws and exits with code 1 after the last request succeeded,
+    // even if an earlier application-level Go RPC error, structured-clone
+    // error, or JSON-serialization error was caught by the caller.
+    const crashedAfterRequest = spawnHost();
+    expect(() => crashedAfterRequest.request({ method: 'unknown' })).toThrow(
+      'unsupported harness request',
+    );
+    expect(() =>
+      crashedAfterRequest.request({ uncloneable: () => {} }),
+    ).toThrow();
+    expect(() => crashedAfterRequest.request({ unserializable: 1n })).toThrow();
+    const descriptor = crashedAfterRequest.request({
+      method: 'init',
+      config,
+      syntaxOnly: true,
+    }) as TypeServiceDescriptor;
+    expect(descriptor.generation).toBeGreaterThan(0);
+    const crashedExit = new Promise<number>((resolveExit) => {
+      crashedAfterRequest.worker.once('exit', resolveExit);
+    });
+    crashedAfterRequest.worker.postMessage(null);
+    expect(await crashedExit).toBe(1);
+    await expect(crashedAfterRequest.close()).rejects.toThrow(TypeError);
+
+    // 2. Reply exceeding the mailbox limit is recoverable and does not hide a
+    // subsequent worker crash after another request succeeds.
+    const tinyMailboxHost = spawnHost(8_192);
+    const tinyDescriptor = tinyMailboxHost.request({
+      method: 'init',
+      config,
+      syntaxOnly: true,
+    }) as TypeServiceDescriptor;
+    expect(() => tinyMailboxHost.source(tinyDescriptor, bigFile)).toThrow(
+      'type service test mailbox exhausted',
+    );
+    expect(tinyMailboxHost.request({ method: 'close' })).toBe(true);
+    const tinyCrashExit = new Promise<number>((resolveExit) => {
+      tinyMailboxHost.worker.once('exit', resolveExit);
+    });
+    tinyMailboxHost.worker.postMessage(null);
+    expect(await tinyCrashExit).toBe(1);
+    await expect(tinyMailboxHost.close()).rejects.toThrow(TypeError);
+
+    // 3. Worker exits before `close()` without emitting an `error` event.
+    const exitedWithoutError = spawnHost();
+    expect(
+      (
+        exitedWithoutError.request({
+          method: 'init',
+          config,
+          syntaxOnly: true,
+        }) as TypeServiceDescriptor
+      ).generation,
+    ).toBeGreaterThan(0);
+    await exitedWithoutError.worker.terminate();
+    await expect(exitedWithoutError.close()).rejects.toThrow(
+      /exited unexpectedly/,
+    );
+
+    // 4. Worker crash while `request()` is waiting in `Atomics.wait` wakes the
+    // caller immediately instead of stalling 60s, and `close()` in `finally`
+    // neither stalls in a second `Atomics.wait` nor re-throws over the caller.
+    const crashedInFlight = spawnHost();
+    const startedAt = Date.now();
+    expect(() => crashedInFlight.request(null as unknown as object)).toThrow(
+      /exited unexpectedly/,
+    );
+    await expect(crashedInFlight.close()).resolves.toBeUndefined();
+    expect(Date.now() - startedAt).toBeLessThan(30_000);
+  } finally {
+    await Promise.allSettled(
+      hosts.map((instance) => instance.worker.terminate()),
+    );
+  }
 });

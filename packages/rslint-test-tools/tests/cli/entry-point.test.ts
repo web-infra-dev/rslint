@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
+import { cleanupTempDir } from '../helpers/cleanup-temp-dir.js';
 
 const RSLINT_BIN = require.resolve('@rslint/core/bin');
 
@@ -32,10 +33,6 @@ async function createTempDir(files: Record<string, string>): Promise<string> {
     await fs.writeFile(fullPath, content, 'utf8');
   }
   return tempDir;
-}
-
-async function cleanupTempDir(tempDir: string): Promise<void> {
-  await fs.rm(tempDir, { recursive: true, force: true });
 }
 
 describe('Entry point (bin/rslint.js)', () => {

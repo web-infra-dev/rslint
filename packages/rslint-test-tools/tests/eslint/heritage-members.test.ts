@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Linter } from 'eslint';
 import * as parser from '@typescript-eslint/parser';
-import { lint } from '@rslint/core/internal';
+import { NodeRslintService } from '@rslint/core/internal';
+import { RSLintService } from '@rslint/core/service';
 import { afterAll, expect, test } from 'rstack/test';
 import { cleanupTempDir } from '../cli/js-config/helpers';
 
@@ -39,7 +40,22 @@ if (cases.length === 0)
 const cwd = mkdtempSync(path.join(tmpdir(), 'rslint-heritage-members-'));
 const file = path.join(cwd, 'member.ts');
 const eslint = new Linter();
-afterAll(() => cleanupTempDir(cwd));
+let service: RSLintService | undefined;
+
+function getService(): RSLintService {
+  service ??= new RSLintService(
+    new NodeRslintService({ workingDirectory: cwd }),
+  );
+  return service;
+}
+
+afterAll(async () => {
+  try {
+    await service?.close();
+  } finally {
+    await cleanupTempDir(cwd);
+  }
+});
 
 for (const entry of cases) {
   test(`${entry.rule}: ${entry.name}`, async () => {
@@ -77,7 +93,7 @@ for (const entry of cases) {
       })),
     ).toEqual(expected);
 
-    const actual = await lint({
+    const actual = await getService().lint({
       config: [{ files: ['**/*.ts'], languageOptions, rules }],
       configDirectory: cwd,
       workingDirectory: cwd,

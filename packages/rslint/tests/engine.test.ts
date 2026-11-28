@@ -17,6 +17,7 @@ import { setWorkerEntryForTests } from '../src/eslint-plugin/worker-pool.js';
 import { resolvePluginAttachments } from '../src/eslint-plugin/plugin/attachments.js';
 import { getNativeBinding } from '../src/native/binding.js';
 import { decodeFrame as decodeEstreeFrame } from '../src/languages/js/frame.js';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 setWorkerEntryForTests(
@@ -129,7 +130,7 @@ describe('CLI shared source integration', () => {
         }
       } finally {
         transport?.close();
-        fs.rmSync(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -231,9 +232,9 @@ describe('runEngine IPC disconnect cleanup', () => {
     );
   }, 70_000);
 
-  afterAll(() => {
-    if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true });
-  });
+  afterAll(async () => {
+    if (fixtureRoot) await cleanupTempDir(fixtureRoot);
+  }, 35 * 60_000);
 
   function start(mode: string) {
     const stderr = new PassThrough();
@@ -645,7 +646,7 @@ describe('runEngine config activation', () => {
       expect(lintCalls).toBe(0);
       expect(shutdownCalls).toBe(1);
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -750,7 +751,7 @@ describe('runEngine config activation', () => {
       } finally {
         releaseShutdown();
         ChildProcess.prototype.once = originalOnce;
-        fs.rmSync(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
     CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS,
@@ -863,7 +864,7 @@ describe('runEngine config activation', () => {
         releaseShutdown();
         releasePostPrepare();
         if (postPrepareEntered) await postPrepareFinished;
-        fs.rmSync(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
     CONFIG_ACTIVATION_OUTER_DEADLOCK_SENTINEL_MS,

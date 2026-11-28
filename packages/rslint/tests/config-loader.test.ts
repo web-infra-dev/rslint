@@ -10,13 +10,10 @@ import path from 'node:path';
 import os from 'node:os';
 import vm from 'node:vm';
 import { ts } from '../src/config/presets/index.js';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 function createTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-config-loader-test-'));
-}
-
-function cleanup(dir: string): void {
-  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 describe('loadConfigFile', () => {
@@ -33,7 +30,7 @@ describe('loadConfigFile', () => {
         'no-console': 'error',
       });
     } finally {
-      cleanup(tmp);
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -47,7 +44,7 @@ describe('loadConfigFile', () => {
       const result = await loadConfigFile(path.join(tmp, 'rslint.config.mjs'));
       expect(Array.isArray(result)).toBe(true);
     } finally {
-      cleanup(tmp);
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -64,7 +61,7 @@ describe('loadConfigFile', () => {
         'no-console': 'error',
       });
     } finally {
-      cleanup(tmp);
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -78,7 +75,7 @@ describe('loadConfigFile', () => {
       const result = await loadConfigFile(path.join(tmp, 'rslint.config.cts'));
       expect(Array.isArray(result)).toBe(true);
     } finally {
-      cleanup(tmp);
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -95,7 +92,7 @@ describe('loadConfigFile', () => {
         'no-console': 'error',
       });
     } finally {
-      cleanup(tmp);
+      await cleanupTempDir(tmp);
     }
   });
 });
@@ -117,7 +114,7 @@ describe('loadConfigFileFresh', () => {
           { name: 'second' },
         ]);
       } finally {
-        cleanup(tmp);
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -141,7 +138,7 @@ describe('loadConfigFileFresh', () => {
         );
         expect(fs.readFileSync(sideEffectPath, 'utf8')).toBe('x');
       } finally {
-        cleanup(tmp);
+        await cleanupTempDir(tmp);
       }
     },
   );

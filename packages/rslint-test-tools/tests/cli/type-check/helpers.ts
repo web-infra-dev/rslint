@@ -28,9 +28,7 @@ export async function createTempDir(
   return tempDir;
 }
 
-export async function cleanupTempDir(tempDir: string): Promise<void> {
-  await fs.rm(tempDir, { recursive: true, force: true });
-}
+export { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 export async function addUntypedPackage(
   tempDir: string,

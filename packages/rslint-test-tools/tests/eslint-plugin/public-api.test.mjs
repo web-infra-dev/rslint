@@ -87,26 +87,27 @@ async function runExitFixture(scriptName, successMarker) {
 describe('Rslint community plugin API', () => {
   test('lintText runs a local community plugin Program listener and returns its fix output', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-plugin-'));
-    const pluginUrl = pathToFileURL(
-      path.join(eslintPluginFixturesDir, 'local-plugin.mjs'),
-    ).href;
-    await writeFile(
-      path.join(tmp, 'rslint.config.mjs'),
-      [
-        `import local from ${JSON.stringify(pluginUrl)};`,
-        'export default [{',
-        '  plugins: { local },',
-        '  rules: {',
-        "    'local/program-listener': 'error',",
-        "    'local/prefer-array-some': 'error',",
-        '  },',
-        '}];',
-        '',
-      ].join('\n'),
-    );
-
-    const rslint = new Rslint({ cwd: tmp, fix: true });
+    let rslint;
     try {
+      const pluginUrl = pathToFileURL(
+        path.join(eslintPluginFixturesDir, 'local-plugin.mjs'),
+      ).href;
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        [
+          `import local from ${JSON.stringify(pluginUrl)};`,
+          'export default [{',
+          '  plugins: { local },',
+          '  rules: {',
+          "    'local/program-listener': 'error',",
+          "    'local/prefer-array-some': 'error',",
+          '  },',
+          '}];',
+          '',
+        ].join('\n'),
+      );
+
+      rslint = new Rslint({ cwd: tmp, fix: true });
       const [result] = await rslint.lintText(
         'const found = [1].filter(Boolean);\n',
         { filePath: 'probe.ts' },
@@ -117,8 +118,11 @@ describe('Rslint community plugin API', () => {
       expect(result.fixableErrorCount).toBe(0);
       expect(result.output).toBe('const found = [1].some(Boolean);\n');
     } finally {
-      await rslint.close();
-      await cleanupTempDir(tmp);
+      try {
+        await rslint?.close();
+      } finally {
+        await cleanupTempDir(tmp);
+      }
     }
   });
 

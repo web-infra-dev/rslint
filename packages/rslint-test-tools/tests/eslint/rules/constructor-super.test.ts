@@ -7,6 +7,7 @@ import path from 'node:path';
 import { expect, test } from 'rstack/test';
 import { lint } from '@rslint/core/internal';
 import { RuleTester } from '@rslint/rule-tester';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 const ruleTester = new RuleTester({ languageOptions: { ecmaVersion: 2021 } });
 
@@ -769,6 +770,6 @@ test('autofix leaves every upstream constructor-super case unchanged', async () 
       expect(diagnostic.suggestions).toBeUndefined();
     }
   } finally {
-    await fs.rm(root, { recursive: true, force: true });
+    await cleanupTempDir(root);
   }
 });

@@ -5,16 +5,18 @@
 // asserts their absence for every diagnostic.
 // https://github.com/eslint/eslint/blob/v10.8.1/tests/lib/rules/no-constant-condition.js
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'rstack/test';
-import { lint } from '@rslint/core/internal';
+import { NodeRslintService } from '@rslint/core/internal';
+import { RSLintService } from '@rslint/core/service';
 import {
   RuleTester,
   type TestCase,
   type ValidTestCase,
 } from '@rslint/rule-tester';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 const ruleTester = new RuleTester({
   plugin: '',
@@ -2360,51 +2362,58 @@ ruleTester.run('no-constant-condition', cases);
 test('no-constant-condition preserves every upstream input when autofixing', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-constant-fix-'));
   try {
-    for (const item of cases.invalid) {
-      const result = await lint({
-        configDirectory: root,
-        workingDirectory: root,
-        config: [
-          {
-            languageOptions: {
-              ecmaVersion: 2021,
-              ...item.languageOptions,
-              parserOptions: { projectService: false },
+    const service = new RSLintService(
+      new NodeRslintService({ workingDirectory: root }),
+    );
+    try {
+      for (const item of cases.invalid) {
+        const result = await service.lint({
+          configDirectory: root,
+          workingDirectory: root,
+          config: [
+            {
+              languageOptions: {
+                ecmaVersion: 2021,
+                ...item.languageOptions,
+                parserOptions: { projectService: false },
+              },
+              rules: {
+                'no-constant-condition': [
+                  'error',
+                  ...(typeof item.options === 'function'
+                    ? item.options(root)
+                    : (item.options ?? [])),
+                ],
+              },
             },
-            rules: {
-              'no-constant-condition': [
-                'error',
-                ...(typeof item.options === 'function'
-                  ? item.options(root)
-                  : (item.options ?? [])),
-              ],
-            },
-          },
-        ],
-        fileContents: { [path.join(root, 'input.js')]: item.code },
-        fix: true,
-      });
-      assert.equal(result.fileCount, 1);
-      assert.equal(result.ruleCount, 1);
-      assert.deepEqual(Object.keys(result.output ?? {}), [], item.code);
-      assert.deepEqual(
-        result.diagnostics.map((diagnostic) => ({
-          messageId: diagnostic.messageId,
-          message: diagnostic.message,
-          line: diagnostic.range.start.line,
-          column: diagnostic.range.start.column,
-          endLine: diagnostic.range.end.line,
-          endColumn: diagnostic.range.end.column,
-        })),
-        item.errors,
-        item.code,
-      );
-      for (const diagnostic of result.diagnostics) {
-        assert.equal(diagnostic.fixes, undefined);
-        assert.deepEqual(diagnostic.suggestions ?? [], []);
+          ],
+          fileContents: { [path.join(root, 'input.js')]: item.code },
+          fix: true,
+        });
+        assert.equal(result.fileCount, 1);
+        assert.equal(result.ruleCount, 1);
+        assert.deepEqual(Object.keys(result.output ?? {}), [], item.code);
+        assert.deepEqual(
+          result.diagnostics.map((diagnostic) => ({
+            messageId: diagnostic.messageId,
+            message: diagnostic.message,
+            line: diagnostic.range.start.line,
+            column: diagnostic.range.start.column,
+            endLine: diagnostic.range.end.line,
+            endColumn: diagnostic.range.end.column,
+          })),
+          item.errors,
+          item.code,
+        );
+        for (const diagnostic of result.diagnostics) {
+          assert.equal(diagnostic.fixes, undefined);
+          assert.deepEqual(diagnostic.suggestions ?? [], []);
+        }
       }
+    } finally {
+      await service.close();
     }
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await cleanupTempDir(root);
   }
 });

@@ -11,10 +11,14 @@ import {
   getCurrentRuleIds,
   getRuleIdsAtRef,
 } from '../../../scripts/sync-version-info/release.js';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
-function withFixture<T>(
-  run: (root: string, write: (file: string, content: string) => void) => T,
-): T {
+async function withFixture<T>(
+  run: (
+    root: string,
+    write: (file: string, content: string) => void,
+  ) => T | Promise<T>,
+): Promise<T> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-rule-metadata-'));
   const write = (file: string, content: string) => {
     const target = path.join(root, file);
@@ -22,15 +26,15 @@ function withFixture<T>(
     fs.writeFileSync(target, content);
   };
   try {
-    return run(root, write);
+    return await run(root, write);
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    await cleanupTempDir(root);
   }
 }
 
 describe('rule metadata', () => {
-  test('filesystem and Git discovery preserve nested rule IDs and test ownership', () => {
-    withFixture((root, write) => {
+  test('filesystem and Git discovery preserve nested rule IDs and test ownership', async () => {
+    await withFixture((root, write) => {
       write('internal/rules/core_rule/core_rule.go', 'package core_rule');
       write('internal/rules/core_rule/helper/helper.go', 'package helper');
       write(
@@ -141,7 +145,11 @@ describe('rule metadata', () => {
         ].sort(),
       );
       const git = (...args: string[]) =>
-        execFileSync('git', args, { cwd: root, stdio: 'pipe' })
+        // cspell:disable-next-line
+        execFileSync('git', ['-c', 'core.fsmonitor=false', ...args], {
+          cwd: root,
+          stdio: 'pipe',
+        })
           .toString()
           .trim();
       git('init', '--quiet');
@@ -213,7 +221,7 @@ describe('rule metadata', () => {
     expect(await compileRuleOptionTypes([...entries].reverse())).toEqual(
       generated,
     );
-    withFixture((root, write) => {
+    await withFixture((root, write) => {
       const source = `type RuleEntry<T extends unknown[]> = ['error', ...T];
 interface RulesRecord { ${generated.recordProperties.join('\n')} }
 ${generated.typeDeclarations.join('\n')}

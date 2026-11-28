@@ -1,6 +1,6 @@
 // Ported from eslint-plugin-unicorn v79.0.0; see LICENSE.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-at.js
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -12,6 +12,7 @@ import {
   type LintOptions,
 } from '@rslint/core/internal';
 import { RSLintService } from '@rslint/core/service';
+import { cleanupTempDir } from '../../helpers/cleanup-temp-dir.js';
 
 interface ExpectedDiagnostic {
   id: string;
@@ -3130,14 +3131,12 @@ beforeAll(async () => {
   );
 });
 afterAll(async () => {
-  await service?.close();
-  if (root) {
-    await rm(root, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 100,
-    });
+  try {
+    await service?.close();
+  } finally {
+    if (root) {
+      await cleanupTempDir(root);
+    }
   }
 });
 

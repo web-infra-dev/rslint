@@ -1,12 +1,13 @@
 import { projectFrame } from '../languages/js/project-frame.js';
 import { describe, test, expect } from 'rstack/test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { finished } from 'node:stream/promises';
 
 import { WorkerPool } from '../../../rslint/src/eslint-plugin/worker-pool.js';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
+import { cleanupTempDir } from '../helpers/cleanup-temp-dir.js';
 
 /**
  * WorkerPool end-to-end — multi-config (monorepo) dispatch: a single
@@ -369,7 +370,7 @@ export default [{ plugins: { r4: p } }];
         // Idempotent (this.closed guard) — the in-body shutdown already
         // ran on the happy path; this also covers an early throw before it.
         await pool.shutdown();
-        await rm(fxDir, { recursive: true, force: true });
+        await cleanupTempDir(fxDir);
       }
     });
   },

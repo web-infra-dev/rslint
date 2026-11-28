@@ -5,12 +5,12 @@ import {
   mkdtemp,
   readFile,
   realpath,
-  rm,
   writeFile,
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { cleanupTempDir } from './cleanup-temp-dir.js';
 
 const cliScript = path.resolve(import.meta.dirname, '../bin/rslint.js');
 const cliTimeoutMs = 30_000;
@@ -207,7 +207,7 @@ describe('CLI basePath product contract', () => {
       ]);
       expect(result.stderr).not.toContain('warning:');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -256,7 +256,7 @@ describe('CLI basePath product contract', () => {
       ]);
       expect(result.stderr).not.toContain('warning:');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -288,7 +288,7 @@ describe('CLI basePath product contract', () => {
       ).toEqual(expected);
       expect(result.stderr).not.toContain('warning:');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 });
@@ -336,7 +336,7 @@ describe('CLI lint target contracts', () => {
         'no-console',
       ]);
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -428,7 +428,7 @@ describe('CLI lint target contracts', () => {
         },
       ]);
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -491,7 +491,7 @@ describe('CLI lint target contracts', () => {
             .sort(),
         ).toEqual(['@typescript-eslint/no-for-in-array', 'no-console']);
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -548,7 +548,7 @@ describe('CLI lint target contracts', () => {
             : [path.join(root, 'packages', 'app', 'src', 'peer.ts')],
         );
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -587,7 +587,7 @@ describe('CLI lint target contracts', () => {
           );
         }
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -631,7 +631,7 @@ describe('CLI lint target contracts', () => {
           parseDiagnostics(result.stdout).map(({ ruleName }) => ruleName),
         ).toEqual(['no-debugger']);
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -695,7 +695,7 @@ describe('CLI lint target contracts', () => {
           ).toEqual(['no-debugger']);
         }
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -748,7 +748,7 @@ describe('CLI lint target contracts', () => {
         },
       ]);
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -843,7 +843,7 @@ describe('CLI lint target contracts', () => {
           normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
         ).toEqual(normalizedDiagnostics(root, expected));
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -940,7 +940,7 @@ describe('CLI lint target contracts', () => {
           normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
         ).toEqual(normalizedDiagnostics(root, expected));
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -1065,7 +1065,7 @@ describe('CLI lint target contracts', () => {
           ),
         );
       } finally {
-        await rm(root, { recursive: true, force: true });
+        await cleanupTempDir(root);
       }
     },
   );
@@ -1125,7 +1125,7 @@ describe('CLI lint target contracts', () => {
         expect(result.stderr).not.toContain('warning:');
       }
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -1173,7 +1173,7 @@ describe('CLI lint target contracts', () => {
       );
       expect(result.stderr).not.toContain('warning:');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 
@@ -1223,7 +1223,7 @@ describe('CLI lint target contracts', () => {
       expect(result.stderr).not.toContain('outside-files.js');
       expect(result.stderr).not.toContain('linted.ts');
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await cleanupTempDir(root);
     }
   });
 });

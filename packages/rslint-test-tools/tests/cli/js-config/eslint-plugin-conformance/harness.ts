@@ -20,6 +20,7 @@ import path from 'node:path';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
 import { validateConformanceStderrContract } from './stderr-contract.js';
+import { cleanupTempDir } from '../../../helpers/cleanup-temp-dir.js';
 
 const require = createRequire(import.meta.url);
 // A finite test cannot prove that work will never complete. Normal completion
@@ -243,10 +244,10 @@ export async function runEslintV10(
  * only zero out its own chunk, not the whole suite, and so no single config /
  * IPC payload grows unbounded. Returns Map<globalIndex, NormDiag[]>.
  */
-export function runRslintBatch(
+export async function runRslintBatch(
   cases: DiffCase[],
   deadline = performance.now() + CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS,
-): Map<number, NormDiag[]> {
+): Promise<Map<number, NormDiag[]>> {
   const CHUNK = 60;
   const byIndex = new Map<number, NormDiag[]>(cases.map((_, i) => [i, []]));
   for (let start = 0; start < cases.length; start += CHUNK) {
@@ -256,7 +257,7 @@ export function runRslintBatch(
         `rslint conformance exceeded its ${CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS}ms batch deadlock sentinel`,
       );
     }
-    runRslintChunk(
+    await runRslintChunk(
       cases,
       start,
       Math.min(start + CHUNK, cases.length),
@@ -270,13 +271,13 @@ export function runRslintBatch(
 
 /** Run one chunk [start,end) in its own temp project, filling `byIndex` by the
  *  GLOBAL case index (fixture files are named `c<globalIndex>.<ext>`). */
-function runRslintChunk(
+async function runRslintChunk(
   cases: DiffCase[],
   start: number,
   end: number,
   byIndex: Map<number, NormDiag[]>,
   timeoutMs: number,
-): void {
+): Promise<void> {
   const rslintBin = require.resolve('@rslint/core/bin');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-v10-diff-'));
   try {
@@ -424,7 +425,7 @@ function runRslintChunk(
       );
     }
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    await cleanupTempDir(dir);
   }
 }
 
@@ -435,7 +436,7 @@ function runRslintChunk(
 export async function compareCases(cases: DiffCase[]): Promise<Verdict[]> {
   const deadline = performance.now() + CONFORMANCE_BATCH_DEADLOCK_SENTINEL_MS;
   const es = await runEslintV10(cases);
-  const rs = runRslintBatch(cases, deadline);
+  const rs = await runRslintBatch(cases, deadline);
   return cases.map((c, i) => {
     const eslint = es.get(i) ?? [];
     const rslint = rs.get(i) ?? [];

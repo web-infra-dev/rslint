@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { RuleTesterConfig } from '@rslint/rule-tester';
+import { cleanupTempDir } from '../helpers/cleanup-temp-dir.js';
 
 const compilerOptions = {
   jsx: 'preserve',
@@ -50,11 +51,6 @@ export async function withFixture<T>(
     }
     return await run(root);
   } finally {
-    await fs.rm(root, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 1_000,
-    });
+    await cleanupTempDir(root);
   }
 }
