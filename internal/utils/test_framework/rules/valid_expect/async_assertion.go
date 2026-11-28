@@ -479,39 +479,11 @@ func (r *AsyncAssertionResolver) getBlockAwaitSummary(block *ast.Block) *blockAw
 		}
 	}
 
-	recordArrayElem := func(expr *ast.Node, stmtIdx int, baseFlags consumeFlags) {
-		u := internalUtils.SkipAssertionsAndParens(expr)
-		if u == nil {
+	var recordConsumedExpr func(expr *ast.Node, stmtIdx int, baseFlags consumeFlags, depth int)
+	recordConsumedExpr = func(expr *ast.Node, stmtIdx int, baseFlags consumeFlags, depth int) {
+		if depth > 8 {
 			return
 		}
-		flags := baseFlags
-		stripChains := func(cur *ast.Node) *ast.Node {
-			for cur != nil {
-				m, ok := r.promiseChainMethodName(cur)
-				if !ok {
-					break
-				}
-				if m != "finally" {
-					flags |= consumeNonFinally
-				}
-				callee := internalUtils.SkipAssertionsAndParens(cur.AsCallExpression().Expression)
-				cur = internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
-			}
-			return cur
-		}
-		u = stripChains(u)
-		if u == nil {
-			return
-		}
-		if method, ok := r.promiseMethodName(u); ok && method == "resolve" {
-			if args := u.AsCallExpression().Arguments; args != nil && len(args.Nodes) > 0 {
-				u = stripChains(internalUtils.SkipAssertionsAndParens(args.Nodes[0]))
-			}
-		}
-		recordIdent(u, stmtIdx, flags)
-	}
-
-	recordConsumedExpr := func(expr *ast.Node, stmtIdx int, baseFlags consumeFlags) {
 		u := internalUtils.SkipAssertionsAndParens(expr)
 		if u == nil {
 			return
@@ -543,14 +515,14 @@ func (r *AsyncAssertionResolver) getBlockAwaitSummary(block *ast.Block) *blockAw
 			arg0 := internalUtils.SkipAssertionsAndParens(args.Nodes[0])
 			switch method {
 			case "resolve":
-				recordArrayElem(arg0, stmtIdx, flags)
+				recordConsumedExpr(arg0, stmtIdx, flags, depth+1)
 			case "all", "allSettled", "race", "any":
 				if method == "allSettled" || method == "any" {
 					flags |= consumeNonFinally
 				}
 				if arg0 != nil && arg0.Kind == ast.KindArrayLiteralExpression && arg0.AsArrayLiteralExpression().Elements != nil {
 					for _, el := range arg0.AsArrayLiteralExpression().Elements.Nodes {
-						recordArrayElem(el, stmtIdx, flags)
+						recordConsumedExpr(el, stmtIdx, flags, depth+1)
 					}
 				}
 			}
@@ -565,12 +537,12 @@ func (r *AsyncAssertionResolver) getBlockAwaitSummary(block *ast.Block) *blockAw
 		case ast.KindExpressionStatement:
 			expr := internalUtils.SkipAssertionsAndParens(stmt.AsExpressionStatement().Expression)
 			if expr != nil && expr.Kind == ast.KindAwaitExpression {
-				recordConsumedExpr(expr.AsAwaitExpression().Expression, i, 0)
+				recordConsumedExpr(expr.AsAwaitExpression().Expression, i, 0, 0)
 			} else if expr != nil && expr.Kind == ast.KindBinaryExpression {
 				if bin := expr.AsBinaryExpression(); bin != nil && bin.OperatorToken != nil &&
 					bin.OperatorToken.Kind == ast.KindEqualsToken {
 					if rhs := internalUtils.SkipAssertionsAndParens(bin.Right); rhs != nil && rhs.Kind == ast.KindAwaitExpression {
-						recordConsumedExpr(rhs.AsAwaitExpression().Expression, i, 0)
+						recordConsumedExpr(rhs.AsAwaitExpression().Expression, i, 0, 0)
 					}
 				}
 			}
@@ -582,7 +554,7 @@ func (r *AsyncAssertionResolver) getBlockAwaitSummary(block *ast.Block) *blockAw
 					}
 					init := internalUtils.SkipAssertionsAndParens(d.AsVariableDeclaration().Initializer)
 					if init != nil && init.Kind == ast.KindAwaitExpression {
-						recordConsumedExpr(init.AsAwaitExpression().Expression, i, 0)
+						recordConsumedExpr(init.AsAwaitExpression().Expression, i, 0, 0)
 					}
 				}
 			}
@@ -591,9 +563,9 @@ func (r *AsyncAssertionResolver) getBlockAwaitSummary(block *ast.Block) *blockAw
 			if ret != nil && ret.Expression != nil {
 				expr := internalUtils.SkipAssertionsAndParens(ret.Expression)
 				if expr != nil && expr.Kind == ast.KindAwaitExpression {
-					recordConsumedExpr(expr.AsAwaitExpression().Expression, i, 0)
+					recordConsumedExpr(expr.AsAwaitExpression().Expression, i, 0, 0)
 				} else {
-					recordConsumedExpr(expr, i, consumeViaReturn)
+					recordConsumedExpr(expr, i, consumeViaReturn, 0)
 				}
 			}
 		}
@@ -919,60 +891,198 @@ func (r *AsyncAssertionResolver) FindFixableContainingFunctionCached(node *ast.N
 	return nil, false
 }
 
-func isTestOrHookCallbackCall(fn *ast.Node) bool {
-	fnOuter := internalUtils.OutermostTransparentExpression(fn)
-	if fnOuter == nil || fnOuter.Parent == nil || fnOuter.Parent.Kind != ast.KindCallExpression {
-		return false
-	}
-	call := fnOuter.Parent.AsCallExpression()
-	if call == nil || call.Expression == fnOuter {
-		return false
-	}
-	root := testFramework.ResolveFirstIdentifier(call.Expression)
-	if root == nil || root.Kind != ast.KindIdentifier {
-		return false
-	}
-	switch root.AsIdentifier().Text {
+func isTestOrHookName(name string) bool {
+	switch name {
 	case "test", "it", "fit", "xit", "beforeEach", "afterEach", "beforeAll", "afterAll":
 		return true
 	}
 	return false
 }
 
-func (r *AsyncAssertionResolver) isDoneCallbackFunction(fn *ast.Node) bool {
-	if fn == nil || (fn.Kind != ast.KindArrowFunction && fn.Kind != ast.KindFunctionExpression) {
+func isTestOrHookCallbackArg(arg *ast.Node) bool {
+	argOuter := internalUtils.OutermostTransparentExpression(arg)
+	if argOuter == nil || argOuter.Parent == nil || argOuter.Parent.Kind != ast.KindCallExpression {
 		return false
+	}
+	call := argOuter.Parent.AsCallExpression()
+	if call == nil || call.Expression == argOuter {
+		return false
+	}
+	cur := internalUtils.SkipAssertionsAndParens(call.Expression)
+	for cur != nil {
+		switch {
+		case cur.Kind == ast.KindIdentifier:
+			return isTestOrHookName(cur.AsIdentifier().Text)
+		case ast.IsAccessExpression(cur):
+			if name, ok := internalUtils.AccessExpressionStaticName(cur); ok && isTestOrHookName(name) {
+				return true
+			}
+			cur = internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(cur))
+		case cur.Kind == ast.KindCallExpression:
+			cur = internalUtils.SkipAssertionsAndParens(cur.AsCallExpression().Expression)
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) functionSymbol(fn *ast.Node) *ast.Symbol {
+	if r == nil || fn == nil {
+		return nil
+	}
+	if fn.Kind == ast.KindFunctionDeclaration {
+		if sym := fn.Symbol(); sym != nil {
+			return sym
+		}
+		if name := fn.Name(); name != nil && name.Kind == ast.KindIdentifier {
+			return r.resolveSymbol(name)
+		}
+		return nil
 	}
 	fnOuter := internalUtils.OutermostTransparentExpression(fn)
-	if fnOuter == nil || fnOuter.Parent == nil || fnOuter.Parent.Kind != ast.KindCallExpression ||
-		fnOuter.Parent.AsCallExpression().Expression == fnOuter {
+	if fnOuter == nil || fnOuter.Parent == nil {
+		return nil
+	}
+	switch fnOuter.Parent.Kind {
+	case ast.KindVariableDeclaration:
+		if fnOuter.Parent.AsVariableDeclaration().Initializer == fnOuter {
+			return internalUtils.GetVariableDeclarationSymbol(fnOuter.Parent, r.typeChecker)
+		}
+	case ast.KindBinaryExpression:
+		bin := fnOuter.Parent.AsBinaryExpression()
+		if bin != nil && bin.Right == fnOuter && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
+			if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
+				return r.resolveSymbol(lhs)
+			}
+		}
+	}
+	return nil
+}
+
+// walkFunctionAliasRefs visits references to `sym` and up to `maxDepth` hops of
+// local variable/assignment aliases (`const Alias = Worker; Alias = Worker;`),
+// stopping early if `visit` returns true.
+func (r *AsyncAssertionResolver) walkFunctionAliasRefs(sym *ast.Symbol, maxDepth int, visit func(ref *ast.Node) bool) bool {
+	if r == nil || r.refs == nil || sym == nil {
 		return false
 	}
-	isTestOrHook := isTestOrHookCallbackCall(fn)
-	for _, param := range fn.Parameters() {
-		if param == nil || param.Name() == nil || param.Name().Kind != ast.KindIdentifier {
-			continue
-		}
-		if param.Name().AsIdentifier().Text == "done" {
-			return true
-		}
-		if isTestOrHook && r != nil && r.refs != nil {
-			if sym := internalUtils.BindingNameSymbol(param.Name()); sym != nil {
-				for _, ref := range r.refs.References(sym) {
-					if ref == nil {
-						continue
-					}
-					refOuter := internalUtils.OutermostTransparentExpression(ref)
-					if refOuter != nil && refOuter.Parent != nil && refOuter.Parent.Kind == ast.KindCallExpression {
-						if refOuter.Parent.AsCallExpression().Expression == refOuter {
-							return true
-						}
-						if _, isChain := r.promiseChainMethodName(refOuter.Parent); isChain {
-							return true
-						}
+	type queueItem struct {
+		sym   *ast.Symbol
+		depth int
+	}
+	queue := []queueItem{{sym: sym, depth: 0}}
+	visited := map[*ast.Symbol]bool{sym: true}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, ref := range r.refs.References(cur.sym) {
+			if ref == nil {
+				continue
+			}
+			if visit(ref) {
+				return true
+			}
+			if cur.depth >= maxDepth {
+				continue
+			}
+			outer := internalUtils.OutermostTransparentExpression(ref)
+			if outer == nil || outer.Parent == nil {
+				continue
+			}
+			var nextSym *ast.Symbol
+			switch outer.Parent.Kind {
+			case ast.KindVariableDeclaration:
+				vd := outer.Parent.AsVariableDeclaration()
+				if vd != nil && vd.Initializer == outer && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+					nextSym = internalUtils.GetVariableDeclarationSymbol(outer.Parent, r.typeChecker)
+				}
+			case ast.KindBinaryExpression:
+				bin := outer.Parent.AsBinaryExpression()
+				if bin != nil && bin.Right == outer && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
+					if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
+						nextSym = r.resolveSymbol(lhs)
 					}
 				}
 			}
+			if nextSym != nil && !visited[nextSym] {
+				visited[nextSym] = true
+				queue = append(queue, queueItem{sym: nextSym, depth: cur.depth + 1})
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) isParamUsedAsCallback(param *ast.Node) bool {
+	if r == nil || r.refs == nil || param == nil || param.Name() == nil {
+		return false
+	}
+	sym := internalUtils.BindingNameSymbol(param.Name())
+	if sym == nil {
+		return false
+	}
+	for _, ref := range r.refs.References(sym) {
+		if ref == nil {
+			continue
+		}
+		refOuter := internalUtils.OutermostTransparentExpression(ref)
+		if refOuter != nil && refOuter.Parent != nil && refOuter.Parent.Kind == ast.KindCallExpression {
+			if refOuter.Parent.AsCallExpression().Expression == refOuter {
+				return true
+			}
+			if _, isChain := r.promiseChainMethodName(refOuter.Parent); isChain {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) isDoneCallbackFunction(fn *ast.Node) bool {
+	if fn == nil || (fn.Kind != ast.KindArrowFunction && fn.Kind != ast.KindFunctionExpression && fn.Kind != ast.KindFunctionDeclaration) {
+		return false
+	}
+	params := fn.Parameters()
+	if len(params) == 0 {
+		return false
+	}
+	isCallArg := false
+	isTestOrHook := false
+	if fn.Kind != ast.KindFunctionDeclaration {
+		fnOuter := internalUtils.OutermostTransparentExpression(fn)
+		if fnOuter != nil && fnOuter.Parent != nil && fnOuter.Parent.Kind == ast.KindCallExpression &&
+			fnOuter.Parent.AsCallExpression().Expression != fnOuter {
+			isCallArg = true
+			isTestOrHook = isTestOrHookCallbackArg(fn)
+		}
+	}
+	if !isTestOrHook {
+		if sym := r.functionSymbol(fn); sym != nil {
+			r.walkFunctionAliasRefs(sym, 3, func(ref *ast.Node) bool {
+				refOuter := internalUtils.OutermostTransparentExpression(ref)
+				if refOuter != nil && refOuter.Parent != nil && refOuter.Parent.Kind == ast.KindCallExpression &&
+					refOuter.Parent.AsCallExpression().Expression != refOuter {
+					isCallArg = true
+					if isTestOrHookCallbackArg(ref) {
+						isTestOrHook = true
+						return true
+					}
+				}
+				return false
+			})
+		}
+	}
+	for _, param := range params {
+		if param == nil || param.Name() == nil || param.Name().Kind != ast.KindIdentifier {
+			continue
+		}
+		isNamedDone := param.Name().AsIdentifier().Text == "done"
+		if isNamedDone && isCallArg {
+			return true
+		}
+		if (isTestOrHook || isNamedDone) && r.isParamUsedAsCallback(param) {
+			return true
 		}
 	}
 	return false
@@ -997,42 +1107,23 @@ func (r *AsyncAssertionResolver) isConstructedOrExtendedFunction(fn *ast.Node) b
 			}
 		}
 	}
-	if r == nil || r.refs == nil {
-		return false
-	}
-	var sym *ast.Symbol
-	if fn.Kind == ast.KindFunctionDeclaration {
-		sym = fn.Symbol()
-	} else {
-		fnOuter := internalUtils.OutermostTransparentExpression(fn)
-		if fnOuter != nil && fnOuter.Parent != nil && fnOuter.Parent.Kind == ast.KindVariableDeclaration &&
-			fnOuter.Parent.AsVariableDeclaration().Initializer == fnOuter {
-			sym = internalUtils.GetVariableDeclarationSymbol(fnOuter.Parent, r.typeChecker)
-		}
-	}
+	sym := r.functionSymbol(fn)
 	if sym == nil {
 		return false
 	}
-	for _, ref := range r.refs.References(sym) {
-		if ref == nil {
-			continue
-		}
+	return r.walkFunctionAliasRefs(sym, 4, func(ref *ast.Node) bool {
 		outer := internalUtils.OutermostTransparentExpression(ref)
 		if outer == nil || outer.Parent == nil {
-			continue
+			return false
 		}
 		switch outer.Parent.Kind {
 		case ast.KindNewExpression:
-			if outer.Parent.AsNewExpression().Expression == outer {
-				return true
-			}
+			return outer.Parent.AsNewExpression().Expression == outer
 		case ast.KindExpressionWithTypeArguments:
-			if outer.Parent.AsExpressionWithTypeArguments().Expression == outer {
-				return true
-			}
+			return outer.Parent.AsExpressionWithTypeArguments().Expression == outer
 		}
-	}
-	return false
+		return false
+	})
 }
 
 func isNonVoidNonPromiseType(tc *checker.Checker, node *ast.Node, t *checker.Type) bool {
@@ -1074,11 +1165,24 @@ func (r *AsyncAssertionResolver) isLikelyAsyncReturnExpr(expr *ast.Node) bool {
 	}
 	if u.Kind == ast.KindCallExpression {
 		cur := internalUtils.SkipAssertionsAndParens(u.AsCallExpression().Expression)
+		allowBuiltinToResolve := r == nil || !r.disallowBuiltinToResolveReject
+		hasExpectRoot := false
+		hasExpectAsyncProp := false
 		for cur != nil {
 			if ast.IsAccessExpression(cur) {
-				if name, ok := r.accessStaticNameThroughAssertions(cur); ok &&
-					(name == "resolves" || name == "rejects" || name == "expect") {
-					return true
+				if name, ok := r.accessStaticNameThroughAssertions(cur); ok {
+					switch name {
+					case "resolves", "rejects":
+						return true
+					case "poll", "element":
+						hasExpectAsyncProp = true
+					case "toResolve", "toReject":
+						if allowBuiltinToResolve {
+							hasExpectAsyncProp = true
+						}
+					case "expect":
+						hasExpectRoot = true
+					}
 				}
 				cur = internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(cur))
 				continue
@@ -1088,9 +1192,12 @@ func (r *AsyncAssertionResolver) isLikelyAsyncReturnExpr(expr *ast.Node) bool {
 				continue
 			}
 			if cur.Kind == ast.KindIdentifier && cur.AsIdentifier().Text == "expect" {
-				return true
+				hasExpectRoot = true
 			}
 			break
+		}
+		if hasExpectRoot && hasExpectAsyncProp {
+			return true
 		}
 	}
 	return false

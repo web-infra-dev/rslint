@@ -50,6 +50,7 @@ func TestUnboundMethodExtras(t *testing.T) {
 		`expect(service.method)['toBeDefined']();`,
 		`import { expect as check } from '@rstest/core'; check(service.method).toBeDefined();`,
 		`import * as core from '@rstest/core'; core.expect(service.method).toBeDefined();`,
+		`import * as core from '@rstest/core'; export const { test, describe } = core; core.expect(service.method).toBeDefined();`,
 		`const { expect: check } = require('@rstest/core'); check(service.method).toBeDefined();`,
 		`import.meta.rstest.expect(service.method).toBeDefined();`,
 		`test('case', ({ expect: check }) => { check(service.method).toBeDefined(); });`,

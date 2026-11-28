@@ -119,6 +119,8 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `test("t", async () => { await Promise.resolve(Promise.all([expect(p).resolves.toBe(1)])); });`},
 			{Code: `test("t", async () => { const assertion = expect(p).resolves.toBe(1); await Promise.all([assertion.finally(cleanup)]); });`},
 			{Code: `test("t", async () => { const assertion = expect(p).resolves.toBe(1); await Promise.all([Promise.resolve(assertion)]); });`},
+			{Code: `test("t", async () => { const assertion = expect(p).resolves.toBe(1); await Promise.all([Promise.all([assertion])]); });`},
+			{Code: `test("t", async () => { const assertion = expect(p).resolves.toBe(1); await Promise.all([Promise.race([assertion])]); });`},
 			{Code: `test("t", async () => { let result: any; const assertion = expect(p).resolves.toBe(1); result = await assertion; });`},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -626,6 +628,31 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "asyncMustBeAwaited"},
 				},
 			},
+			// Named done callbacks, aliased constructors, and sync expect.* helper returns must not receive `async`.
+			{
+				Code: `function finish(done: any) { expect(p).resolves.toBe(1).then(() => done(), done); } test("works", finish);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `function finish(done: any) { expect(p).resolves.toBe(1).then(() => done(), done); } beforeEach(finish);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `function helper() { expect(p).resolves.toBe(1); return expect.any(Number); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `function Worker() { expect(p).resolves.toBe(1); } const Alias = Worker; new Alias();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
 		},
 	)
 }
@@ -728,6 +755,11 @@ func TestValidExpectSourceOnlyMode(t *testing.T) {
 		{
 			name:         "awaited-const-binding.ts",
 			code:         `async function run() { const p = Promise.resolve(1); const check = expect(p).resolves.toBe(1); await check; }`,
+			wantDiagSize: 0,
+		},
+		{
+			name:         "awaited-const-nested-promise-all.ts",
+			code:         `async function run() { const p = Promise.resolve(1); const assertion = expect(p).resolves.toBe(1); await Promise.all([Promise.all([assertion])]); }`,
 			wantDiagSize: 0,
 		},
 		{

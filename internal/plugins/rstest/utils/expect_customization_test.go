@@ -189,6 +189,17 @@ func TestRstestExpectCustomizationAnalysis(t *testing.T) {
 			{Code: `import * as r from '@rstest/core'; export const register = r.expect.extend; probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
 			{Code: `import * as r from '@rstest/core'; const register = r.expect.extend; export { register }; probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
 			{Code: `import * as r from '@rstest/core'; export const api = r.expect; probe();`, Errors: want("toBe=true toBeDefined=true equality=true")},
+			// Exported destructuring only escapes bindings that extract expect-config values,
+			// while post-export assignment to an exported binding escapes conservatively.
+			{Code: `import * as r from '@rstest/core'; export const { test, describe } = r; probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; export const { expect } = r; probe();`, Errors: want("toBe=true toBeDefined=true equality=true")},
+			{Code: `import * as r from '@rstest/core'; export const { ...api } = r; probe();`, Errors: want("toBe=true toBeDefined=true equality=true")},
+			{Code: `import * as r from '@rstest/core'; export const { extend } = r.expect; probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			{Code: `import * as r from '@rstest/core'; export const { any } = r.expect; probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; export let register: any; register = r.expect.extend; probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			{Code: `import * as r from '@rstest/core'; export let { register } = obj; register = r.expect.extend; probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			{Code: `import * as r from '@rstest/core'; export let api: any; api = r.expect; probe();`, Errors: want("toBe=true toBeDefined=true equality=true")},
+			{Code: `import * as r from '@rstest/core'; export function register() {} register = r.expect.extend as any; probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
 		},
 	)
 }
@@ -234,7 +245,20 @@ func TestRstestExpectCustomizationLinearScaling(t *testing.T) {
 		}
 	}
 	b.WriteString("ring0 = core.expect;\n")
-	b.WriteString("core.expect.extend({ toBe() {} });\nprobe();\n")
+	// 400-alias hub-and-chain branching cycle: every chain node writes to `hub`,
+	// exercising edge-level propagation so `hub`'s reference list is not scanned O(N) times.
+	b.WriteString("let hub: any;\n")
+	for i := range 400 {
+		fmt.Fprintf(&b, "let hc%d: any;\n", i)
+	}
+	b.WriteString("hc0 = hub;\nhc0 = core.expect;\n")
+	for i := 1; i < 400; i++ {
+		fmt.Fprintf(&b, "hc%d = hc%d;\n", i, i-1)
+	}
+	for i := range 400 {
+		fmt.Fprintf(&b, "hub = hc%d;\n", i)
+	}
+	b.WriteString("hub.extend({ toBe() {} });\nprobe();\n")
 
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 	program, sourceFile, err := helper.CreateTestProgram(b.String(), "scaling.ts", "tsconfig.json")

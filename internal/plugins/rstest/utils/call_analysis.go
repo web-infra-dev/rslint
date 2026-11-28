@@ -45,10 +45,11 @@ type RstestCallAnalysis struct {
 	sccCurrent                  *ast.Symbol
 	sccHitActive                bool
 	sccQueueActive              bool
-	sccQueueCaller              *ast.Symbol
+	sccQueueRecording           bool
+	sccQueueEdge                sccRevEdge
 	sccQueueMembers             map[*ast.Symbol]bool
-	sccQueueRevDeps             map[*ast.Symbol][]*ast.Symbol
-	sccQueueRevDepSeen          map[*ast.Symbol]map[*ast.Symbol]bool
+	sccQueueRevEdges            map[*ast.Symbol][]sccRevEdge
+	sccQueueRevEdgeSeen         map[*ast.Symbol]map[sccRevEdge]bool
 	safeMatcherChecks           []safeExpectMatcherCheck
 	shallowCopyKilledProps      map[*ast.Symbol]map[string]bool
 	stmtIndices                 map[*ast.Node]map[*ast.Node]int
@@ -283,6 +284,12 @@ type safeExpectMatcherCheck struct {
 	argKind     expectConfigKind
 }
 
+type sccRevEdge struct {
+	dst         *ast.Symbol
+	expr        *ast.Node
+	bindingElem *ast.Node
+}
+
 const (
 	expectConfigNone expectConfigKind = 0
 	// expectConfigGlobalObject denotes an unshadowed global object
@@ -386,16 +393,34 @@ func (analysis *RstestCallAnalysis) collectExpectCustomization() {
 				}
 			}
 		case ast.KindBindingElement:
-			// Nested destructuring of `extend` or `addEqualityTesters` (e.g.
-			// `const { extend: { call } } = expect`) extracts methods off the
-			// function object and escapes conservatively.
-			if be := node.AsBindingElement(); be != nil && be.Name() != nil && be.Name().Kind != ast.KindIdentifier {
-				kind := analysis.destructuredExpectConfigMember(node)
-				if kind&expectConfigExtend != 0 {
-					analysis.allExpectMatchersOverridden = true
-				}
-				if kind&expectConfigEquality != 0 {
-					analysis.hasCustomEqualityTesters = true
+			be := node.AsBindingElement()
+			if be != nil && be.Name() != nil {
+				if be.Name().Kind != ast.KindIdentifier {
+					// Nested destructuring of `extend` or `addEqualityTesters` (e.g.
+					// `const { extend: { call } } = expect`) extracts methods off the
+					// function object and escapes conservatively.
+					kind := analysis.destructuredExpectConfigMember(node)
+					if be.Initializer != nil {
+						kind |= analysis.expectConfigMember(be.Initializer)
+					}
+					if kind&expectConfigExtend != 0 {
+						analysis.allExpectMatchersOverridden = true
+					}
+					if kind&expectConfigEquality != 0 {
+						analysis.hasCustomEqualityTesters = true
+					}
+				} else if isExportedVariableDeclaration(internalUtils.EnclosingVariableDeclarationOfBindingElement(node)) {
+					// Exported destructuring (`export const { expect } = r`,
+					// `export const { ...api } = r`, `export const { extend } = r.expect`)
+					// escapes only the bindings that actually extract expect-config values,
+					// so `export const { test, describe } = r` remains non-escaping.
+					kind := analysis.destructuredExpectConfigMember(node)
+					if be.Initializer != nil {
+						kind |= analysis.expectConfigMember(be.Initializer)
+					}
+					if kind != expectConfigNone {
+						analysis.markExpectConfigEscaped(kind)
+					}
 				}
 			}
 		}
@@ -706,6 +731,9 @@ func (analysis *RstestCallAnalysis) isTrackedLocalAssignment(bin *ast.BinaryExpr
 		}
 	}
 	if bin.Right == outer {
+		if hasExportedDeclaration(sym) {
+			return false
+		}
 		switch bin.OperatorToken.Kind {
 		case ast.KindEqualsToken, ast.KindBarBarEqualsToken,
 			ast.KindAmpersandAmpersandEqualsToken, ast.KindQuestionQuestionEqualsToken:
@@ -752,6 +780,24 @@ func isExportedVariableDeclaration(vd *ast.Node) bool {
 		vd.Parent.Parent != nil &&
 		vd.Parent.Parent.Kind == ast.KindVariableStatement &&
 		ast.HasSyntacticModifier(vd.Parent.Parent, ast.ModifierFlagsExport)
+}
+
+func hasExportedDeclaration(sym *ast.Symbol) bool {
+	if sym == nil {
+		return false
+	}
+	for _, decl := range sym.Declarations {
+		if decl == nil {
+			continue
+		}
+		if decl.Kind == ast.KindBindingElement {
+			decl = internalUtils.EnclosingVariableDeclarationOfBindingElement(decl)
+		}
+		if isExportedVariableDeclaration(decl) || ast.HasSyntacticModifier(decl, ast.ModifierFlagsExport) {
+			return true
+		}
+	}
+	return false
 }
 
 func (analysis *RstestCallAnalysis) checkExpectConfigEscape(node *ast.Node, kind expectConfigKind) {
@@ -801,10 +847,12 @@ func (analysis *RstestCallAnalysis) checkExpectConfigEscape(node *ast.Node, kind
 		if ast.IsAccessExpression(p) && p.Expression() == outer {
 			return
 		}
-		// 3. Initializer of a non-exported local VariableDeclaration:
+		// 3. Initializer of a local VariableDeclaration, or an exported
+		//    destructuring declaration whose individual bindings are checked
+		//    in the KindBindingElement visitor:
 		//    `const check = expect`, `const { extend } = expect`, `const { ...copy } = expect`
 		if p.Kind == ast.KindVariableDeclaration && p.AsVariableDeclaration().Initializer == outer &&
-			!isExportedVariableDeclaration(p) {
+			(!isExportedVariableDeclaration(p) || (p.AsVariableDeclaration().Name() != nil && p.AsVariableDeclaration().Name().Kind != ast.KindIdentifier)) {
 			return
 		}
 		// 4. Plain local variable overwrite/assignment: `check = other`, `c = expect`
@@ -822,10 +870,12 @@ func (analysis *RstestCallAnalysis) checkExpectConfigEscape(node *ast.Node, kind
 		if ast.IsAccessExpression(p) && p.Expression() == outer {
 			return
 		}
-		// 2. Initializer of a non-exported local VariableDeclaration:
-		//    `const { expect } = r`, `const core = r`, `const { ...api } = r`, `const [ctx] = args`
+		// 2. Initializer of a local VariableDeclaration, or an exported
+		//    destructuring declaration whose selected bindings are checked in
+		//    the KindBindingElement visitor:
+		//    `const { expect } = r`, `export const { test, describe } = r`, `const core = r`, `const [ctx] = args`
 		if p.Kind == ast.KindVariableDeclaration && p.AsVariableDeclaration().Initializer == outer &&
-			!isExportedVariableDeclaration(p) {
+			(!isExportedVariableDeclaration(p) || (p.AsVariableDeclaration().Name() != nil && p.AsVariableDeclaration().Name().Kind != ast.KindIdentifier)) {
 			return
 		}
 		// 3. Plain local variable overwrite/assignment: `core = other`, `c = r`, `c ??= r`
@@ -1023,7 +1073,15 @@ func (analysis *RstestCallAnalysis) expectConfigMember(node *ast.Node) expectCon
 
 // evaluateExpectConfigSymbolOnce computes one monotone step of `symbol`'s
 // expectConfigKind from its declarations and direct/logical assignment writes.
+// When `sccQueueRecording` is active, it records each individual incoming edge
+// on the referenced SCC members so the subsequent queue propagates edge-by-edge
+// without rescanning a hub symbol's full reference list.
 func (analysis *RstestCallAnalysis) evaluateExpectConfigSymbolOnce(symbol *ast.Symbol) expectConfigKind {
+	prevEdge := analysis.sccQueueEdge
+	defer func() {
+		analysis.sccQueueEdge = prevEdge
+	}()
+
 	callbacks := analysis.callbacksRef()
 	var out expectConfigKind
 	if callbacks.ContextReceivers[symbol] {
@@ -1048,6 +1106,7 @@ func (analysis *RstestCallAnalysis) evaluateExpectConfigSymbolOnce(symbol *ast.S
 				}
 			}
 			if pd != nil && pd.Initializer != nil {
+				analysis.sccQueueEdge = sccRevEdge{dst: symbol, expr: pd.Initializer}
 				out |= analysis.expectConfigMember(pd.Initializer)
 			}
 		case ast.KindImportSpecifier:
@@ -1074,6 +1133,7 @@ func (analysis *RstestCallAnalysis) evaluateExpectConfigSymbolOnce(symbol *ast.S
 			if vd == nil || vd.Initializer == nil {
 				continue
 			}
+			analysis.sccQueueEdge = sccRevEdge{dst: symbol, expr: vd.Initializer}
 			k := analysis.expectConfigMember(vd.Initializer)
 			if k == expectConfigNone {
 				continue
@@ -1084,8 +1144,10 @@ func (analysis *RstestCallAnalysis) evaluateExpectConfigSymbolOnce(symbol *ast.S
 			}
 			out |= k
 		case ast.KindBindingElement:
+			analysis.sccQueueEdge = sccRevEdge{dst: symbol, bindingElem: decl}
 			k := analysis.destructuredExpectConfigMember(decl)
 			if be := decl.AsBindingElement(); be != nil && be.Initializer != nil {
+				analysis.sccQueueEdge = sccRevEdge{dst: symbol, expr: be.Initializer}
 				k |= analysis.expectConfigMember(be.Initializer)
 			}
 			if k == expectConfigNone {
@@ -1117,6 +1179,7 @@ func (analysis *RstestCallAnalysis) evaluateExpectConfigSymbolOnce(symbol *ast.S
 			case ast.KindEqualsToken, ast.KindBarBarEqualsToken,
 				ast.KindAmpersandAmpersandEqualsToken, ast.KindQuestionQuestionEqualsToken:
 				if !internalUtils.IsDefaultValueInDestructuringAssignment(outer.Parent) {
+					analysis.sccQueueEdge = sccRevEdge{dst: symbol, expr: bin.Right}
 					out |= analysis.expectConfigMember(bin.Right)
 				}
 			}
@@ -1125,23 +1188,23 @@ func (analysis *RstestCallAnalysis) evaluateExpectConfigSymbolOnce(symbol *ast.S
 	return out
 }
 
-// classifyExpectConfigSymbol uses Tarjan SCC discovery plus a bounded monotone
-// fixed-point pass over each cyclic SCC so arbitrary alias cycles (including
-// `a = a.extend` member-access cycles and branching cycles) converge cleanly
-// in O(V + E) time without exponential re-traversal or cache poisoning.
+// classifyExpectConfigSymbol uses Tarjan SCC discovery plus an edge-level
+// monotone fixed-point queue over each cyclic SCC so arbitrary alias cycles
+// (including `a = a.extend` member-access cycles and hub-and-chain branching
+// cycles) converge cleanly in O(V + E) time without rescanning reference lists.
 func (analysis *RstestCallAnalysis) classifyExpectConfigSymbol(symbol *ast.Symbol) expectConfigKind {
 	if symbol == nil {
 		return expectConfigNone
 	}
-	if analysis.sccQueueActive && analysis.sccQueueCaller != nil && analysis.sccQueueMembers[symbol] {
-		seen := analysis.sccQueueRevDepSeen[symbol]
+	if analysis.sccQueueRecording && analysis.sccQueueEdge.dst != nil && analysis.sccQueueMembers[symbol] {
+		seen := analysis.sccQueueRevEdgeSeen[symbol]
 		if seen == nil {
-			seen = map[*ast.Symbol]bool{}
-			analysis.sccQueueRevDepSeen[symbol] = seen
+			seen = map[sccRevEdge]bool{}
+			analysis.sccQueueRevEdgeSeen[symbol] = seen
 		}
-		if !seen[analysis.sccQueueCaller] {
-			seen[analysis.sccQueueCaller] = true
-			analysis.sccQueueRevDeps[symbol] = append(analysis.sccQueueRevDeps[symbol], analysis.sccQueueCaller)
+		if !seen[analysis.sccQueueEdge] {
+			seen[analysis.sccQueueEdge] = true
+			analysis.sccQueueRevEdges[symbol] = append(analysis.sccQueueRevEdges[symbol], analysis.sccQueueEdge)
 		}
 	}
 	if cached, ok := analysis.expectConfigAliases[symbol]; ok {
@@ -1171,10 +1234,13 @@ func (analysis *RstestCallAnalysis) classifyExpectConfigSymbol(symbol *ast.Symbo
 	analysis.sccOnStack[symbol] = true
 
 	prevHit := analysis.sccHitActive
+	prevRecording := analysis.sccQueueRecording
 	analysis.sccHitActive = false
+	analysis.sccQueueRecording = false
 	analysis.sccCurrent = symbol
 	out := analysis.evaluateExpectConfigSymbolOnce(symbol)
 	analysis.sccCurrent = caller
+	analysis.sccQueueRecording = prevRecording
 	hadSelfOrCycleHit := analysis.sccHitActive
 	analysis.sccHitActive = prevHit || hadSelfOrCycleHit
 
@@ -1207,12 +1273,13 @@ func (analysis *RstestCallAnalysis) classifyExpectConfigSymbol(symbol *ast.Symbo
 		analysis.expectConfigAliases[symbol] = out
 		return out
 	}
-	// Seed every SCC member in the cache, then propagate monotonically via a
-	// reverse-dependency queue. Because each symbol can gain at most 7 bits,
-	// every intra-SCC edge is traversed O(1) times (strictly O(V + E) total).
+	// Seed every SCC member in the cache, run one recording pass to collect
+	// exact reverse edges, then propagate monotonically edge-by-edge. Because
+	// each symbol can gain at most 7 bits, every intra-SCC edge is evaluated
+	// O(1) times and reference lists are never scanned again (strictly O(V + E)).
 	members := make(map[*ast.Symbol]bool, len(component))
-	revDeps := make(map[*ast.Symbol][]*ast.Symbol, len(component))
-	revDepSeen := make(map[*ast.Symbol]map[*ast.Symbol]bool, len(component))
+	revEdges := make(map[*ast.Symbol][]sccRevEdge, len(component))
+	revEdgeSeen := make(map[*ast.Symbol]map[sccRevEdge]bool, len(component))
 	for _, member := range component {
 		analysis.expectConfigAliases[member] = expectConfigNone
 		members[member] = true
@@ -1220,53 +1287,58 @@ func (analysis *RstestCallAnalysis) classifyExpectConfigSymbol(symbol *ast.Symbo
 	analysis.expectConfigAliases[symbol] = out
 
 	prevActive := analysis.sccQueueActive
-	prevCaller := analysis.sccQueueCaller
+	prevRec := analysis.sccQueueRecording
+	prevEdge := analysis.sccQueueEdge
 	prevMembers := analysis.sccQueueMembers
-	prevRevDeps := analysis.sccQueueRevDeps
-	prevRevDepSeen := analysis.sccQueueRevDepSeen
+	prevRevEdges := analysis.sccQueueRevEdges
+	prevRevEdgeSeen := analysis.sccQueueRevEdgeSeen
 	analysis.sccQueueActive = true
+	analysis.sccQueueRecording = true
+	analysis.sccQueueEdge = sccRevEdge{}
 	analysis.sccQueueMembers = members
-	analysis.sccQueueRevDeps = revDeps
-	analysis.sccQueueRevDepSeen = revDepSeen
+	analysis.sccQueueRevEdges = revEdges
+	analysis.sccQueueRevEdgeSeen = revEdgeSeen
 	defer func() {
 		analysis.sccQueueActive = prevActive
-		analysis.sccQueueCaller = prevCaller
+		analysis.sccQueueRecording = prevRec
+		analysis.sccQueueEdge = prevEdge
 		analysis.sccQueueMembers = prevMembers
-		analysis.sccQueueRevDeps = prevRevDeps
-		analysis.sccQueueRevDepSeen = prevRevDepSeen
+		analysis.sccQueueRevEdges = prevRevEdges
+		analysis.sccQueueRevEdgeSeen = prevRevEdgeSeen
 	}()
 
-	var changedInitial []*ast.Symbol
-	for _, member := range component {
-		analysis.sccQueueCaller = member
-		next := analysis.expectConfigAliases[member] | analysis.evaluateExpectConfigSymbolOnce(member)
-		if next != analysis.expectConfigAliases[member] || (member == symbol && out != expectConfigNone) {
-			analysis.expectConfigAliases[member] = next
-			changedInitial = append(changedInitial, member)
-		}
-	}
 	queue := make([]*ast.Symbol, 0, len(component))
 	inQueue := make(map[*ast.Symbol]bool, len(component))
-	enqueueDeps := func(changedSym *ast.Symbol) {
-		for _, dep := range revDeps[changedSym] {
-			if !inQueue[dep] {
-				inQueue[dep] = true
-				queue = append(queue, dep)
-			}
+	for _, member := range component {
+		next := analysis.expectConfigAliases[member] | analysis.evaluateExpectConfigSymbolOnce(member)
+		analysis.expectConfigAliases[member] = next
+		if next != expectConfigNone && !inQueue[member] {
+			inQueue[member] = true
+			queue = append(queue, member)
 		}
 	}
-	for _, m := range changedInitial {
-		enqueueDeps(m)
-	}
+	analysis.sccQueueRecording = false
+	analysis.sccQueueEdge = sccRevEdge{}
+
 	for len(queue) > 0 {
-		member := queue[0]
+		changedSym := queue[0]
 		queue = queue[1:]
-		inQueue[member] = false
-		analysis.sccQueueCaller = member
-		next := analysis.expectConfigAliases[member] | analysis.evaluateExpectConfigSymbolOnce(member)
-		if next != analysis.expectConfigAliases[member] {
-			analysis.expectConfigAliases[member] = next
-			enqueueDeps(member)
+		inQueue[changedSym] = false
+		for _, edge := range revEdges[changedSym] {
+			var edgeKind expectConfigKind
+			if edge.bindingElem != nil {
+				edgeKind = analysis.destructuredExpectConfigMember(edge.bindingElem)
+			} else if edge.expr != nil {
+				edgeKind = analysis.expectConfigMember(edge.expr)
+			}
+			next := analysis.expectConfigAliases[edge.dst] | edgeKind
+			if next != analysis.expectConfigAliases[edge.dst] {
+				analysis.expectConfigAliases[edge.dst] = next
+				if !inQueue[edge.dst] {
+					inQueue[edge.dst] = true
+					queue = append(queue, edge.dst)
+				}
+			}
 		}
 	}
 	return analysis.expectConfigAliases[symbol]
@@ -1443,7 +1515,7 @@ func statementListOf(parent *ast.Node) []*ast.Node {
 // shallow copy whose `propName` property is immediately overwritten to a pure
 // non-config value in the next statement before any other use of `copy`.
 func (analysis *RstestCallAnalysis) isShallowCopyPropKilled(recvExpr *ast.Node, propName string) bool {
-	if analysis.ctx.Refs == nil || recvExpr == nil || recvExpr.Kind != ast.KindIdentifier {
+	if analysis.ctx.Refs == nil || recvExpr == nil || recvExpr.Kind != ast.KindIdentifier || analysis.sccQueueActive {
 		return false
 	}
 	sym := resolveRstestRootSymbol(analysis.ctx, recvExpr)
