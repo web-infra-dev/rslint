@@ -1,9 +1,13 @@
 package test_framework
 
 import (
+	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 )
@@ -130,20 +134,32 @@ func TestIsModuleRequireCallModulesIgnoresShadowedRequire(t *testing.T) {
 		`const require = () => ({}); namespace N { declare const require: any; export const r = require("@rstest/core"); }`,
 		// Mutable `let` bindings are rejected conservatively rather than scanning for reassignments.
 		`import { createRequire } from "node:module"; let require = createRequire(import.meta.url); require("@rstest/core");`,
+		// `export import require = ...` binds `require` via module/namespace Exports.
+		`export import require = require("./fake"); require("@rstest/core");`,
+		`namespace N { export import require = Fake; require("@rstest/core"); }`,
 	} {
-		t.Run("shadowed/"+code, func(t *testing.T) {
-			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/test.ts",
-				Path:     "/test.ts",
-			}, code, core.ScriptKindTS)
-			reqCall := findRequireCallForModule(sourceFile, "@rstest/core")
-			if reqCall == nil {
-				t.Fatal("expected a require call in test code")
+		for _, bind := range []bool{false, true} {
+			mode := "unbound"
+			if bind {
+				mode = "bound"
 			}
-			if IsModuleRequireCallModules(reqCall, modules) {
-				t.Fatalf("expected shadowed require call to be ignored: %s", code)
-			}
-		})
+			t.Run("shadowed/"+mode+"/"+code, func(t *testing.T) {
+				sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+					FileName: "/test.ts",
+					Path:     "/test.ts",
+				}, code, core.ScriptKindTS)
+				if bind {
+					binder.BindSourceFile(sourceFile)
+				}
+				reqCall := findRequireCallForModule(sourceFile, "@rstest/core")
+				if reqCall == nil {
+					t.Fatal("expected a require call in test code")
+				}
+				if IsModuleRequireCallModules(reqCall, modules) {
+					t.Fatalf("expected shadowed require call to be ignored (%s): %s", mode, code)
+				}
+			})
+		}
 	}
 
 	for _, code := range []string{
@@ -167,20 +183,94 @@ func TestIsModuleRequireCallModulesIgnoresShadowedRequire(t *testing.T) {
 		`import { createRequire } from "node:module"; const require = createRequire(import.meta.url); class C { m(@dec(() => require("@rstest/core")) require: any) {} }`,
 		`function f() { { function require() {} } return require("@rstest/core"); }`,
 		`function f(x = require("@rstest/core")) { var require = () => ({}); return x; }`,
+		`export import mod = require("node:module"); const require = mod.createRequire(import.meta.url); require("@rstest/core");`,
+		`namespace require { export type T = number; } require("@rstest/core");`,
 	} {
-		t.Run("genuine/"+code, func(t *testing.T) {
-			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: "/test.ts",
-				Path:     "/test.ts",
-			}, code, core.ScriptKindTS)
-			reqCall := findRequireCallForModule(sourceFile, "@rstest/core")
-			if reqCall == nil {
-				t.Fatal("expected a require call in test code")
+		for _, bind := range []bool{false, true} {
+			mode := "unbound"
+			if bind {
+				mode = "bound"
 			}
-			if !IsModuleRequireCallModules(reqCall, modules) {
-				t.Fatalf("expected genuine require call to match: %s", code)
-			}
+			t.Run("genuine/"+mode+"/"+code, func(t *testing.T) {
+				sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+					FileName: "/test.ts",
+					Path:     "/test.ts",
+				}, code, core.ScriptKindTS)
+				if bind {
+					binder.BindSourceFile(sourceFile)
+				}
+				reqCall := findRequireCallForModule(sourceFile, "@rstest/core")
+				if reqCall == nil {
+					t.Fatal("expected a require call in test code")
+				}
+				if !IsModuleRequireCallModules(reqCall, modules) {
+					t.Fatalf("expected genuine require call to match (%s): %s", mode, code)
+				}
+			})
+		}
+	}
+}
+
+func TestIsModuleRequireCallModulesLinearScalingInBoundFunction(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("import { createRequire } from 'node:module';\n")
+	b.WriteString("const require = createRequire(import.meta.url);\n")
+	b.WriteString("function run() {\n")
+	for i := range 400 {
+		fmt.Fprintf(&b, "  const r%d = require('@rstest/core');\n", i)
+	}
+	b.WriteString("}\n")
+
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/scaling.ts",
+		Path:     "/scaling.ts",
+	}, b.String(), core.ScriptKindTS)
+	binder.BindSourceFile(sourceFile)
+
+	var calls []*ast.Node
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		if node.Kind == ast.KindCallExpression && ast.IsRequireCall(node, false) {
+			calls = append(calls, node)
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
 		})
+	}
+	visit(sourceFile.AsNode())
+	if len(calls) != 400 {
+		t.Fatalf("found %d require calls; want 400", len(calls))
+	}
+
+	modules := []string{"@rstest/core"}
+	start := time.Now()
+	for _, call := range calls {
+		if !IsModuleRequireCallModules(call, modules) {
+			t.Fatal("expected genuine createRequire call to match")
+		}
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("took %v; expected linear-time O(1) lookup per call", elapsed)
+	}
+}
+
+func TestIsModuleRequireCallModulesJSDocTypedefBound(t *testing.T) {
+	code := "/** @typedef {{ foo: number }} require */\nconst r = require('@rstest/core');\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.js",
+		Path:     "/test.js",
+	}, code, core.ScriptKindJS)
+	binder.BindSourceFile(sourceFile)
+	reqCall := findRequireCallForModule(sourceFile, "@rstest/core")
+	if reqCall == nil {
+		t.Fatal("expected a require call")
+	}
+	if !IsModuleRequireCallModules(reqCall, []string{"@rstest/core"}) {
+		t.Fatal("expected JSDoc @typedef named require not to shadow runtime require")
 	}
 }
 

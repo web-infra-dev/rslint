@@ -183,6 +183,12 @@ func TestRstestExpectCustomizationAnalysis(t *testing.T) {
 			{Code: `namespace expect { export type T = number; } const check = expect; check.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 			{Code: `let v0: any, v1: any, v2: any, v3: any, v4: any, v5: any, v6: any, v7: any, v8: any, v9: any, v10: any, v11: any, v12: any, v13: any, v14: any, v15: any, v16: any, v17: any, v18: any; if (false) { v0 = v1.foo; v1 = v2.foo; v2 = v3.foo; v3 = v4.foo; v4 = v5.foo; v5 = v6.foo; v6 = v7.foo; v7 = v8.foo; v8 = v9.foo; v9 = v10.foo; v10 = v11.foo; v11 = v12.foo; v12 = v13.foo; v13 = v14.foo; v14 = v15.foo; v15 = v16.foo; v16 = v17.foo; v17 = v18.foo; v18 = v0.foo; } v1 = expect; v2 = v1; v3 = v2; v4 = v3; v5 = v4; v6 = v5; v7 = v6; v8 = v7; v9 = v8; v10 = v9; v11 = v10; v12 = v11; v13 = v12; v14 = v13; v15 = v14; v16 = v15; v17 = v16; v18 = v17; v18.extend({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 			{Code: `function check() { expect(expect).toBeTruthy(); } expect.extend({ toBeDefined(ext: any) { ext({ toBeTruthy(e: any) { e.addEqualityTesters([tester]); return { pass: true, message: () => '' }; } }); return { pass: true, message: () => '' }; } }); expect(expect.extend).toBeDefined(); check(); probe();`, Errors: want("toBe=true toBeDefined=true equality=true")},
+
+			// Read-only feature checks (Boolean, Object.isFrozen, Object.keys) and exported aliases.
+			{Code: `import * as r from '@rstest/core'; if (!Boolean(r.expect.extend)) throw new Error('missing'); const f = Object.isFrozen(r.expect); const k = Object.keys(r.expect); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; export const register = r.expect.extend; probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			{Code: `import * as r from '@rstest/core'; const register = r.expect.extend; export { register }; probe();`, Errors: want("toBe=true toBeDefined=true equality=false")},
+			{Code: `import * as r from '@rstest/core'; export const api = r.expect; probe();`, Errors: want("toBe=true toBeDefined=true equality=true")},
 		},
 	)
 }
@@ -209,6 +215,25 @@ func TestRstestExpectCustomizationLinearScaling(t *testing.T) {
 		}
 	}
 	b.WriteString("cyc29 = cyc0;\n")
+	// 400-member property chain (memoized in expectConfigExprs to stay O(N)).
+	b.WriteString("declare const chain: any;\nvoid chain")
+	for i := range 400 {
+		fmt.Fprintf(&b, ".p%d", i)
+	}
+	b.WriteString(";\n")
+	// 400-alias alternating ring (queue propagates in O(V+E) instead of O(N^2)).
+	for i := range 400 {
+		fmt.Fprintf(&b, "let ring%d: any;\n", i)
+	}
+	for i := range 400 {
+		next := (i + 1) % 400
+		if i%2 == 0 {
+			fmt.Fprintf(&b, "ring%d = ring%d?.p;\n", i, next)
+		} else {
+			fmt.Fprintf(&b, "ring%d = ring%d;\n", next, i)
+		}
+	}
+	b.WriteString("ring0 = core.expect;\n")
 	b.WriteString("core.expect.extend({ toBe() {} });\nprobe();\n")
 
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())

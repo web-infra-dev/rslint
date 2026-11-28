@@ -141,6 +141,9 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: "export {}; namespace Promise { export type Extra = number; } test('t', async () => { await Promise.all([expect(p).resolves.toBe(1)]); });"},
 			{Code: "test('t', async () => { await Promise.all([Promise.all([expect(p).resolves.toBe(1)])]); });"},
 			{Code: "test('t', async () => { await Promise.resolve(Promise.all([expect(p).resolves.toBe(1)])); });"},
+			{Code: "test('t', async () => { const assertion = expect(p).resolves.toBe(1); await Promise.all([assertion.finally(cleanup)]); });"},
+			{Code: "test('t', async () => { const assertion = expect(p).resolves.toBe(1); await Promise.all([Promise.resolve(assertion)]); });"},
+			{Code: "test('t', async () => { let result: any; const assertion = expect(p).resolves.toBe(1); result = await assertion; });"},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -969,6 +972,41 @@ func TestValidExpectRule(t *testing.T) {
 			{
 				Code: `test("t", () => { const handle = (p: any) => p.then(() => {}); handle(expect(Promise.resolve(1)).resolves.toBe(1)); });`,
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			// Do not add `async` to done-callback tests/hooks, named constructors, or sync value-returning helpers; do not reorder custom matcher ahead of toResolve().
+			{
+				Code: `test("t", done => { expect(p).resolves.toBe(1).then(() => done(), done); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `beforeEach(done => { expect(p).resolves.toBe(1).then(() => done(), done); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `function Worker() { expect(p).resolves.toBe(1); } new Worker();`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `const cb: () => number = () => { expect(p).resolves.toBe(1); return 1; };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("starts", async () => { const pending = [expect(Promise.resolve(1)).resolves.toHaveStarted(), expect(Promise.resolve(1)).toResolve()]; });`,
+				Output: []string{
+					`test("starts", async () => { const pending = [expect(Promise.resolve(1)).resolves.toHaveStarted(), await expect(Promise.resolve(1)).toResolve()]; });`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
 					{MessageId: "asyncMustBeAwaited"},
 				},
 			},

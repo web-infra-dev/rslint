@@ -470,17 +470,10 @@ func isShadowedByNonModuleRequire(callee *ast.Node, depth int) bool {
 		return true
 	}
 	name := callee.AsIdentifier().Text
-	if !internalUtils.IsShadowed(callee, name) {
-		return false
-	}
 	decl, ambient := findInnermostDeclaration(callee, name)
-	if decl == nil {
-		// IsShadowed was true, so never assume a missing declaration is ambient.
-		return true
-	}
-	if ambient {
-		// An ambient (`declare ...`) binding is erased at runtime, so `require`
-		// still resolves to the global CommonJS loader.
+	if decl == nil || ambient {
+		// No enclosing runtime declaration (or only an erased `declare ...` /
+		// `import type` binding), so `require` resolves to the global loader.
 		return false
 	}
 	if decl.Kind != ast.KindVariableDeclaration || !isImmutableConstDeclaration(decl) {
@@ -502,7 +495,105 @@ func isImmutableConstDeclaration(decl *ast.Node) bool {
 		!ast.IsVarAwaitUsing(decl)
 }
 
+func isAmbientOrTypeOnlyBoundDecl(decl *ast.Node) (skip bool, ambient bool) {
+	if decl == nil || decl.Flags&ast.NodeFlagsReparsed != 0 {
+		return true, false
+	}
+	switch decl.Kind {
+	case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindTypeParameter, ast.KindJSTypeAliasDeclaration:
+		return true, false
+	case ast.KindModuleDeclaration:
+		if ast.GetModuleInstanceState(decl) != ast.ModuleInstanceStateInstantiated {
+			return true, false
+		}
+		return false, decl.Flags&ast.NodeFlagsAmbient != 0 || ast.HasSyntacticModifier(decl, ast.ModifierFlagsAmbient)
+	case ast.KindImportSpecifier, ast.KindNamespaceImport, ast.KindImportClause, ast.KindImportDeclaration:
+		return false, ast.IsTypeOnlyImportDeclaration(decl)
+	case ast.KindImportEqualsDeclaration:
+		return false, decl.AsImportEqualsDeclaration().IsTypeOnly
+	case ast.KindVariableDeclaration:
+		amb := decl.Flags&ast.NodeFlagsAmbient != 0 || ast.HasSyntacticModifier(decl, ast.ModifierFlagsAmbient)
+		if !amb && decl.Parent != nil && decl.Parent.Parent != nil {
+			amb = ast.HasSyntacticModifier(decl.Parent.Parent, ast.ModifierFlagsAmbient)
+		}
+		return false, amb
+	case ast.KindBindingElement:
+		vd := internalUtils.EnclosingVariableDeclarationOfBindingElement(decl)
+		if vd != nil && vd.Kind == ast.KindVariableDeclaration {
+			return isAmbientOrTypeOnlyBoundDecl(vd)
+		}
+		return false, decl.Flags&ast.NodeFlagsAmbient != 0
+	default:
+		return false, decl.Flags&ast.NodeFlagsAmbient != 0 || ast.HasSyntacticModifier(decl, ast.ModifierFlagsAmbient)
+	}
+}
+
+func lookupBoundLocal(container *ast.Node, name string) (decl *ast.Node, ambient bool) {
+	if container == nil {
+		return nil, false
+	}
+	var runtimeDecl *ast.Node
+	var ambientDecl *ast.Node
+	inspectSym := func(sym *ast.Symbol, onlyImportEquals bool) {
+		if sym == nil {
+			return
+		}
+		for _, d := range sym.Declarations {
+			if onlyImportEquals && (d == nil || d.Kind != ast.KindImportEqualsDeclaration) {
+				continue
+			}
+			skip, amb := isAmbientOrTypeOnlyBoundDecl(d)
+			if skip {
+				continue
+			}
+			target := d
+			if d.Kind == ast.KindBindingElement {
+				if vd := internalUtils.EnclosingVariableDeclarationOfBindingElement(d); vd != nil {
+					target = vd
+				}
+			}
+			if amb {
+				if ambientDecl == nil {
+					ambientDecl = target
+				}
+				continue
+			}
+			if runtimeDecl == nil || !isImmutableConstDeclaration(target) {
+				runtimeDecl = target
+			}
+		}
+	}
+	if ast.IsLocalsContainer(container) {
+		// Use read-only container.Locals() rather than ast.GetLocals(container),
+		// which lazily mutates AST Locals maps and would race across workers.
+		if locals := container.Locals(); locals != nil {
+			inspectSym(locals[name], false)
+		}
+	}
+	// `export import X = ...` is stored on the module/namespace symbol's
+	// Exports table rather than its Locals table.
+	if container.Kind == ast.KindSourceFile || container.Kind == ast.KindModuleDeclaration {
+		if sym := container.Symbol(); sym != nil && sym.Exports != nil {
+			inspectSym(sym.Exports[name], true)
+		}
+	}
+	if runtimeDecl != nil {
+		// Multiple runtime declarations for the same symbol (e.g. a hoisted
+		// `var` merged with a `function` declaration) can never be an
+		// unambiguous immutable `const` binding; preferring a non-const decl
+		// guarantees callers treat it as shadowed.
+		return runtimeDecl, false
+	}
+	if ambientDecl != nil {
+		return ambientDecl, true
+	}
+	return nil, false
+}
+
 func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, ambient bool) {
+	sf := ast.GetSourceFileOfNode(node)
+	boundFile := sf != nil && sf.IsBound()
+
 	prev := node
 	inParameterDecorator := false
 	crossedScope := false
@@ -523,6 +614,56 @@ func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, ambi
 		if current.Kind == ast.KindParameter {
 			inParameterDecorator = prev.Kind == ast.KindDecorator
 		}
+		if boundFile {
+			switch current.Kind {
+			case ast.KindClassDeclaration, ast.KindClassExpression:
+				if prev.Kind == ast.KindDecorator && crossedScope {
+					continue
+				}
+				if current.Kind == ast.KindClassExpression && prev != current.Name() && prev.Kind != ast.KindDecorator {
+					if n := current.Name(); n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == name {
+						return current, false
+					}
+				}
+				crossedScope = true
+				continue
+			}
+			if IsFunction(current) {
+				if prev.Kind == ast.KindDecorator || prev == current.Name() ||
+					(inParameterDecorator && crossedScope && isDirectParameterNode(current, prev)) {
+					continue
+				}
+				crossedScope = true
+				inParam := isDirectParameterNode(current, prev)
+				for _, param := range current.Parameters() {
+					if param != nil && bindingDeclaresName(param.Name(), name) {
+						return param, false
+					}
+				}
+				if !inParam {
+					if d, amb := lookupBoundLocal(current, name); record(d, amb) {
+						return d, false
+					}
+				}
+				if current.Kind == ast.KindFunctionExpression || current.Kind == ast.KindFunctionDeclaration {
+					if fnName := current.Name(); fnName != nil && fnName.Kind == ast.KindIdentifier && fnName.AsIdentifier().Text == name {
+						if record(current, ast.HasSyntacticModifier(current, ast.ModifierFlagsAmbient)) {
+							return current, false
+						}
+					}
+				}
+				continue
+			}
+			if ast.IsLocalsContainer(current) {
+				if d, amb := lookupBoundLocal(current, name); record(d, amb) {
+					return d, false
+				}
+				if current.Kind == ast.KindSourceFile {
+					return ambientDecl, ambientDecl != nil
+				}
+			}
+			continue
+		}
 		switch current.Kind {
 		case ast.KindSourceFile:
 			if sf := current.AsSourceFile(); sf != nil && sf.Statements != nil {
@@ -533,7 +674,14 @@ func findInnermostDeclaration(node *ast.Node, name string) (decl *ast.Node, ambi
 			return ambientDecl, ambientDecl != nil
 		case ast.KindBlock:
 			if block := current.AsBlock(); block != nil && block.Statements != nil {
-				if d, amb := findDeclInStatements(block.Statements.Nodes, name, false); record(d, amb) {
+				// When this Block is a function body, the enclosing function
+				// iteration immediately scans hoisted `var`/function decls; avoid
+				// scanning the same statement list twice.
+				if current.Parent != nil && IsFunction(current.Parent) {
+					if d, amb := findDirectDeclInStatements(block.Statements.Nodes, name); record(d, amb) {
+						return d, false
+					}
+				} else if d, amb := findDeclInStatements(block.Statements.Nodes, name, false); record(d, amb) {
 					return d, false
 				}
 			}
@@ -636,7 +784,7 @@ func isDirectParameterNode(fn *ast.Node, child *ast.Node) bool {
 	return false
 }
 
-func findDeclInStatements(statements []*ast.Node, name string, includeHoisted bool) (*ast.Node, bool) {
+func findDirectDeclInStatements(statements []*ast.Node, name string) (*ast.Node, bool) {
 	var ambientDecl *ast.Node
 	for _, stmt := range statements {
 		if stmt == nil {
@@ -649,9 +797,15 @@ func findDeclInStatements(statements []*ast.Node, name string, includeHoisted bo
 			if vs := stmt.AsVariableStatement(); vs != nil && vs.DeclarationList != nil {
 				matched = findDeclInVarDeclList(vs.DeclarationList.AsVariableDeclarationList(), name)
 			}
-		case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration:
+		case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindEnumDeclaration:
 			if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == name {
 				matched = stmt
+			}
+		case ast.KindModuleDeclaration:
+			if ast.GetModuleInstanceState(stmt) == ast.ModuleInstanceStateInstantiated {
+				if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == name {
+					matched = stmt
+				}
 			}
 		case ast.KindImportEqualsDeclaration:
 			if ie := stmt.AsImportEqualsDeclaration(); ie != nil && ie.Name() != nil && ie.Name().Text() == name {
@@ -677,12 +831,24 @@ func findDeclInStatements(statements []*ast.Node, name string, includeHoisted bo
 			}
 		}
 	}
-	if d, amb := findHoistedVarOrFnInStatements(statements, name, includeHoisted); d != nil {
-		if !amb {
-			return d, false
+	if ambientDecl != nil {
+		return ambientDecl, true
+	}
+	return nil, false
+}
+
+func findDeclInStatements(statements []*ast.Node, name string, includeHoisted bool) (*ast.Node, bool) {
+	d, amb := findDirectDeclInStatements(statements, name)
+	if d != nil && !amb {
+		return d, false
+	}
+	ambientDecl := d
+	if hd, hoistedAmb := findHoistedVarOrFnInStatements(statements, name, includeHoisted); hd != nil {
+		if !hoistedAmb {
+			return hd, false
 		}
 		if ambientDecl == nil {
-			ambientDecl = d
+			ambientDecl = hd
 		}
 	}
 	if ambientDecl != nil {
@@ -998,8 +1164,8 @@ func isNodeModuleNamespaceIdent(obj *ast.Node, depth int) bool {
 	case ast.KindNamespaceImport:
 		imp := FindImportDeclaration(decl)
 		return imp != nil && imp.ModuleSpecifier != nil && matchesModule(imp.ModuleSpecifier.Text(), nodeModuleSpecifiers)
-	case ast.KindImportDeclaration:
-		imp := decl.AsImportDeclaration()
+	case ast.KindImportClause, ast.KindImportDeclaration:
+		imp := FindImportDeclaration(decl)
 		return imp != nil && imp.ModuleSpecifier != nil && matchesModule(imp.ModuleSpecifier.Text(), nodeModuleSpecifiers)
 	case ast.KindImportSpecifier:
 		imported, _, ok := resolveModuleImportSpecifier(decl, nodeModuleSpecifiers, false)

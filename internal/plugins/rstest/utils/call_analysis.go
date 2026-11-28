@@ -36,6 +36,7 @@ type RstestCallAnalysis struct {
 	hasCustomEqualityTesters    bool
 	expectCustomizationOK       bool
 	expectConfigAliases         map[*ast.Symbol]expectConfigKind
+	expectConfigExprs           map[*ast.Node]expectConfigKind
 	sccIndex                    int
 	sccIndices                  map[*ast.Symbol]int
 	sccLowLink                  map[*ast.Symbol]int
@@ -43,6 +44,11 @@ type RstestCallAnalysis struct {
 	sccOnStack                  map[*ast.Symbol]bool
 	sccCurrent                  *ast.Symbol
 	sccHitActive                bool
+	sccQueueActive              bool
+	sccQueueCaller              *ast.Symbol
+	sccQueueMembers             map[*ast.Symbol]bool
+	sccQueueRevDeps             map[*ast.Symbol][]*ast.Symbol
+	sccQueueRevDepSeen          map[*ast.Symbol]map[*ast.Symbol]bool
 	safeMatcherChecks           []safeExpectMatcherCheck
 	shallowCopyKilledProps      map[*ast.Symbol]map[string]bool
 	stmtIndices                 map[*ast.Node]map[*ast.Node]int
@@ -555,30 +561,38 @@ func safeReadOnlyExpectMatcherName(call *ast.Node, analysis *RstestCallAnalysis)
 	return "", false
 }
 
-func isDiscardedObjectMetadataCall(call *ast.Node, arg *ast.Node, analysis *RstestCallAnalysis) bool {
+func isUnshadowedGlobalIdent(node *ast.Node, expected string, analysis *RstestCallAnalysis) bool {
+	u := internalUtils.SkipAssertionsAndParens(node)
+	if u == nil || u.Kind != ast.KindIdentifier || u.AsIdentifier().Text != expected {
+		return false
+	}
+	sym := resolveRstestRootSymbol(analysis.ctx, u)
+	if hasSameFileRuntimeValueDecl(sym, analysis.ctx.SourceFile) {
+		return false
+	}
+	return sym != nil || analysis.ctx.Refs != nil || !internalUtils.IsShadowed(u, expected)
+}
+
+func isReadOnlyBuiltinInspectionCall(call *ast.Node, arg *ast.Node, analysis *RstestCallAnalysis) bool {
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
 	}
-	callOuter := internalUtils.OutermostTransparentExpression(call)
-	if callOuter == nil || callOuter.Parent == nil ||
-		callOuter.Parent.Kind != ast.KindExpressionStatement ||
-		callOuter.Parent.AsExpressionStatement().Expression != callOuter {
-		return false
-	}
 	args := call.AsCallExpression().Arguments
-	if args == nil || len(args.Nodes) != 1 || args.Nodes[0] != arg {
+	if args == nil || len(args.Nodes) == 0 {
 		return false
 	}
 	callee := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
-	if callee == nil || !ast.IsAccessExpression(callee) {
+	if callee == nil {
 		return false
 	}
-	obj := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
-	if obj == nil || obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != "Object" {
+	// `Boolean(x)` coerces to boolean without invoking `x` or leaking it.
+	if isUnshadowedGlobalIdent(callee, "Boolean", analysis) {
+		return len(args.Nodes) == 1 && args.Nodes[0] == arg
+	}
+	if !ast.IsAccessExpression(callee) {
 		return false
 	}
-	if sym := resolveRstestRootSymbol(analysis.ctx, obj); hasSameFileRuntimeValueDecl(sym, analysis.ctx.SourceFile) ||
-		(sym == nil && analysis.ctx.Refs == nil && internalUtils.IsShadowed(obj, "Object")) {
+	if !isUnshadowedGlobalIdent(internalUtils.AccessExpressionObject(callee), "Object", analysis) {
 		return false
 	}
 	name, known, _ := analysis.evalExpectConfigAccessName(callee)
@@ -586,8 +600,15 @@ func isDiscardedObjectMetadataCall(call *ast.Node, arg *ast.Node, analysis *Rste
 		return false
 	}
 	switch name {
-	case "freeze", "seal", "preventExtensions", "isFrozen", "isSealed", "isExtensible":
-		return true
+	case "isFrozen", "isSealed", "isExtensible", "keys", "getOwnPropertyNames", "getOwnPropertySymbols":
+		return len(args.Nodes) == 1 && args.Nodes[0] == arg
+	case "hasOwn":
+		return len(args.Nodes) >= 2 && args.Nodes[0] == arg
+	case "is":
+		return len(args.Nodes) == 2 && (args.Nodes[0] == arg || args.Nodes[1] == arg)
+	case "freeze", "seal", "preventExtensions":
+		// These return their argument, so they are only safe when discarded.
+		return len(args.Nodes) == 1 && args.Nodes[0] == arg && isStandaloneExpressionStmt(call)
 	}
 	return false
 }
@@ -643,7 +664,7 @@ func isSafeReadOnlyExpectUse(outer *ast.Node, kind expectConfigKind, analysis *R
 				})
 				return true
 			}
-			if isDiscardedObjectMetadataCall(p, outer, analysis) {
+			if isReadOnlyBuiltinInspectionCall(p, outer, analysis) {
 				return true
 			}
 		}
@@ -724,6 +745,15 @@ func (analysis *RstestCallAnalysis) objectLiteralDestructuresKey(obj *ast.Node, 
 	return false
 }
 
+func isExportedVariableDeclaration(vd *ast.Node) bool {
+	return vd != nil &&
+		vd.Parent != nil &&
+		vd.Parent.Kind == ast.KindVariableDeclarationList &&
+		vd.Parent.Parent != nil &&
+		vd.Parent.Parent.Kind == ast.KindVariableStatement &&
+		ast.HasSyntacticModifier(vd.Parent.Parent, ast.ModifierFlagsExport)
+}
+
 func (analysis *RstestCallAnalysis) checkExpectConfigEscape(node *ast.Node, kind expectConfigKind) {
 	outer := internalUtils.OutermostTransparentExpression(node)
 	if outer == nil || outer.Parent == nil {
@@ -740,8 +770,9 @@ func (analysis *RstestCallAnalysis) checkExpectConfigEscape(node *ast.Node, kind
 		if p.Kind == ast.KindCallExpression && p.AsCallExpression().Expression == outer {
 			return
 		}
-		// 2. Simple local variable initializer: `const ext = expect.extend`
-		if p.Kind == ast.KindVariableDeclaration && p.AsVariableDeclaration().Initializer == outer {
+		// 2. Simple non-exported local variable initializer: `const ext = expect.extend`
+		if p.Kind == ast.KindVariableDeclaration && p.AsVariableDeclaration().Initializer == outer &&
+			!isExportedVariableDeclaration(p) {
 			name := p.AsVariableDeclaration().Name()
 			if name != nil && name.Kind == ast.KindIdentifier {
 				return
@@ -770,9 +801,10 @@ func (analysis *RstestCallAnalysis) checkExpectConfigEscape(node *ast.Node, kind
 		if ast.IsAccessExpression(p) && p.Expression() == outer {
 			return
 		}
-		// 3. Initializer of a local VariableDeclaration:
+		// 3. Initializer of a non-exported local VariableDeclaration:
 		//    `const check = expect`, `const { extend } = expect`, `const { ...copy } = expect`
-		if p.Kind == ast.KindVariableDeclaration && p.AsVariableDeclaration().Initializer == outer {
+		if p.Kind == ast.KindVariableDeclaration && p.AsVariableDeclaration().Initializer == outer &&
+			!isExportedVariableDeclaration(p) {
 			return
 		}
 		// 4. Plain local variable overwrite/assignment: `check = other`, `c = expect`
@@ -790,9 +822,10 @@ func (analysis *RstestCallAnalysis) checkExpectConfigEscape(node *ast.Node, kind
 		if ast.IsAccessExpression(p) && p.Expression() == outer {
 			return
 		}
-		// 2. Initializer of a local VariableDeclaration:
+		// 2. Initializer of a non-exported local VariableDeclaration:
 		//    `const { expect } = r`, `const core = r`, `const { ...api } = r`, `const [ctx] = args`
-		if p.Kind == ast.KindVariableDeclaration && p.AsVariableDeclaration().Initializer == outer {
+		if p.Kind == ast.KindVariableDeclaration && p.AsVariableDeclaration().Initializer == outer &&
+			!isExportedVariableDeclaration(p) {
 			return
 		}
 		// 3. Plain local variable overwrite/assignment: `core = other`, `c = r`, `c ??= r`
@@ -908,52 +941,63 @@ func (analysis *RstestCallAnalysis) expectConfigMember(node *ast.Node) expectCon
 		return expectConfigNone
 	}
 	if ast.IsAccessExpression(node) {
+		canCache := len(analysis.sccStack) == 0 && !analysis.sccQueueActive
+		if canCache && analysis.expectConfigExprs != nil {
+			if cached, ok := analysis.expectConfigExprs[node]; ok {
+				return cached
+			}
+		}
 		recvExpr := internalUtils.SkipAssertionsAndParens(node.Expression())
 		recvKind := analysis.expectConfigMember(recvExpr)
-		if recvKind == expectConfigNone {
-			return expectConfigNone
-		}
-		member, known, staticKey := analysis.evalExpectConfigAccessName(node)
 		var out expectConfigKind
-		if recvKind&expectConfigGlobalObject != 0 {
-			if known && member == "expect" {
-				out |= expectConfigExpect
-			}
-		}
-		if recvKind&expectConfigImportMeta != 0 {
-			if known && member == "rstest" {
-				out |= expectConfigReceiver
-			}
-		}
-		if recvKind&expectConfigReceiverArray != 0 {
-			if (known && member == "0") || !staticKey {
-				out |= expectConfigReceiver
-			}
-		}
-		if recvKind&expectConfigReceiver != 0 {
-			if known {
-				if member == "expect" {
+		if recvKind != expectConfigNone {
+			member, known, staticKey := analysis.evalExpectConfigAccessName(node)
+			if recvKind&expectConfigGlobalObject != 0 {
+				if known && member == "expect" {
 					out |= expectConfigExpect
 				}
-			} else if !staticKey {
-				out |= expectConfigExpect
+			}
+			if recvKind&expectConfigImportMeta != 0 {
+				if known && member == "rstest" {
+					out |= expectConfigReceiver
+				}
+			}
+			if recvKind&expectConfigReceiverArray != 0 {
+				if (known && member == "0") || !staticKey {
+					out |= expectConfigReceiver
+				}
+			}
+			if recvKind&expectConfigReceiver != 0 {
+				if known {
+					if member == "expect" {
+						out |= expectConfigExpect
+					}
+				} else if !staticKey {
+					out |= expectConfigExpect
+				}
+			}
+			if recvKind&expectConfigExpect != 0 {
+				if known {
+					switch member {
+					case "extend":
+						if !analysis.isShallowCopyPropKilled(recvExpr, "extend") {
+							out |= expectConfigExtend
+						}
+					case "addEqualityTesters":
+						if !analysis.isShallowCopyPropKilled(recvExpr, "addEqualityTesters") {
+							out |= expectConfigEquality
+						}
+					}
+				} else if !staticKey {
+					out |= expectConfigExtend | expectConfigEquality
+				}
 			}
 		}
-		if recvKind&expectConfigExpect != 0 {
-			if known {
-				switch member {
-				case "extend":
-					if !analysis.isShallowCopyPropKilled(recvExpr, "extend") {
-						out |= expectConfigExtend
-					}
-				case "addEqualityTesters":
-					if !analysis.isShallowCopyPropKilled(recvExpr, "addEqualityTesters") {
-						out |= expectConfigEquality
-					}
-				}
-			} else if !staticKey {
-				out |= expectConfigExtend | expectConfigEquality
+		if canCache && len(analysis.sccStack) == 0 && !analysis.sccQueueActive {
+			if analysis.expectConfigExprs == nil {
+				analysis.expectConfigExprs = map[*ast.Node]expectConfigKind{}
 			}
+			analysis.expectConfigExprs[node] = out
 		}
 		return out
 	}
@@ -1089,6 +1133,17 @@ func (analysis *RstestCallAnalysis) classifyExpectConfigSymbol(symbol *ast.Symbo
 	if symbol == nil {
 		return expectConfigNone
 	}
+	if analysis.sccQueueActive && analysis.sccQueueCaller != nil && analysis.sccQueueMembers[symbol] {
+		seen := analysis.sccQueueRevDepSeen[symbol]
+		if seen == nil {
+			seen = map[*ast.Symbol]bool{}
+			analysis.sccQueueRevDepSeen[symbol] = seen
+		}
+		if !seen[analysis.sccQueueCaller] {
+			seen[analysis.sccQueueCaller] = true
+			analysis.sccQueueRevDeps[symbol] = append(analysis.sccQueueRevDeps[symbol], analysis.sccQueueCaller)
+		}
+	}
 	if cached, ok := analysis.expectConfigAliases[symbol]; ok {
 		return cached
 	}
@@ -1152,29 +1207,66 @@ func (analysis *RstestCallAnalysis) classifyExpectConfigSymbol(symbol *ast.Symbo
 		analysis.expectConfigAliases[symbol] = out
 		return out
 	}
-	// Seed every SCC member in the cache, then iterate monotonically to a fixed
-	// point. Alternating forward/reverse sweeps make rings of any length converge
-	// in O(1) passes while remaining strictly bounded by the 7-bit mask.
+	// Seed every SCC member in the cache, then propagate monotonically via a
+	// reverse-dependency queue. Because each symbol can gain at most 7 bits,
+	// every intra-SCC edge is traversed O(1) times (strictly O(V + E) total).
+	members := make(map[*ast.Symbol]bool, len(component))
+	revDeps := make(map[*ast.Symbol][]*ast.Symbol, len(component))
+	revDepSeen := make(map[*ast.Symbol]map[*ast.Symbol]bool, len(component))
 	for _, member := range component {
 		analysis.expectConfigAliases[member] = expectConfigNone
+		members[member] = true
 	}
 	analysis.expectConfigAliases[symbol] = out
-	for pass := 0; ; pass++ {
-		changed := false
-		for i := range component {
-			idx := i
-			if pass%2 == 1 {
-				idx = len(component) - 1 - i
-			}
-			member := component[idx]
-			next := analysis.expectConfigAliases[member] | analysis.evaluateExpectConfigSymbolOnce(member)
-			if next != analysis.expectConfigAliases[member] {
-				analysis.expectConfigAliases[member] = next
-				changed = true
+
+	prevActive := analysis.sccQueueActive
+	prevCaller := analysis.sccQueueCaller
+	prevMembers := analysis.sccQueueMembers
+	prevRevDeps := analysis.sccQueueRevDeps
+	prevRevDepSeen := analysis.sccQueueRevDepSeen
+	analysis.sccQueueActive = true
+	analysis.sccQueueMembers = members
+	analysis.sccQueueRevDeps = revDeps
+	analysis.sccQueueRevDepSeen = revDepSeen
+	defer func() {
+		analysis.sccQueueActive = prevActive
+		analysis.sccQueueCaller = prevCaller
+		analysis.sccQueueMembers = prevMembers
+		analysis.sccQueueRevDeps = prevRevDeps
+		analysis.sccQueueRevDepSeen = prevRevDepSeen
+	}()
+
+	var changedInitial []*ast.Symbol
+	for _, member := range component {
+		analysis.sccQueueCaller = member
+		next := analysis.expectConfigAliases[member] | analysis.evaluateExpectConfigSymbolOnce(member)
+		if next != analysis.expectConfigAliases[member] || (member == symbol && out != expectConfigNone) {
+			analysis.expectConfigAliases[member] = next
+			changedInitial = append(changedInitial, member)
+		}
+	}
+	queue := make([]*ast.Symbol, 0, len(component))
+	inQueue := make(map[*ast.Symbol]bool, len(component))
+	enqueueDeps := func(changedSym *ast.Symbol) {
+		for _, dep := range revDeps[changedSym] {
+			if !inQueue[dep] {
+				inQueue[dep] = true
+				queue = append(queue, dep)
 			}
 		}
-		if !changed {
-			break
+	}
+	for _, m := range changedInitial {
+		enqueueDeps(m)
+	}
+	for len(queue) > 0 {
+		member := queue[0]
+		queue = queue[1:]
+		inQueue[member] = false
+		analysis.sccQueueCaller = member
+		next := analysis.expectConfigAliases[member] | analysis.evaluateExpectConfigSymbolOnce(member)
+		if next != analysis.expectConfigAliases[member] {
+			analysis.expectConfigAliases[member] = next
+			enqueueDeps(member)
 		}
 	}
 	return analysis.expectConfigAliases[symbol]
@@ -1244,7 +1336,7 @@ func isInsideTryBlock(node *ast.Node) bool {
 // unconditionally overwritten by a pure non-config assignment in the next
 // statement before any reference can read it.
 func (analysis *RstestCallAnalysis) isUnconditionallyKilledBeforeRead(symbol *ast.Symbol, decl *ast.Node) bool {
-	if analysis.ctx.Refs == nil || symbol == nil || decl == nil {
+	if analysis.ctx.Refs == nil || symbol == nil || decl == nil || analysis.sccQueueActive {
 		return false
 	}
 	vd := decl
