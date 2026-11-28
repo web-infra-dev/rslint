@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestValidExpectRule(t *testing.T) {
@@ -179,6 +182,30 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `test("t", async () => { await Promise.try(async (check: any) => { const saved = [check]; await Promise.all(saved); saved.length = 0; }, expect(p).resolves.toBe(1)); });`},
 			{Code: `test("t", async () => { await Promise.try(async (check: any) => { const saved: any[] = []; saved.length = 0; saved.push(check); await Promise.all(saved); }, expect(p).resolves.toBe(1)); });`},
 			{Code: `export {}; interface Set { add(p: Promise<unknown>): Promise<void>; } async function run(queue: Set) { await Promise.try((check: any) => queue.add(check), expect(p).resolves.toBe(1)); }`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map([['key', check]]); return Promise.all(jobs.values()); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map(); jobs.set('key', check); return Promise.all(jobs.values()); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => Promise.all(new Map().set('key', check).values()), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => Promise.all(Array.from({ 0: check, length: 1 })), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => Promise.all({ *[Symbol.iterator]() { yield check; } }), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check]; let b = a; b = []; b.length = 0; return Promise.all(a); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check]; let b = a; b = []; b.length = 0; return a[0]; }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { const dispatch: (p: Promise<unknown>) => void = p => p; await Promise.try((check: any) => dispatch(check), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a = [Promise.resolve(0), check]; return a.pop(); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a = [Promise.resolve(0), check]; return (a).pop(); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check, Promise.resolve(0)]; return a.shift(); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `export interface Set { add(p: Promise<unknown>): Promise<void>; } async function run(queue: Set) { await Promise.try((check: any) => queue.add(check), expect(p).resolves.toBe(1)); }`},
+			{Code: "test(\"t\", async () => {\n  await Promise.try(async (check: any) => {\n    const saved: any[] = []\n    saved.length = 0\n    saved.push(check)\n    await Promise.all(saved)\n  }, expect(p).resolves.toBe(1))\n})"},
+			{Code: `test("t", async () => { const dispatch: (p: Promise<unknown>) => void = async p => { await p; }; await Promise.try((check: any) => dispatch(check), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => Promise.all(new Set([check]).keys()), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check]; const c = [check]; c.length = 0; let b = c; b = a; return Promise.all(a); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try(async (check: any) => { const a = [check]; await Promise.all(a); for (let i = 0; i < 2; i++) { a.pop(); } }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; a.push(check); return a.pop(); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((...args: any[]) => args.pop(), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; a.push(check); return a.shift(); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; a.unshift(check); return a.shift(); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; a[0] = check; return a.pop(); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => Array.of(check).pop(), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; a.push(check); return Promise.resolve().then(() => a.pop()); }, expect(p).resolves.toBe(1)); });`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// --- arg count ---
@@ -1695,6 +1722,150 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "asyncMustBeAwaited"},
 				},
 			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; const done = Promise.all(a); a.push(check); a.pop(); return done; }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; const b = a; const done = Promise.all(b); a.push(check); return done; }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check]; let b = a; b = []; return Promise.all(b); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check, Promise.resolve(0)]; return a.pop(); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a = [Promise.resolve(0), check]; return a.shift(); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => [check, Promise.resolve(0)].pop(), expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map([[check, 1]]); return Promise.all(jobs.values()); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map([['key', check]]); return Promise.all(jobs); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map([['key', check]]); return Promise.all(jobs.keys()); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map([['key', check]]); return Promise.all(jobs.entries()); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map([['key', check]]); jobs.clear(); return Promise.all(jobs.values()); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map(); const done = Promise.all(jobs.values()); jobs.set('key', check); return done; }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => Promise.all(Array.from({ 0: check, length: 0 })), expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => Promise.all(Array.from({ 1: check, length: 1 })), expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check]; let b = a; let c = b; b = []; c.length = 0; return Promise.all(a); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check]; let b = a; b.length = 0; b = []; return Promise.all(a); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check]; a.length = 0; const c = [check]; let b = c; b = a; return Promise.all(a); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check]; a.length = 0; const b = cond ? a : [check]; return Promise.all(a); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; const done = Promise.all(a); for (let i = 0; i < 2; i++) { a.push(check); } return done; }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { let a: any[] = []; for (let i = 0; i < 2; i++) { a.push(check); } a = []; return Promise.all(a); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = [check]; a.push(Promise.resolve(0)); return a.pop(); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => Promise.all(Array.from({ 0: check, length: -1 })), expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; a.push(check, Promise.resolve(0)); return a.pop(); }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; for (let i = 0; i < 1; i++) { a.push(check); a.push(Promise.resolve(0)); return a.pop(); } }, expect(p).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
 		},
 	)
 }
@@ -1771,19 +1942,42 @@ func TestValidExpectPromiseAllLinearScaling(t *testing.T) {
 	}
 	b6.WriteString(");\n});\n")
 
+	var b7 strings.Builder
+	b7.WriteString("test('many named Promise.try args collected into one array', async () => {\n  await Promise.try((")
+	for i := range namedN {
+		if i > 0 {
+			b7.WriteString(", ")
+		}
+		fmt.Fprintf(&b7, "a%d: any", i)
+	}
+	b7.WriteString(") => {\n    const saved = [")
+	for i := range namedN {
+		if i > 0 {
+			b7.WriteString(", ")
+		}
+		fmt.Fprintf(&b7, "a%d", i)
+	}
+	b7.WriteString("];\n    return Promise.all(saved);\n  }")
+	for i := range namedN {
+		fmt.Fprintf(&b7, ", expect(p).resolves.toBe(%d)", i)
+	}
+	b7.WriteString(");\n});\n")
+
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 	for _, tc := range []struct {
 		name         string
 		code         string
 		demand       rule.EditDemand
+		hasTypeInfo  bool
 		wantDiagSize int
 	}{
-		{name: "promise-all.ts", code: b.String(), demand: rule.EditDemandNone, wantDiagSize: 0},
-		{name: "const-bound.ts", code: b2.String(), demand: rule.EditDemandNone, wantDiagSize: 0},
-		{name: "not-awaited-array-autofix.ts", code: b3.String(), demand: rule.EditDemandAutofix, wantDiagSize: n},
-		{name: "promise-try-rest-all.ts", code: b4.String(), demand: rule.EditDemandNone, wantDiagSize: 0},
-		{name: "promise-try-rest-index0.ts", code: b5.String(), demand: rule.EditDemandNone, wantDiagSize: tryN - 1},
-		{name: "promise-try-named-pops.ts", code: b6.String(), demand: rule.EditDemandNone, wantDiagSize: 0},
+		{name: "promise-all.ts", code: b.String(), demand: rule.EditDemandNone, hasTypeInfo: true, wantDiagSize: 0},
+		{name: "const-bound.ts", code: b2.String(), demand: rule.EditDemandNone, hasTypeInfo: true, wantDiagSize: 0},
+		{name: "not-awaited-array-autofix.ts", code: b3.String(), demand: rule.EditDemandAutofix, hasTypeInfo: true, wantDiagSize: n},
+		{name: "promise-try-rest-all.ts", code: b4.String(), demand: rule.EditDemandNone, hasTypeInfo: true, wantDiagSize: 0},
+		{name: "promise-try-rest-index0.ts", code: b5.String(), demand: rule.EditDemandNone, hasTypeInfo: true, wantDiagSize: tryN - 1},
+		{name: "promise-try-named-pops.ts", code: b6.String(), demand: rule.EditDemandNone, hasTypeInfo: true, wantDiagSize: 0},
+		{name: "promise-try-named-array.ts", code: b7.String(), demand: rule.EditDemandNone, hasTypeInfo: true, wantDiagSize: 0},
 	} {
 		program, sourceFile, err := helper.CreateTestProgram(tc.code, tc.name, "tsconfig.json")
 		if err != nil {
@@ -1794,7 +1988,7 @@ func TestValidExpectPromiseAllLinearScaling(t *testing.T) {
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        sourceFile.FileName(),
-			HasTypeInfo: true,
+			HasTypeInfo: tc.hasTypeInfo,
 			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return []rule.ConfiguredRule{{
 					Name:     valid_expect.ValidExpectRule.Name,
@@ -1817,5 +2011,90 @@ func TestValidExpectPromiseAllLinearScaling(t *testing.T) {
 		if len(diagnostics) != tc.wantDiagSize {
 			t.Fatalf("%s reported %d diagnostics; want %d", tc.name, len(diagnostics), tc.wantDiagSize)
 		}
+	}
+}
+
+func TestValidExpectSourceOnlyMode(t *testing.T) {
+	root := fixtures.GetRootDir()
+	for _, tc := range []struct {
+		name         string
+		code         string
+		wantDiagSize int
+	}{
+		{
+			name:         "typed-array-param.ts",
+			code:         `async function run(pending: Promise<unknown>[]) { const p = Promise.resolve(1); await Promise.try(check => pending.push(check), expect(p).resolves.toBe(1)); }`,
+			wantDiagSize: 1,
+		},
+		{
+			name:         "export-shadowed-set-interface.ts",
+			code:         `export interface Set { add(p: Promise<unknown>): Promise<void>; } async function run(queue: Set) { const p = Promise.resolve(1); await Promise.try(check => queue.add(check), expect(p).resolves.toBe(1)); }`,
+			wantDiagSize: 0,
+		},
+		{
+			name:         "typed-weak-set-param.ts",
+			code:         `async function run(seen: WeakSet<Promise<unknown>>) { const p = Promise.resolve(1); await Promise.try(check => Promise.all(seen.add(check) as any), expect(p).resolves.toBe(1)); }`,
+			wantDiagSize: 1,
+		},
+		{
+			name:         "typed-weak-map-param.ts",
+			code:         `async function run(m: WeakMap<object, Promise<unknown>>) { const p = Promise.resolve(1); await Promise.try(check => Promise.all((m.set({}, check) as any).values()), expect(p).resolves.toBe(1)); }`,
+			wantDiagSize: 1,
+		},
+		{
+			name:         "typed-set-keys.ts",
+			code:         `async function run(s: Set<Promise<unknown>>) { const p = Promise.resolve(1); await Promise.try(check => { s.add(check); return Promise.all(s.keys()); }, expect(p).resolves.toBe(1)); }`,
+			wantDiagSize: 0,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fileName := tspath.ResolvePath(root.Dir, tc.name)
+			fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: tc.code})
+			host := utils.CreateCompilerHost(root.Dir, fs)
+			sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames:   []string{fileName},
+				Host:            host,
+				CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
+				SingleThreaded:  true,
+			})
+			if err != nil {
+				t.Fatalf("NewFromRoots: %v", err)
+			}
+			if sourceProgram.CanProvideTypeChecker(sourceProgram.SourceFiles()[0]) {
+				t.Fatal("expected a source-only Program with no TypeChecker")
+			}
+			lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+				Programs:         []*lintprogram.Program{sourceProgram},
+				TargetsByProgram: [][]string{{fileName}},
+				SingleThreaded:   true,
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{
+						Name:     valid_expect.ValidExpectRule.Name,
+						Severity: rule.SeverityError,
+						Run: func(ctx rule.RuleContext) rule.RuleListeners {
+							return valid_expect.ValidExpectRule.Run(ctx, nil)
+						},
+					}}
+				},
+			})
+			if err != nil {
+				t.Fatalf("PrepareLintPlan: %v", err)
+			}
+			var diagnostics []rule.RuleDiagnostic
+			if _, err := linter.RunLinter(linter.RunLinterOptions{
+				SingleThreaded: true,
+				LintPlan:       lintPlan,
+				Consumer: rule.DiagnosticConsumer{
+					Report: func(d rule.RuleDiagnostic) {
+						diagnostics = append(diagnostics, d)
+					},
+				},
+			}); err != nil {
+				t.Fatalf("RunLinter: %v", err)
+			}
+			if len(diagnostics) != tc.wantDiagSize {
+				t.Fatalf("%s reported %d diagnostics; want %d", tc.name, len(diagnostics), tc.wantDiagSize)
+			}
+		})
 	}
 }

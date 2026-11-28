@@ -3,9 +3,16 @@ package valid_expect_test
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_expect"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestValidExpectRule(t *testing.T) {
@@ -173,6 +180,11 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: `test("t", async () => { await Promise.try((check: any) => { const saved = [check]; return saved[0]; }, expect(p).resolves.toBe(1)); });`},
 			{Code: `test("t", async () => { await Promise.try(async (check: any) => { const saved = [check]; await Promise.all(saved); saved.length = 0; }, expect(p).resolves.toBe(1)); });`},
 			{Code: `test("t", async () => { await Promise.try(async (check: any) => { const saved: any[] = []; saved.length = 0; saved.push(check); await Promise.all(saved); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map([['key', check]]); return Promise.all(jobs.values()); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => Promise.all(Array.from({ 0: check, length: 1 })), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => Promise.all({ *[Symbol.iterator]() { yield check; } }), expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check]; let b = a; b = []; b.length = 0; return Promise.all(a); }, expect(p).resolves.toBe(1)); });`},
+			{Code: `test("t", async () => { const dispatch: (p: Promise<unknown>) => void = p => p; await Promise.try((check: any) => dispatch(check), expect(p).resolves.toBe(1)); });`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -1800,6 +1812,116 @@ func TestValidExpectRule(t *testing.T) {
 					{MessageId: "asyncMustBeAwaited"},
 				},
 			},
+			{
+				Code: `test("t", async () => { let started = false; (globalThis as any).startWork = () => { started = true; }; const p = Promise.resolve().then(() => started); const done = Promise.withResolvers<void>(); await Promise.resolve([expect(p).resolves.toBe(true).then(done.resolve, done.reject), expect(1).toResolve()]); await done.promise; });`,
+				Output: []string{
+					`test("t", async () => { let started = false; (globalThis as any).startWork = () => { started = true; }; const p = Promise.resolve().then(() => started); const done = Promise.withResolvers<void>(); await Promise.resolve([expect(p).resolves.toBe(true).then(done.resolve, done.reject), await expect(1).toResolve()]); await done.promise; });`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.resolve([expect(Promise.resolve(1)).resolves.toBe(1), expect(Promise.resolve(1)).toResolve()]); });`,
+				Output: []string{
+					`test("t", async () => { await Promise.resolve([expect(Promise.resolve(1)).resolves.toBe(1), await expect(Promise.resolve(1)).toResolve()]); });`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a: any[] = []; const done = Promise.all(a); a.push(check); a.pop(); return done; }, expect(Promise.resolve(1)).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const a = [check, Promise.resolve(0)]; return a.pop(); }, expect(Promise.resolve(1)).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { await Promise.try((check: any) => { const jobs = new Map([[check, 1]]); return Promise.all(jobs.values()); }, expect(Promise.resolve(1)).resolves.toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { const assertions = [expect(Promise.resolve(1)).resolves.toBe(1), expect(Promise.resolve(2)).toResolve()]; await done; });`,
+				Output: []string{
+					`test("t", async () => { const assertions = [expect(Promise.resolve(1)).resolves.toBe(1), await expect(Promise.resolve(2)).toResolve()]; await done; });`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
+			{
+				Code: `test("t", async () => { let started = false; { const assertions = [expect(Promise.resolve(2)).resolves.toBe(2), expect(Promise.resolve(3)).toReject()]; } expect(started).toBe(true); });`,
+				Output: []string{
+					`test("t", async () => { let started = false; { const assertions = [expect(Promise.resolve(2)).resolves.toBe(2), await expect(Promise.resolve(3)).toReject()]; } expect(started).toBe(true); });`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited"},
+					{MessageId: "asyncMustBeAwaited"},
+				},
+			},
 		},
 	)
+}
+
+func TestJestValidExpectSourceOnlyMode(t *testing.T) {
+	root := fixtures.GetRootDir()
+	code := `async function run(pending: Promise<unknown>[]) { const p = Promise.resolve(1); await Promise.try(check => pending.push(check), expect(p).resolves.toBe(1)); }`
+	fileName := tspath.ResolvePath(root.Dir, "jest-source-only-typed-array.ts")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+	host := utils.CreateCompilerHost(root.Dir, fs)
+	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{fileName},
+		Host:            host,
+		CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatalf("NewFromRoots: %v", err)
+	}
+	if sourceProgram.CanProvideTypeChecker(sourceProgram.SourceFiles()[0]) {
+		t.Fatal("expected a source-only Program with no TypeChecker")
+	}
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{sourceProgram},
+		TargetsByProgram: [][]string{{fileName}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     valid_expect.ValidExpectRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return valid_expect.ValidExpectRule.Run(ctx, nil)
+				},
+			}}
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	var diagnostics []rule.RuleDiagnostic
+	if _, err := linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		Consumer: rule.DiagnosticConsumer{
+			Report: func(d rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, d)
+			},
+		},
+	}); err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	if len(diagnostics) != 1 {
+		t.Fatalf("reported %d diagnostics; want 1", len(diagnostics))
+	}
 }

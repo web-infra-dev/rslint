@@ -5949,6 +5949,7 @@ type objGetterSummary struct {
 	hasProtoDynamic         bool
 	hasOpaqueProto          bool
 	ownShadowedProps        map[string]bool
+	ownInlineMethods        map[string]*ast.Node
 	staticGetters           map[string][]*ast.Node
 	allGetters              []*ast.Node
 	protoDynamicGetters     []*ast.Node
@@ -5984,11 +5985,18 @@ func (analysis *RstestCallAnalysis) getObjectLiteralGetterSummary(objExpr *ast.N
 		curStaticGetters := map[string]*ast.Node{}
 		curStaticData := map[string]bool{}
 		curStaticSetters := map[string]bool{}
+		var curInlineMethods map[string]*ast.Node
 		var curStaticGetterOrder []string
 		var curDynamicGetters []*ast.Node
 		var curSymbolGetters []*ast.Node
 		for _, prop := range cur.AsObjectLiteralExpression().Properties.Nodes {
 			if prop == nil {
+				continue
+			}
+			if prop.Kind == ast.KindSpreadAssignment {
+				if depth == 0 {
+					curInlineMethods = nil
+				}
 				continue
 			}
 			if prop.Kind == ast.KindPropertyAssignment && prop.Name() != nil && prop.Name().Kind != ast.KindComputedPropertyName {
@@ -6002,6 +6010,7 @@ func (analysis *RstestCallAnalysis) getObjectLiteralGetterSummary(objExpr *ast.N
 				if prop.Name() == nil {
 					if depth == 0 {
 						summary.hasOwnDynamic = true
+						curInlineMethods = nil
 					} else {
 						summary.hasProtoDynamic = true
 						summary.protoDynamicGetters = append(summary.protoDynamicGetters, prop)
@@ -6013,6 +6022,7 @@ func (analysis *RstestCallAnalysis) getObjectLiteralGetterSummary(objExpr *ast.N
 				if !ok && !staticKey {
 					if depth == 0 {
 						summary.hasOwnDynamic = true
+						curInlineMethods = nil
 					} else {
 						summary.hasProtoDynamic = true
 						summary.protoDynamicGetters = append(summary.protoDynamicGetters, prop)
@@ -6025,6 +6035,9 @@ func (analysis *RstestCallAnalysis) getObjectLiteralGetterSummary(objExpr *ast.N
 					continue
 				}
 				if ok {
+					if depth == 0 {
+						delete(curInlineMethods, name)
+					}
 					if shadowed[name] {
 						if depth > 0 {
 							if summary.shadowedProtoGetters == nil {
@@ -6042,21 +6055,68 @@ func (analysis *RstestCallAnalysis) getObjectLiteralGetterSummary(objExpr *ast.N
 					curStaticGetters[name] = prop
 				}
 			case ast.KindSetAccessor:
-				if prop.Name() != nil {
-					if name, ok, _ := analysis.evalPropertyNameKey(prop.Name()); ok {
-						delete(curStaticData, name)
-						curStaticSetters[name] = true
+				if prop.Name() == nil {
+					if depth == 0 {
+						curInlineMethods = nil
+					}
+					continue
+				}
+				name, ok, staticKey := analysis.evalPropertyNameKey(prop.Name())
+				if !ok && !staticKey {
+					if depth == 0 {
+						curInlineMethods = nil
+					}
+					continue
+				}
+				if ok {
+					delete(curStaticData, name)
+					curStaticSetters[name] = true
+					if depth == 0 {
+						delete(curInlineMethods, name)
 					}
 				}
 			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindMethodDeclaration:
-				if prop.Name() != nil {
-					if name, ok, _ := analysis.evalPropertyNameKey(prop.Name()); ok {
-						delete(curStaticGetters, name)
-						delete(curStaticSetters, name)
-						curStaticData[name] = true
+				if prop.Name() == nil {
+					if depth == 0 {
+						curInlineMethods = nil
+					}
+					continue
+				}
+				name, ok, staticKey := analysis.evalPropertyNameKey(prop.Name())
+				if !ok && !staticKey {
+					if depth == 0 {
+						curInlineMethods = nil
+					}
+					continue
+				}
+				if ok {
+					delete(curStaticGetters, name)
+					delete(curStaticSetters, name)
+					curStaticData[name] = true
+					if depth == 0 {
+						var inlineMethod *ast.Node
+						switch prop.Kind {
+						case ast.KindMethodDeclaration:
+							inlineMethod = prop
+						case ast.KindPropertyAssignment:
+							if init := internalUtils.SkipAssertionsAndParens(prop.AsPropertyAssignment().Initializer); init != nil && init.Kind == ast.KindFunctionExpression {
+								inlineMethod = init
+							}
+						}
+						if inlineMethod != nil {
+							if curInlineMethods == nil {
+								curInlineMethods = map[string]*ast.Node{}
+							}
+							curInlineMethods[name] = inlineMethod
+						} else {
+							delete(curInlineMethods, name)
+						}
 					}
 				}
 			}
+		}
+		if depth == 0 {
+			summary.ownInlineMethods = curInlineMethods
 		}
 		if depth == 0 && (len(curStaticData) > 0 || len(curStaticGetters) > 0 || len(curStaticSetters) > 0) {
 			summary.ownShadowedProps = make(map[string]bool, len(curStaticData)+len(curStaticGetters)+len(curStaticSetters))
@@ -6314,48 +6374,6 @@ func thisAccessRootProp(node *ast.Node, isThis func(*ast.Node) bool) (rootAccess
 	return nil, false, false
 }
 
-func (analysis *RstestCallAnalysis) lookupOwnLiteralInlineMethod(objExpr *ast.Node, methodName string) *ast.Node {
-	if objExpr == nil || objExpr.Kind != ast.KindObjectLiteralExpression || objExpr.AsObjectLiteralExpression().Properties == nil {
-		return nil
-	}
-	var found *ast.Node
-	for _, prop := range objExpr.AsObjectLiteralExpression().Properties.Nodes {
-		if prop == nil {
-			continue
-		}
-		if prop.Kind == ast.KindSpreadAssignment {
-			found = nil
-			continue
-		}
-		if prop.Name() == nil {
-			found = nil
-			continue
-		}
-		name, ok, staticKey := analysis.evalPropertyNameKey(prop.Name())
-		if !ok && !staticKey {
-			found = nil
-			continue
-		}
-		if !ok || name != methodName {
-			continue
-		}
-		switch prop.Kind {
-		case ast.KindMethodDeclaration:
-			found = prop
-		case ast.KindPropertyAssignment:
-			init := internalUtils.SkipAssertionsAndParens(prop.AsPropertyAssignment().Initializer)
-			if init != nil && init.Kind == ast.KindFunctionExpression {
-				found = init
-			} else {
-				found = nil
-			}
-		default:
-			found = nil
-		}
-	}
-	return found
-}
-
 // collectPrecedingGetterPropWriteExprs collects RHS expressions (and non-literal
 // `Object.assign(this, src)` containers) written to `this[targetProp]` (or any
 // property when `targetProp == ""`) inside getters that can execute before
@@ -6445,6 +6463,20 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 	}
 	thisPropWrittenInGetters := map[string]bool{}
 	gettersWriteDynamicThisProp := false
+	resolvedOwnMethods := map[string]bool{}
+	markThisPropMutated := func(pName string, pKnown bool) {
+		if pKnown {
+			thisPropWrittenInGetters[pName] = true
+			if resolvedOwnMethods[pName] {
+				unresolved = true
+			}
+			return
+		}
+		gettersWriteDynamicThisProp = true
+		if len(resolvedOwnMethods) > 0 {
+			unresolved = true
+		}
+	}
 	scanThisPropWrites := func(body *ast.Node, isThis func(*ast.Node) bool) {
 		var scan func(*ast.Node)
 		scan = func(node *ast.Node) {
@@ -6457,11 +6489,8 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 			if node.Kind == ast.KindBinaryExpression {
 				if bin := node.AsBinaryExpression(); bin != nil && bin.OperatorToken != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
 					if rootAccess, isDirect, ok := thisAccessRootProp(bin.Left, isThis); ok && isDirect {
-						if pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess); pKnown {
-							thisPropWrittenInGetters[pName] = true
-						} else {
-							gettersWriteDynamicThisProp = true
-						}
+						pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess)
+						markThisPropMutated(pName, pKnown)
 					}
 				}
 			}
@@ -6480,84 +6509,85 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 			})
 		}
 	}
-	exprReferencesParams := func(expr *ast.Node, paramSymbols map[*ast.Symbol]bool) bool {
-		if expr == nil || len(paramSymbols) == 0 {
+	knownLocalFnBindCache := map[*ast.Symbol]bool{}
+	isKnownLocalFunctionBindCallee := func(callee *ast.Node) bool {
+		if callee == nil || !ast.IsAccessExpression(callee) {
 			return false
 		}
-		foundParam := false
-		var walk func(*ast.Node)
-		walk = func(node *ast.Node) {
-			if node == nil || foundParam || ast.IsTypeNode(node) {
-				return
+		if mName, ok := internalUtils.AccessExpressionStaticName(callee); !ok || mName != "bind" {
+			return false
+		}
+		recv := internalUtils.SkipAssertionsAndParens(callee.Expression())
+		if recv == nil {
+			return false
+		}
+		switch recv.Kind {
+		case ast.KindArrowFunction, ast.KindFunctionExpression:
+			return true
+		case ast.KindIdentifier:
+			sym := resolveRstestRootSymbol(analysis.ctx, recv)
+			if sym == nil || len(sym.Declarations) != 1 || sym.Declarations[0] == nil {
+				return false
 			}
-			if node.Kind == ast.KindIdentifier {
-				if node.AsIdentifier().Text == "arguments" {
-					foundParam = true
-					return
-				}
-				if sym := resolveRstestRootSymbol(analysis.ctx, node); sym != nil && paramSymbols[sym] {
-					foundParam = true
-					return
-				}
+			if cached, ok := knownLocalFnBindCache[sym]; ok {
+				return cached
 			}
-			node.ForEachChild(func(child *ast.Node) bool {
-				walk(child)
-				return foundParam
-			})
-		}
-		walk(expr)
-		return foundParam
-	}
-	collectFnParamSymbols := func(fn *ast.Node, base map[*ast.Symbol]bool) map[*ast.Symbol]bool {
-		if fn == nil {
-			return base
-		}
-		params := fn.Parameters()
-		if len(params) == 0 {
-			return base
-		}
-		out := make(map[*ast.Symbol]bool, len(base)+len(params))
-		for s := range base {
-			out[s] = true
-		}
-		var addBinding func(*ast.Node)
-		addBinding = func(n *ast.Node) {
-			if n == nil {
-				return
+			decl := sym.Declarations[0]
+			isFnDecl := decl.Kind == ast.KindFunctionDeclaration
+			if !isFnDecl && decl.Kind == ast.KindVariableDeclaration {
+				init := internalUtils.SkipAssertionsAndParens(decl.AsVariableDeclaration().Initializer)
+				isFnDecl = init != nil && (init.Kind == ast.KindArrowFunction || init.Kind == ast.KindFunctionExpression)
 			}
-			switch n.Kind {
-			case ast.KindIdentifier:
-				sym := n.Parent.Symbol()
-				if sym == nil {
-					sym = resolveRstestRootSymbol(analysis.ctx, n)
-				}
-				if sym != nil {
-					out[sym] = true
-				}
-			case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
-				if bp := n.AsBindingPattern(); bp != nil && bp.Elements != nil {
-					for _, el := range bp.Elements.Nodes {
-						if el != nil && el.Kind == ast.KindBindingElement {
-							addBinding(el.Name())
+			result := isFnDecl && analysis.ctx.Refs != nil
+			if result {
+				for _, ref := range analysis.ctx.Refs.References(sym) {
+					if ref == nil || ref == decl.Name() {
+						continue
+					}
+					if internalUtils.IsWriteReference(ref) {
+						result = false
+						break
+					}
+					outer := outermostExpressionWrapper(ref)
+					if outer != nil && outer.Parent != nil && ast.IsAccessExpression(outer.Parent) &&
+						outer.Parent.Expression() == outer {
+						memberOuter := outermostExpressionWrapper(outer.Parent)
+						if internalUtils.IsWriteReference(outer.Parent) || internalUtils.IsWriteReference(memberOuter) {
+							result = false
+							break
+						}
+						if memberOuter != nil && memberOuter.Parent != nil && memberOuter.Parent.Kind == ast.KindDeleteExpression {
+							result = false
+							break
 						}
 					}
 				}
 			}
+			knownLocalFnBindCache[sym] = result
+			return result
 		}
-		for _, p := range params {
-			if p != nil && p.Name() != nil {
-				addBinding(p.Name())
-			}
-		}
-		return out
+		return false
 	}
-	visitedBodies := map[*ast.Node]bool{}
-	var visitBody func(body *ast.Node, ownThis bool, outerAliases map[*ast.Symbol]bool, paramSymbols map[*ast.Symbol]bool)
-	visitBody = func(body *ast.Node, ownThis bool, outerAliases map[*ast.Symbol]bool, paramSymbols map[*ast.Symbol]bool) {
-		if body == nil || visitedBodies[body] {
+	type bodyVisitKey struct {
+		body          *ast.Node
+		hasCallerArgs bool
+	}
+	type pendingNestedFn struct {
+		fn            *ast.Node
+		ownThis       bool
+		aliases       map[*ast.Symbol]bool
+		hasCallerArgs bool
+	}
+	visitedBodies := map[bodyVisitKey]bool{}
+	var pendingNestedFns []pendingNestedFn
+	hasUnresolvedCall := false
+	var visitBody func(body *ast.Node, ownThis bool, outerAliases map[*ast.Symbol]bool, hasCallerArgs bool)
+	visitBody = func(body *ast.Node, ownThis bool, outerAliases map[*ast.Symbol]bool, hasCallerArgs bool) {
+		key := bodyVisitKey{body: body, hasCallerArgs: hasCallerArgs}
+		if body == nil || visitedBodies[key] {
 			return
 		}
-		visitedBodies[body] = true
+		visitedBodies[key] = true
 		var thisAliases map[*ast.Symbol]bool
 		if len(outerAliases) > 0 {
 			thisAliases = make(map[*ast.Symbol]bool, len(outerAliases))
@@ -6565,29 +6595,12 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 				thisAliases[sym] = true
 			}
 		}
-		var localFns map[*ast.Symbol][]*ast.Node
-		addLocalFn := func(sym *ast.Symbol, fn *ast.Node) {
-			if sym == nil || fn == nil {
-				return
-			}
-			if localFns == nil {
-				localFns = map[*ast.Symbol][]*ast.Node{}
-			}
-			localFns[sym] = append(localFns[sym], fn)
-		}
-		var collectLocalBindings func(*ast.Node)
-		collectLocalBindings = func(node *ast.Node) {
+		var collectThisAliases func(*ast.Node)
+		collectThisAliases = func(node *ast.Node) {
 			if node == nil {
 				return
 			}
 			if node != body && testFramework.IsFunction(node) {
-				if node.Kind == ast.KindFunctionDeclaration && node.Name() != nil && node.Name().Kind == ast.KindIdentifier {
-					sym := node.Symbol()
-					if sym == nil {
-						sym = resolveRstestRootSymbol(analysis.ctx, node.Name())
-					}
-					addLocalFn(sym, node)
-				}
 				if node.Kind != ast.KindArrowFunction || !isImmediatelyInvokedFunction(node) {
 					return
 				}
@@ -6595,49 +6608,41 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 			switch node.Kind {
 			case ast.KindVariableDeclaration:
 				vd := node.AsVariableDeclaration()
-				if vd != nil && vd.Initializer != nil && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
-					init := internalUtils.SkipAssertionsAndParens(vd.Initializer)
-					sym := node.Symbol()
-					if sym == nil {
-						sym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
-					}
-					if sym != nil && init != nil {
-						if ownThis && init.Kind == ast.KindThisKeyword {
+				if ownThis && vd != nil && vd.Initializer != nil && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
+					if init := internalUtils.SkipAssertionsAndParens(vd.Initializer); init != nil && init.Kind == ast.KindThisKeyword {
+						sym := node.Symbol()
+						if sym == nil {
+							sym = resolveRstestRootSymbol(analysis.ctx, vd.Name())
+						}
+						if sym != nil {
 							if thisAliases == nil {
 								thisAliases = map[*ast.Symbol]bool{}
 							}
 							thisAliases[sym] = true
-						} else if init.Kind == ast.KindArrowFunction || init.Kind == ast.KindFunctionExpression {
-							addLocalFn(sym, init)
 						}
 					}
 				}
 			case ast.KindBinaryExpression:
 				bin := node.AsBinaryExpression()
-				if bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
+				if ownThis && bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
 					if lhs := internalUtils.SkipAssertionsAndParens(bin.Left); lhs != nil && lhs.Kind == ast.KindIdentifier {
-						if rhs := internalUtils.SkipAssertionsAndParens(bin.Right); rhs != nil {
-							sym := resolveRstestRootSymbol(analysis.ctx, lhs)
-							if sym != nil {
-								if ownThis && rhs.Kind == ast.KindThisKeyword {
-									if thisAliases == nil {
-										thisAliases = map[*ast.Symbol]bool{}
-									}
-									thisAliases[sym] = true
-								} else if rhs.Kind == ast.KindArrowFunction || rhs.Kind == ast.KindFunctionExpression {
-									addLocalFn(sym, rhs)
+						if rhs := internalUtils.SkipAssertionsAndParens(bin.Right); rhs != nil && rhs.Kind == ast.KindThisKeyword {
+							if sym := resolveRstestRootSymbol(analysis.ctx, lhs); sym != nil {
+								if thisAliases == nil {
+									thisAliases = map[*ast.Symbol]bool{}
 								}
+								thisAliases[sym] = true
 							}
 						}
 					}
 				}
 			}
 			node.ForEachChild(func(child *ast.Node) bool {
-				collectLocalBindings(child)
+				collectThisAliases(child)
 				return false
 			})
 		}
-		collectLocalBindings(body)
+		collectThisAliases(body)
 		isThis := func(e *ast.Node) bool {
 			e = internalUtils.SkipAssertionsAndParens(e)
 			if e == nil {
@@ -6663,16 +6668,9 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 		scanThisPropWrites(body, isThis)
 		recordDirectWriteExpr := func(rhs *ast.Node) {
 			exprs = append(exprs, rhs)
-			if !isSimplePrimitiveLiteralExpr(rhs) && exprReferencesParams(rhs, paramSymbols) {
+			if hasCallerArgs && !isSimplePrimitiveLiteralExpr(rhs) {
 				unresolved = true
 			}
-		}
-		visitLocalFn := func(fn *ast.Node) {
-			if fn == nil || fn.Body() == nil {
-				return
-			}
-			fnOwnThis := ownThis && fn.Kind == ast.KindArrowFunction
-			visitBody(fn.Body(), fnOwnThis, thisAliases, collectFnParamSymbols(fn, paramSymbols))
 		}
 		var visit func(*ast.Node)
 		visit = func(node *ast.Node) {
@@ -6680,12 +6678,38 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 				return
 			}
 			if node != body && testFramework.IsFunction(node) {
+				fnOwnThis := ownThis && node.Kind == ast.KindArrowFunction
 				if isImmediatelyInvokedFunction(node) {
-					visitLocalFn(node)
+					iifeHasArgs := hasCallerArgs || len(node.Parameters()) > 0
+					if !iifeHasArgs {
+						if outer := outermostExpressionWrapper(node); outer != nil && outer.Parent != nil {
+							if outer.Parent.Kind == ast.KindCallExpression && len(outer.Parent.Arguments()) > 0 {
+								iifeHasArgs = true
+							} else if ast.IsAccessExpression(outer.Parent) {
+								if accOuter := outermostExpressionWrapper(outer.Parent); accOuter != nil && accOuter.Parent != nil &&
+									accOuter.Parent.Kind == ast.KindCallExpression {
+									cArgs := accOuter.Parent.Arguments()
+									if len(cArgs) > 1 || hasSpreadBeforeIndex(cArgs, 1) {
+										iifeHasArgs = true
+									}
+								}
+							}
+						}
+					}
+					visitBody(node.Body(), fnOwnThis, thisAliases, iifeHasArgs)
+				} else {
+					pendingNestedFns = append(pendingNestedFns, pendingNestedFn{
+						fn:            node,
+						ownThis:       fnOwnThis,
+						aliases:       thisAliases,
+						hasCallerArgs: true,
+					})
 				}
 				return
 			}
 			switch node.Kind {
+			case ast.KindNewExpression, ast.KindTaggedTemplateExpression:
+				hasUnresolvedCall = true
 			case ast.KindBinaryExpression:
 				bin := node.AsBinaryExpression()
 				if bin != nil && bin.OperatorToken != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) &&
@@ -6693,6 +6717,9 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 					lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
 					if rootAccess, isDirect, ok := thisAccessRootProp(lhs, isThis); ok {
 						pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess)
+						if isDirect {
+							markThisPropMutated(pName, pKnown)
+						}
 						if matchesTarget(pName, pKnown) {
 							if isDirect {
 								recordDirectWriteExpr(bin.Right)
@@ -6710,8 +6737,11 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 						outer.Parent.AsBinaryExpression().Left == outer &&
 						!internalUtils.IsDefaultValueInDestructuringAssignment(outer.Parent)
 					if !isDirectBinLHS {
-						if rootAccess, _, ok := thisAccessRootProp(node, isThis); ok {
+						if rootAccess, isDirect, ok := thisAccessRootProp(node, isThis); ok {
 							pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess)
+							if isDirect {
+								markThisPropMutated(pName, pKnown)
+							}
 							if matchesTarget(pName, pKnown) {
 								unresolved = true
 							}
@@ -6723,15 +6753,16 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 					if rootAccess, isDirect, ok := thisAccessRootProp(target, isThis); ok {
 						pName, pKnown := analysis.evalExpectConfigAccessName(rootAccess)
 						if isDirect {
+							markThisPropMutated(pName, pKnown)
 							if !pKnown {
 								unresolved = true
 							} else if allGetters || hasDynamicPrecedingKey || precedingKeySet[pName] {
 								for _, sg := range gs.shadowedProtoGetters[pName] {
-									visitBody(sg.Body(), true, nil, nil)
+									visitBody(sg.Body(), true, nil, false)
 								}
 								if gs.hasProtoDynamic {
 									for _, dg := range gs.protoDynamicGetters {
-										visitBody(dg.Body(), true, nil, nil)
+										visitBody(dg.Body(), true, nil, false)
 									}
 									if gs.hasOpaqueProto {
 										unresolved = true
@@ -6747,30 +6778,14 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 				args := node.Arguments()
 				callee := internalUtils.SkipAssertionsAndParens(node.Expression())
 				handledBuiltin := false
-				if len(localFns) > 0 && callee != nil {
-					if callee.Kind == ast.KindIdentifier {
-						if sym := resolveRstestRootSymbol(analysis.ctx, callee); sym != nil {
-							for _, fn := range localFns[sym] {
-								visitLocalFn(fn)
-							}
-						}
-					} else if ast.IsAccessExpression(callee) {
-						if mName, ok := internalUtils.AccessExpressionStaticName(callee); ok && (mName == "call" || mName == "apply") {
-							if recv := internalUtils.SkipAssertionsAndParens(callee.Expression()); recv != nil && recv.Kind == ast.KindIdentifier {
-								if sym := resolveRstestRootSymbol(analysis.ctx, recv); sym != nil {
-									for _, fn := range localFns[sym] {
-										visitLocalFn(fn)
-									}
-								}
-							}
-						}
-					}
-				}
+				resolvedOwnMethod := false
 				if rootAccess, isDirect, ok := thisAccessRootProp(callee, isThis); ok {
 					if isDirect {
 						mName, mOK := analysis.evalExpectConfigAccessName(callee)
 						if mOK && mName == "__defineGetter__" && len(args) >= 2 && !hasSpreadBeforeIndex(args, 2) {
+							handledBuiltin = true
 							kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[0]))
+							markThisPropMutated(kName, kOK)
 							if matchesTarget(kName, kOK) {
 								fnArg := internalUtils.SkipAssertionsAndParens(args[1])
 								if fnArg != nil && (fnArg.Kind == ast.KindArrowFunction || fnArg.Kind == ast.KindFunctionExpression) {
@@ -6781,9 +6796,11 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 									unresolved = true
 								}
 							}
-						} else if mOK && len(args) == 0 && !allGetters && !mutableObj && !gettersWriteDynamicThisProp && !thisPropWrittenInGetters[mName] {
-							if methodFn := analysis.lookupOwnLiteralInlineMethod(objExpr, mName); methodFn != nil && methodFn.Body() != nil {
-								visitBody(methodFn.Body(), true, nil, nil)
+						} else if mOK && !allGetters && !mutableObj && !gettersWriteDynamicThisProp && !thisPropWrittenInGetters[mName] {
+							if methodFn := gs.ownInlineMethods[mName]; methodFn != nil && methodFn.Body() != nil {
+								resolvedOwnMethod = true
+								resolvedOwnMethods[mName] = true
+								visitBody(methodFn.Body(), true, nil, len(args) > 0)
 							} else {
 								unresolved = true
 							}
@@ -6802,10 +6819,27 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 						handledBuiltin = true
 						for _, src := range args[1:] {
 							if src == nil || src.Kind == ast.KindSpreadElement {
+								markThisPropMutated("", false)
 								unresolved = true
 								continue
 							}
 							if srcObj, mutableSrc := analysis.resolveObjectLiteralForBoundLookup(src); srcObj != nil {
+								if props := srcObj.AsObjectLiteralExpression().Properties; props != nil {
+									for _, prop := range props.Nodes {
+										if prop == nil {
+											continue
+										}
+										if prop.Kind == ast.KindSpreadAssignment || prop.Name() == nil {
+											markThisPropMutated("", false)
+											continue
+										}
+										kName, kOK, _ := analysis.evalPropertyNameKey(prop.Name())
+										markThisPropMutated(kName, kOK)
+									}
+								}
+								if mutableSrc {
+									markThisPropMutated("", false)
+								}
 								var propExprs []*ast.Node
 								if targetProp == "" {
 									propExprs = analysis.allObjectLiteralPropertyExprs(srcObj)
@@ -6819,8 +6853,9 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 									containers = append(containers, src)
 								}
 							} else {
+								markThisPropMutated("", false)
 								containers = append(containers, src)
-								if exprReferencesParams(src, paramSymbols) {
+								if hasCallerArgs {
 									unresolved = true
 								}
 							}
@@ -6828,9 +6863,11 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 					} else if analysis.isGlobalBuiltinMemberCall(callee, "Reflect", "set") {
 						handledBuiltin = true
 						if hasSpreadBeforeIndex(args, 3) || len(args) < 3 {
+							markThisPropMutated("", false)
 							unresolved = true
 						} else {
 							kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[1]))
+							markThisPropMutated(kName, kOK)
 							if matchesTarget(kName, kOK) {
 								recordDirectWriteExpr(args[2])
 							}
@@ -6839,9 +6876,11 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 						analysis.isGlobalBuiltinMemberCall(callee, "Reflect", "defineProperty") {
 						handledBuiltin = true
 						if hasSpreadBeforeIndex(args, 3) || len(args) < 3 {
+							markThisPropMutated("", false)
 							unresolved = true
 						} else {
 							kName, kOK := analysis.staticStringEvaluator().EvalToString(internalUtils.SkipAssertionsAndParens(args[1]))
+							markThisPropMutated(kName, kOK)
 							if matchesTarget(kName, kOK) {
 								descObj, mutableDesc := analysis.resolveObjectLiteralForBoundLookup(args[2])
 								dExprs, complete := analysis.collectDescriptorValueAndGetExprs(descObj)
@@ -6856,10 +6895,12 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 					} else if analysis.isGlobalBuiltinMemberCall(callee, "Object", "defineProperties") {
 						handledBuiltin = true
 						if hasSpreadBeforeIndex(args, 2) {
+							markThisPropMutated("", false)
 							unresolved = true
 						} else {
 							propsObj, mutableProps := analysis.resolveObjectLiteralForBoundLookup(args[1])
 							if propsObj == nil || mutableProps || propsObj.AsObjectLiteralExpression().Properties == nil {
+								markThisPropMutated("", false)
 								unresolved = true
 							} else {
 								for _, p := range propsObj.AsObjectLiteralExpression().Properties.Nodes {
@@ -6867,10 +6908,12 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 										continue
 									}
 									if p.Kind != ast.KindPropertyAssignment || p.Name() == nil {
+										markThisPropMutated("", false)
 										unresolved = true
 										continue
 									}
 									kName, kOK, _ := analysis.evalPropertyNameKey(p.Name())
+									markThisPropMutated(kName, kOK)
 									if matchesTarget(kName, kOK) {
 										descObj, mutableDesc := analysis.resolveObjectLiteralForBoundLookup(p.AsPropertyAssignment().Initializer)
 										dExprs, complete := analysis.collectDescriptorValueAndGetExprs(descObj)
@@ -6886,17 +6929,11 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 						}
 					}
 				}
+				if !handledBuiltin && !resolvedOwnMethod && !isConsoleCallee(callee) && !isKnownLocalFunctionBindCallee(callee) {
+					hasUnresolvedCall = true
+				}
 				if !handledBuiltin && !isConsoleCallee(callee) {
 					for _, arg := range args {
-						if len(localFns) > 0 {
-							if uArg := internalUtils.SkipAssertionsAndParens(arg); uArg != nil && uArg.Kind == ast.KindIdentifier {
-								if sym := resolveRstestRootSymbol(analysis.ctx, uArg); sym != nil {
-									for _, fn := range localFns[sym] {
-										visitLocalFn(fn)
-									}
-								}
-							}
-						}
 						if isThis(arg) {
 							unresolved = true
 							break
@@ -6919,7 +6956,13 @@ func (analysis *RstestCallAnalysis) collectPrecedingGetterPropWriteExprs(
 		visit(body)
 	}
 	for _, g := range getters {
-		visitBody(g.Body(), true, nil, nil)
+		visitBody(g.Body(), true, nil, false)
+	}
+	for i := 0; hasUnresolvedCall && i < len(pendingNestedFns); i++ {
+		pending := pendingNestedFns[i]
+		if pending.fn != nil && pending.fn.Body() != nil {
+			visitBody(pending.fn.Body(), pending.ownThis, pending.aliases, pending.hasCallerArgs)
+		}
 	}
 	return exprs, containers, unresolved
 }

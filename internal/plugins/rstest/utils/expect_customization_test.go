@@ -435,6 +435,24 @@ func TestRstestExpectCustomizationAnalysis(t *testing.T) {
 			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { let fn = () => { (this as any).register = r.expect.extend; }; fn(); fn = () => {}; return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const proto: any = {}; Object.defineProperty(proto, 'prepare', { get() { this.register = r.expect.extend; return 1; } }); const { prepare, register } = { __proto__: proto, register: noop }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { a, prepare, register } = { register: noop, install() {}, get a() { (this as any).install = function () { this.register = r.expect.extend; }; return 1; }, get prepare() { this.install(); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { const install = () => { (this as any).register = r.expect.extend; }; const run = install; run(); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { const install = () => { (this as any).register = r.expect.extend; }; ({ f: install }).f(); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { const install = () => { (this as any).register = r.expect.extend; }; install.bind(null)(); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { const install = () => { (this as any).register = r.expect.extend; }; [install][0](); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { const install = () => { (this as any).register = r.expect.extend; }; return install.bind(null); } }; register({ toBe() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, log(message: string) { return message.length; }, get prepare() { this.log('ready'); return 1; } }; register({ toBeDefined() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, run(cb: () => void) { cb(); }, get prepare() { this.run(() => { (this as any).register = r.expect.extend; }); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, install() { (this as any).register = arguments[0]; }, get prepare() { (this as any).install(r.expect.extend); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, install(fn: any) { const target = fn; (this as any).register = target; }, get prepare() { this.install(r.expect.extend); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, run(cb: () => void) { const f = cb; f(); }, get prepare() { const install = () => { (this as any).register = r.expect.extend; }; this.run(install); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { const make = () => { return () => { (this as any).register = r.expect.extend; }; }; make()(); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; let saved: any; const { a, b, register } = { register: noop, get a() { saved = () => { (this as any).register = r.expect.extend; }; return 1; }, get b() { saved(); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, log() {}, get prepare() { const setLog = () => { (this as any).log = function () { this.register = r.expect.extend; }; }; setLog(); this.log(); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { const install = () => { (this as any).register = r.expect.extend; }; const runner = { bind(fn: () => void) { fn(); } }; runner.bind(install); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, log(msg: string) { return msg.length; }, get prepare() { const later = () => { (this as any).register = r.expect.extend; }; this.log('ready'); return later; } }; register({ toBeDefined() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, log(msg: string) { return msg.trim().length; }, get prepare() { this.log('ready'); return 1; } }; register({ toBeDefined() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { ['a', 'b'].forEach((s) => s.trim()); return 1; } }; register({ toBeDefined() {} }); probe();`, Errors: want("toBe=false toBeDefined=false equality=false")},
+			{Code: `import * as r from '@rstest/core'; const noop = (_m: any) => {}; const { prepare, register } = { register: noop, get prepare() { ((fn: any) => { (this as any).register = fn; }).call(null, r.expect.extend); return 1; } }; register({ toBe() {} }); probe();`, Errors: want("toBe=true toBeDefined=false equality=false")},
 		},
 	)
 }
@@ -529,6 +547,16 @@ func TestRstestExpectCustomizationLinearScaling(t *testing.T) {
 		fmt.Fprintf(&b, "w%d: %d, ", i, i)
 	}
 	b.WriteString("register: noop, get unused() { return 1; } };\nwideReg({ toBeDefined() {} });\n")
+	// 13. 400 data properties + 400 calls to one inline helper from a getter (would be O(P*C) without cached ownInlineMethods).
+	b.WriteString("const { prepare: prepLog, register: logReg } = { ")
+	for i := range 400 {
+		fmt.Fprintf(&b, "d%d: %d, ", i, i)
+	}
+	b.WriteString("register: noop, log(msg: string) { return msg.length; }, get prepare() { ")
+	for range 400 {
+		b.WriteString("this.log('ready'); ")
+	}
+	b.WriteString("return 1; } };\nlogReg({ toBeDefined() {} });\n")
 	b.WriteString("probe();\n")
 
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())

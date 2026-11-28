@@ -56,6 +56,9 @@ type promiseTryCallIndex struct {
 type inlineCallbackSummary struct {
 	usesArguments     bool
 	bodyCanConsume    bool
+	hasDefaultParam   bool
+	restParamIdx      int // -1 if no rest parameter
+	params            []*ast.Node
 	restWholeConsumed map[*ast.Node]bool
 }
 
@@ -66,19 +69,22 @@ const (
 	scopeDepAssign
 	scopeDepContainerPush
 	scopeDepContainerIndexWrite
+	scopeDepMapSet
 )
 
 type scopeDepEdge struct {
-	kind     scopeDepKind
-	target   *ast.Node
-	rhs      *ast.Node
-	pos      int
-	topLevel bool
+	kind      scopeDepKind
+	target    *ast.Node
+	rhs       *ast.Node
+	pos       int
+	topLevel  bool
+	outerLoop *ast.Node
 }
 
 type containerRemoval struct {
-	pos    int
-	inLoop bool
+	startPos  int
+	pos       int
+	outerLoop *ast.Node
 }
 
 type scopeConsumeKind uint8
@@ -107,8 +113,22 @@ type scopeBodyIndex struct {
 	consumesByName        map[string][]int
 	removedContainers     map[*ast.Symbol][]containerRemoval
 	removedContainerNames map[string][]containerRemoval
-	shiftedContainers     map[*ast.Symbol]bool
-	shiftedContainerNames map[string]bool
+	shiftedContainers     map[*ast.Symbol][]containerRemoval
+	shiftedContainerNames map[string][]containerRemoval
+	pushedContainers      map[*ast.Symbol][]containerRemoval
+	pushedContainerNames  map[string][]containerRemoval
+	reassignedContainers  map[*ast.Symbol]bool
+	reassignedNames       map[string]bool
+	topLevelReassigns     map[*ast.Symbol][]int
+	topLevelReassignNames map[string][]int
+}
+
+type arrayLiteralSlotIndex struct {
+	bySym               map[*ast.Symbol][]int
+	byName              map[string][]int
+	nonIdentifierSlices []int
+	firstSpreadIdx      int // -1 if no spread element
+	elemCount           int
 }
 
 type arrayLiteralIndex struct {
@@ -146,6 +166,8 @@ type AsyncAssertionResolver struct {
 	callbackInfos                  map[*ast.Node]*inlineCallbackSummary
 	scopeBodyIndices               map[*ast.Node]*scopeBodyIndex
 	arrayElemIndices               map[*ast.Node]*arrayLiteralIndex
+	arraySlotIndices               map[*ast.Node]*arrayLiteralSlotIndex
+	pureLiteralExpectArrays        map[*ast.Node]bool
 	callArgIndices                 map[*ast.Node]*callArgsIndex
 	exprMutates                    map[*ast.Node]bool
 	listSideEffectIndices          map[*ast.Node]*nodeListSideEffectIndex
@@ -578,9 +600,28 @@ func (r *AsyncAssertionResolver) getInlineCallbackSummary(cb *ast.Node) *inlineC
 			return info
 		}
 	}
+	params := runtimeParameters(cb)
+	restParamIdx := -1
+	hasDefaultParam := false
+	for i, param := range params {
+		if param == nil {
+			continue
+		}
+		if p := param.AsParameterDeclaration(); p != nil {
+			if p.DotDotDotToken != nil && restParamIdx < 0 {
+				restParamIdx = i
+			}
+			if p.Initializer != nil || (p.Name() != nil && (p.Name().Kind == ast.KindObjectBindingPattern || p.Name().Kind == ast.KindArrayBindingPattern)) {
+				hasDefaultParam = true
+			}
+		}
+	}
 	info := &inlineCallbackSummary{
-		usesArguments:  cb != nil && cb.Kind == ast.KindFunctionExpression && functionBodyUsesArguments(cb),
-		bodyCanConsume: inlineCallbackBodyCanConsume(cb),
+		usesArguments:   cb != nil && cb.Kind == ast.KindFunctionExpression && functionBodyUsesArguments(cb),
+		bodyCanConsume:  inlineCallbackBodyCanConsume(cb),
+		hasDefaultParam: hasDefaultParam,
+		restParamIdx:    restParamIdx,
+		params:          params,
 	}
 	if r != nil {
 		if r.callbackInfos == nil {
@@ -775,9 +816,28 @@ func collectBindingIdentifiers(pattern *ast.Node) []*ast.Node {
 }
 
 type containerWrite struct {
+	scope          *ast.Node
+	pos            int
+	topLevel       bool
+	outerLoop      *ast.Node
+	isMutation     bool
+	isLastPushElem bool
+}
+
+type containerPeerLink struct {
+	sym      *ast.Symbol
 	scope    *ast.Node
 	pos      int
 	topLevel bool
+	isDest   bool
+}
+
+type containerNamePeerLink struct {
+	name     string
+	scope    *ast.Node
+	pos      int
+	topLevel bool
+	isDest   bool
 }
 
 type trackedBindings struct {
@@ -787,17 +847,21 @@ type trackedBindings struct {
 	restNames             map[string]bool
 	containerSymbols      map[*ast.Symbol]bool
 	containerNames        map[string]bool
+	mapSymbols            map[*ast.Symbol]bool
+	mapNames              map[string]bool
 	arraySlotSymbols      map[*ast.Symbol]map[int]bool
 	arraySlotNames        map[string]map[int]bool
 	arraySlotDeclPos      map[*ast.Symbol]int
 	arraySlotDeclNamePos  map[string]int
+	arraySlotLen          map[*ast.Symbol]int
+	arraySlotNameLen      map[string]int
 	containerScopes       []*ast.Node
 	containerWrites       map[*ast.Symbol][]containerWrite
 	containerNameWrites   map[string][]containerWrite
 	initialContainers     map[*ast.Symbol]bool
 	initialContainerNames map[string]bool
-	containerPeers        map[*ast.Symbol][]*ast.Symbol
-	containerNamePeers    map[string][]string
+	containerPeers        map[*ast.Symbol][]containerPeerLink
+	containerNamePeers    map[string][]containerNamePeerLink
 	argumentsAliasSymbols map[*ast.Symbol]bool
 	argumentsAliasNames   map[string]bool
 	restOffset            int // >= 0 exact expected 0-based index into rest/`arguments`, -1 if unknown
@@ -808,6 +872,7 @@ func (tb *trackedBindings) isEmpty() bool {
 	return len(tb.symbols) == 0 && len(tb.names) == 0 &&
 		len(tb.restSymbols) == 0 && len(tb.restNames) == 0 &&
 		len(tb.containerSymbols) == 0 && len(tb.containerNames) == 0 &&
+		len(tb.mapSymbols) == 0 && len(tb.mapNames) == 0 &&
 		!tb.trackArguments
 }
 
@@ -817,6 +882,7 @@ const (
 	trackedBindingDirect trackedBindingKind = iota
 	trackedBindingRest
 	trackedBindingContainer
+	trackedBindingMap
 )
 
 func (r *AsyncAssertionResolver) addTrackedIdentKind(
@@ -853,6 +919,15 @@ func (r *AsyncAssertionResolver) addTrackedIdentKind(
 			}
 			tb.containerSymbols[sym] = true
 			return sym, name, true
+		case trackedBindingMap:
+			if tb.mapSymbols[sym] {
+				return sym, name, false
+			}
+			if tb.mapSymbols == nil {
+				tb.mapSymbols = map[*ast.Symbol]bool{}
+			}
+			tb.mapSymbols[sym] = true
+			return sym, name, true
 		default:
 			if tb.symbols[sym] {
 				return sym, name, false
@@ -882,6 +957,15 @@ func (r *AsyncAssertionResolver) addTrackedIdentKind(
 			tb.containerNames = map[string]bool{}
 		}
 		tb.containerNames[name] = true
+		return nil, name, true
+	case trackedBindingMap:
+		if tb.mapNames[name] {
+			return nil, name, false
+		}
+		if tb.mapNames == nil {
+			tb.mapNames = map[string]bool{}
+		}
+		tb.mapNames[name] = true
 		return nil, name, true
 	default:
 		if tb.names[name] {
@@ -920,47 +1004,186 @@ func (r *AsyncAssertionResolver) matchesTrackedDirectIdent(node *ast.Node, tb *t
 	return tb.names[name] && !shadowed[name]
 }
 
-func collectPeerSymbols(start *ast.Symbol, peers map[*ast.Symbol][]*ast.Symbol) []*ast.Symbol {
+type peerSymbolState struct {
+	sym      *ast.Symbol
+	tPos     int  // position at which `sym` holds the same object as `start` (-1 = unknown)
+	minPos   int  // earliest position at which `sym` holds it (-1 = unbounded before tPos)
+	fromDest bool // true once reached via a downstream (`src -> dst`) alias edge
+}
+
+type peerNameState struct {
+	name     string
+	tPos     int
+	minPos   int
+	fromDest bool
+}
+
+func hasTopLevelReassignBetween(positions []int, afterPos, beforePos int) bool {
+	for _, rPos := range positions {
+		if rPos > afterPos && rPos < beforePos {
+			return true
+		}
+	}
+	return false
+}
+
+func peerCanTransition(tPos, minPos, linkPos int, isDest bool, reassigns []int) bool {
+	if tPos < 0 {
+		return true
+	}
+	if !isDest {
+		// Moving `dst -> src` across `dst = src` at `linkPos`: `dst` held `src`'s value from `linkPos` onward.
+		if tPos < linkPos {
+			return false
+		}
+		return !hasTopLevelReassignBetween(reassigns, linkPos, tPos)
+	}
+	// Moving `src -> dst` across `dst = src` at `linkPos`: `src` was read at `linkPos`.
+	if minPos >= 0 && linkPos < minPos {
+		return false
+	}
+	lo, hi := tPos, linkPos
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	return !hasTopLevelReassignBetween(reassigns, lo, hi)
+}
+
+func peerStateHoldsAt(tPos, minPos, eventPos int, reassigns []int) bool {
+	if tPos < 0 {
+		return true
+	}
+	if minPos >= 0 && eventPos < minPos {
+		return false
+	}
+	if eventPos > tPos {
+		return !hasTopLevelReassignBetween(reassigns, tPos, eventPos)
+	}
+	if eventPos < tPos {
+		return !hasTopLevelReassignBetween(reassigns, eventPos, tPos)
+	}
+	return true
+}
+
+func peerStateWriteMatches(tPos, minPos int, fromDest bool, w containerWrite, reassigns []int) bool {
+	if !w.isMutation && fromDest {
+		return false
+	}
+	if tPos < 0 {
+		return true
+	}
+	if !w.isMutation {
+		if tPos < w.pos {
+			return false
+		}
+		return !hasTopLevelReassignBetween(reassigns, w.pos, tPos)
+	}
+	return peerStateHoldsAt(tPos, minPos, w.pos, reassigns)
+}
+
+func eventInSameLoopAsUse(outerLoop *ast.Node, useNode *ast.Node) bool {
+	return outerLoop != nil && useNode != nil && nodeContains(outerLoop, useNode)
+}
+
+func collectActivePeerSymbols(
+	start *ast.Symbol,
+	scope *ast.Node,
+	usePos int,
+	peers map[*ast.Symbol][]containerPeerLink,
+	reassigns map[*ast.Symbol][]int,
+) []peerSymbolState {
 	if start == nil {
 		return nil
 	}
-	out := []*ast.Symbol{start}
+	initState := peerSymbolState{sym: start, tPos: usePos, minPos: -1}
+	out := []peerSymbolState{initState}
 	if len(peers) == 0 {
 		return out
 	}
-	seen := map[*ast.Symbol]bool{start: true}
-	for i := 0; i < len(out); i++ {
-		for _, next := range peers[out[i]] {
-			if next != nil && !seen[next] {
+	seen := map[peerSymbolState]bool{initState: true}
+	const maxStates = 32
+	for i := 0; i < len(out) && len(out) < maxStates; i++ {
+		cur := out[i]
+		for _, link := range peers[cur.sym] {
+			if link.sym == nil {
+				continue
+			}
+			// Never zigzag down (`src -> dst`) and then back up (`dst -> otherSrc`),
+			// which would conflate two distinct upstream sources assigned to `dst`.
+			if cur.fromDest && !link.isDest {
+				continue
+			}
+			next := peerSymbolState{sym: link.sym, tPos: -1, minPos: -1, fromDest: cur.fromDest || link.isDest}
+			if link.scope == scope && link.topLevel && cur.tPos >= 0 {
+				if !peerCanTransition(cur.tPos, cur.minPos, link.pos, link.isDest, reassigns[cur.sym]) {
+					continue
+				}
+				next.tPos = link.pos
+				if link.isDest {
+					next.minPos = link.pos
+				}
+			}
+			if !seen[next] {
 				seen[next] = true
 				out = append(out, next)
+				if len(out) >= maxStates {
+					break
+				}
 			}
 		}
 	}
 	return out
 }
 
-func collectPeerNames(start string, peers map[string][]string) []string {
+func collectActivePeerNames(
+	start string,
+	scope *ast.Node,
+	usePos int,
+	peers map[string][]containerNamePeerLink,
+	reassigns map[string][]int,
+) []peerNameState {
 	if start == "" {
 		return nil
 	}
-	out := []string{start}
+	initState := peerNameState{name: start, tPos: usePos, minPos: -1}
+	out := []peerNameState{initState}
 	if len(peers) == 0 {
 		return out
 	}
-	seen := map[string]bool{start: true}
-	for i := 0; i < len(out); i++ {
-		for _, next := range peers[out[i]] {
-			if next != "" && !seen[next] {
+	seen := map[peerNameState]bool{initState: true}
+	const maxStates = 32
+	for i := 0; i < len(out) && len(out) < maxStates; i++ {
+		cur := out[i]
+		for _, link := range peers[cur.name] {
+			if link.name == "" {
+				continue
+			}
+			if cur.fromDest && !link.isDest {
+				continue
+			}
+			next := peerNameState{name: link.name, tPos: -1, minPos: -1, fromDest: cur.fromDest || link.isDest}
+			if link.scope == scope && link.topLevel && cur.tPos >= 0 {
+				if !peerCanTransition(cur.tPos, cur.minPos, link.pos, link.isDest, reassigns[cur.name]) {
+					continue
+				}
+				next.tPos = link.pos
+				if link.isDest {
+					next.minPos = link.pos
+				}
+			}
+			if !seen[next] {
 				seen[next] = true
 				out = append(out, next)
+				if len(out) >= maxStates {
+					break
+				}
 			}
 		}
 	}
 	return out
 }
 
-func hasRemovedInScope(scope *ast.Node, usePos int, rems []containerRemoval, writes []containerWrite, isInitial bool) bool {
+func hasRemovedInScope(scope *ast.Node, useNode *ast.Node, usePos int, rems []containerRemoval, writes []containerWrite, isInitial bool) bool {
 	if len(rems) == 0 {
 		return false
 	}
@@ -981,7 +1204,7 @@ func hasRemovedInScope(scope *ast.Node, usePos int, rems []containerRemoval, wri
 		readyPos = 0
 	}
 	for _, rem := range rems {
-		if rem.inLoop || (rem.pos >= readyPos && rem.pos < usePos) {
+		if eventInSameLoopAsUse(rem.outerLoop, useNode) || (rem.pos > readyPos && rem.pos < usePos) {
 			return true
 		}
 	}
@@ -1000,8 +1223,13 @@ func (r *AsyncAssertionResolver) isContainerInvalidatedAt(node *ast.Node, tb *tr
 			continue
 		}
 		usePos := scope.End()
-		if nodeFn == ast.GetContainingFunction(scope) {
+		sameFn := nodeFn == ast.GetContainingFunction(scope)
+		if sameFn {
 			usePos = node.Pos()
+		}
+		var useNode *ast.Node
+		if sameFn {
+			useNode = node
 		}
 		if name == "arguments" && tb.trackArguments {
 			isImplicitArgs := r == nil || r.refs == nil
@@ -1011,20 +1239,26 @@ func (r *AsyncAssertionResolver) isContainerInvalidatedAt(node *ast.Node, tb *tr
 				}
 			}
 			if isImplicitArgs {
-				if hasRemovedInScope(scope, usePos, idx.removedContainerNames["arguments"], nil, true) {
+				if hasRemovedInScope(scope, useNode, usePos, idx.removedContainerNames["arguments"], nil, true) {
 					return true
 				}
 				for aliasSym := range tb.argumentsAliasSymbols {
-					for _, peer := range collectPeerSymbols(aliasSym, tb.containerPeers) {
-						if hasRemovedInScope(scope, usePos, idx.removedContainers[peer], tb.containerWrites[peer], tb.initialContainers[peer]) {
-							return true
+					for _, st := range collectActivePeerSymbols(aliasSym, scope, -1, tb.containerPeers, idx.topLevelReassigns) {
+						for _, rem := range idx.removedContainers[st.sym] {
+							if (eventInSameLoopAsUse(rem.outerLoop, useNode) || rem.pos < usePos) &&
+								peerStateHoldsAt(st.tPos, st.minPos, rem.pos, idx.topLevelReassigns[st.sym]) {
+								return true
+							}
 						}
 					}
 				}
 				for aliasName := range tb.argumentsAliasNames {
-					for _, peerName := range collectPeerNames(aliasName, tb.containerNamePeers) {
-						if hasRemovedInScope(scope, usePos, idx.removedContainerNames[peerName], tb.containerNameWrites[peerName], tb.initialContainerNames[peerName]) {
-							return true
+					for _, st := range collectActivePeerNames(aliasName, scope, -1, tb.containerNamePeers, idx.topLevelReassignNames) {
+						for _, rem := range idx.removedContainerNames[st.name] {
+							if (eventInSameLoopAsUse(rem.outerLoop, useNode) || rem.pos < usePos) &&
+								peerStateHoldsAt(st.tPos, st.minPos, rem.pos, idx.topLevelReassignNames[st.name]) {
+								return true
+							}
 						}
 					}
 				}
@@ -1032,24 +1266,148 @@ func (r *AsyncAssertionResolver) isContainerInvalidatedAt(node *ast.Node, tb *tr
 		}
 		if r != nil && r.refs != nil {
 			if sym := r.resolveSymbol(node); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
-				for _, peer := range collectPeerSymbols(sym, tb.containerPeers) {
-					if tb.argumentsAliasSymbols[peer] &&
-						hasRemovedInScope(scope, usePos, idx.removedContainerNames["arguments"], nil, true) {
+				states := collectActivePeerSymbols(sym, scope, usePos, tb.containerPeers, idx.topLevelReassigns)
+				readyPos := -1
+				for _, st := range states {
+					if tb.initialContainers[st.sym] && readyPos < 0 {
+						readyPos = 0
+					}
+					for _, w := range tb.containerWrites[st.sym] {
+						if w.scope == scope && w.pos < usePos &&
+							peerStateWriteMatches(st.tPos, st.minPos, st.fromDest, w, idx.topLevelReassigns[st.sym]) {
+							if w.topLevel && w.pos > readyPos {
+								readyPos = w.pos
+							} else if !w.topLevel && readyPos < 0 {
+								readyPos = 0
+							}
+						}
+					}
+				}
+				if readyPos < 0 {
+					readyPos = 0
+				}
+				for _, st := range states {
+					if tb.argumentsAliasSymbols[st.sym] &&
+						hasRemovedInScope(scope, useNode, usePos, idx.removedContainerNames["arguments"], nil, true) {
 						return true
 					}
-					if hasRemovedInScope(scope, usePos, idx.removedContainers[peer], tb.containerWrites[peer], tb.initialContainers[peer]) {
-						return true
+					for _, rem := range idx.removedContainers[st.sym] {
+						if !peerStateHoldsAt(st.tPos, st.minPos, rem.pos, idx.topLevelReassigns[st.sym]) {
+							continue
+						}
+						if eventInSameLoopAsUse(rem.outerLoop, useNode) || (rem.pos > readyPos && rem.pos < usePos) {
+							return true
+						}
 					}
 				}
 				continue
 			}
 		}
-		for _, peerName := range collectPeerNames(name, tb.containerNamePeers) {
-			if tb.argumentsAliasNames[peerName] &&
-				hasRemovedInScope(scope, usePos, idx.removedContainerNames["arguments"], nil, true) {
+		states := collectActivePeerNames(name, scope, usePos, tb.containerNamePeers, idx.topLevelReassignNames)
+		readyPos := -1
+		for _, st := range states {
+			if tb.initialContainerNames[st.name] && readyPos < 0 {
+				readyPos = 0
+			}
+			for _, w := range tb.containerNameWrites[st.name] {
+				if w.scope == scope && w.pos < usePos &&
+					peerStateWriteMatches(st.tPos, st.minPos, st.fromDest, w, idx.topLevelReassignNames[st.name]) {
+					if w.topLevel && w.pos > readyPos {
+						readyPos = w.pos
+					} else if !w.topLevel && readyPos < 0 {
+						readyPos = 0
+					}
+				}
+			}
+		}
+		if readyPos < 0 {
+			readyPos = 0
+		}
+		for _, st := range states {
+			if tb.argumentsAliasNames[st.name] &&
+				hasRemovedInScope(scope, useNode, usePos, idx.removedContainerNames["arguments"], nil, true) {
 				return true
 			}
-			if hasRemovedInScope(scope, usePos, idx.removedContainerNames[peerName], tb.containerNameWrites[peerName], tb.initialContainerNames[peerName]) {
+			for _, rem := range idx.removedContainerNames[st.name] {
+				if !peerStateHoldsAt(st.tPos, st.minPos, rem.pos, idx.topLevelReassignNames[st.name]) {
+					continue
+				}
+				if eventInSameLoopAsUse(rem.outerLoop, useNode) || (rem.pos > readyPos && rem.pos < usePos) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// isContainerPopulatedAt reports whether the container or map named by `node`
+// already holds a tracked Promise at `node`'s evaluation point (preventing a
+// later write such as `a.push(check)` from crediting an earlier empty
+// `Promise.all(a)` snapshot, while still allowing earlier aliases and loops).
+func (r *AsyncAssertionResolver) isContainerPopulatedAt(node *ast.Node, tb *trackedBindings) bool {
+	if node == nil || node.Kind != ast.KindIdentifier || tb == nil || len(tb.containerScopes) == 0 {
+		return true
+	}
+	name := node.AsIdentifier().Text
+	nodeFn := ast.GetContainingFunction(node)
+	var activeScope *ast.Node
+	for _, scope := range tb.containerScopes {
+		if nodeFn == ast.GetContainingFunction(scope) {
+			activeScope = scope
+			break
+		}
+	}
+	if activeScope == nil {
+		return true
+	}
+	idx := r.getScopeBodyIndex(activeScope)
+	usePos := node.Pos()
+	if r != nil && r.refs != nil {
+		if sym := r.resolveSymbol(node); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
+			var reassigns map[*ast.Symbol][]int
+			if idx != nil {
+				reassigns = idx.topLevelReassigns
+			}
+			for _, st := range collectActivePeerSymbols(sym, activeScope, usePos, tb.containerPeers, reassigns) {
+				if tb.argumentsAliasSymbols[st.sym] {
+					return true
+				}
+				if tb.initialContainers[st.sym] &&
+					(st.tPos < 0 || !hasTopLevelReassignBetween(reassigns[st.sym], -1, st.tPos)) {
+					return true
+				}
+				for _, w := range tb.containerWrites[st.sym] {
+					if w.scope != activeScope {
+						return true
+					}
+					if (w.pos < usePos || eventInSameLoopAsUse(w.outerLoop, node)) &&
+						peerStateWriteMatches(st.tPos, st.minPos, st.fromDest, w, reassigns[st.sym]) {
+						return true
+					}
+				}
+			}
+			return false
+		}
+	}
+	var reassigns map[string][]int
+	if idx != nil {
+		reassigns = idx.topLevelReassignNames
+	}
+	for _, st := range collectActivePeerNames(name, activeScope, usePos, tb.containerNamePeers, reassigns) {
+		if tb.argumentsAliasNames[st.name] {
+			return true
+		}
+		if tb.initialContainerNames[st.name] &&
+			(st.tPos < 0 || !hasTopLevelReassignBetween(reassigns[st.name], -1, st.tPos)) {
+			return true
+		}
+		for _, w := range tb.containerNameWrites[st.name] {
+			if w.scope != activeScope {
+				return true
+			}
+			if (w.pos < usePos || eventInSameLoopAsUse(w.outerLoop, node)) &&
+				peerStateWriteMatches(st.tPos, st.minPos, st.fromDest, w, reassigns[st.name]) {
 				return true
 			}
 		}
@@ -1085,11 +1443,14 @@ func (r *AsyncAssertionResolver) matchesTrackedRestIdent(node *ast.Node, tb *tra
 	return tb.restNames[name] && !shadowed[name]
 }
 
-func (r *AsyncAssertionResolver) matchesTrackedContainerIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) bool {
+func (r *AsyncAssertionResolver) matchesTrackedContainerIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool, requirePopulated bool) bool {
 	if node == nil || node.Kind != ast.KindIdentifier || !isIdentifierValueReference(node) {
 		return false
 	}
 	if r.isContainerInvalidatedAt(node, tb) {
+		return false
+	}
+	if requirePopulated && !r.isContainerPopulatedAt(node, tb) {
 		return false
 	}
 	name := node.AsIdentifier().Text
@@ -1105,10 +1466,34 @@ func (r *AsyncAssertionResolver) matchesTrackedContainerIdent(node *ast.Node, tb
 	return tb.containerNames[name] && !shadowed[name]
 }
 
+func (r *AsyncAssertionResolver) matchesTrackedMapIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool, requirePopulated bool) bool {
+	if node == nil || node.Kind != ast.KindIdentifier || !isIdentifierValueReference(node) {
+		return false
+	}
+	if r.isContainerInvalidatedAt(node, tb) {
+		return false
+	}
+	if requirePopulated && !r.isContainerPopulatedAt(node, tb) {
+		return false
+	}
+	name := node.AsIdentifier().Text
+	if r != nil && r.refs != nil && len(tb.mapSymbols) > 0 {
+		if sym := r.resolveSymbol(node); sym != nil {
+			return tb.mapSymbols[sym]
+		}
+		if len(tb.mapNames) > 0 && tb.mapNames[name] && !shadowed[name] {
+			return true
+		}
+		return false
+	}
+	return tb.mapNames[name] && !shadowed[name]
+}
+
 func (r *AsyncAssertionResolver) matchesTrackedIdent(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) bool {
 	return r.matchesTrackedDirectIdent(node, tb, shadowed) ||
 		r.matchesTrackedRestIdent(node, tb, shadowed) ||
-		r.matchesTrackedContainerIdent(node, tb, shadowed)
+		r.matchesTrackedContainerIdent(node, tb, shadowed, false) ||
+		r.matchesTrackedMapIdent(node, tb, shadowed, false)
 }
 
 func scopeShadowsNames(node *ast.Node, tb *trackedBindings, shadowed map[string]bool) map[string]bool {
@@ -1117,7 +1502,7 @@ func scopeShadowsNames(node *ast.Node, tb *trackedBindings, shadowed map[string]
 	}
 	var added []string
 	checkName := func(n string) {
-		if (tb.names[n] || tb.restNames[n] || tb.containerNames[n] || (tb.trackArguments && n == "arguments")) && !shadowed[n] {
+		if (tb.names[n] || tb.restNames[n] || tb.containerNames[n] || tb.mapNames[n] || (tb.trackArguments && n == "arguments")) && !shadowed[n] {
 			added = append(added, n)
 		}
 	}
@@ -1246,34 +1631,39 @@ func (r *AsyncAssertionResolver) isRestElementAccess(expr *ast.Node, tb *tracked
 	return true
 }
 
-func (r *AsyncAssertionResolver) isTrackedArraySlotAccess(expr *ast.Node, tb *trackedBindings) bool {
-	if expr == nil || expr.Kind != ast.KindElementAccessExpression || tb == nil ||
+func (r *AsyncAssertionResolver) resolveValidArraySlotsAt(recv *ast.Node, tb *trackedBindings) (slots map[int]bool, arrLen int, ok bool) {
+	if recv == nil || recv.Kind != ast.KindIdentifier || !isIdentifierValueReference(recv) || tb == nil ||
 		(len(tb.arraySlotSymbols) == 0 && len(tb.arraySlotNames) == 0) {
-		return false
-	}
-	recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(expr))
-	if recv == nil || recv.Kind != ast.KindIdentifier || !isIdentifierValueReference(recv) {
-		return false
+		return nil, -1, false
 	}
 	name := recv.AsIdentifier().Text
-	var slots map[int]bool
 	var sym *ast.Symbol
+	arrLen = -1
 	if r != nil && r.refs != nil && len(tb.arraySlotSymbols) > 0 {
 		sym = r.resolveSymbol(recv)
 		if sym != nil {
 			slots = tb.arraySlotSymbols[sym]
+			if l, hasLen := tb.arraySlotLen[sym]; hasLen {
+				arrLen = l
+			}
 		} else {
 			slots = tb.arraySlotNames[name]
+			if l, hasLen := tb.arraySlotNameLen[name]; hasLen {
+				arrLen = l
+			}
 		}
 	} else {
 		slots = tb.arraySlotNames[name]
+		if l, hasLen := tb.arraySlotNameLen[name]; hasLen {
+			arrLen = l
+		}
 	}
 	if len(slots) == 0 {
-		return false
+		return nil, -1, false
 	}
 	// Array literal slot indices remain valid only if neither `recv` nor any
-	// alias peer has been shifted, overwritten, or truncated since the literal
-	// was created (later `.push()` calls never restore invalidated slot indices).
+	// active alias peer has been shifted, overwritten, or truncated since the
+	// literal was created (later `.push()` calls never restore invalidated slot indices).
 	nodeFn := ast.GetContainingFunction(recv)
 	for _, scope := range tb.containerScopes {
 		idx := r.getScopeBodyIndex(scope)
@@ -1281,25 +1671,36 @@ func (r *AsyncAssertionResolver) isTrackedArraySlotAccess(expr *ast.Node, tb *tr
 			continue
 		}
 		usePos := scope.End()
-		if nodeFn == ast.GetContainingFunction(scope) {
+		sameFn := nodeFn == ast.GetContainingFunction(scope)
+		var useNode *ast.Node
+		if sameFn {
 			usePos = recv.Pos()
+			useNode = recv
 		}
 		if sym != nil {
 			declPos := tb.arraySlotDeclPos[sym]
 			if declPos < scope.Pos() || declPos >= scope.End() {
 				declPos = 0
 			}
-			for _, peer := range collectPeerSymbols(sym, tb.containerPeers) {
-				if idx.shiftedContainers[peer] {
-					return false
+			for _, st := range collectActivePeerSymbols(sym, scope, usePos, tb.containerPeers, idx.topLevelReassigns) {
+				if tb.argumentsAliasSymbols[st.sym] &&
+					hasRemovedInScope(scope, useNode, usePos, idx.removedContainerNames["arguments"], nil, true) {
+					return nil, -1, false
 				}
-				if tb.argumentsAliasSymbols[peer] &&
-					hasRemovedInScope(scope, usePos, idx.removedContainerNames["arguments"], nil, true) {
-					return false
+				for _, sh := range idx.shiftedContainers[st.sym] {
+					if !peerStateHoldsAt(st.tPos, st.minPos, sh.pos, idx.topLevelReassigns[st.sym]) {
+						continue
+					}
+					if eventInSameLoopAsUse(sh.outerLoop, useNode) || (sh.pos > declPos && sh.pos < usePos) {
+						return nil, -1, false
+					}
 				}
-				for _, rem := range idx.removedContainers[peer] {
-					if rem.inLoop || (rem.pos >= declPos && rem.pos < usePos) {
-						return false
+				for _, rem := range idx.removedContainers[st.sym] {
+					if !peerStateHoldsAt(st.tPos, st.minPos, rem.pos, idx.topLevelReassigns[st.sym]) {
+						continue
+					}
+					if eventInSameLoopAsUse(rem.outerLoop, useNode) || (rem.pos > declPos && rem.pos < usePos) {
+						return nil, -1, false
 					}
 				}
 			}
@@ -1308,21 +1709,289 @@ func (r *AsyncAssertionResolver) isTrackedArraySlotAccess(expr *ast.Node, tb *tr
 			if declPos < scope.Pos() || declPos >= scope.End() {
 				declPos = 0
 			}
-			for _, peerName := range collectPeerNames(name, tb.containerNamePeers) {
-				if idx.shiftedContainerNames[peerName] {
-					return false
+			for _, st := range collectActivePeerNames(name, scope, usePos, tb.containerNamePeers, idx.topLevelReassignNames) {
+				if tb.argumentsAliasNames[st.name] &&
+					hasRemovedInScope(scope, useNode, usePos, idx.removedContainerNames["arguments"], nil, true) {
+					return nil, -1, false
 				}
-				if tb.argumentsAliasNames[peerName] &&
-					hasRemovedInScope(scope, usePos, idx.removedContainerNames["arguments"], nil, true) {
-					return false
+				for _, sh := range idx.shiftedContainerNames[st.name] {
+					if !peerStateHoldsAt(st.tPos, st.minPos, sh.pos, idx.topLevelReassignNames[st.name]) {
+						continue
+					}
+					if eventInSameLoopAsUse(sh.outerLoop, useNode) || (sh.pos > declPos && sh.pos < usePos) {
+						return nil, -1, false
+					}
 				}
-				for _, rem := range idx.removedContainerNames[peerName] {
-					if rem.inLoop || (rem.pos >= declPos && rem.pos < usePos) {
-						return false
+				for _, rem := range idx.removedContainerNames[st.name] {
+					if !peerStateHoldsAt(st.tPos, st.minPos, rem.pos, idx.topLevelReassignNames[st.name]) {
+						continue
+					}
+					if eventInSameLoopAsUse(rem.outerLoop, useNode) || (rem.pos > declPos && rem.pos < usePos) {
+						return nil, -1, false
 					}
 				}
 			}
 		}
+	}
+	return slots, arrLen, true
+}
+
+func (r *AsyncAssertionResolver) hasContainerPushSinceDecl(recv *ast.Node, tb *trackedBindings) bool {
+	if recv == nil || recv.Kind != ast.KindIdentifier || tb == nil {
+		return false
+	}
+	name := recv.AsIdentifier().Text
+	nodeFn := ast.GetContainingFunction(recv)
+	for _, scope := range tb.containerScopes {
+		idx := r.getScopeBodyIndex(scope)
+		if idx == nil || (len(idx.pushedContainers) == 0 && len(idx.pushedContainerNames) == 0) {
+			continue
+		}
+		usePos := scope.End()
+		sameFn := nodeFn == ast.GetContainingFunction(scope)
+		var useNode *ast.Node
+		if sameFn {
+			usePos = recv.Pos()
+			useNode = recv
+		}
+		if r != nil && r.refs != nil {
+			if sym := r.resolveSymbol(recv); sym != nil {
+				declPos := tb.arraySlotDeclPos[sym]
+				if declPos < scope.Pos() || declPos >= scope.End() {
+					declPos = 0
+				}
+				for _, st := range collectActivePeerSymbols(sym, scope, usePos, tb.containerPeers, idx.topLevelReassigns) {
+					for _, p := range idx.pushedContainers[st.sym] {
+						if !peerStateHoldsAt(st.tPos, st.minPos, p.pos, idx.topLevelReassigns[st.sym]) {
+							continue
+						}
+						if eventInSameLoopAsUse(p.outerLoop, useNode) || (p.pos > declPos && p.pos < usePos) {
+							return true
+						}
+					}
+				}
+				continue
+			}
+		}
+		declPos := tb.arraySlotDeclNamePos[name]
+		if declPos < scope.Pos() || declPos >= scope.End() {
+			declPos = 0
+		}
+		for _, st := range collectActivePeerNames(name, scope, usePos, tb.containerNamePeers, idx.topLevelReassignNames) {
+			for _, p := range idx.pushedContainerNames[st.name] {
+				if !peerStateHoldsAt(st.tPos, st.minPos, p.pos, idx.topLevelReassignNames[st.name]) {
+					continue
+				}
+				if eventInSameLoopAsUse(p.outerLoop, useNode) || (p.pos > declPos && p.pos < usePos) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) hasAnyPushBeforeUse(recv *ast.Node, tb *trackedBindings) bool {
+	if recv == nil || recv.Kind != ast.KindIdentifier || tb == nil {
+		return false
+	}
+	name := recv.AsIdentifier().Text
+	nodeFn := ast.GetContainingFunction(recv)
+	for _, scope := range tb.containerScopes {
+		idx := r.getScopeBodyIndex(scope)
+		if idx == nil || (len(idx.pushedContainers) == 0 && len(idx.pushedContainerNames) == 0) {
+			continue
+		}
+		usePos := scope.End()
+		sameFn := nodeFn == ast.GetContainingFunction(scope)
+		var useNode *ast.Node
+		if sameFn {
+			usePos = recv.Pos()
+			useNode = recv
+		}
+		if r != nil && r.refs != nil {
+			if sym := r.resolveSymbol(recv); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
+				for _, st := range collectActivePeerSymbols(sym, scope, usePos, tb.containerPeers, idx.topLevelReassigns) {
+					for _, p := range idx.pushedContainers[st.sym] {
+						if !peerStateHoldsAt(st.tPos, st.minPos, p.pos, idx.topLevelReassigns[st.sym]) {
+							continue
+						}
+						if eventInSameLoopAsUse(p.outerLoop, useNode) || p.pos < usePos {
+							return true
+						}
+					}
+				}
+				continue
+			}
+		}
+		for _, st := range collectActivePeerNames(name, scope, usePos, tb.containerNamePeers, idx.topLevelReassignNames) {
+			for _, p := range idx.pushedContainerNames[st.name] {
+				if !peerStateHoldsAt(st.tPos, st.minPos, p.pos, idx.topLevelReassignNames[st.name]) {
+					continue
+				}
+				if eventInSameLoopAsUse(p.outerLoop, useNode) || p.pos < usePos {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// lastPushBeforeUseIsTracked reports whether the latest `.push(...)` call on
+// `recv` (or an active alias peer) before `recv` ends with a tracked Promise
+// element (e.g. `const a = []; a.push(check); return a.pop();`), returning
+// `false` if an untracked `.push(other)` happened later or the push ended with
+// a non-tracked argument (e.g. `a.push(check, Promise.resolve(0)); return a.pop();`).
+func (r *AsyncAssertionResolver) lastPushBeforeUseIsTracked(recv *ast.Node, tb *trackedBindings) bool {
+	if recv == nil || recv.Kind != ast.KindIdentifier || tb == nil || len(tb.containerScopes) == 0 {
+		return false
+	}
+	name := recv.AsIdentifier().Text
+	nodeFn := ast.GetContainingFunction(recv)
+	var activeScope *ast.Node
+	for _, scope := range tb.containerScopes {
+		if nodeFn == ast.GetContainingFunction(scope) {
+			activeScope = scope
+			break
+		}
+	}
+	if activeScope == nil {
+		return true
+	}
+	idx := r.getScopeBodyIndex(activeScope)
+	if idx == nil {
+		return false
+	}
+	usePos := recv.Pos()
+	checkStates := func(
+		latestTrackedPos int,
+		latestAnyPushEnd int,
+		latestAnyPushStart int,
+		hasOtherLoopPush bool,
+		hasShiftAfterTracked bool,
+	) bool {
+		if latestTrackedPos < 0 || hasShiftAfterTracked || hasOtherLoopPush {
+			return false
+		}
+		return latestAnyPushStart <= latestTrackedPos && latestAnyPushEnd > latestTrackedPos
+	}
+	if r != nil && r.refs != nil {
+		if sym := r.resolveSymbol(recv); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
+			latestTrackedPos := -1
+			latestAnyPushEnd := -1
+			latestAnyPushStart := -1
+			states := collectActivePeerSymbols(sym, activeScope, usePos, tb.containerPeers, idx.topLevelReassigns)
+			for _, st := range states {
+				for _, w := range tb.containerWrites[st.sym] {
+					if w.scope != activeScope || !w.isLastPushElem {
+						continue
+					}
+					if !peerStateWriteMatches(st.tPos, st.minPos, st.fromDest, w, idx.topLevelReassigns[st.sym]) {
+						continue
+					}
+					if w.pos < usePos && w.pos > latestTrackedPos {
+						latestTrackedPos = w.pos
+					}
+				}
+				for _, p := range idx.pushedContainers[st.sym] {
+					if !peerStateHoldsAt(st.tPos, st.minPos, p.pos, idx.topLevelReassigns[st.sym]) {
+						continue
+					}
+					if p.pos < usePos && p.pos > latestAnyPushEnd {
+						latestAnyPushEnd = p.pos
+						latestAnyPushStart = p.startPos
+					}
+				}
+			}
+			hasOtherLoopPush := false
+			hasShift := false
+			if latestTrackedPos >= 0 {
+				for _, st := range states {
+					for _, p := range idx.pushedContainers[st.sym] {
+						if !peerStateHoldsAt(st.tPos, st.minPos, p.pos, idx.topLevelReassigns[st.sym]) {
+							continue
+						}
+						if eventInSameLoopAsUse(p.outerLoop, recv) && (p.startPos > latestTrackedPos || p.pos <= latestTrackedPos) {
+							hasOtherLoopPush = true
+							break
+						}
+					}
+					for _, sh := range idx.shiftedContainers[st.sym] {
+						if !peerStateHoldsAt(st.tPos, st.minPos, sh.pos, idx.topLevelReassigns[st.sym]) {
+							continue
+						}
+						if eventInSameLoopAsUse(sh.outerLoop, recv) || (sh.startPos > latestTrackedPos && sh.pos < usePos) {
+							hasShift = true
+							break
+						}
+					}
+				}
+			}
+			return checkStates(latestTrackedPos, latestAnyPushEnd, latestAnyPushStart, hasOtherLoopPush, hasShift)
+		}
+	}
+	latestTrackedPos := -1
+	latestAnyPushEnd := -1
+	latestAnyPushStart := -1
+	states := collectActivePeerNames(name, activeScope, usePos, tb.containerNamePeers, idx.topLevelReassignNames)
+	for _, st := range states {
+		for _, w := range tb.containerNameWrites[st.name] {
+			if w.scope != activeScope || !w.isLastPushElem {
+				continue
+			}
+			if !peerStateWriteMatches(st.tPos, st.minPos, st.fromDest, w, idx.topLevelReassignNames[st.name]) {
+				continue
+			}
+			if w.pos < usePos && w.pos > latestTrackedPos {
+				latestTrackedPos = w.pos
+			}
+		}
+		for _, p := range idx.pushedContainerNames[st.name] {
+			if !peerStateHoldsAt(st.tPos, st.minPos, p.pos, idx.topLevelReassignNames[st.name]) {
+				continue
+			}
+			if p.pos < usePos && p.pos > latestAnyPushEnd {
+				latestAnyPushEnd = p.pos
+				latestAnyPushStart = p.startPos
+			}
+		}
+	}
+	hasOtherLoopPush := false
+	hasShift := false
+	if latestTrackedPos >= 0 {
+		for _, st := range states {
+			for _, p := range idx.pushedContainerNames[st.name] {
+				if !peerStateHoldsAt(st.tPos, st.minPos, p.pos, idx.topLevelReassignNames[st.name]) {
+					continue
+				}
+				if eventInSameLoopAsUse(p.outerLoop, recv) && (p.startPos > latestTrackedPos || p.pos <= latestTrackedPos) {
+					hasOtherLoopPush = true
+					break
+				}
+			}
+			for _, sh := range idx.shiftedContainerNames[st.name] {
+				if !peerStateHoldsAt(st.tPos, st.minPos, sh.pos, idx.topLevelReassignNames[st.name]) {
+					continue
+				}
+				if eventInSameLoopAsUse(sh.outerLoop, recv) || (sh.startPos > latestTrackedPos && sh.pos < usePos) {
+					hasShift = true
+					break
+				}
+			}
+		}
+	}
+	return checkStates(latestTrackedPos, latestAnyPushEnd, latestAnyPushStart, hasOtherLoopPush, hasShift)
+}
+
+func (r *AsyncAssertionResolver) isTrackedArraySlotAccess(expr *ast.Node, tb *trackedBindings) bool {
+	if expr == nil || expr.Kind != ast.KindElementAccessExpression {
+		return false
+	}
+	recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(expr))
+	slots, _, ok := r.resolveValidArraySlotsAt(recv, tb)
+	if !ok {
+		return false
 	}
 	propName, ok := r.accessStaticNameThroughAssertions(expr)
 	if !ok {
@@ -1407,7 +2076,159 @@ func (r *AsyncAssertionResolver) isKnownBuiltinCollectionType(t *checker.Type) b
 	return true
 }
 
-func (r *AsyncAssertionResolver) isKnownNonPromiseReturnType(t *checker.Type) bool {
+func fnBodyCanReturnValue(fn *ast.Node) bool {
+	if fn == nil {
+		return false
+	}
+	if IsAsyncFunctionLike(fn) {
+		return true
+	}
+	body := fn.Body()
+	if body == nil {
+		return true
+	}
+	if body.Kind != ast.KindBlock {
+		u := internalUtils.SkipAssertionsAndParens(body)
+		return u != nil && u.Kind != ast.KindVoidExpression
+	}
+	hasReturnValue := false
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil || hasReturnValue || ast.IsTypeNode(node) {
+			return
+		}
+		if node != body {
+			switch node.Kind {
+			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+				ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor,
+				ast.KindClassStaticBlockDeclaration:
+				return
+			}
+		}
+		if node.Kind == ast.KindReturnStatement {
+			if ret := node.AsReturnStatement(); ret != nil && ret.Expression != nil {
+				u := internalUtils.SkipAssertionsAndParens(ret.Expression)
+				if u != nil && u.Kind != ast.KindVoidExpression {
+					hasReturnValue = true
+					return
+				}
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return hasReturnValue
+		})
+	}
+	visit(body)
+	return hasReturnValue
+}
+
+// voidCallCanReturnValue reports whether a call whose TypeScript return type is
+// `void` can still return a value at runtime because of TypeScript's contextual
+// `() => void` assignability (e.g. `const dispatch: (p: Promise<unknown>) => void = p => p`).
+func (r *AsyncAssertionResolver) voidCallCanReturnValue(callExpr *ast.Node) bool {
+	if callExpr == nil || callExpr.Kind != ast.KindCallExpression {
+		return false
+	}
+	callee := internalUtils.SkipAssertionsAndParens(callExpr.AsCallExpression().Expression)
+	if callee == nil {
+		return false
+	}
+	resolveExprToFn := func(expr *ast.Node) (fn *ast.Node, unknown bool) {
+		for depth := 0; depth < 4 && expr != nil; depth++ {
+			expr = internalUtils.SkipAssertionsAndParens(expr)
+			if expr == nil {
+				return nil, false
+			}
+			switch expr.Kind {
+			case ast.KindArrowFunction, ast.KindFunctionExpression:
+				return expr, false
+			case ast.KindIdentifier:
+				sym := r.resolveSymbol(expr)
+				if sym == nil {
+					return nil, false
+				}
+				decl := r.singleSameFileValueDeclaration(sym)
+				if decl == nil {
+					return nil, false
+				}
+				switch decl.Kind {
+				case ast.KindFunctionDeclaration:
+					return decl, false
+				case ast.KindVariableDeclaration:
+					if !ast.IsVarConst(decl) && r.hasSymbolWrite(sym) {
+						return nil, true
+					}
+					init := decl.AsVariableDeclaration().Initializer
+					if init == nil || nodeContains(init, expr) {
+						return nil, false
+					}
+					expr = init
+					continue
+				default:
+					return nil, false
+				}
+			default:
+				return nil, false
+			}
+		}
+		return nil, false
+	}
+	if fn, unknown := resolveExprToFn(callee); unknown {
+		return true
+	} else if fn != nil {
+		return fnBodyCanReturnValue(fn)
+	}
+	if ast.IsAccessExpression(callee) {
+		propName, ok := r.accessStaticNameThroughAssertions(callee)
+		if !ok {
+			return false
+		}
+		recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+		if recv != nil && recv.Kind == ast.KindIdentifier {
+			if sym := r.resolveSymbol(recv); sym != nil {
+				if decl := r.singleSameFileValueDeclaration(sym); decl != nil &&
+					decl.Kind == ast.KindVariableDeclaration &&
+					(ast.IsVarConst(decl) || !r.hasSymbolWrite(sym)) {
+					init := internalUtils.SkipAssertionsAndParens(decl.AsVariableDeclaration().Initializer)
+					if init != nil && init.Kind == ast.KindObjectLiteralExpression && init.AsObjectLiteralExpression().Properties != nil {
+						var matchedProp *ast.Node
+						for _, prop := range init.AsObjectLiteralExpression().Properties.Nodes {
+							if prop == nil || prop.Kind == ast.KindSpreadAssignment || prop.Name() == nil {
+								continue
+							}
+							name, nameOK := internalUtils.GetStaticPropertyName(prop.Name())
+							if nameOK && name == propName {
+								matchedProp = prop
+							}
+						}
+						if matchedProp != nil {
+							switch matchedProp.Kind {
+							case ast.KindMethodDeclaration:
+								return fnBodyCanReturnValue(matchedProp)
+							case ast.KindPropertyAssignment:
+								if fn, unknown := resolveExprToFn(matchedProp.AsPropertyAssignment().Initializer); unknown {
+									return true
+								} else if fn != nil {
+									return fnBodyCanReturnValue(fn)
+								}
+							case ast.KindShorthandPropertyAssignment:
+								if fn, unknown := resolveExprToFn(matchedProp.Name()); unknown {
+									return true
+								} else if fn != nil {
+									return fnBodyCanReturnValue(fn)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) isKnownNonPromiseReturnType(t *checker.Type, callExpr *ast.Node) bool {
 	if r == nil || r.typeChecker == nil || t == nil {
 		return false
 	}
@@ -1415,15 +2236,16 @@ func (r *AsyncAssertionResolver) isKnownNonPromiseReturnType(t *checker.Type) bo
 	if len(parts) == 0 {
 		return false
 	}
-	const primitiveOrVoidFlags = checker.TypeFlagsStringLike |
+	const nonPromisePrimitiveFlags = checker.TypeFlagsStringLike |
 		checker.TypeFlagsNumberLike |
 		checker.TypeFlagsBooleanLike |
 		checker.TypeFlagsBigIntLike |
 		checker.TypeFlagsESSymbolLike |
-		checker.TypeFlagsVoid |
 		checker.TypeFlagsUndefined |
 		checker.TypeFlagsNull |
 		checker.TypeFlagsNever
+	checkedVoid := false
+	voidReturnsValue := false
 	for _, part := range parts {
 		if part == nil {
 			return false
@@ -1432,7 +2254,17 @@ func (r *AsyncAssertionResolver) isKnownNonPromiseReturnType(t *checker.Type) bo
 		if flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
 			return false
 		}
-		if flags&primitiveOrVoidFlags != 0 {
+		if flags&nonPromisePrimitiveFlags != 0 {
+			continue
+		}
+		if flags&checker.TypeFlagsVoid != 0 {
+			if !checkedVoid {
+				checkedVoid = true
+				voidReturnsValue = r.voidCallCanReturnValue(callExpr)
+			}
+			if voidReturnsValue {
+				return false
+			}
 			continue
 		}
 		if r.isKnownBuiltinCollectionType(part) {
@@ -1441,6 +2273,117 @@ func (r *AsyncAssertionResolver) isKnownNonPromiseReturnType(t *checker.Type) bo
 		return false
 	}
 	return true
+}
+
+func (r *AsyncAssertionResolver) isLocallyTypeShadowed(node *ast.Node, name string) bool {
+	const typeFlags = ast.SymbolFlagsType | ast.SymbolFlagsAlias
+	for cur := node; cur != nil; cur = cur.Parent {
+		if cur.Kind == ast.KindClassExpression {
+			if cn := cur.Name(); cn != nil && cn.Kind == ast.KindIdentifier && cn.AsIdentifier().Text == name {
+				return true
+			}
+		}
+		switch cur.Kind {
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+			ast.KindMethodDeclaration, ast.KindClassDeclaration, ast.KindClassExpression,
+			ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration,
+			ast.KindFunctionType, ast.KindConstructorType,
+			ast.KindCallSignature, ast.KindConstructSignature, ast.KindMethodSignature:
+			for _, tp := range cur.TypeParameters() {
+				if tp != nil && tp.Name() != nil && tp.Name().Kind == ast.KindIdentifier && tp.Name().AsIdentifier().Text == name {
+					return true
+				}
+			}
+		}
+		if !ast.IsLocalsContainer(cur) {
+			continue
+		}
+		if local := ast.GetLocals(cur)[name]; local != nil {
+			if local.Flags&typeFlags != 0 {
+				return true
+			}
+			if local.ExportSymbol != nil && local.ExportSymbol.Flags&typeFlags != 0 {
+				return true
+			}
+		}
+		if sym := cur.Symbol(); sym != nil && sym.Exports != nil {
+			if exp := sym.Exports[name]; exp != nil && exp.Flags&typeFlags != 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) isSpecificBuiltinTypeNode(typeNode *ast.Node, depth int, allowed ...string) bool {
+	if depth > 6 || typeNode == nil {
+		return false
+	}
+	switch typeNode.Kind {
+	case ast.KindParenthesizedType:
+		return r.isSpecificBuiltinTypeNode(typeNode.AsParenthesizedTypeNode().Type, depth+1, allowed...)
+	case ast.KindUnionType:
+		ut := typeNode.AsUnionTypeNode()
+		if ut == nil || ut.Types == nil || len(ut.Types.Nodes) == 0 {
+			return false
+		}
+		for _, member := range ut.Types.Nodes {
+			if !r.isSpecificBuiltinTypeNode(member, depth+1, allowed...) {
+				return false
+			}
+		}
+		return true
+	case ast.KindTypeReference:
+		tr := typeNode.AsTypeReferenceNode()
+		if tr == nil || tr.TypeName == nil || tr.TypeName.Kind != ast.KindIdentifier {
+			return false
+		}
+		name := tr.TypeName.AsIdentifier().Text
+		for _, want := range allowed {
+			if name == want {
+				return !r.isLocallyTypeShadowed(tr.TypeName, name)
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) isBuiltinCollectionTypeNode(typeNode *ast.Node, depth int) bool {
+	if depth > 6 || typeNode == nil {
+		return false
+	}
+	switch typeNode.Kind {
+	case ast.KindParenthesizedType:
+		return r.isBuiltinCollectionTypeNode(typeNode.AsParenthesizedTypeNode().Type, depth+1)
+	case ast.KindTypeOperator:
+		op := typeNode.AsTypeOperatorNode()
+		return op != nil && op.Operator == ast.KindReadonlyKeyword &&
+			r.isBuiltinCollectionTypeNode(op.Type, depth+1)
+	case ast.KindArrayType, ast.KindTupleType:
+		return !r.isLocallyTypeShadowed(typeNode, "Array")
+	case ast.KindUnionType:
+		ut := typeNode.AsUnionTypeNode()
+		if ut == nil || ut.Types == nil || len(ut.Types.Nodes) == 0 {
+			return false
+		}
+		for _, member := range ut.Types.Nodes {
+			if !r.isBuiltinCollectionTypeNode(member, depth+1) {
+				return false
+			}
+		}
+		return true
+	case ast.KindTypeReference:
+		tr := typeNode.AsTypeReferenceNode()
+		if tr == nil || tr.TypeName == nil || tr.TypeName.Kind != ast.KindIdentifier {
+			return false
+		}
+		name := tr.TypeName.AsIdentifier().Text
+		switch name {
+		case "Array", "ReadonlyArray", "Set", "ReadonlySet", "Map", "ReadonlyMap", "WeakSet", "WeakMap":
+			return !r.isLocallyTypeShadowed(tr.TypeName, name)
+		}
+	}
+	return false
 }
 
 func (r *AsyncAssertionResolver) isKnownBuiltinCollectionExpr(expr *ast.Node, tb *trackedBindings) bool {
@@ -1464,14 +2407,21 @@ func (r *AsyncAssertionResolver) isKnownBuiltinCollectionExprDepth(expr *ast.Nod
 		}
 		if sym := r.resolveSymbol(expr); sym != nil {
 			if decl := r.singleSameFileValueDeclaration(sym); decl != nil {
-				if decl.Kind == ast.KindParameter && decl.AsParameterDeclaration().DotDotDotToken != nil && !r.hasSymbolWrite(sym) {
-					return true
+				if decl.Kind == ast.KindParameter && !r.hasSymbolWrite(sym) {
+					pd := decl.AsParameterDeclaration()
+					if pd.DotDotDotToken != nil || ((r == nil || r.typeChecker == nil) && r.isBuiltinCollectionTypeNode(pd.Type, 0)) {
+						return true
+					}
 				}
 				if decl.Kind == ast.KindVariableDeclaration &&
-					(ast.IsVarConst(decl) || !r.hasSymbolWrite(sym)) &&
-					decl.AsVariableDeclaration().Initializer != nil &&
-					!nodeContains(decl.AsVariableDeclaration().Initializer, expr) {
-					if r.isKnownBuiltinCollectionExprDepth(decl.AsVariableDeclaration().Initializer, tb, depth+1) {
+					(ast.IsVarConst(decl) || !r.hasSymbolWrite(sym)) {
+					vd := decl.AsVariableDeclaration()
+					if vd.Initializer != nil &&
+						!nodeContains(vd.Initializer, expr) &&
+						r.isKnownBuiltinCollectionExprDepth(vd.Initializer, tb, depth+1) {
+						return true
+					}
+					if (r == nil || r.typeChecker == nil) && r.isBuiltinCollectionTypeNode(vd.Type, 0) {
 						return true
 					}
 				}
@@ -1509,6 +2459,66 @@ func (r *AsyncAssertionResolver) isKnownBuiltinCollectionExprDepth(expr *ast.Nod
 	return false
 }
 
+func (r *AsyncAssertionResolver) isSetExpr(expr *ast.Node) bool {
+	return r.isSetExprDepth(expr, 0)
+}
+
+func (r *AsyncAssertionResolver) isSetExprDepth(expr *ast.Node, depth int) bool {
+	if depth > 4 {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindNewExpression:
+		ctor := internalUtils.SkipAssertionsAndParens(expr.AsNewExpression().Expression)
+		return ctor != nil && ctor.Kind == ast.KindIdentifier && ctor.AsIdentifier().Text == "Set" &&
+			!r.isLocallyValueShadowed(ctor, "Set")
+	case ast.KindCallExpression:
+		callee := internalUtils.SkipAssertionsAndParens(expr.AsCallExpression().Expression)
+		if callee != nil && ast.IsAccessExpression(callee) {
+			if mName, ok := r.accessStaticNameThroughAssertions(callee); ok && mName == "add" {
+				return r.isSetExprDepth(internalUtils.AccessExpressionObject(callee), depth+1)
+			}
+		}
+	case ast.KindIdentifier:
+		if sym := r.resolveSymbol(expr); sym != nil {
+			if decl := r.singleSameFileValueDeclaration(sym); decl != nil {
+				if decl.Kind == ast.KindParameter && !r.hasSymbolWrite(sym) &&
+					(r == nil || r.typeChecker == nil) && r.isSpecificBuiltinTypeNode(decl.AsParameterDeclaration().Type, 0, "Set", "ReadonlySet") {
+					return true
+				}
+				if decl.Kind == ast.KindVariableDeclaration && (ast.IsVarConst(decl) || !r.hasSymbolWrite(sym)) {
+					vd := decl.AsVariableDeclaration()
+					if vd.Initializer != nil && !nodeContains(vd.Initializer, expr) && r.isSetExprDepth(vd.Initializer, depth+1) {
+						return true
+					}
+					if (r == nil || r.typeChecker == nil) && r.isSpecificBuiltinTypeNode(vd.Type, 0, "Set", "ReadonlySet") {
+						return true
+					}
+				}
+			}
+		}
+	}
+	if r != nil && r.typeChecker != nil && r.program != nil {
+		t := r.typeChecker.GetTypeAtLocation(expr)
+		parts := internalUtils.UnionTypeParts(t)
+		if len(parts) > 0 {
+			for _, part := range parts {
+				if part == nil || part.Symbol() == nil ||
+					(part.Symbol().Name != "Set" && part.Symbol().Name != "ReadonlySet") ||
+					!internalUtils.IsSymbolFromDefaultLibrary(r.program, part.Symbol()) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
+
 func (r *AsyncAssertionResolver) isWeakSetExpr(expr *ast.Node) bool {
 	return r.isWeakSetExprDepth(expr, 0)
 }
@@ -1535,13 +2545,22 @@ func (r *AsyncAssertionResolver) isWeakSetExprDepth(expr *ast.Node, depth int) b
 		}
 	case ast.KindIdentifier:
 		if sym := r.resolveSymbol(expr); sym != nil {
-			if decl := r.singleSameFileValueDeclaration(sym); decl != nil &&
-				decl.Kind == ast.KindVariableDeclaration &&
-				(ast.IsVarConst(decl) || !r.hasSymbolWrite(sym)) &&
-				decl.AsVariableDeclaration().Initializer != nil &&
-				!nodeContains(decl.AsVariableDeclaration().Initializer, expr) {
-				if r.isWeakSetExprDepth(decl.AsVariableDeclaration().Initializer, depth+1) {
+			if decl := r.singleSameFileValueDeclaration(sym); decl != nil {
+				if decl.Kind == ast.KindParameter && !r.hasSymbolWrite(sym) &&
+					(r == nil || r.typeChecker == nil) && r.isSpecificBuiltinTypeNode(decl.AsParameterDeclaration().Type, 0, "WeakSet") {
 					return true
+				}
+				if decl.Kind == ast.KindVariableDeclaration &&
+					(ast.IsVarConst(decl) || !r.hasSymbolWrite(sym)) {
+					vd := decl.AsVariableDeclaration()
+					if vd.Initializer != nil &&
+						!nodeContains(vd.Initializer, expr) &&
+						r.isWeakSetExprDepth(vd.Initializer, depth+1) {
+						return true
+					}
+					if (r == nil || r.typeChecker == nil) && r.isSpecificBuiltinTypeNode(vd.Type, 0, "WeakSet") {
+						return true
+					}
 				}
 			}
 		}
@@ -1562,15 +2581,223 @@ func (r *AsyncAssertionResolver) isWeakSetExprDepth(expr *ast.Node, depth int) b
 	return false
 }
 
-func (r *AsyncAssertionResolver) exprCanBeTrackedContainer(expr *ast.Node, tb *trackedBindings) bool {
-	return r.exprCanBeTrackedContainerDepth(expr, tb, 0)
+func (r *AsyncAssertionResolver) isWeakMapExpr(expr *ast.Node) bool {
+	return r.isWeakMapExprDepth(expr, 0)
 }
 
-// exprCanBeTrackedContainerDepth reports whether `expr` evaluates to an array
-// or iterable holding a tracked Promise (e.g. `[p]`, `saved`, `...checks`,
-// `[...saved]`, `new Set([p])`, `new Set().add(p)`) that
-// `Promise.all`/`allSettled`/`race`/`any` or `for await` awaits.
-func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, tb *trackedBindings, depth int) bool {
+func (r *AsyncAssertionResolver) isWeakMapExprDepth(expr *ast.Node, depth int) bool {
+	if depth > 4 {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindNewExpression:
+		ctor := internalUtils.SkipAssertionsAndParens(expr.AsNewExpression().Expression)
+		return ctor != nil && ctor.Kind == ast.KindIdentifier && ctor.AsIdentifier().Text == "WeakMap" &&
+			!r.isLocallyValueShadowed(ctor, "WeakMap")
+	case ast.KindCallExpression:
+		callee := internalUtils.SkipAssertionsAndParens(expr.AsCallExpression().Expression)
+		if callee != nil && ast.IsAccessExpression(callee) {
+			if mName, ok := r.accessStaticNameThroughAssertions(callee); ok && mName == "set" {
+				return r.isWeakMapExprDepth(internalUtils.AccessExpressionObject(callee), depth+1)
+			}
+		}
+	case ast.KindIdentifier:
+		if sym := r.resolveSymbol(expr); sym != nil {
+			if decl := r.singleSameFileValueDeclaration(sym); decl != nil {
+				if decl.Kind == ast.KindParameter && !r.hasSymbolWrite(sym) &&
+					(r == nil || r.typeChecker == nil) && r.isSpecificBuiltinTypeNode(decl.AsParameterDeclaration().Type, 0, "WeakMap") {
+					return true
+				}
+				if decl.Kind == ast.KindVariableDeclaration &&
+					(ast.IsVarConst(decl) || !r.hasSymbolWrite(sym)) {
+					vd := decl.AsVariableDeclaration()
+					if vd.Initializer != nil &&
+						!nodeContains(vd.Initializer, expr) &&
+						r.isWeakMapExprDepth(vd.Initializer, depth+1) {
+						return true
+					}
+					if (r == nil || r.typeChecker == nil) && r.isSpecificBuiltinTypeNode(vd.Type, 0, "WeakMap") {
+						return true
+					}
+				}
+			}
+		}
+	}
+	if r != nil && r.typeChecker != nil && r.program != nil {
+		t := r.typeChecker.GetTypeAtLocation(expr)
+		parts := internalUtils.UnionTypeParts(t)
+		if len(parts) > 0 {
+			for _, part := range parts {
+				if part == nil || part.Symbol() == nil || part.Symbol().Name != "WeakMap" ||
+					!internalUtils.IsSymbolFromDefaultLibrary(r.program, part.Symbol()) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) getArrayLiteralSlotIndex(arr *ast.Node) *arrayLiteralSlotIndex {
+	if arr == nil || arr.Kind != ast.KindArrayLiteralExpression {
+		return nil
+	}
+	if r != nil && r.arraySlotIndices != nil {
+		if idx, ok := r.arraySlotIndices[arr]; ok {
+			return idx
+		}
+	}
+	a := arr.AsArrayLiteralExpression()
+	idx := &arrayLiteralSlotIndex{firstSpreadIdx: -1}
+	if a != nil && a.Elements != nil {
+		idx.elemCount = len(a.Elements.Nodes)
+		for i, el := range a.Elements.Nodes {
+			if el == nil || el.Kind == ast.KindOmittedExpression {
+				continue
+			}
+			if el.Kind == ast.KindSpreadElement {
+				if idx.firstSpreadIdx < 0 {
+					idx.firstSpreadIdx = i
+				}
+				idx.nonIdentifierSlices = append(idx.nonIdentifierSlices, i)
+				continue
+			}
+			unwrapped := internalUtils.SkipAssertionsAndParens(el)
+			if unwrapped != nil && unwrapped.Kind == ast.KindIdentifier && isIdentifierValueReference(unwrapped) {
+				name := unwrapped.AsIdentifier().Text
+				if r != nil && r.refs != nil {
+					if sym := r.resolveSymbol(unwrapped); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
+						if idx.bySym == nil {
+							idx.bySym = map[*ast.Symbol][]int{}
+						}
+						idx.bySym[sym] = append(idx.bySym[sym], i)
+						continue
+					}
+				}
+				if idx.byName == nil {
+					idx.byName = map[string][]int{}
+				}
+				idx.byName[name] = append(idx.byName[name], i)
+				continue
+			}
+			idx.nonIdentifierSlices = append(idx.nonIdentifierSlices, i)
+		}
+	}
+	if r != nil {
+		if r.arraySlotIndices == nil {
+			r.arraySlotIndices = map[*ast.Node]*arrayLiteralSlotIndex{}
+		}
+		r.arraySlotIndices[arr] = idx
+	}
+	return idx
+}
+
+func (r *AsyncAssertionResolver) isSymbolIteratorPropertyName(name *ast.Node) bool {
+	if name == nil || name.Kind != ast.KindComputedPropertyName {
+		return false
+	}
+	expr := internalUtils.SkipAssertionsAndParens(name.AsComputedPropertyName().Expression)
+	if expr == nil || !ast.IsAccessExpression(expr) {
+		return false
+	}
+	propName, ok := r.accessStaticNameThroughAssertions(expr)
+	if !ok || propName != "iterator" {
+		return false
+	}
+	obj := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(expr))
+	return obj != nil && obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "Symbol" &&
+		!r.isLocallyValueShadowed(obj, "Symbol")
+}
+
+func (r *AsyncAssertionResolver) isArrayLikeObjectLiteralWithTracked(expr *ast.Node, tb *trackedBindings, depth int) bool {
+	if depth > 6 {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	if expr == nil || expr.Kind != ast.KindObjectLiteralExpression {
+		return false
+	}
+	obj := expr.AsObjectLiteralExpression()
+	if obj == nil || obj.Properties == nil {
+		return false
+	}
+	hasLength := false
+	lengthVal := -1
+	hasSpread := false
+	var slotTracked map[int]bool
+	for _, prop := range obj.Properties.Nodes {
+		if prop == nil {
+			continue
+		}
+		if prop.Kind == ast.KindSpreadAssignment {
+			hasSpread = true
+			continue
+		}
+		pName := prop.Name()
+		if pName == nil {
+			continue
+		}
+		key, ok := internalUtils.GetStaticPropertyName(pName)
+		if !ok && r != nil && r.staticStringEvaluator() != nil {
+			key, ok = r.staticStringEvaluator().EvalPropertyName(pName)
+		}
+		if !ok {
+			continue
+		}
+		if key == "length" {
+			hasLength = true
+			lengthVal = -1
+			if prop.Kind == ast.KindPropertyAssignment {
+				val := internalUtils.SkipAssertionsAndParens(prop.AsPropertyAssignment().Initializer)
+				if val != nil && val.Kind == ast.KindNumericLiteral {
+					if n, err := strconv.Atoi(val.AsNumericLiteral().Text); err == nil && n >= 0 {
+						lengthVal = n
+					}
+				} else if val != nil && val.Kind == ast.KindPrefixUnaryExpression &&
+					val.AsPrefixUnaryExpression().Operator == ast.KindMinusToken {
+					op := internalUtils.SkipAssertionsAndParens(val.AsPrefixUnaryExpression().Operand)
+					if op != nil && op.Kind == ast.KindNumericLiteral {
+						lengthVal = 0
+					}
+				}
+			}
+			continue
+		}
+		idx, err := strconv.Atoi(key)
+		if err != nil || idx < 0 || strconv.Itoa(idx) != key {
+			continue
+		}
+		matched := false
+		switch prop.Kind {
+		case ast.KindPropertyAssignment:
+			matched = r.exprCanReturnTrackedPromiseDepth(prop.AsPropertyAssignment().Initializer, tb, depth+1)
+		case ast.KindShorthandPropertyAssignment:
+			matched = r.exprCanReturnTrackedPromiseDepth(prop.Name(), tb, depth+1)
+		case ast.KindGetAccessor:
+			matched = r.exprReferencesTracked(prop.Body(), tb, true)
+		}
+		if slotTracked == nil {
+			slotTracked = map[int]bool{}
+		}
+		slotTracked[idx] = matched
+	}
+	if !hasLength && !hasSpread {
+		return false
+	}
+	for idx, ok := range slotTracked {
+		if ok && (lengthVal < 0 || idx < lengthVal) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) exprCanBeTrackedMapDepth(expr *ast.Node, tb *trackedBindings, depth int, requirePopulated bool) bool {
 	if depth > 6 {
 		return false
 	}
@@ -1583,18 +2810,184 @@ func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, 
 	}
 	switch expr.Kind {
 	case ast.KindIdentifier:
-		return r.matchesTrackedRestIdent(expr, tb, nil) || r.matchesTrackedContainerIdent(expr, tb, nil)
+		return r.matchesTrackedMapIdent(expr, tb, nil, requirePopulated)
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		if cond == nil {
+			return false
+		}
+		return r.exprCanBeTrackedMapDepth(cond.WhenTrue, tb, depth+1, requirePopulated) ||
+			r.exprCanBeTrackedMapDepth(cond.WhenFalse, tb, depth+1, requirePopulated)
+	case ast.KindBinaryExpression:
+		bin := expr.AsBinaryExpression()
+		if bin == nil || bin.OperatorToken == nil {
+			return false
+		}
+		switch bin.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken, ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+			return r.exprCanBeTrackedMapDepth(bin.Right, tb, depth+1, requirePopulated)
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken,
+			ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			return r.exprCanBeTrackedMapDepth(bin.Left, tb, depth+1, requirePopulated) ||
+				r.exprCanBeTrackedMapDepth(bin.Right, tb, depth+1, requirePopulated)
+		}
+		return false
+	case ast.KindNewExpression:
+		ctor := internalUtils.SkipAssertionsAndParens(expr.AsNewExpression().Expression)
+		if ctor == nil || ctor.Kind != ast.KindIdentifier || ctor.AsIdentifier().Text != "Map" ||
+			r.isLocallyValueShadowed(ctor, "Map") {
+			return false
+		}
+		arg0, argOK := staticCallArgAt(expr, 0)
+		if !argOK {
+			return r.exprReferencesTracked(expr, tb, true)
+		}
+		if arg0 == nil {
+			return false
+		}
+		arg0 = internalUtils.SkipAssertionsAndParens(arg0)
+		if arg0 == nil {
+			return false
+		}
+		if arg0.Kind == ast.KindArrayLiteralExpression {
+			arr := arg0.AsArrayLiteralExpression()
+			if arr == nil || arr.Elements == nil {
+				return false
+			}
+			for _, el := range arr.Elements.Nodes {
+				if el == nil || el.Kind == ast.KindOmittedExpression {
+					continue
+				}
+				if el.Kind == ast.KindSpreadElement {
+					if r.exprReferencesTracked(el.AsSpreadElement().Expression, tb, true) {
+						return true
+					}
+					continue
+				}
+				entry := internalUtils.SkipAssertionsAndParens(el)
+				if entry == nil {
+					continue
+				}
+				if entry.Kind == ast.KindArrayLiteralExpression {
+					pair := entry.AsArrayLiteralExpression()
+					if pair == nil || pair.Elements == nil || len(pair.Elements.Nodes) == 0 {
+						continue
+					}
+					elems := pair.Elements.Nodes
+					if elems[0] != nil && elems[0].Kind == ast.KindSpreadElement {
+						if r.exprReferencesTracked(entry, tb, true) {
+							return true
+						}
+						continue
+					}
+					if len(elems) < 2 || elems[1] == nil || elems[1].Kind == ast.KindOmittedExpression {
+						continue
+					}
+					if elems[1].Kind == ast.KindSpreadElement {
+						if r.exprReferencesTracked(elems[1], tb, true) {
+							return true
+						}
+						continue
+					}
+					if r.exprCanReturnTrackedPromiseDepth(elems[1], tb, depth+1) {
+						return true
+					}
+					continue
+				}
+				if !r.matchesTrackedDirectIdent(entry, tb, nil) && r.exprReferencesTracked(entry, tb, true) {
+					return true
+				}
+			}
+			return false
+		}
+		if r.exprCanBeTrackedMapDepth(arg0, tb, depth+1, requirePopulated) {
+			return true
+		}
+		if arg0.Kind == ast.KindCallExpression {
+			callee := internalUtils.SkipAssertionsAndParens(arg0.AsCallExpression().Expression)
+			if callee != nil && ast.IsAccessExpression(callee) {
+				if mName, ok := r.accessStaticNameThroughAssertions(callee); ok && mName == "entries" {
+					return r.exprCanBeTrackedMapDepth(internalUtils.AccessExpressionObject(callee), tb, depth+1, requirePopulated)
+				}
+			}
+		}
+		return false
+	case ast.KindCallExpression:
+		callee := internalUtils.SkipAssertionsAndParens(expr.AsCallExpression().Expression)
+		if callee != nil && ast.IsAccessExpression(callee) {
+			if mName, ok := r.accessStaticNameThroughAssertions(callee); ok && mName == "set" {
+				recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+				if r.isWeakMapExpr(recv) {
+					return false
+				}
+				if r.isKnownBuiltinCollectionExpr(recv, tb) {
+					if r.exprCanBeTrackedMapDepth(recv, tb, depth+1, requirePopulated) {
+						return true
+					}
+					arg1, argOK := staticCallArgAt(expr, 1)
+					if !argOK {
+						return r.exprReferencesTracked(expr, tb, true)
+					}
+					return arg1 != nil && r.exprCanReturnTrackedPromiseDepth(arg1, tb, depth+1)
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) exprCanBeTrackedContainer(expr *ast.Node, tb *trackedBindings) bool {
+	return r.exprCanBeTrackedContainerDepth(expr, tb, 0, true)
+}
+
+// exprCanBeTrackedContainerDepth reports whether `expr` evaluates to an array
+// or iterable holding a tracked Promise (e.g. `[p]`, `saved`, `...checks`,
+// `[...saved]`, `new Set([p])`, `new Set().add(p)`, `map.values()`,
+// `Array.from({ 0: p, length: 1 })`, `{ *[Symbol.iterator]() { yield p; } }`)
+// that `Promise.all`/`allSettled`/`race`/`any` or `for await` awaits.
+func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, tb *trackedBindings, depth int, requirePopulated bool) bool {
+	if depth > 6 {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	for expr != nil && internalUtils.IsCommaOperator(expr) {
+		expr = internalUtils.SkipAssertionsAndParens(expr.AsBinaryExpression().Right)
+	}
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindIdentifier:
+		return r.matchesTrackedRestIdent(expr, tb, nil) || r.matchesTrackedContainerIdent(expr, tb, nil, requirePopulated)
 	case ast.KindArrayLiteralExpression:
+		slotIdx := r.getArrayLiteralSlotIndex(expr)
+		if slotIdx == nil {
+			return false
+		}
+		for sym := range tb.symbols {
+			if len(slotIdx.bySym[sym]) > 0 {
+				return true
+			}
+		}
+		for name := range tb.names {
+			if len(slotIdx.byName[name]) > 0 {
+				return true
+			}
+		}
+		if len(slotIdx.nonIdentifierSlices) == 0 {
+			return false
+		}
 		arr := expr.AsArrayLiteralExpression()
 		if arr == nil || arr.Elements == nil {
 			return false
 		}
-		for _, el := range arr.Elements.Nodes {
+		for _, pos := range slotIdx.nonIdentifierSlices {
+			el := arr.Elements.Nodes[pos]
 			if el == nil || el.Kind == ast.KindOmittedExpression {
 				continue
 			}
 			if el.Kind == ast.KindSpreadElement {
-				if r.exprCanBeTrackedContainerDepth(el.AsSpreadElement().Expression, tb, depth+1) {
+				if r.exprCanBeTrackedContainerDepth(el.AsSpreadElement().Expression, tb, depth+1, requirePopulated) {
 					return true
 				}
 				continue
@@ -1604,13 +2997,27 @@ func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, 
 			}
 		}
 		return false
+	case ast.KindObjectLiteralExpression:
+		obj := expr.AsObjectLiteralExpression()
+		if obj == nil || obj.Properties == nil {
+			return false
+		}
+		for _, prop := range obj.Properties.Nodes {
+			if prop == nil || prop.Kind == ast.KindSpreadAssignment {
+				continue
+			}
+			if r.isSymbolIteratorPropertyName(prop.Name()) && r.exprReferencesTracked(prop, tb, true) {
+				return true
+			}
+		}
+		return false
 	case ast.KindConditionalExpression:
 		cond := expr.AsConditionalExpression()
 		if cond == nil {
 			return false
 		}
-		return r.exprCanBeTrackedContainerDepth(cond.WhenTrue, tb, depth+1) ||
-			r.exprCanBeTrackedContainerDepth(cond.WhenFalse, tb, depth+1)
+		return r.exprCanBeTrackedContainerDepth(cond.WhenTrue, tb, depth+1, requirePopulated) ||
+			r.exprCanBeTrackedContainerDepth(cond.WhenFalse, tb, depth+1, requirePopulated)
 	case ast.KindBinaryExpression:
 		bin := expr.AsBinaryExpression()
 		if bin == nil || bin.OperatorToken == nil {
@@ -1618,11 +3025,11 @@ func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, 
 		}
 		switch bin.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken, ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
-			return r.exprCanBeTrackedContainerDepth(bin.Right, tb, depth+1)
+			return r.exprCanBeTrackedContainerDepth(bin.Right, tb, depth+1, requirePopulated)
 		case ast.KindBarBarToken, ast.KindQuestionQuestionToken,
 			ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
-			return r.exprCanBeTrackedContainerDepth(bin.Left, tb, depth+1) ||
-				r.exprCanBeTrackedContainerDepth(bin.Right, tb, depth+1)
+			return r.exprCanBeTrackedContainerDepth(bin.Left, tb, depth+1, requirePopulated) ||
+				r.exprCanBeTrackedContainerDepth(bin.Right, tb, depth+1, requirePopulated)
 		}
 		return false
 	case ast.KindCallExpression:
@@ -1647,19 +3054,38 @@ func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, 
 						return r.argsCanProduceTrackedContainer(expr.AsCallExpression().Arguments, tb, depth+1)
 					case "from":
 						if args := expr.AsCallExpression().Arguments; args != nil && len(args.Nodes) == 1 && args.Nodes[0] != nil && args.Nodes[0].Kind != ast.KindSpreadElement {
-							return r.exprCanBeTrackedContainerDepth(args.Nodes[0], tb, depth+1)
+							return r.exprCanBeTrackedContainerDepth(args.Nodes[0], tb, depth+1, requirePopulated) ||
+								r.isArrayLikeObjectLiteralWithTracked(args.Nodes[0], tb, depth+1)
 						}
 					}
 				}
 				switch mName {
 				case "then", "catch", "finally":
 					return false
+				case "values":
+					if r.isWeakMapExpr(recv) || r.isWeakSetExpr(recv) {
+						return false
+					}
+					if r.exprCanBeTrackedMapDepth(recv, tb, depth+1, requirePopulated) ||
+						r.exprCanBeTrackedContainerDepth(recv, tb, depth+1, requirePopulated) {
+						return true
+					}
+					if r.isKnownBuiltinCollectionExpr(recv, tb) {
+						return false
+					}
+				case "keys":
+					if r.isSetExpr(recv) {
+						return r.exprCanBeTrackedContainerDepth(recv, tb, depth+1, requirePopulated)
+					}
+					if r.isKnownBuiltinCollectionExpr(recv, tb) {
+						return false
+					}
 				case "add":
 					if r.isWeakSetExpr(recv) {
 						return false
 					}
 					if r.isKnownBuiltinCollectionExpr(recv, tb) {
-						if r.exprCanBeTrackedContainerDepth(recv, tb, depth+1) {
+						if r.exprCanBeTrackedContainerDepth(recv, tb, depth+1, requirePopulated) {
 							return true
 						}
 						arg0, argOK := staticCallArgAt(expr, 0)
@@ -1669,7 +3095,7 @@ func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, 
 						return arg0 != nil && r.exprCanReturnTrackedPromiseDepth(arg0, tb, depth+1)
 					}
 				case "set", "push", "unshift", "forEach", "includes", "indexOf", "lastIndexOf",
-					"join", "toString", "every", "some", "has", "delete", "clear":
+					"join", "toString", "every", "some", "has", "delete", "clear", "entries":
 					if r.isKnownBuiltinCollectionExpr(recv, tb) {
 						return false
 					}
@@ -1686,7 +3112,7 @@ func (r *AsyncAssertionResolver) exprCanBeTrackedContainerDepth(expr *ast.Node, 
 				if !argOK {
 					return r.exprReferencesTracked(expr, tb, true)
 				}
-				return arg0 != nil && r.exprCanBeTrackedContainerDepth(arg0, tb, depth+1)
+				return arg0 != nil && r.exprCanBeTrackedContainerDepth(arg0, tb, depth+1, requirePopulated)
 			case "Array":
 				return r.argsCanProduceTrackedContainer(expr.AsNewExpression().Arguments, tb, depth+1)
 			case "Map", "WeakSet", "WeakMap":
@@ -1707,7 +3133,7 @@ func (r *AsyncAssertionResolver) argsCanProduceTrackedContainer(args *ast.NodeLi
 			continue
 		}
 		if a.Kind == ast.KindSpreadElement {
-			if r.exprCanBeTrackedContainerDepth(a.AsSpreadElement().Expression, tb, depth) {
+			if r.exprCanBeTrackedContainerDepth(a.AsSpreadElement().Expression, tb, depth, true) {
 				return true
 			}
 			continue
@@ -1772,6 +3198,18 @@ func cloneTrackedBindings(tb *trackedBindings, clearArguments bool) *trackedBind
 			out.containerNames[k] = v
 		}
 	}
+	if len(tb.mapSymbols) > 0 {
+		out.mapSymbols = make(map[*ast.Symbol]bool, len(tb.mapSymbols))
+		for k, v := range tb.mapSymbols {
+			out.mapSymbols[k] = v
+		}
+	}
+	if len(tb.mapNames) > 0 {
+		out.mapNames = make(map[string]bool, len(tb.mapNames))
+		for k, v := range tb.mapNames {
+			out.mapNames[k] = v
+		}
+	}
 	if len(tb.arraySlotSymbols) > 0 {
 		out.arraySlotSymbols = make(map[*ast.Symbol]map[int]bool, len(tb.arraySlotSymbols))
 		for sym, slots := range tb.arraySlotSymbols {
@@ -1804,6 +3242,18 @@ func cloneTrackedBindings(tb *trackedBindings, clearArguments bool) *trackedBind
 			out.arraySlotDeclNamePos[k] = v
 		}
 	}
+	if len(tb.arraySlotLen) > 0 {
+		out.arraySlotLen = make(map[*ast.Symbol]int, len(tb.arraySlotLen))
+		for k, v := range tb.arraySlotLen {
+			out.arraySlotLen[k] = v
+		}
+	}
+	if len(tb.arraySlotNameLen) > 0 {
+		out.arraySlotNameLen = make(map[string]int, len(tb.arraySlotNameLen))
+		for k, v := range tb.arraySlotNameLen {
+			out.arraySlotNameLen[k] = v
+		}
+	}
 	if len(tb.containerScopes) > 0 {
 		out.containerScopes = append([]*ast.Node(nil), tb.containerScopes...)
 	}
@@ -1832,15 +3282,15 @@ func cloneTrackedBindings(tb *trackedBindings, clearArguments bool) *trackedBind
 		}
 	}
 	if len(tb.containerPeers) > 0 {
-		out.containerPeers = make(map[*ast.Symbol][]*ast.Symbol, len(tb.containerPeers))
+		out.containerPeers = make(map[*ast.Symbol][]containerPeerLink, len(tb.containerPeers))
 		for k, v := range tb.containerPeers {
-			out.containerPeers[k] = append([]*ast.Symbol(nil), v...)
+			out.containerPeers[k] = append([]containerPeerLink(nil), v...)
 		}
 	}
 	if len(tb.containerNamePeers) > 0 {
-		out.containerNamePeers = make(map[string][]string, len(tb.containerNamePeers))
+		out.containerNamePeers = make(map[string][]containerNamePeerLink, len(tb.containerNamePeers))
 		for k, v := range tb.containerNamePeers {
-			out.containerNamePeers[k] = append([]string(nil), v...)
+			out.containerNamePeers[k] = append([]containerNamePeerLink(nil), v...)
 		}
 	}
 	if len(tb.argumentsAliasSymbols) > 0 {
@@ -1929,7 +3379,7 @@ func (r *AsyncAssertionResolver) exprCanReturnTrackedPromiseDepth(expr *ast.Node
 				if !argOK {
 					return r.exprReferencesTracked(expr, tb, true)
 				}
-				return arg0 != nil && r.exprCanBeTrackedContainerDepth(arg0, tb, depth+1)
+				return arg0 != nil && r.exprCanBeTrackedContainerDepth(arg0, tb, depth+1, true)
 			}
 		}
 		callee := internalUtils.SkipAssertionsAndParens(expr.AsCallExpression().Expression)
@@ -1948,7 +3398,7 @@ func (r *AsyncAssertionResolver) exprCanReturnTrackedPromiseDepth(expr *ast.Node
 						var resolvedContainerArg *ast.Node
 						if mName == "then" && recv != nil && recv.Kind == ast.KindCallExpression {
 							if pMethod, pOK := r.promiseMethodName(recv); pOK && pMethod == "resolve" {
-								if a0, aOK := staticCallArgAt(recv, 0); aOK && a0 != nil && r.exprCanBeTrackedContainerDepth(a0, tb, depth+1) {
+								if a0, aOK := staticCallArgAt(recv, 0); aOK && a0 != nil && r.exprCanBeTrackedContainerDepth(a0, tb, depth+1, true) {
 									resolvedContainerArg = internalUtils.SkipAssertionsAndParens(a0)
 								}
 							}
@@ -2050,17 +3500,64 @@ func (r *AsyncAssertionResolver) exprCanReturnTrackedPromiseDepth(expr *ast.Node
 						!r.isLocallyValueShadowed(recv, "Array") {
 						return false
 					}
+				case "pop", "shift":
+					recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(callee))
+					if r.isKnownBuiltinCollectionExpr(recv, tb) {
+						if recv != nil && recv.Kind == ast.KindArrayLiteralExpression {
+							if arr := recv.AsArrayLiteralExpression(); arr != nil && arr.Elements != nil {
+								elems := arr.Elements.Nodes
+								hasSpread := false
+								for _, el := range elems {
+									if el != nil && el.Kind == ast.KindSpreadElement {
+										hasSpread = true
+										break
+									}
+								}
+								if !hasSpread {
+									if len(elems) == 0 {
+										return false
+									}
+									target := elems[0]
+									if mName == "pop" {
+										target = elems[len(elems)-1]
+									}
+									return target != nil && target.Kind != ast.KindOmittedExpression &&
+										r.exprCanReturnTrackedPromiseDepth(target, tb, depth+1)
+								}
+							}
+						}
+						if recv != nil && recv.Kind == ast.KindIdentifier {
+							if r.isContainerInvalidatedAt(recv, tb) || !r.isContainerPopulatedAt(recv, tb) {
+								return false
+							}
+							if slots, arrLen, ok := r.resolveValidArraySlotsAt(recv, tb); ok {
+								if mName == "shift" {
+									return slots[0]
+								}
+								if arrLen > 0 && !r.hasContainerPushSinceDecl(recv, tb) {
+									return slots[arrLen-1]
+								}
+								return r.lastPushBeforeUseIsTracked(recv, tb)
+							}
+							if mName == "shift" && r.matchesTrackedRestIdent(recv, tb, nil) && tb.restOffset >= 0 {
+								return tb.restOffset == 0
+							}
+							if mName == "pop" && r.hasAnyPushBeforeUse(recv, tb) {
+								return r.lastPushBeforeUseIsTracked(recv, tb)
+							}
+						}
+					}
 				case "push", "unshift", "forEach", "includes", "indexOf", "lastIndexOf",
 					"join", "toString", "slice", "concat", "filter", "map", "flat", "flatMap",
-					"splice", "reverse", "sort", "every", "some", "keys", "values", "entries",
-					"has", "add", "set", "delete", "clear":
+					"splice", "reverse", "sort", "fill", "copyWithin", "every", "some",
+					"keys", "values", "entries", "has", "add", "set", "delete", "clear":
 					if r.isKnownBuiltinCollectionExpr(internalUtils.AccessExpressionObject(callee), tb) {
 						return false
 					}
 				}
 			}
 		}
-		if r != nil && r.typeChecker != nil && r.isKnownNonPromiseReturnType(r.typeChecker.GetTypeAtLocation(expr)) {
+		if r != nil && r.typeChecker != nil && r.isKnownNonPromiseReturnType(r.typeChecker.GetTypeAtLocation(expr), expr) {
 			return false
 		}
 		return r.exprReferencesTracked(expr, tb, true)
@@ -2331,11 +3828,11 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 		idx.consumes = append(idx.consumes, site)
 		r.indexExprValueRefs(site.expr, enterNested, idx.consumesBySym, idx.consumesByName, siteIdx)
 	}
-	markContainerRemoved := func(ident *ast.Node, pos int, inLoop bool) {
+	markContainerRemoved := func(ident *ast.Node, startPos, pos int, outerLoop *ast.Node) {
 		if ident == nil || ident.Kind != ast.KindIdentifier {
 			return
 		}
-		rem := containerRemoval{pos: pos, inLoop: inLoop}
+		rem := containerRemoval{startPos: startPos, pos: pos, outerLoop: outerLoop}
 		name := ident.AsIdentifier().Text
 		if r != nil && r.refs != nil {
 			if sym := r.resolveSymbol(ident); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
@@ -2351,37 +3848,89 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 		}
 		idx.removedContainerNames[name] = append(idx.removedContainerNames[name], rem)
 	}
-	markContainerShifted := func(ident *ast.Node) {
+	markContainerShifted := func(ident *ast.Node, startPos, pos int, outerLoop *ast.Node) {
+		if ident == nil || ident.Kind != ast.KindIdentifier {
+			return
+		}
+		sh := containerRemoval{startPos: startPos, pos: pos, outerLoop: outerLoop}
+		name := ident.AsIdentifier().Text
+		if r != nil && r.refs != nil {
+			if sym := r.resolveSymbol(ident); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
+				if idx.shiftedContainers == nil {
+					idx.shiftedContainers = map[*ast.Symbol][]containerRemoval{}
+				}
+				idx.shiftedContainers[sym] = append(idx.shiftedContainers[sym], sh)
+				return
+			}
+		}
+		if idx.shiftedContainerNames == nil {
+			idx.shiftedContainerNames = map[string][]containerRemoval{}
+		}
+		idx.shiftedContainerNames[name] = append(idx.shiftedContainerNames[name], sh)
+	}
+	markContainerPushed := func(ident *ast.Node, startPos, pos int, outerLoop *ast.Node) {
+		if ident == nil || ident.Kind != ast.KindIdentifier {
+			return
+		}
+		p := containerRemoval{startPos: startPos, pos: pos, outerLoop: outerLoop}
+		name := ident.AsIdentifier().Text
+		if r != nil && r.refs != nil {
+			if sym := r.resolveSymbol(ident); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
+				if idx.pushedContainers == nil {
+					idx.pushedContainers = map[*ast.Symbol][]containerRemoval{}
+				}
+				idx.pushedContainers[sym] = append(idx.pushedContainers[sym], p)
+				return
+			}
+		}
+		if idx.pushedContainerNames == nil {
+			idx.pushedContainerNames = map[string][]containerRemoval{}
+		}
+		idx.pushedContainerNames[name] = append(idx.pushedContainerNames[name], p)
+	}
+	markContainerReassigned := func(ident *ast.Node, pos int, topLevelEquals bool) {
 		if ident == nil || ident.Kind != ast.KindIdentifier {
 			return
 		}
 		name := ident.AsIdentifier().Text
 		if r != nil && r.refs != nil {
 			if sym := r.resolveSymbol(ident); sym != nil && (name != "arguments" || len(sym.Declarations) > 0) {
-				if idx.shiftedContainers == nil {
-					idx.shiftedContainers = map[*ast.Symbol]bool{}
+				if idx.reassignedContainers == nil {
+					idx.reassignedContainers = map[*ast.Symbol]bool{}
 				}
-				idx.shiftedContainers[sym] = true
+				idx.reassignedContainers[sym] = true
+				if topLevelEquals {
+					if idx.topLevelReassigns == nil {
+						idx.topLevelReassigns = map[*ast.Symbol][]int{}
+					}
+					idx.topLevelReassigns[sym] = append(idx.topLevelReassigns[sym], pos)
+				}
 				return
 			}
 		}
-		if idx.shiftedContainerNames == nil {
-			idx.shiftedContainerNames = map[string]bool{}
+		if idx.reassignedNames == nil {
+			idx.reassignedNames = map[string]bool{}
 		}
-		idx.shiftedContainerNames[name] = true
+		idx.reassignedNames[name] = true
+		if topLevelEquals {
+			if idx.topLevelReassignNames == nil {
+				idx.topLevelReassignNames = map[string][]int{}
+			}
+			idx.topLevelReassignNames[name] = append(idx.topLevelReassignNames[name], pos)
+		}
 	}
-	markLengthOperandRemoved := func(operand *ast.Node, pos int, inLoop bool) {
+	markLengthOperandRemoved := func(operand *ast.Node, startPos, pos int, outerLoop *ast.Node) {
 		lhs := internalUtils.SkipAssertionsAndParens(operand)
 		if lhs != nil && ast.IsAccessExpression(lhs) {
 			if mName, ok := r.accessStaticNameThroughAssertions(lhs); ok && mName == "length" {
 				if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(lhs)); recv != nil &&
 					recv.Kind == ast.KindIdentifier {
-					markContainerRemoved(recv, pos, inLoop)
+					markContainerRemoved(recv, startPos, pos, outerLoop)
 				}
 			}
 		}
 	}
-	loopDepth := 0
+	var outerLoop *ast.Node
 	branchDepth := 0
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
@@ -2424,13 +3973,13 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 		case ast.KindVariableDeclaration:
 			vd := node.AsVariableDeclaration()
 			if vd != nil && vd.Initializer != nil && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier {
-				addDep(scopeDepEdge{kind: scopeDepVarDecl, target: vd.Name(), rhs: vd.Initializer, pos: node.Pos(), topLevel: edgeTopLevel}, vd.Initializer)
+				addDep(scopeDepEdge{kind: scopeDepVarDecl, target: vd.Name(), rhs: vd.Initializer, pos: node.Pos(), topLevel: edgeTopLevel, outerLoop: outerLoop}, vd.Initializer)
 			}
 		case ast.KindElementAccessExpression:
 			if internalUtils.IsWriteReference(node) {
 				if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(node)); recv != nil &&
 					recv.Kind == ast.KindIdentifier {
-					markContainerShifted(recv)
+					markContainerShifted(recv, node.Pos(), node.End(), outerLoop)
 				}
 			}
 		case ast.KindBinaryExpression:
@@ -2443,7 +3992,7 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 						if mName, ok := r.accessStaticNameThroughAssertions(lhs); ok && mName == "length" {
 							if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(lhs)); recv != nil &&
 								recv.Kind == ast.KindIdentifier {
-								markContainerRemoved(recv, node.Pos(), loopDepth > 0)
+								markContainerRemoved(recv, node.Pos(), node.End(), outerLoop)
 							}
 						}
 					}
@@ -2453,30 +4002,30 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 					ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
 					lhs := internalUtils.SkipAssertionsAndParens(bin.Left)
 					if lhs != nil && lhs.Kind == ast.KindIdentifier {
-						markContainerShifted(lhs)
-						addDep(scopeDepEdge{kind: scopeDepAssign, target: lhs, rhs: bin.Right, pos: node.Pos(), topLevel: edgeTopLevel}, bin.Right)
+						markContainerReassigned(lhs, node.Pos(), edgeTopLevel && op == ast.KindEqualsToken)
+						addDep(scopeDepEdge{kind: scopeDepAssign, target: lhs, rhs: bin.Right, pos: node.Pos(), topLevel: edgeTopLevel, outerLoop: outerLoop}, bin.Right)
 					} else if op == ast.KindEqualsToken &&
 						lhs != nil && lhs.Kind == ast.KindElementAccessExpression {
 						if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(lhs)); recv != nil &&
 							recv.Kind == ast.KindIdentifier {
-							markContainerShifted(recv)
-							addDep(scopeDepEdge{kind: scopeDepContainerIndexWrite, target: recv, rhs: bin.Right, pos: node.Pos(), topLevel: edgeTopLevel}, bin.Right)
+							markContainerShifted(recv, node.Pos(), node.End(), outerLoop)
+							addDep(scopeDepEdge{kind: scopeDepContainerIndexWrite, target: recv, rhs: bin.Right, pos: node.Pos(), topLevel: edgeTopLevel, outerLoop: outerLoop}, bin.Right)
 						}
 					}
 				}
 			}
 		case ast.KindPrefixUnaryExpression:
 			if op := node.AsPrefixUnaryExpression().Operator; op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
-				markLengthOperandRemoved(node.AsPrefixUnaryExpression().Operand, node.Pos(), loopDepth > 0)
+				markLengthOperandRemoved(node.AsPrefixUnaryExpression().Operand, node.Pos(), node.End(), outerLoop)
 			}
 		case ast.KindPostfixUnaryExpression:
-			markLengthOperandRemoved(node.AsPostfixUnaryExpression().Operand, node.Pos(), loopDepth > 0)
+			markLengthOperandRemoved(node.AsPostfixUnaryExpression().Operand, node.Pos(), node.End(), outerLoop)
 		case ast.KindDeleteExpression:
 			if target := internalUtils.SkipAssertionsAndParens(node.AsDeleteExpression().Expression); target != nil &&
 				target.Kind == ast.KindElementAccessExpression {
 				if recv := internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(target)); recv != nil &&
 					recv.Kind == ast.KindIdentifier {
-					markContainerRemoved(recv, node.Pos(), loopDepth > 0)
+					markContainerRemoved(recv, node.Pos(), node.End(), outerLoop)
 				}
 			}
 		case ast.KindCallExpression:
@@ -2487,20 +4036,31 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 					if recv != nil && recv.Kind == ast.KindIdentifier {
 						switch mName {
 						case "push", "unshift", "add":
-							if mName == "unshift" {
-								markContainerShifted(recv)
+							switch mName {
+							case "push":
+								markContainerPushed(recv, node.Pos(), node.End(), outerLoop)
+							case "unshift":
+								markContainerShifted(recv, node.Pos(), node.End(), outerLoop)
 							}
 							if args := node.AsCallExpression().Arguments; args != nil && len(args.Nodes) > 0 {
 								edgeIdx := len(idx.deps)
-								idx.deps = append(idx.deps, scopeDepEdge{kind: scopeDepContainerPush, target: recv, rhs: node, pos: node.Pos(), topLevel: edgeTopLevel})
+								idx.deps = append(idx.deps, scopeDepEdge{kind: scopeDepContainerPush, target: recv, rhs: node, pos: node.Pos(), topLevel: edgeTopLevel, outerLoop: outerLoop})
+								for _, a := range args.Nodes {
+									r.indexExprValueRefs(a, true, idx.depsBySym, idx.depsByName, edgeIdx)
+								}
+							}
+						case "set":
+							if args := node.AsCallExpression().Arguments; args != nil && len(args.Nodes) > 0 {
+								edgeIdx := len(idx.deps)
+								idx.deps = append(idx.deps, scopeDepEdge{kind: scopeDepMapSet, target: recv, rhs: node, pos: node.Pos(), topLevel: edgeTopLevel, outerLoop: outerLoop})
 								for _, a := range args.Nodes {
 									r.indexExprValueRefs(a, true, idx.depsBySym, idx.depsByName, edgeIdx)
 								}
 							}
 						case "reverse", "sort":
-							markContainerShifted(recv)
+							markContainerShifted(recv, node.Pos(), node.End(), outerLoop)
 						case "pop", "shift", "splice", "clear", "delete", "fill", "copyWithin":
-							markContainerRemoved(recv, node.Pos(), loopDepth > 0)
+							markContainerRemoved(recv, node.Pos(), node.End(), outerLoop)
 						}
 					}
 				}
@@ -2516,8 +4076,9 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 				addConsume(scopeConsumeSite{kind: scopeConsumeReturn, node: node, expr: ret.Expression}, true)
 			}
 		}
-		if isLoop {
-			loopDepth++
+		prevOuterLoop := outerLoop
+		if isLoop && outerLoop == nil {
+			outerLoop = node
 		}
 		if isBranch {
 			branchDepth++
@@ -2529,9 +4090,7 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 		if isBranch {
 			branchDepth--
 		}
-		if isLoop {
-			loopDepth--
-		}
+		outerLoop = prevOuterLoop
 	}
 	visit(root)
 	if r != nil {
@@ -2541,6 +4100,39 @@ func (r *AsyncAssertionResolver) getScopeBodyIndex(root *ast.Node) *scopeBodyInd
 		r.scopeBodyIndices[root] = idx
 	}
 	return idx
+}
+
+func isPureAliasExpr(expr *ast.Node, depth int) bool {
+	if depth > 6 || expr == nil {
+		return false
+	}
+	expr = internalUtils.SkipAssertionsAndParens(expr)
+	for expr != nil && internalUtils.IsCommaOperator(expr) {
+		expr = internalUtils.SkipAssertionsAndParens(expr.AsBinaryExpression().Right)
+	}
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindIdentifier:
+		return true
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		return cond != nil && isPureAliasExpr(cond.WhenTrue, depth+1) && isPureAliasExpr(cond.WhenFalse, depth+1)
+	case ast.KindBinaryExpression:
+		bin := expr.AsBinaryExpression()
+		if bin == nil || bin.OperatorToken == nil {
+			return false
+		}
+		switch bin.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken, ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+			return isPureAliasExpr(bin.Right, depth+1)
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken,
+			ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			return isPureAliasExpr(bin.Left, depth+1) && isPureAliasExpr(bin.Right, depth+1)
+		}
+	}
+	return false
 }
 
 func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb *trackedBindings) {
@@ -2603,6 +4195,13 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 		tb.initialContainers[sym] = true
 		enqueue(sym, "", trackedBindingContainer)
 	}
+	for sym := range tb.mapSymbols {
+		if tb.initialContainers == nil {
+			tb.initialContainers = map[*ast.Symbol]bool{}
+		}
+		tb.initialContainers[sym] = true
+		enqueue(sym, "", trackedBindingMap)
+	}
 	for name := range tb.names {
 		enqueue(nil, name, trackedBindingDirect)
 	}
@@ -2620,12 +4219,19 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 		tb.initialContainerNames[name] = true
 		enqueue(nil, name, trackedBindingContainer)
 	}
+	for name := range tb.mapNames {
+		if tb.initialContainerNames == nil {
+			tb.initialContainerNames = map[string]bool{}
+		}
+		tb.initialContainerNames[name] = true
+		enqueue(nil, name, trackedBindingMap)
+	}
 	if tb.trackArguments {
 		enqueue(nil, "arguments", trackedBindingRest)
 	}
 
-	recordContainerWrite := func(sym *ast.Symbol, name string, pos int, topLevel bool) {
-		w := containerWrite{scope: root, pos: pos, topLevel: topLevel}
+	recordContainerWrite := func(sym *ast.Symbol, name string, pos int, topLevel bool, outerLoop *ast.Node, isMutation, isLastPushElem bool) {
+		w := containerWrite{scope: root, pos: pos, topLevel: topLevel, outerLoop: outerLoop, isMutation: isMutation, isLastPushElem: isLastPushElem}
 		if sym != nil {
 			if tb.containerWrites == nil {
 				tb.containerWrites = map[*ast.Symbol][]containerWrite{}
@@ -2640,41 +4246,41 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 			tb.containerNameWrites[name] = append(tb.containerNameWrites[name], w)
 		}
 	}
-	linkPeerSymbols := func(a, b *ast.Symbol) {
-		if a == nil || b == nil || a == b {
+	linkPeerSymbols := func(dst, src *ast.Symbol, pos int, topLevel bool) {
+		if dst == nil || src == nil || dst == src {
 			return
 		}
 		if tb.containerPeers == nil {
-			tb.containerPeers = map[*ast.Symbol][]*ast.Symbol{}
+			tb.containerPeers = map[*ast.Symbol][]containerPeerLink{}
 		}
-		addEdge := func(from, to *ast.Symbol) {
+		addEdge := func(from *ast.Symbol, link containerPeerLink) {
 			for _, existing := range tb.containerPeers[from] {
-				if existing == to {
+				if existing == link {
 					return
 				}
 			}
-			tb.containerPeers[from] = append(tb.containerPeers[from], to)
+			tb.containerPeers[from] = append(tb.containerPeers[from], link)
 		}
-		addEdge(a, b)
-		addEdge(b, a)
+		addEdge(dst, containerPeerLink{sym: src, scope: root, pos: pos, topLevel: topLevel, isDest: false})
+		addEdge(src, containerPeerLink{sym: dst, scope: root, pos: pos, topLevel: topLevel, isDest: true})
 	}
-	linkPeerNames := func(a, b string) {
-		if a == "" || b == "" || a == b {
+	linkPeerNames := func(dst, src string, pos int, topLevel bool) {
+		if dst == "" || src == "" || dst == src {
 			return
 		}
 		if tb.containerNamePeers == nil {
-			tb.containerNamePeers = map[string][]string{}
+			tb.containerNamePeers = map[string][]containerNamePeerLink{}
 		}
-		addEdge := func(from, to string) {
+		addEdge := func(from string, link containerNamePeerLink) {
 			for _, existing := range tb.containerNamePeers[from] {
-				if existing == to {
+				if existing == link {
 					return
 				}
 			}
-			tb.containerNamePeers[from] = append(tb.containerNamePeers[from], to)
+			tb.containerNamePeers[from] = append(tb.containerNamePeers[from], link)
 		}
-		addEdge(a, b)
-		addEdge(b, a)
+		addEdge(dst, containerNamePeerLink{name: src, scope: root, pos: pos, topLevel: topLevel, isDest: false})
+		addEdge(src, containerNamePeerLink{name: dst, scope: root, pos: pos, topLevel: topLevel, isDest: true})
 	}
 	var collectAliasIdentifiers func(expr *ast.Node, depth int, out *[]*ast.Node)
 	collectAliasIdentifiers = func(expr *ast.Node, depth int, out *[]*ast.Node) {
@@ -2709,7 +4315,7 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 			}
 		}
 	}
-	linkContainerPeersFromExpr := func(dstSym *ast.Symbol, dstName string, rhs *ast.Node) {
+	linkContainerPeersFromExpr := func(dstSym *ast.Symbol, dstName string, rhs *ast.Node, pos int, topLevel bool) {
 		var srcIdentifiers []*ast.Node
 		collectAliasIdentifiers(rhs, 0, &srcIdentifiers)
 		for _, srcIdent := range srcIdentifiers {
@@ -2742,16 +4348,16 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 			}
 			if dstSym != nil && r != nil && r.refs != nil {
 				if srcSym := r.resolveSymbol(srcIdent); srcSym != nil && (srcName != "arguments" || len(srcSym.Declarations) > 0) {
-					linkPeerSymbols(dstSym, srcSym)
+					linkPeerSymbols(dstSym, srcSym, pos, topLevel)
 					continue
 				}
 			}
-			linkPeerNames(dstName, srcName)
+			linkPeerNames(dstName, srcName, pos, topLevel)
 		}
 	}
-	isContainerShifted := func(sym *ast.Symbol, name string) bool {
+	isContainerReassigned := func(sym *ast.Symbol, name string) bool {
 		if sym != nil {
-			if idx.shiftedContainers[sym] {
+			if idx.reassignedContainers[sym] {
 				return true
 			}
 			if r.hasSymbolWrite(sym) || r.singleSameFileValueDeclaration(sym) == nil {
@@ -2759,9 +4365,9 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 			}
 			return false
 		}
-		return idx.shiftedContainerNames[name]
+		return idx.reassignedNames[name]
 	}
-	recordArraySlots := func(sym *ast.Symbol, name string, declPos int, slots map[int]bool) {
+	recordArraySlots := func(sym *ast.Symbol, name string, declPos int, slots map[int]bool, arrLen int) {
 		if len(slots) == 0 {
 			return
 		}
@@ -2779,6 +4385,12 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 				tb.arraySlotDeclPos = map[*ast.Symbol]int{}
 			}
 			tb.arraySlotDeclPos[sym] = declPos
+			if arrLen >= 0 {
+				if tb.arraySlotLen == nil {
+					tb.arraySlotLen = map[*ast.Symbol]int{}
+				}
+				tb.arraySlotLen[sym] = arrLen
+			}
 			return
 		}
 		if name != "" {
@@ -2795,6 +4407,12 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 				tb.arraySlotDeclNamePos = map[string]int{}
 			}
 			tb.arraySlotDeclNamePos[name] = declPos
+			if arrLen >= 0 {
+				if tb.arraySlotNameLen == nil {
+					tb.arraySlotNameLen = map[string]int{}
+				}
+				tb.arraySlotNameLen[name] = arrLen
+			}
 		}
 	}
 
@@ -2820,8 +4438,7 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 				}
 				if r.matchesTrackedRestIdent(rhsUnwrapped, tb, nil) {
 					sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingRest)
-					recordContainerWrite(sym, name, edge.pos, edge.topLevel)
-					linkContainerPeersFromExpr(sym, name, rhsUnwrapped)
+					linkContainerPeersFromExpr(sym, name, rhsUnwrapped, edge.pos, edge.topLevel)
 					if added {
 						enqueue(sym, name, trackedBindingRest)
 					}
@@ -2832,44 +4449,77 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 						enqueue(sym, name, trackedBindingDirect)
 					}
 				}
-				if r.exprCanBeTrackedContainer(edge.rhs, tb) {
+				pureAlias := isPureAliasExpr(edge.rhs, 0)
+				if r.exprCanBeTrackedContainerDepth(edge.rhs, tb, 0, !pureAlias) {
 					sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingContainer)
-					recordContainerWrite(sym, name, edge.pos, edge.topLevel)
-					linkContainerPeersFromExpr(sym, name, edge.rhs)
-					if edge.kind == scopeDepVarDecl && !isContainerShifted(sym, name) {
+					if !pureAlias {
+						recordContainerWrite(sym, name, edge.pos, edge.topLevel, edge.outerLoop, false, false)
+					}
+					linkContainerPeersFromExpr(sym, name, edge.rhs, edge.pos, edge.topLevel)
+					if edge.kind == scopeDepVarDecl && !isContainerReassigned(sym, name) {
 						if rhsUnwrapped != nil && rhsUnwrapped.Kind == ast.KindArrayLiteralExpression {
-							if arr := rhsUnwrapped.AsArrayLiteralExpression(); arr != nil && arr.Elements != nil {
+							slotIdx := r.getArrayLiteralSlotIndex(rhsUnwrapped)
+							if slotIdx != nil {
 								var matched map[int]bool
-								for slotIdx, el := range arr.Elements.Nodes {
-									if el == nil || el.Kind == ast.KindOmittedExpression {
-										continue
+								addSlot := func(pos int) {
+									if slotIdx.firstSpreadIdx >= 0 && pos >= slotIdx.firstSpreadIdx {
+										return
 									}
-									if el.Kind == ast.KindSpreadElement {
-										break
+									if matched == nil {
+										matched = map[int]bool{}
 									}
-									if r.exprCanReturnTrackedPromise(el, tb) {
-										if matched == nil {
-											matched = map[int]bool{}
-										}
-										matched[slotIdx] = true
+									matched[pos] = true
+								}
+								for s := range tb.symbols {
+									for _, pos := range slotIdx.bySym[s] {
+										addSlot(pos)
 									}
 								}
-								recordArraySlots(sym, name, edge.pos, matched)
+								for n := range tb.names {
+									for _, pos := range slotIdx.byName[n] {
+										addSlot(pos)
+									}
+								}
+								if len(slotIdx.nonIdentifierSlices) > 0 {
+									if arr := rhsUnwrapped.AsArrayLiteralExpression(); arr != nil && arr.Elements != nil {
+										for _, pos := range slotIdx.nonIdentifierSlices {
+											if slotIdx.firstSpreadIdx >= 0 && pos >= slotIdx.firstSpreadIdx {
+												break
+											}
+											el := arr.Elements.Nodes[pos]
+											if el != nil && r.exprCanReturnTrackedPromise(el, tb) {
+												addSlot(pos)
+											}
+										}
+									}
+								}
+								arrLen := -1
+								if slotIdx.firstSpreadIdx < 0 {
+									arrLen = slotIdx.elemCount
+								}
+								recordArraySlots(sym, name, edge.pos, matched, arrLen)
 							}
 						} else if rhsUnwrapped != nil && rhsUnwrapped.Kind == ast.KindIdentifier {
 							var srcSlots map[int]bool
 							srcDeclPos := edge.pos
+							srcLen := -1
 							if r != nil && r.refs != nil && len(tb.arraySlotSymbols) > 0 {
 								if srcSym := r.resolveSymbol(rhsUnwrapped); srcSym != nil {
 									srcSlots = tb.arraySlotSymbols[srcSym]
 									if p, ok := tb.arraySlotDeclPos[srcSym]; ok {
 										srcDeclPos = p
 									}
+									if l, ok := tb.arraySlotLen[srcSym]; ok {
+										srcLen = l
+									}
 								} else {
 									srcName := rhsUnwrapped.AsIdentifier().Text
 									srcSlots = tb.arraySlotNames[srcName]
 									if p, ok := tb.arraySlotDeclNamePos[srcName]; ok {
 										srcDeclPos = p
+									}
+									if l, ok := tb.arraySlotNameLen[srcName]; ok {
+										srcLen = l
 									}
 								}
 							} else {
@@ -2878,12 +4528,25 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 								if p, ok := tb.arraySlotDeclNamePos[srcName]; ok {
 									srcDeclPos = p
 								}
+								if l, ok := tb.arraySlotNameLen[srcName]; ok {
+									srcLen = l
+								}
 							}
-							recordArraySlots(sym, name, srcDeclPos, srcSlots)
+							recordArraySlots(sym, name, srcDeclPos, srcSlots, srcLen)
 						}
 					}
 					if added {
 						enqueue(sym, name, trackedBindingContainer)
+					}
+				}
+				if r.exprCanBeTrackedMapDepth(edge.rhs, tb, 0, !pureAlias) {
+					sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingMap)
+					if !pureAlias {
+						recordContainerWrite(sym, name, edge.pos, edge.topLevel, edge.outerLoop, false, false)
+					}
+					linkContainerPeersFromExpr(sym, name, edge.rhs, edge.pos, edge.topLevel)
+					if added {
+						enqueue(sym, name, trackedBindingMap)
 					}
 				}
 			case scopeDepContainerPush:
@@ -2906,17 +4569,41 @@ func (r *AsyncAssertionResolver) propagateLocalAliasesInScope(root *ast.Node, tb
 						}
 					}
 					if matched {
+						isLastPushElem := false
+						if callCallee := internalUtils.SkipAssertionsAndParens(edge.rhs.AsCallExpression().Expression); callCallee != nil && ast.IsAccessExpression(callCallee) {
+							if mName, ok := r.accessStaticNameThroughAssertions(callCallee); ok && mName == "push" && len(args.Nodes) > 0 {
+								lastArg := args.Nodes[len(args.Nodes)-1]
+								if lastArg != nil && lastArg.Kind != ast.KindSpreadElement && r.exprCanReturnTrackedPromise(lastArg, tb) {
+									isLastPushElem = true
+								}
+							}
+						}
 						sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingContainer)
-						recordContainerWrite(sym, name, edge.pos, edge.topLevel)
+						recordContainerWrite(sym, name, edge.pos, edge.topLevel, edge.outerLoop, true, isLastPushElem)
 						if added {
 							enqueue(sym, name, trackedBindingContainer)
 						}
 					}
 				}
+			case scopeDepMapSet:
+				arg1, argOK := staticCallArgAt(edge.rhs, 1)
+				matched := false
+				if !argOK {
+					matched = r.exprReferencesTracked(edge.rhs, tb, true)
+				} else if arg1 != nil {
+					matched = r.exprCanReturnTrackedPromise(arg1, tb)
+				}
+				if matched {
+					sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingMap)
+					recordContainerWrite(sym, name, edge.pos, edge.topLevel, edge.outerLoop, true, false)
+					if added {
+						enqueue(sym, name, trackedBindingMap)
+					}
+				}
 			case scopeDepContainerIndexWrite:
 				if r.exprCanReturnTrackedPromise(edge.rhs, tb) {
 					sym, name, added := r.addTrackedIdentKind(tb, edge.target, trackedBindingContainer)
-					recordContainerWrite(sym, name, edge.pos, edge.topLevel)
+					recordContainerWrite(sym, name, edge.pos, edge.topLevel, edge.outerLoop, true, false)
 					if added {
 						enqueue(sym, name, trackedBindingContainer)
 					}
@@ -2962,6 +4649,11 @@ func (r *AsyncAssertionResolver) forEachTrackedConsumeSite(
 			return
 		}
 	}
+	for sym := range tb.mapSymbols {
+		if visitIndices(idx.consumesBySym[sym]) {
+			return
+		}
+	}
 	for name := range tb.names {
 		if visitIndices(idx.consumesByName[name]) {
 			return
@@ -2973,6 +4665,11 @@ func (r *AsyncAssertionResolver) forEachTrackedConsumeSite(
 		}
 	}
 	for name := range tb.containerNames {
+		if visitIndices(idx.consumesByName[name]) {
+			return
+		}
+	}
+	for name := range tb.mapNames {
 		if visitIndices(idx.consumesByName[name]) {
 			return
 		}
@@ -3088,8 +4785,10 @@ func (r *AsyncAssertionResolver) buildCallbackTrackedBindings(
 			r.addTrackedIdent(tb, targetParam.Name(), false)
 		}
 		if !tb.isEmpty() {
-			params := runtimeParameters(cb)
-			r.propagateParamDefaults(params, paramIdx+1, tb, passedArgs, firstUnknownSpreadIdx)
+			summary := r.getInlineCallbackSummary(cb)
+			if summary.hasDefaultParam {
+				r.propagateParamDefaults(summary.params, paramIdx+1, tb, passedArgs, firstUnknownSpreadIdx)
+			}
 		}
 	}
 	if cb != nil && !tb.isEmpty() {
@@ -3374,27 +5073,24 @@ func (r *AsyncAssertionResolver) inlineCallbackCanConsumePromiseArg(cb *ast.Node
 			return true
 		}
 	}
-	params := runtimeParameters(cb)
-	for i, param := range params {
-		if param == nil {
-			continue
-		}
-		if p := param.AsParameterDeclaration(); p != nil && p.DotDotDotToken != nil && i < argIdx {
-			if p.Name() != nil && p.Name().Kind == ast.KindIdentifier {
-				whole, cached := summary.restWholeConsumed[param]
-				if !cached {
-					whole = r.isParamConsumedByCallback(cb, param, i, -1, nil, 1)
-					if summary.restWholeConsumed == nil {
-						summary.restWholeConsumed = map[*ast.Node]bool{}
-					}
-					summary.restWholeConsumed[param] = whole
+	params := summary.params
+	if summary.restParamIdx >= 0 && summary.restParamIdx < argIdx {
+		param := params[summary.restParamIdx]
+		p := param.AsParameterDeclaration()
+		if p != nil && p.Name() != nil && p.Name().Kind == ast.KindIdentifier {
+			whole, cached := summary.restWholeConsumed[param]
+			if !cached {
+				whole = r.isParamConsumedByCallback(cb, param, summary.restParamIdx, -1, nil, 1)
+				if summary.restWholeConsumed == nil {
+					summary.restWholeConsumed = map[*ast.Node]bool{}
 				}
-				if whole {
-					return true
-				}
+				summary.restWholeConsumed[param] = whole
 			}
-			return r.isParamConsumedByCallback(cb, param, i, argIdx-1-i, passedArgs, firstUnknownSpreadIdx)
+			if whole {
+				return true
+			}
 		}
+		return r.isParamConsumedByCallback(cb, param, summary.restParamIdx, argIdx-1-summary.restParamIdx, passedArgs, firstUnknownSpreadIdx)
 	}
 	if len(params) >= argIdx {
 		return r.isParamConsumedByCallback(cb, params[argIdx-1], argIdx-1, -1, passedArgs, firstUnknownSpreadIdx)
@@ -3421,26 +5117,24 @@ func (r *AsyncAssertionResolver) inlineCallbackCanConsumeSpreadArg(cb *ast.Node,
 			return true
 		}
 	}
-	params := runtimeParameters(cb)
-	for i, param := range params {
-		if param == nil {
-			continue
-		}
-		if p := param.AsParameterDeclaration(); p != nil && p.DotDotDotToken != nil {
-			if p.Name() != nil && p.Name().Kind == ast.KindArrayBindingPattern {
-				if !r.isRestArrayPatternConsumedForSpread(cb, param, i, minRuntimeIdx-1-i) {
-					return false
-				}
-			} else if !r.isParamConsumedByCallback(cb, param, i, -1, nil, 1) {
+	params := summary.params
+	if summary.restParamIdx >= 0 {
+		i := summary.restParamIdx
+		param := params[i]
+		p := param.AsParameterDeclaration()
+		if p != nil && p.Name() != nil && p.Name().Kind == ast.KindArrayBindingPattern {
+			if !r.isRestArrayPatternConsumedForSpread(cb, param, i, minRuntimeIdx-1-i) {
 				return false
 			}
-			for j := minRuntimeIdx - 1; j < i; j++ {
-				if !r.isParamConsumedByCallback(cb, params[j], j, -1, nil, 1) {
-					return false
-				}
-			}
-			return true
+		} else if !r.isParamConsumedByCallback(cb, param, i, -1, nil, 1) {
+			return false
 		}
+		for j := minRuntimeIdx - 1; j < i; j++ {
+			if !r.isParamConsumedByCallback(cb, params[j], j, -1, nil, 1) {
+				return false
+			}
+		}
+		return true
 	}
 	return false
 }
@@ -4605,6 +6299,149 @@ func (r *AsyncAssertionResolver) fileMayExtendExpect() bool {
 	return found
 }
 
+func (r *AsyncAssertionResolver) isPurePromiseLiteralArg(arg *ast.Node) bool {
+	u := internalUtils.SkipAssertionsAndParens(arg)
+	if u == nil || u.Kind != ast.KindCallExpression {
+		return false
+	}
+	if m, ok := r.promiseMethodName(u); !ok || (m != "resolve" && m != "reject") {
+		return false
+	}
+	if args := u.AsCallExpression().Arguments; args != nil {
+		for _, a := range args.Nodes {
+			if !r.isPurePrimitiveLiteral(a) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (r *AsyncAssertionResolver) isPureLiteralExpectPromiseCall(call *ast.Node) bool {
+	u := internalUtils.SkipAssertionsAndParens(call)
+	if u == nil || u.Kind != ast.KindCallExpression {
+		return false
+	}
+	args := u.AsCallExpression().Arguments
+	if args != nil {
+		for _, a := range args.Nodes {
+			if !r.isPurePrimitiveLiteral(a) {
+				return false
+			}
+		}
+	}
+	outerCallee := internalUtils.SkipAssertionsAndParens(u.AsCallExpression().Expression)
+	if outerCallee == nil || !ast.IsAccessExpression(outerCallee) {
+		return false
+	}
+	isBareAsyncMatcher := false
+	if mName, ok := r.accessStaticNameThroughAssertions(outerCallee); ok && (mName == "toResolve" || mName == "toReject") {
+		isBareAsyncMatcher = args == nil || len(args.Nodes) == 0
+	}
+	hasAsyncModifier := false
+	cur := outerCallee
+	for cur != nil {
+		if ast.IsAccessExpression(cur) {
+			if cur.Kind == ast.KindElementAccessExpression && !r.isPurePrimitiveLiteral(cur.AsElementAccessExpression().ArgumentExpression) {
+				return false
+			}
+			if cur != outerCallee {
+				if mName, ok := r.accessStaticNameThroughAssertions(cur); ok && (mName == "resolves" || mName == "rejects") {
+					hasAsyncModifier = true
+				}
+			}
+			cur = internalUtils.SkipAssertionsAndParens(internalUtils.AccessExpressionObject(cur))
+			continue
+		}
+		if cur.Kind == ast.KindCallExpression && r.isExpectCallWithoutCallback(cur) {
+			if !hasAsyncModifier && !isBareAsyncMatcher {
+				return false
+			}
+			headArgs := cur.AsCallExpression().Arguments
+			return headArgs != nil && len(headArgs.Nodes) == 1 && r.isPurePromiseLiteralArg(headArgs.Nodes[0])
+		}
+		return false
+	}
+	return false
+}
+
+func (r *AsyncAssertionResolver) arrayLiteralAllPurePromiseExpect(arr *ast.Node) bool {
+	if arr == nil || arr.Kind != ast.KindArrayLiteralExpression {
+		return false
+	}
+	if r != nil && r.pureLiteralExpectArrays != nil {
+		if cached, ok := r.pureLiteralExpectArrays[arr]; ok {
+			return cached
+		}
+	}
+	ok := false
+	if a := arr.AsArrayLiteralExpression(); a != nil && a.Elements != nil && len(a.Elements.Nodes) > 0 {
+		ok = true
+		for _, el := range a.Elements.Nodes {
+			if !r.isPureLiteralExpectPromiseCall(el) {
+				ok = false
+				break
+			}
+		}
+	}
+	if r != nil {
+		if r.pureLiteralExpectArrays == nil {
+			r.pureLiteralExpectArrays = map[*ast.Node]bool{}
+		}
+		r.pureLiteralExpectArrays[arr] = ok
+	}
+	return ok
+}
+
+// isStandaloneBareAsyncMatcherElem reports whether a bare `toResolve()` /
+// `toReject()` call (without `.resolves`/`.rejects`) is safe to treat as
+// side-effect-free for sibling autofix checks. Because Jest `setupFilesAfterEnv`
+// can supply a custom `toResolve`/`toReject` without any `expect.extend` in the
+// current file, only accept zero-arg `expect(Promise.resolve/reject(<primitive>))`
+// elements inside an unread first-statement array literal whose elements are
+// all pure `expect(Promise.resolve/reject(<primitive>))` calls.
+func (r *AsyncAssertionResolver) isStandaloneBareAsyncMatcherElem(call *ast.Node, expectHead *ast.Node) bool {
+	if r == nil || r.disallowBuiltinToResolveReject || r.fileMayExtendExpect() {
+		return false
+	}
+	if args := call.AsCallExpression().Arguments; args != nil && len(args.Nodes) > 0 {
+		return false
+	}
+	headArgs := expectHead.AsCallExpression().Arguments
+	if headArgs == nil || len(headArgs.Nodes) != 1 || !r.isPurePromiseLiteralArg(headArgs.Nodes[0]) {
+		return false
+	}
+	arr := outermostTransparentExpression(call).Parent
+	if arr == nil || arr.Kind != ast.KindArrayLiteralExpression {
+		return false
+	}
+	outerArr := outermostTransparentExpression(arr)
+	vd := outerArr.Parent
+	if vd == nil || vd.Kind != ast.KindVariableDeclaration || vd.AsVariableDeclaration().Initializer != outerArr {
+		return false
+	}
+	name := vd.Name()
+	if name == nil || name.Kind != ast.KindIdentifier || r.isBindingReadOrExported(vd, name) {
+		return false
+	}
+	declList := vd.Parent
+	if declList == nil || declList.Kind != ast.KindVariableDeclarationList ||
+		declList.AsVariableDeclarationList().Declarations == nil ||
+		len(declList.AsVariableDeclarationList().Declarations.Nodes) != 1 ||
+		declList.Parent == nil || declList.Parent.Kind != ast.KindVariableStatement {
+		return false
+	}
+	varStmt := declList.Parent
+	block := varStmt.Parent
+	if block == nil || block.Kind != ast.KindBlock ||
+		block.Parent == nil || !testFramework.IsFunction(block.Parent) ||
+		block.AsBlock().Statements == nil || len(block.AsBlock().Statements.Nodes) != 1 ||
+		block.AsBlock().Statements.Nodes[0] != varStmt {
+		return false
+	}
+	return r.arrayLiteralAllPurePromiseExpect(arr)
+}
+
 func (r *AsyncAssertionResolver) isPureExpectOrPromiseWrapperCall(call *ast.Node) bool {
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
@@ -4613,9 +6450,9 @@ func (r *AsyncAssertionResolver) isPureExpectOrPromiseWrapperCall(call *ast.Node
 		return true
 	}
 	// Only accept async matcher chains (`expect(...).resolves...` /
-	// `expect(...).rejects...`, or built-in async matchers `toResolve`/`toReject`
-	// when the framework ships them and the file does not extend `expect`):
-	// synchronous or custom matchers can synchronously invoke user code.
+	// `expect(...).rejects...`, or standalone `toResolve`/`toReject` array
+	// elements when the framework ships them and no custom setup can be observed):
+	// synchronous or setup-file custom matchers can synchronously invoke user code.
 	outerCallee := internalUtils.SkipAssertionsAndParens(call.AsCallExpression().Expression)
 	if outerCallee == nil || !ast.IsAccessExpression(outerCallee) {
 		return false
@@ -4641,7 +6478,7 @@ func (r *AsyncAssertionResolver) isPureExpectOrPromiseWrapperCall(call *ast.Node
 				if hasAsyncModifier {
 					return true
 				}
-				return isOuterAsyncMatcher && !r.disallowBuiltinToResolveReject && !r.fileMayExtendExpect()
+				return isOuterAsyncMatcher && r.isStandaloneBareAsyncMatcherElem(call, cur)
 			}
 			if hasAsyncModifier || isOuterAsyncMatcher {
 				return false
